@@ -25,8 +25,8 @@
   --purple-light: #ede9fe;
   --bg: #f0f4f8;
   --surface: #ffffff;
-  --sidebar-bg: #0f172a;
-  --sidebar-hover: #1e293b;
+  --sidebar-bg: #0b2419;
+  --sidebar-hover: #163b2c;
   --sidebar-active: #0d9488;
   --text: #0f172a;
   --text-md: #334155;
@@ -94,13 +94,13 @@ body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); colo
 
 /* ===== SIDEBAR ===== */
 .sidebar {
-  width: 260px; min-width: 260px; background: var(--sidebar-bg);
+  width: 260px; min-width: 260px; background: linear-gradient(180deg, #0b2419 0%, #0d3426 60%, #0f3d2c 100%);
   display: flex; flex-direction: column; padding: 0; overflow-y: auto;
   transition: transform 0.3s;
 }
 .sidebar-header {
   padding: 24px 20px 16px;
-  border-bottom: 1px solid rgba(255,255,255,0.06);
+  border-bottom: 1px solid rgba(13,148,136,0.2);
 }
 .sidebar-logo {
   display: flex; align-items: center; gap: 12px; margin-bottom: 16px;
@@ -115,7 +115,7 @@ body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); colo
 .sidebar-logo-text { font-size: 15px; font-weight: 800; color: white; line-height: 1.2; }
 .sidebar-logo-sub { font-size: 11px; color: rgba(255,255,255,0.4); font-weight: 400; }
 .sidebar-user {
-  background: rgba(255,255,255,0.06); border-radius: 10px; padding: 10px 12px;
+  background: rgba(13,148,136,0.12); border-radius: 10px; padding: 10px 12px; border: 1px solid rgba(13,148,136,0.2);
   display: flex; align-items: center; gap: 10px;
 }
 .sidebar-avatar {
@@ -129,17 +129,17 @@ body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); colo
 .sidebar-user-role { font-size: 11px; color: rgba(255,255,255,0.4); }
 
 .sidebar-nav { flex: 1; padding: 12px 12px 0; }
-.sidebar-section { font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.25); letter-spacing: 1.2px; text-transform: uppercase; padding: 12px 8px 6px; }
+.sidebar-section { font-size: 10px; font-weight: 700; color: rgba(94,234,212,0.4); letter-spacing: 1.2px; text-transform: uppercase; padding: 12px 8px 6px; }
 .menu-item {
   display: flex; align-items: center; gap: 10px; padding: 10px 12px;
   border-radius: 8px; cursor: pointer; margin-bottom: 2px;
   color: rgba(255,255,255,0.65); font-size: 13.5px; font-weight: 500;
   transition: all 0.15s; user-select: none;
 }
-.menu-item:hover { background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.9); }
-.menu-item.active { background: var(--primary); color: white; }
+.menu-item:hover { background: rgba(13,148,136,0.15); color: rgba(255,255,255,0.95); }
+.menu-item.active { background: linear-gradient(90deg, #0d9488, #06b6d4); color: white; box-shadow: 0 2px 8px rgba(13,148,136,0.35); }
 .menu-item .material-icons { font-size: 19px; flex-shrink: 0; }
-.sidebar-footer { padding: 12px; border-top: 1px solid rgba(255,255,255,0.06); margin-top: auto; }
+.sidebar-footer { padding: 12px; border-top: 1px solid rgba(13,148,136,0.2); margin-top: auto; }
 .logout-btn {
   display: flex; align-items: center; gap: 10px; padding: 10px 12px;
   border-radius: 8px; cursor: pointer; color: rgba(255,255,255,0.45);
@@ -492,7 +492,7 @@ textarea.form-control { resize: vertical; }
           <thead>
             <tr>
               <th>No</th><th>Nama Indikator</th><th>Bobot</th>
-              <th>Target</th><th>Realisasi</th><th>Rasio</th><th>Nilai</th><th>Bukti</th>
+              <th>Target (%)</th><th>Capaian</th><th>Bukti</th>
             </tr>
           </thead>
           <tbody id="indikatorInputBody"></tbody>

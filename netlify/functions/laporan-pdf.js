@@ -58,7 +58,7 @@ exports.handler = async (event) => {
         <td style="padding:8px 10px;font-weight:700;color:#475569;font-family:monospace;width:32px">${ind.no_indikator}</td>
         <td style="padding:8px 10px;font-size:11.5px;max-width:240px">${ind.nama_indikator}</td>
         <td style="padding:8px 10px;text-align:center">${parseFloat(ind.target)||0}</td>
-        <td style="padding:8px 10px;text-align:center">${parseFloat(ind.realisasi)||0}</td>
+        <td style="padding:8px 10px;text-align:center">${parseFloat(ind.capaian)||0}</td>
         <td style="padding:8px 10px;text-align:center">
           <div style="display:flex;align-items:center;gap:6px">
             <div style="flex:1;height:6px;background:#e2e8f0;border-radius:3px">
@@ -164,7 +164,7 @@ exports.handler = async (event) => {
         <th style="padding:10px;text-align:center">No</th>
         <th style="padding:10px;text-align:left">Nama Indikator</th>
         <th style="padding:10px;text-align:center">Target</th>
-        <th style="padding:10px;text-align:center">Realisasi</th>
+        <th style="padding:10px;text-align:center">Capaian</th>
         <th style="padding:10px;text-align:center;min-width:120px">Capaian</th>
         <th style="padding:10px;text-align:center">Bobot</th>
         <th style="padding:10px;text-align:center">Nilai</th>

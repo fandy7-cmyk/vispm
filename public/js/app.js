@@ -637,18 +637,26 @@ async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, tahun
   }
 }
 async function saveIndikator(noIndikator) {
-  const target = parseFloat(document.getElementById(`t-${noIndikator}`)?.value) || 0;
+  const target  = parseFloat(document.getElementById(`t-${noIndikator}`)?.value) || 0;
   const capaian = parseFloat(document.getElementById(`c-${noIndikator}`)?.value) || 0;
-  const linkFile = '';  // link diisi via upload, bukan manual
 
   try {
-    await API.updateIndikatorUsulan({ idUsulan: currentIndikatorUsulan, noIndikator, target, capaian, linkFile: undefined });
-    // Refresh SPM display only
-    const detail = await API.getDetailUsulan(currentIndikatorUsulan);
-    const spmVal = parseFloat(detail.indeksSPM).toFixed(2);
-    document.getElementById('indModalSPM').textContent = spmVal;
-    const topEl = document.getElementById('indModalSPMTop');
-    if (topEl) topEl.textContent = spmVal;
+    // Kirim update — tanpa linkFile supaya link yg sudah ada tidak terhapus
+    const res = await fetch('/api/usulan?action=indikator', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idUsulan: currentIndikatorUsulan, noIndikator, target, capaian })
+    });
+    const result = await res.json();
+    if (!res.ok) { toast(result.error || 'Gagal simpan', 'error'); return; }
+
+    // Update SPM display langsung dari response (tanpa extra API call)
+    if (result.indeksSPM !== undefined) {
+      const spmVal = parseFloat(result.indeksSPM).toFixed(2);
+      document.getElementById('indModalSPM').textContent = spmVal;
+      const topEl = document.getElementById('indModalSPMTop');
+      if (topEl) topEl.textContent = spmVal;
+    }
   } catch (e) {
     toast(e.message, 'error');
   }
@@ -667,6 +675,7 @@ async function submitUsulanFromModal() {
 
 async function doSubmitUsulan(forceSubmit) {
   try {
+    setLoading(true);
     const res = await fetch(`/api/usulan?action=submit`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -679,15 +688,18 @@ async function doSubmitUsulan(forceSubmit) {
       return;
     }
 
-    // Ada indikator yang belum ada bukti — minta konfirmasi
+    // Ada indikator yang belum ada bukti — BLOK, tidak boleh submit
     if (data.needConfirm) {
-      showConfirm({
-        title: 'Bukti Belum Lengkap',
-        message: `${data.missingCount} indikator (no. ${data.missingNos.join(', ')}) belum ada file bukti.
-
-Tetap submit sekarang?`,
-        type: 'danger', icon: 'warning',
-        onConfirm: async () => { await doSubmitUsulan(true); }
+      const nos = data.missingNos.join(', ');
+      toast(`Tidak bisa submit! Indikator no. ${nos} belum ada file data dukung. Upload terlebih dahulu.`, 'error');
+      // Highlight tombol upload yang kurang
+      data.missingNos.forEach(no => {
+        const label = document.getElementById(`uploadLabel-${no}`);
+        if (label) {
+          label.style.boxShadow = '0 0 0 3px rgba(239,68,68,0.5)';
+          label.style.transform = 'scale(1.05)';
+          setTimeout(() => { label.style.boxShadow = ''; label.style.transform = ''; }, 2500);
+        }
       });
       return;
     }
@@ -697,6 +709,8 @@ Tetap submit sekarang?`,
     loadMyUsulan();
   } catch (e) {
     toast(e.message, 'error');
+  } finally {
+    setLoading(false);
   }
 }
 

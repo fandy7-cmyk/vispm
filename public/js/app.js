@@ -495,28 +495,20 @@ async function deleteUsulan(idUsulan) {
 let currentIndikatorUsulan = null;
 let indikatorData = [];
 
-// GANTI fungsi openGDriveFolder dengan yang ini
-async function openGDriveFolder(kodePKM, tahun, bulan, namaBulan) {
+// FUNGSI UNTUK MEMBUKA GOOGLE DRIVE (1 FOLDER SAJA)
+async function openGDriveFolder() {
   const btn = document.getElementById('btnOpenDrive');
   if (btn) {
-    btn.innerHTML = '<span class="material-icons" style="animation:spin 0.8s linear infinite;font-size:16px">refresh</span> Membuka folder...';
+    btn.innerHTML = '<span class="material-icons" style="animation:spin 0.8s linear infinite;font-size:16px">refresh</span> Membuka...';
     btn.disabled = true;
   }
   
   try {
-    console.log('Opening folder:', { kodePKM, tahun, bulan, namaBulan });
-    
-    const response = await fetch(`/api/drive?kodePKM=${encodeURIComponent(kodePKM)}&tahun=${tahun}&bulan=${bulan}&namaBulan=${encodeURIComponent(namaBulan)}`);
-    const result = await response.json();
-    
-    console.log('Drive response:', result);
-    
-    if (!result.success) {
-      throw new Error(result.message || 'Gagal membuka folder');
-    }
+    // LANGSUNG BUKA ROOT FOLDER (GANTI DENGAN LINK FOLDER ANDA)
+    const folderUrl = 'https://drive.google.com/drive/folders/1WYRRcm5oxbCaPx8s9XNUkTUe1b85wuDG';
     
     // Buka folder di tab baru
-    window.open(result.data.folderUrl, '_blank');
+    window.open(folderUrl, '_blank');
     
     toast('Folder berhasil dibuka', 'success');
     
@@ -531,6 +523,7 @@ async function openGDriveFolder(kodePKM, tahun, bulan, namaBulan) {
   }
 }
 
+// FUNGSI UTAMA UNTUK MEMBUKA MODAL INDIKATOR
 async function openIndikatorModal(idUsulan) {
   currentIndikatorUsulan = idUsulan;
   document.getElementById('indModalId').textContent = idUsulan;
@@ -538,7 +531,11 @@ async function openIndikatorModal(idUsulan) {
   document.getElementById('indikatorInputBody').innerHTML = `<tr><td colspan="8"><div class="empty-state" style="padding:20px"><p>Memuat data...</p></div></td></tr>`;
 
   try {
-    const [detail, inds] = await Promise.all([API.getDetailUsulan(idUsulan), API.getIndikatorUsulan(idUsulan)]);
+    const [detail, inds] = await Promise.all([
+      API.getDetailUsulan(idUsulan), 
+      API.getIndikatorUsulan(idUsulan)
+    ]);
+    
     indikatorData = inds;
     const isLocked = detail.isLocked || detail.statusGlobal !== 'Draft';
     const namaBulan = BULAN_NAMA[detail.bulan] || detail.bulan;
@@ -546,32 +543,43 @@ async function openIndikatorModal(idUsulan) {
     document.getElementById('indModalSPM').textContent = parseFloat(detail.indeksSPM).toFixed(4);
     document.getElementById('btnSubmitFromModal').style.display = isLocked ? 'none' : 'flex';
 
-    // Update info drive di modal
+    // INSTRUKSI UPLOAD KE 1 FOLDER GOOGLE DRIVE
     const infoEl = document.getElementById('indModalInfo');
     if (infoEl) {
       infoEl.innerHTML = `
-        <span class="material-icons">folder</span>
-        <div class="info-card-text" style="flex:1">
-          Upload file bukti ke Google Drive pada folder:
-          <strong>${detail.kodePKM} / ${detail.tahun} / ${namaBulan}</strong>
-          — lalu paste link file di kolom "Link Bukti".
-        </div>
-        <button id="btnOpenDrive" class="btn btn-primary btn-sm"
-          onclick="openGDriveFolder('${detail.kodePKM}', ${detail.tahun}, ${detail.bulan}, '${namaBulan}')"
-          style="flex-shrink:0;margin-left:12px">
-          <span class="material-icons" style="font-size:16px">open_in_new</span> Buka Google Drive
-        </button>`;
-      infoEl.style.display = 'flex';
-      infoEl.style.alignItems = 'center';
+        <div style="background:var(--info-light); border-radius:8px; padding:16px;">
+          <div style="display:flex; align-items:flex-start; gap:12px;">
+            <span class="material-icons" style="color:var(--info); font-size:24px;">info</span>
+            <div style="flex:1;">
+              <div style="font-weight:700; margin-bottom:8px;">📎 CARA UPLOAD DATA DUKUNG:</div>
+              <ol style="margin-left:20px; margin-bottom:8px; line-height:1.6;">
+                <li>Klik tombol <strong>"Buka Google Drive"</strong> di bawah</li>
+                <li>Upload file ke folder <strong>"DATA DUKUNG SPM"</strong></li>
+                <li><strong>Rename file</strong> dengan format: <br>
+                  <code style="background:white; padding:4px 8px; border-radius:4px; display:inline-block; margin:4px 0; font-size:12px;">
+                  ${detail.kodePKM}-${detail.tahun}-${detail.bulan}-Indikator${inds[0]?.no || 'X'}-NamaFile
+                  </code>
+                </li>
+                <li>Klik kanan file → <strong>Bagikan → Salin link</strong></li>
+                <li>Paste link di kolom <strong>"Link Bukti"</strong> di bawah</li>
+              </ol>
+            </div>
+            <button id="btnOpenDrive" class="btn btn-primary" 
+              onclick="openGDriveFolder()" style="white-space:nowrap;">
+              <span class="material-icons" style="font-size:16px">open_in_new</span> Buka Google Drive
+            </button>
+          </div>
+        </div>`;
     }
 
+    // TABLE INDIKATOR
     document.getElementById('indikatorInputBody').innerHTML = inds.map(ind => `
       <tr id="indRow-${ind.no}">
         <td><span style="font-family:'JetBrains Mono';font-weight:700">${ind.no}</span></td>
         <td style="max-width:240px;font-size:13px">${ind.nama}</td>
         <td style="text-align:center">${ind.bobot}</td>
-        <td>${isLocked ? `<span>${ind.target}</span>` : `<input type="number" id="t-${ind.no}" value="${ind.target}" min="0" max="100" step="0.01" onchange="saveIndikator(${ind.no})">`}</td>
-        <td>${isLocked ? `<span>${ind.realisasi}</span>` : `<input type="number" id="r-${ind.no}" value="${ind.realisasi}" min="0" step="0.01" onchange="saveIndikator(${ind.no})">`}</td>
+        <td>${isLocked ? `<span>${ind.target}</span>` : `<input type="number" id="t-${ind.no}" value="${ind.target}" min="0" max="100" step="0.01" onchange="saveIndikator(${ind.no})" style="width:70px;">`}</td>
+        <td>${isLocked ? `<span>${ind.realisasi}</span>` : `<input type="number" id="r-${ind.no}" value="${ind.realisasi}" min="0" step="0.01" onchange="saveIndikator(${ind.no})" style="width:70px;">`}</td>
         <td class="rasio-cell" id="rasio-${ind.no}">${(ind.realisasiRasio * 100).toFixed(1)}%</td>
         <td class="rasio-cell" id="nilai-${ind.no}">${parseFloat(ind.nilaiTerbobot).toFixed(2)}</td>
         <td>
@@ -1490,239 +1498,3 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.key === 'Enter') doLogin();
   });
 });
-
-// ============== FUNGSI UPLOAD BUKTI ==============
-
-// Format ukuran file
-function formatFileSize(bytes) {
-  if (!bytes) return '-';
-  if (bytes < 1024) return bytes + ' B';
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-}
-
-// Upload bukti per indikator
-async function uploadBuktiIndikator(noIndikator) {
-  const fileInput = document.getElementById(`file-${noIndikator}`);
-  if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
-    toast('Pilih file terlebih dahulu', 'warning');
-    return;
-  }
-
-  const file = fileInput.files[0];
-  
-  // Validasi client-side
-  if (file.size > 10 * 1024 * 1024) {
-    toast('Ukuran file maksimal 10MB', 'error');
-    return;
-  }
-
-  const allowedTypes = [
-    'application/pdf', 
-    'image/jpeg', 
-    'image/png', 
-    'application/msword', 
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-  ];
-  
-  if (!allowedTypes.includes(file.type)) {
-    toast('Tipe file tidak diizinkan. Hanya PDF, JPG, PNG, DOC, DOCX', 'error');
-    return;
-  }
-
-  // Show loading
-  const btn = document.getElementById(`upload-btn-${noIndikator}`);
-  const originalText = btn ? btn.innerHTML : 'Upload';
-  if (btn) {
-    btn.innerHTML = '<span class="material-icons" style="animation:spin 0.8s linear infinite;font-size:16px">refresh</span> Uploading...';
-    btn.disabled = true;
-  }
-
-  setLoading(true);
-
-  try {
-    // Dapatkan detail usulan
-    const detail = await API.getDetailUsulan(currentIndikatorUsulan);
-    const bulanNama = BULAN_NAMA[detail.bulan] || 'Bulan';
-
-    // Buat FormData
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('idUsulan', currentIndikatorUsulan);
-    formData.append('noIndikator', noIndikator);
-    formData.append('kodePKM', detail.kodePKM);
-    formData.append('tahun', detail.tahun);
-    formData.append('bulan', detail.bulan);
-    formData.append('namaBulan', bulanNama);
-    formData.append('email', currentUser.email);
-
-    // Upload ke server
-    const response = await fetch('/api/drive', {
-      method: 'POST',
-      body: formData
-    });
-
-    const result = await response.json();
-    if (!result.success) throw new Error(result.message);
-
-    toast('File berhasil diupload', 'success');
-    
-    // Refresh daftar file
-    await loadBuktiIndikator(noIndikator);
-    
-    // Clear file input
-    fileInput.value = '';
-
-  } catch (error) {
-    toast('Gagal upload: ' + error.message, 'error');
-  } finally {
-    setLoading(false);
-    if (btn) {
-      btn.innerHTML = originalText;
-      btn.disabled = false;
-    }
-  }
-}
-
-// Load daftar bukti per indikator
-async function loadBuktiIndikator(noIndikator) {
-  try {
-    const response = await fetch(`/api/bukti?idUsulan=${currentIndikatorUsulan}&noIndikator=${noIndikator}`);
-    const result = await response.json();
-    
-    if (result.success) {
-      const container = document.getElementById(`bukti-list-${noIndikator}`);
-      if (container) {
-        if (result.data.length === 0) {
-          container.innerHTML = '';
-          return;
-        }
-        
-        container.innerHTML = result.data.map(b => `
-          <div style="display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--border-light);font-size:12px">
-            <span class="material-icons" style="font-size:16px;color:var(--primary)">description</span>
-            <a href="${b.fileUrl}" target="_blank" style="flex:1;color:var(--primary);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${b.fileName}">
-              ${b.fileName}
-            </a>
-            <span style="color:var(--text-light);font-size:10px">${formatFileSize(b.fileSize)}</span>
-            <span style="color:var(--text-light);font-size:10px">${formatDate(b.uploadedAt)}</span>
-          </div>
-        `).join('');
-      }
-    }
-  } catch (error) {
-    console.error('Error loading bukti:', error);
-  }
-}
-
-// ============== GANTI FUNGSI openIndikatorModal ==============
-// COPY dan REPLACE fungsi yang lama dengan yang ini
-
-async function openIndikatorModal(idUsulan) {
-  currentIndikatorUsulan = idUsulan;
-  document.getElementById('indModalId').textContent = idUsulan;
-  showModal('indikatorModal');
-  document.getElementById('indikatorInputBody').innerHTML = `<tr><td colspan="9"><div class="empty-state" style="padding:20px"><p>Memuat data...</p></div></td></tr>`;
-
-  try {
-    const [detail, inds] = await Promise.all([
-      API.getDetailUsulan(idUsulan), 
-      API.getIndikatorUsulan(idUsulan)
-    ]);
-    
-    indikatorData = inds;
-    const isLocked = detail.isLocked || detail.statusGlobal !== 'Draft';
-    const namaBulan = BULAN_NAMA[detail.bulan] || detail.bulan;
-
-    document.getElementById('indModalSPM').textContent = parseFloat(detail.indeksSPM).toFixed(4);
-    document.getElementById('btnSubmitFromModal').style.display = isLocked ? 'none' : 'flex';
-
-    // Update info drive di modal
-    const infoEl = document.getElementById('indModalInfo');
-    if (infoEl) {
-      infoEl.innerHTML = `
-        <div style="display:flex;align-items:center;gap:12px;width:100%">
-          <span class="material-icons" style="color:var(--primary)">folder</span>
-          <div style="flex:1">
-            <strong>Folder Google Drive:</strong><br>
-            <span style="font-size:12px;color:var(--text-light)">${detail.kodePKM} / ${detail.tahun} / ${namaBulan}</span>
-          </div>
-          <button id="btnOpenDrive" class="btn btn-primary btn-sm" 
-            onclick="openGDriveFolder('${detail.kodePKM}', ${detail.tahun}, ${detail.bulan}, '${namaBulan}')">
-            <span class="material-icons" style="font-size:16px">open_in_new</span> Buka Folder
-          </button>
-        </div>`;
-      infoEl.style.background = 'var(--info-light)';
-      infoEl.style.border = 'none';
-    }
-
-    // Generate tabel indikator
-    let tableHtml = '';
-    
-    for (const ind of inds) {
-      // Load bukti files untuk indikator ini
-      let buktiHtml = '';
-      try {
-        const buktiRes = await fetch(`/api/bukti?idUsulan=${idUsulan}&noIndikator=${ind.no}`);
-        const buktiData = await buktiRes.json();
-        if (buktiData.success && buktiData.data && buktiData.data.length > 0) {
-          buktiHtml = buktiData.data.map(b => `
-            <div style="display:flex;align-items:center;gap:4px;margin-top:4px;padding:2px 4px;background:var(--border-light);border-radius:4px">
-              <span class="material-icons" style="font-size:14px;color:var(--primary)">attach_file</span>
-              <a href="${b.fileUrl}" target="_blank" style="flex:1;font-size:11px;color:var(--primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${b.fileName}">
-                ${b.fileName}
-              </a>
-              <span style="font-size:9px;color:var(--text-light)">${formatFileSize(b.fileSize)}</span>
-            </div>
-          `).join('');
-        }
-      } catch (e) {
-        console.log('Error loading bukti:', e);
-      }
-
-      tableHtml += `
-        <tr id="indRow-${ind.no}">
-          <td><span style="font-family:'JetBrains Mono';font-weight:700">${ind.no}</span></td>
-          <td style="max-width:240px;font-size:13px">${ind.nama}</td>
-          <td style="text-align:center">${ind.bobot}</td>
-          <td>${isLocked ? `<span>${ind.target}</span>` : `<input type="number" id="t-${ind.no}" value="${ind.target}" min="0" max="100" step="0.01" onchange="saveIndikator(${ind.no})" style="width:70px;padding:4px;border:1.5px solid var(--border);border-radius:4px">`}</td>
-          <td>${isLocked ? `<span>${ind.realisasi}</span>` : `<input type="number" id="r-${ind.no}" value="${ind.realisasi}" min="0" step="0.01" onchange="saveIndikator(${ind.no})" style="width:70px;padding:4px;border:1.5px solid var(--border);border-radius:4px">`}</td>
-          <td class="rasio-cell" id="rasio-${ind.no}">${(ind.realisasiRasio * 100).toFixed(1)}%</td>
-          <td class="rasio-cell" id="nilai-${ind.no}">${parseFloat(ind.nilaiTerbobot).toFixed(2)}</td>
-          <td style="min-width:220px">
-            ${!isLocked ? `
-              <div style="display:flex;flex-direction:column;gap:6px">
-                <div style="display:flex;gap:4px">
-                  <input type="file" id="file-${ind.no}" style="display:none" onchange="uploadBuktiIndikator(${ind.no})">
-                  <button id="upload-btn-${ind.no}" class="btn btn-secondary btn-sm" onclick="document.getElementById('file-${ind.no}').click()" style="flex:1;padding:6px">
-                    <span class="material-icons" style="font-size:14px">cloud_upload</span> Upload
-                  </button>
-                  <button class="btn-icon" onclick="openGDriveFolder('${detail.kodePKM}', ${detail.tahun}, ${detail.bulan}, '${namaBulan}')" title="Buka folder Drive">
-                    <span class="material-icons">folder_open</span>
-                  </button>
-                </div>
-                <div id="bukti-list-${ind.no}" style="max-height:80px;overflow-y:auto;padding:2px 0">${buktiHtml}</div>
-              </div>
-            ` : ind.linkFile ? `
-              <a href="${ind.linkFile}" target="_blank" style="display:inline-flex;align-items:center;gap:4px;color:var(--primary);padding:4px 8px;background:var(--info-light);border-radius:4px;text-decoration:none">
-                <span class="material-icons" style="font-size:16px">open_in_new</span> Lihat file bukti
-              </a>
-            ` : '-'}
-          </td>
-        </tr>`;
-    }
-
-    document.getElementById('indikatorInputBody').innerHTML = tableHtml;
-
-    // Load bukti untuk semua indikator (jika tidak locked)
-    if (!isLocked) {
-      for (const ind of inds) {
-        await loadBuktiIndikator(ind.no);
-      }
-    }
-
-  } catch (e) {
-    toast(e.message, 'error');
-    console.error(e);
-  }
-}

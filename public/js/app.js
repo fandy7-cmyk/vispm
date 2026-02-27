@@ -866,8 +866,17 @@ async function renderUsers() {
             </select></div>
           <div id="pkmContainer" style="display:none" class="form-group"><label>Puskesmas</label>
             <select class="form-control" id="uPKM"><option value="">Pilih Puskesmas</option></select></div>
-          <div id="indContainer" style="display:none" class="form-group"><label>Indikator Akses</label>
-            <input class="form-control" id="uIndikator" placeholder="Contoh: 1,2,3 atau 1-5,8"></div>
+          <div id="indContainer" style="display:none" class="form-group">
+            <label>Indikator Akses</label>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+              <span style="font-size:12px;color:var(--text-light)">Centang indikator yang dapat diakses</span>
+              <div style="display:flex;gap:8px">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="checkAllIndikator(true)">Pilih Semua</button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="checkAllIndikator(false)">Hapus Semua</button>
+              </div>
+            </div>
+            <div id="indCheckboxList" style="max-height:220px;overflow-y:auto;border:1.5px solid var(--border);border-radius:8px;padding:8px;background:white;display:grid;grid-template-columns:1fr 1fr;gap:4px"></div>
+          </div>
           <div class="form-group"><label>Status</label>
             <select class="form-control" id="uAktif"><option value="true">Aktif</option><option value="false">Non-aktif</option></select></div>
         </div>
@@ -923,6 +932,40 @@ function checkUserRole() {
   const role = document.getElementById('uRole').value;
   document.getElementById('pkmContainer').style.display = ['Operator', 'Kapus'].includes(role) ? 'block' : 'none';
   document.getElementById('indContainer').style.display = role === 'Pengelola Program' ? 'block' : 'none';
+  if (role === 'Pengelola Program') populateIndCheckbox([]);
+}
+
+function populateIndCheckbox(selectedNos = []) {
+  const container = document.getElementById('indCheckboxList');
+  if (!container || !allIndList.length) return;
+  container.innerHTML = allIndList.filter(i => i.aktif).map(i => `
+    <label style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:13px;transition:background 0.15s"
+      onmouseover="this.style.background='var(--border-light)'" onmouseout="this.style.background=''">
+      <input type="checkbox" value="${i.no}" ${selectedNos.includes(parseInt(i.no)) ? 'checked' : ''}
+        style="width:15px;height:15px;accent-color:var(--primary);cursor:pointer;flex-shrink:0">
+      <span><strong style="font-family:'JetBrains Mono';font-size:12px">${i.no}.</strong> ${i.nama}</span>
+    </label>`).join('');
+}
+
+function checkAllIndikator(check) {
+  document.querySelectorAll('#indCheckboxList input[type="checkbox"]').forEach(cb => cb.checked = check);
+}
+
+function getIndikatorAksesFromCheckbox() {
+  return [...document.querySelectorAll('#indCheckboxList input[type="checkbox"]:checked')]
+    .map(cb => parseInt(cb.value)).sort((a,b) => a-b).join(',');
+}
+
+function parseIndikatorAksesString(str) {
+  if (!str) return [];
+  let result = [];
+  str.replace(/\s/g,'').split(',').forEach(part => {
+    if (part.includes('-')) {
+      const [s,e] = part.split('-').map(Number);
+      for (let i=s;i<=e;i++) result.push(i);
+    } else { const n=Number(part); if(!isNaN(n)&&n>0) result.push(n); }
+  });
+  return [...new Set(result)];
 }
 
 function openUserModal(editEmail = null) {
@@ -932,7 +975,6 @@ function openUserModal(editEmail = null) {
   document.getElementById('uNama').value = '';
   document.getElementById('uRole').value = 'Operator';
   document.getElementById('uPKM').value = '';
-  document.getElementById('uIndikator').value = '';
   document.getElementById('uAktif').value = 'true';
   checkUserRole();
 
@@ -943,9 +985,11 @@ function openUserModal(editEmail = null) {
       document.getElementById('uNama').value = user.nama;
       document.getElementById('uRole').value = user.role;
       document.getElementById('uPKM').value = user.kodePKM || '';
-      document.getElementById('uIndikator').value = user.indikatorAkses || '';
       document.getElementById('uAktif').value = user.aktif ? 'true' : 'false';
       checkUserRole();
+      if (user.role === 'Pengelola Program') {
+        populateIndCheckbox(parseIndikatorAksesString(user.indikatorAkses || ''));
+      }
     }
     document.getElementById('userModal').dataset.editEmail = editEmail;
   } else {
@@ -962,7 +1006,7 @@ async function saveUser() {
   const nama = document.getElementById('uNama').value.trim();
   const role = document.getElementById('uRole').value;
   const kodePKM = document.getElementById('uPKM').value;
-  const indikatorAkses = document.getElementById('uIndikator').value.trim();
+  const indikatorAkses = role === 'Pengelola Program' ? getIndikatorAksesFromCheckbox() : '';
   const aktif = document.getElementById('uAktif').value === 'true';
 
   if (!email || !nama || !role) return toast('Email, nama, dan role harus diisi', 'error');

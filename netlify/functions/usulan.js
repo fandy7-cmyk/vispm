@@ -231,13 +231,34 @@ async function hitungSPM(pool, idUsulan) {
 }
 
 async function submitUsulan(pool, body) {
-  const { idUsulan, email } = body;
-  const indResult = await pool.query('SELECT no_indikator, link_file, capaian FROM usulan_indikator WHERE id_usulan=$1', [idUsulan]);
-  const missing = indResult.rows.filter(r => !r.link_file || r.link_file.trim()==='');
-  if (missing.length > 0) return err(`Data dukung belum lengkap. Indikator no. ${missing.map(r=>r.no_indikator).join(', ')} belum ada link file bukti.`);
+  const { idUsulan, email, forceSubmit } = body;
+
   const result = await pool.query('SELECT status_global FROM usulan_header WHERE id_usulan=$1', [idUsulan]);
-  if (result.rows.length===0) return err('Usulan tidak ditemukan');
-  if (result.rows[0].status_global !== 'Draft') return err('Usulan sudah disubmit');
+  if (result.rows.length === 0) return err('Usulan tidak ditemukan');
+  if (result.rows[0].status_global !== 'Draft') return err('Usulan sudah pernah disubmit');
+
+  // Cek indikator yang belum ada bukti
+  const indResult = await pool.query(
+    'SELECT no_indikator, link_file FROM usulan_indikator WHERE id_usulan=$1',
+    [idUsulan]
+  );
+  const missing = indResult.rows.filter(r => !r.link_file || r.link_file.trim() === '');
+
+  // Kalau ada yang kurang DAN belum force → kembalikan warning, bukan error keras
+  if (missing.length > 0 && !forceSubmit) {
+    return {
+      statusCode: 200,
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+      body: JSON.stringify({
+        success: false,
+        needConfirm: true,
+        missingCount: missing.length,
+        missingNos: missing.map(r => r.no_indikator),
+        message: `${missing.length} indikator belum ada file bukti (no. ${missing.map(r=>r.no_indikator).join(', ')}). Tetap submit?`
+      })
+    };
+  }
+
   await pool.query(`UPDATE usulan_header SET status_global='Menunggu Kapus' WHERE id_usulan=$1`, [idUsulan]);
   await logAktivitas(pool, email, 'Operator', 'Submit', idUsulan, 'Disubmit ke Kapus');
   return ok({ message: 'Usulan berhasil disubmit ke Kapus' });

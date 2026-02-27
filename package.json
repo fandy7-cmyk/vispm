@@ -9,3 +9,12 @@
     "pg": "^8.11.3"
   }
 }
+
+{
+  "dependencies": {
+    "pg": "^8.11.3",
+    "googleapis": "^128.0.0",
+    "formidable-serverless": "^1.1.1",
+    "fs": "0.0.1-security"
+  }
+}

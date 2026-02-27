@@ -8,11 +8,11 @@
 <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 <style>
 :root {
-  --primary: #1a56db;
-  --primary-dark: #1345b7;
-  --primary-light: #e8effd;
-  --secondary: #0ea5e9;
-  --accent: #06b6d4;
+  --primary: #0d9488;
+  --primary-dark: #0f766e;
+  --primary-light: #e6fffa;
+  --secondary: #06b6d4;
+  --accent: #10b981;
   --success: #059669;
   --success-light: #d1fae5;
   --warning: #d97706;
@@ -27,7 +27,7 @@
   --surface: #ffffff;
   --sidebar-bg: #0f172a;
   --sidebar-hover: #1e293b;
-  --sidebar-active: #1a56db;
+  --sidebar-active: #0d9488;
   --text: #0f172a;
   --text-md: #334155;
   --text-light: #64748b;
@@ -48,7 +48,7 @@ body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); colo
 /* ===== AUTH SCREEN ===== */
 #authScreen {
   position: fixed; inset: 0; z-index: 9999;
-  background: linear-gradient(135deg, #0f172a 0%, #1a56db 50%, #0ea5e9 100%);
+  background: linear-gradient(135deg, #0f172a 0%, #0d9488 50%, #06b6d4 100%);
   display: flex; align-items: center; justify-content: center;
 }
 .auth-card {
@@ -62,10 +62,10 @@ body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); colo
 }
 .auth-logo {
   width: 64px; height: 64px; border-radius: 16px;
-  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  background: linear-gradient(135deg, #0d9488, #06b6d4);
   display: flex; align-items: center; justify-content: center;
   margin: 0 auto 20px;
-  box-shadow: 0 8px 24px rgba(26,86,219,0.3);
+  box-shadow: 0 8px 24px rgba(13,148,136,0.3);
 }
 .auth-logo .material-icons { font-size: 32px; color: white; }
 .auth-card h2 { font-size: 22px; font-weight: 800; color: var(--text); margin-bottom: 6px; }
@@ -78,12 +78,12 @@ body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); colo
 }
 .auth-input:focus { outline: none; border-color: var(--primary); background: white; }
 .auth-btn {
-  width: 100%; padding: 13px; background: linear-gradient(135deg, var(--primary), var(--secondary));
+  width: 100%; padding: 13px; background: linear-gradient(135deg, #0d9488, #06b6d4);
   border: none; border-radius: 10px; color: white; font-size: 15px;
   font-weight: 700; font-family: inherit; cursor: pointer;
   transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px;
 }
-.auth-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(26,86,219,0.3); }
+.auth-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(13,148,136,0.3); }
 .auth-btn:disabled { opacity: 0.6; transform: none; cursor: not-allowed; }
 .auth-status { margin-top: 16px; font-size: 13px; color: var(--text-light); min-height: 20px; }
 .auth-status.error { color: var(--danger); }
@@ -107,7 +107,7 @@ body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); colo
 }
 .sidebar-logo-icon {
   width: 40px; height: 40px; border-radius: 10px;
-  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  background: linear-gradient(135deg, #0d9488, #06b6d4);
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
 }
@@ -120,7 +120,7 @@ body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); colo
 }
 .sidebar-avatar {
   width: 34px; height: 34px; border-radius: 8px; flex-shrink: 0;
-  background: linear-gradient(135deg, var(--accent), var(--primary));
+  background: linear-gradient(135deg, #06b6d4, #0d9488);
   display: flex; align-items: center; justify-content: center;
   font-weight: 700; font-size: 14px; color: white;
 }
@@ -194,7 +194,7 @@ body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); colo
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
 .stat-icon .material-icons { font-size: 24px; color: white; }
-.stat-icon.blue { background: linear-gradient(135deg, #1a56db, #3b82f6); }
+.stat-icon.blue { background: linear-gradient(135deg, #0d9488, #06b6d4); }
 .stat-icon.green { background: linear-gradient(135deg, #059669, #10b981); }
 .stat-icon.orange { background: linear-gradient(135deg, #ea580c, #f97316); }
 .stat-icon.purple { background: linear-gradient(135deg, #7c3aed, #a78bfa); }
@@ -223,8 +223,8 @@ tbody tr:hover td { background: #f8fafc; }
 
 /* ===== BUTTONS ===== */
 .btn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 18px; border-radius: 8px; font-size: 13.5px; font-weight: 600; cursor: pointer; transition: all 0.15s; border: none; font-family: inherit; white-space: nowrap; }
-.btn-primary { background: linear-gradient(135deg, var(--primary), var(--secondary)); color: white; }
-.btn-primary:hover { opacity: 0.9; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(26,86,219,0.25); }
+.btn-primary { background: linear-gradient(135deg, #0d9488, #06b6d4); color: white; }
+.btn-primary:hover { opacity: 0.9; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(13,148,136,0.25); }
 .btn-secondary { background: var(--surface); color: var(--text-md); border: 1px solid var(--border); }
 .btn-secondary:hover { background: var(--border-light); }
 .btn-danger { background: var(--danger); color: white; }
@@ -248,7 +248,7 @@ tbody tr:hover td { background: #f8fafc; }
   border-radius: 8px; font-size: 13.5px; font-family: inherit;
   color: var(--text); background: white; transition: all 0.2s;
 }
-.form-control:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(26,86,219,0.1); }
+.form-control:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(13,148,136,0.1); }
 select.form-control { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 36px; }
 textarea.form-control { resize: vertical; }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
@@ -340,7 +340,7 @@ textarea.form-control { resize: vertical; }
 /* ===== CHART ===== */
 .chart-container { display: flex; align-items: flex-end; gap: 8px; padding: 16px 0 8px; overflow-x: auto; min-height: 200px; }
 .chart-bar-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 48px; }
-.chart-bar { width: 36px; border-radius: 6px 6px 0 0; background: linear-gradient(180deg, var(--primary), var(--secondary)); min-height: 4px; transition: all 0.3s; position: relative; cursor: pointer; }
+.chart-bar { width: 36px; border-radius: 6px 6px 0 0; background: linear-gradient(180deg, #0d9488, #06b6d4); min-height: 4px; transition: all 0.3s; position: relative; cursor: pointer; }
 .chart-bar:hover { opacity: 0.8; }
 .chart-bar-val { font-size: 11px; font-weight: 700; color: var(--text); }
 .chart-bar-lbl { font-size: 11px; color: var(--text-light); }
@@ -474,27 +474,23 @@ textarea.form-control { resize: vertical; }
       <button class="btn-icon" onclick="closeModal('indikatorModal')"><span class="material-icons">close</span></button>
     </div>
     <div class="modal-body">
-
+      <div class="info-card info" id="indModalInfo">
+        <span class="material-icons">info</span>
+        <div class="info-card-text">Isi target dan realisasi setiap indikator. Nilai akan dihitung otomatis.</div>
+      </div>
       <div class="table-container">
         <table class="ind-table">
           <thead>
             <tr>
-              <th>No</th>
-              <th>Nama Indikator</th>
-              <th>Bobot</th>
-              <th>Target</th>
-              <th>Realisasi</th>
-              <th>Rasio</th>
-              <th>Nilai</th>
-              <th style="min-width:200px;">Bukti</th>
+              <th>No</th><th>Nama Indikator</th><th>Bobot</th>
+              <th>Target (%)</th><th>Realisasi</th><th>Rasio</th><th>Nilai</th><th>Bukti</th>
             </tr>
           </thead>
           <tbody id="indikatorInputBody"></tbody>
         </table>
       </div>
-      
       <div style="margin-top:16px;padding:12px 16px;background:var(--border-light);border-radius:10px;display:flex;justify-content:space-between;align-items:center;">
-        <span style="font-size:13px;color:var(--text-light);">Indeks SPM</span>
+        <span style="font-size:13px;color:var(--text-light);">Indeks SPM (Kinerja × Beban Kerja)</span>
         <span style="font-size:18px;font-weight:800;color:var(--primary);font-family:'JetBrains Mono',monospace;" id="indModalSPM">0.0000</span>
       </div>
     </div>
@@ -506,7 +502,7 @@ textarea.form-control { resize: vertical; }
     </div>
   </div>
 </div>
-  
+
 <!-- DETAIL USULAN MODAL -->
 <div class="modal" id="detailModal">
   <div class="modal-card lg">
@@ -518,6 +514,9 @@ textarea.form-control { resize: vertical; }
     <div class="modal-body" id="detailModalBody"><!-- dynamic --></div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('detailModal')">Tutup</button>
+      <button class="btn btn-primary" id="btnDownloadPDF" style="display:none" onclick="downloadLaporanPDF(document.getElementById('detailModalId').textContent)">
+        <span class="material-icons">picture_as_pdf</span> Download Laporan PDF
+      </button>
     </div>
   </div>
 </div>
@@ -553,6 +552,9 @@ textarea.form-control { resize: vertical; }
       </button>
       <button class="btn btn-success" id="btnApprove" onclick="doApprove()">
         <span class="material-icons">check_circle</span> Setujui
+      </button>
+      <button class="btn btn-primary" id="btnDownloadVerif" style="display:none" onclick="downloadLaporanPDF(verifCurrentUsulan)">
+        <span class="material-icons">picture_as_pdf</span> Download PDF
       </button>
     </div>
   </div>

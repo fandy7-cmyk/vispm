@@ -1543,3 +1543,270 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.key === 'Enter') doLogin();
   });
 });
+
+// ============== FUNGSI UPLOAD FILE ==============
+
+// Ikon file berdasarkan ekstensi
+function getFileIcon(filename) {
+  const ext = filename.split('.').pop().toLowerCase();
+  if (ext === 'pdf') return 'picture_as_pdf';
+  if (['jpg', 'jpeg', 'png'].includes(ext)) return 'image';
+  if (['doc', 'docx'].includes(ext)) return 'description';
+  if (['xls', 'xlsx'].includes(ext)) return 'table_chart';
+  return 'insert_drive_file';
+}
+
+// Format ukuran file
+function formatFileSize(bytes) {
+  if (!bytes) return '';
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+// Baca file sebagai Base64
+function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+// Upload file untuk indikator tertentu
+async function uploadFiles(noIndikator) {
+  const fileInput = document.getElementById(`file-${noIndikator}`);
+  
+  if (!fileInput.files || fileInput.files.length === 0) {
+    toast('Pilih file terlebih dahulu', 'warning');
+    return;
+  }
+
+  // Validasi jumlah file (max 5 file per upload)
+  if (fileInput.files.length > 5) {
+    toast('Maksimal 5 file dalam satu kali upload', 'warning');
+    return;
+  }
+
+  const files = Array.from(fileInput.files);
+  const uploadedFiles = [];
+  
+  setLoading(true);
+  
+  try {
+    for (const file of files) {
+      // Validasi ukuran (max 5MB per file)
+      if (file.size > 5 * 1024 * 1024) {
+        toast(`File ${file.name} terlalu besar (max 5MB)`, 'error');
+        continue;
+      }
+
+      // Validasi tipe file
+      const allowedTypes = [
+        'application/pdf',
+        'image/jpeg', 'image/jpg', 'image/png',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      ];
+      
+      const fileType = file.type.toLowerCase();
+      if (!allowedTypes.some(t => fileType.includes(t))) {
+        toast(`Tipe file ${file.name} tidak diizinkan. Hanya PDF, JPG, PNG, DOC, DOCX`, 'error');
+        continue;
+      }
+
+      // Baca file sebagai Base64
+      const base64 = await readFileAsBase64(file);
+      
+      uploadedFiles.push({
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        data: base64,
+        uploadedAt: new Date().toISOString()
+      });
+    }
+
+    if (uploadedFiles.length === 0) {
+      setLoading(false);
+      return;
+    }
+
+    // Ambil data file yang sudah ada
+    const currentInd = indikatorData.find(i => i.no === noIndikator);
+    let existingFiles = [];
+    
+    if (currentInd?.linkFile) {
+      try {
+        existingFiles = JSON.parse(currentInd.linkFile);
+      } catch {
+        // Konversi link lama ke format baru
+        existingFiles = [{ name: 'File', url: currentInd.linkFile }];
+      }
+    }
+
+    // Gabungkan file lama dan baru
+    const allFiles = [...existingFiles, ...uploadedFiles];
+    
+    // Simpan ke database
+    await saveIndikatorWithFiles(noIndikator, allFiles);
+    
+    // Update tampilan daftar file
+    await updateFileList(noIndikator, allFiles);
+    
+    // Reset input file
+    fileInput.value = '';
+    
+    toast(`${uploadedFiles.length} file berhasil diupload`, 'success');
+    
+  } catch (error) {
+    console.error('Upload error:', error);
+    toast('Gagal upload: ' + error.message, 'error');
+  } finally {
+    setLoading(false);
+  }
+}
+
+// Simpan file ke database
+async function saveIndikatorWithFiles(noIndikator, files) {
+  const target = parseFloat(document.getElementById(`t-${noIndikator}`)?.value) || 0;
+  const realisasi = parseFloat(document.getElementById(`r-${noIndikator}`)?.value) || 0;
+  
+  // Simpan files sebagai JSON string
+  const linkFile = JSON.stringify(files);
+
+  const result = await API.updateIndikatorUsulan({
+    idUsulan: currentIndikatorUsulan,
+    noIndikator,
+    target,
+    realisasi,
+    linkFile
+  });
+
+  // Update UI
+  document.getElementById(`rasio-${noIndikator}`).textContent = (result.rasio * 100).toFixed(1) + '%';
+  document.getElementById(`nilai-${noIndikator}`).textContent = parseFloat(result.nilaiTerbobot).toFixed(2);
+
+  // Refresh SPM
+  const detail = await API.getDetailUsulan(currentIndikatorUsulan);
+  document.getElementById('indModalSPM').textContent = parseFloat(detail.indeksSPM).toFixed(4);
+  
+  // Update indikatorData
+  const indIndex = indikatorData.findIndex(i => i.no === noIndikator);
+  if (indIndex >= 0) {
+    indikatorData[indIndex].linkFile = linkFile;
+  }
+}
+
+// Update tampilan daftar file
+async function updateFileList(noIndikator, files) {
+  const container = document.getElementById(`file-list-${noIndikator}`);
+  if (!container) return;
+
+  if (!files || files.length === 0) {
+    container.innerHTML = '<div style="padding:4px; text-align:center; color:var(--text-light); font-size:11px;">Belum ada file</div>';
+    return;
+  }
+
+  container.innerHTML = files.map((file, index) => `
+    <div style="display:flex; align-items:center; gap:4px; padding:2px 0; border-bottom:1px dashed var(--border-light);">
+      <span class="material-icons" style="font-size:14px; color:var(--primary);">${getFileIcon(file.name)}</span>
+      <span style="flex:1; font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${file.name}">${file.name}</span>
+      <span style="font-size:9px; color:var(--text-light);">${formatFileSize(file.size)}</span>
+      <a href="${file.data || file.url}" target="_blank" class="btn-icon" style="padding:2px;" title="Lihat file">
+        <span class="material-icons" style="font-size:14px;">visibility</span>
+      </a>
+      <button class="btn-icon" style="padding:2px; color:var(--danger);" onclick="deleteFile(${noIndikator}, ${index})" title="Hapus">
+        <span class="material-icons" style="font-size:14px;">delete</span>
+      </button>
+    </div>
+  `).join('');
+}
+
+// Hapus file
+async function deleteFile(noIndikator, fileIndex) {
+  showConfirm({
+    title: 'Hapus File',
+    message: 'Yakin ingin menghapus file ini?',
+    type: 'warning',
+    onConfirm: async () => {
+      try {
+        // Ambil data file yang ada
+        const currentInd = indikatorData.find(i => i.no === noIndikator);
+        let files = [];
+        
+        if (currentInd?.linkFile) {
+          try {
+            files = JSON.parse(currentInd.linkFile);
+          } catch {
+            files = [{ name: 'File', url: currentInd.linkFile }];
+          }
+        }
+        
+        // Hapus file berdasarkan index
+        files.splice(fileIndex, 1);
+        
+        // Simpan kembali
+        await saveIndikatorWithFiles(noIndikator, files);
+        
+        // Update tampilan
+        await updateFileList(noIndikator, files);
+        
+        toast('File berhasil dihapus', 'success');
+        
+      } catch (error) {
+        toast('Gagal hapus file: ' + error.message, 'error');
+      }
+    }
+  });
+}
+
+// Override fungsi saveIndikator yang lama
+async function saveIndikator(noIndikator) {
+  const target = parseFloat(document.getElementById(`t-${noIndikator}`)?.value) || 0;
+  const realisasi = parseFloat(document.getElementById(`r-${noIndikator}`)?.value) || 0;
+  
+  // Ambil data file yang sudah ada (jangan diubah)
+  const currentInd = indikatorData.find(i => i.no === noIndikator);
+  let files = [];
+  if (currentInd?.linkFile) {
+    try {
+      files = JSON.parse(currentInd.linkFile);
+    } catch {
+      files = [{ name: 'File', url: currentInd.linkFile }];
+    }
+  }
+  
+  // Simpan dengan files yang sudah ada
+  const linkFile = JSON.stringify(files);
+
+  try {
+    const result = await API.updateIndikatorUsulan({
+      idUsulan: currentIndikatorUsulan,
+      noIndikator,
+      target,
+      realisasi,
+      linkFile
+    });
+
+    // Update UI
+    document.getElementById(`rasio-${noIndikator}`).textContent = (result.rasio * 100).toFixed(1) + '%';
+    document.getElementById(`nilai-${noIndikator}`).textContent = parseFloat(result.nilaiTerbobot).toFixed(2);
+
+    // Refresh SPM
+    const detail = await API.getDetailUsulan(currentIndikatorUsulan);
+    document.getElementById('indModalSPM').textContent = parseFloat(detail.indeksSPM).toFixed(4);
+    
+    // Update indikatorData
+    const indIndex = indikatorData.findIndex(i => i.no === noIndikator);
+    if (indIndex >= 0) {
+      indikatorData[indIndex].target = target;
+      indikatorData[indIndex].realisasi = realisasi;
+      indikatorData[indIndex].linkFile = linkFile;
+    }
+    
+  } catch (e) {
+    toast(e.message, 'error');
+  }
+}

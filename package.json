@@ -1,0 +1,11 @@
+{
+  "name": "spm-verifikasi",
+  "version": "1.0.0",
+  "description": "Aplikasi Verifikasi Indeks SPM Puskesmas",
+  "scripts": {
+    "dev": "netlify dev"
+  },
+  "dependencies": {
+    "pg": "^8.11.3"
+  }
+}

@@ -474,25 +474,28 @@ textarea.form-control { resize: vertical; }
       <button class="btn-icon" onclick="closeModal('indikatorModal')"><span class="material-icons">close</span></button>
     </div>
     <div class="modal-body">
-      <!-- INFO CARD BARU - DIKOSONGKAN, ISI NYA DARI JAVASCRIPT -->
-      <div class="info-card info" id="indModalInfo" style="padding:0; background:transparent; border:none;">
-        <!-- Konten akan diisi oleh JavaScript -->
-      </div>
-      
+
       <div class="table-container">
         <table class="ind-table">
           <thead>
             <tr>
-              <th>No</th><th>Nama Indikator</th><th>Bobot</th>
-              <th>Target</th><th>Realisasi</th><th>Rasio</th><th>Nilai</th><th>Bukti</th>
+              <th>No</th>
+              <th>Nama Indikator</th>
+              <th>Bobot</th>
+              <th>Target</th>
+              <th>Realisasi</th>
+              <th>Rasio</th>
+              <th>Nilai</th>
+              <th style="min-width:200px;">Bukti</th>
             </tr>
           </thead>
           <tbody id="indikatorInputBody"></tbody>
         </table>
       </div>
+      
       <div style="margin-top:16px;padding:12px 16px;background:var(--border-light);border-radius:10px;display:flex;justify-content:space-between;align-items:center;">
         <span style="font-size:13px;color:var(--text-light);">Indeks SPM</span>
-        <span style="font-size:18px;font-weight:800;color:var(--primary);font-family:'JetBrains Mono',monospace;" id="indModalSPM">0.00</span>
+        <span style="font-size:18px;font-weight:800;color:var(--primary);font-family:'JetBrains Mono',monospace;" id="indModalSPM">0.0000</span>
       </div>
     </div>
     <div class="modal-footer">

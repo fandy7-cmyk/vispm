@@ -543,34 +543,79 @@ async function openIndikatorModal(idUsulan) {
     document.getElementById('indModalSPM').textContent = parseFloat(detail.indeksSPM).toFixed(4);
     document.getElementById('btnSubmitFromModal').style.display = isLocked ? 'none' : 'flex';
 
-    // INSTRUKSI UPLOAD KE 1 FOLDER GOOGLE DRIVE
-    const infoEl = document.getElementById('indModalInfo');
-    if (infoEl) {
-      infoEl.innerHTML = `
-        <div style="background:var(--info-light); border-radius:8px; padding:16px;">
-          <div style="display:flex; align-items:flex-start; gap:12px;">
-            <span class="material-icons" style="color:var(--info); font-size:24px;">info</span>
-            <div style="flex:1;">
-              <div style="font-weight:700; margin-bottom:8px;">📎 CARA UPLOAD DATA DUKUNG:</div>
-              <ol style="margin-left:20px; margin-bottom:8px; line-height:1.6;">
-                <li>Klik tombol <strong>"Buka Google Drive"</strong> di bawah</li>
-                <li>Upload file ke folder <strong>"DATA DUKUNG SPM"</strong></li>
-                <li><strong>Rename file</strong> dengan format: <br>
-                  <code style="background:white; padding:4px 8px; border-radius:4px; display:inline-block; margin:4px 0; font-size:12px;">
-                  ${detail.kodePKM}-${detail.tahun}-${detail.bulan}-Indikator${inds[0]?.no || 'X'}-NamaFile
-                  </code>
-                </li>
-                <li>Klik kanan file → <strong>Bagikan → Salin link</strong></li>
-                <li>Paste link di kolom <strong>"Link Bukti"</strong> di bawah</li>
-              </ol>
-            </div>
-            <button id="btnOpenDrive" class="btn btn-primary" 
-              onclick="openGDriveFolder()" style="white-space:nowrap;">
-              <span class="material-icons" style="font-size:16px">open_in_new</span> Buka Google Drive
+    // Generate tabel dengan tombol upload
+    let tableHtml = '';
+    
+    for (const ind of inds) {
+      // Parse existing files dari link_file
+      let files = [];
+      if (ind.linkFile) {
+        try {
+          files = JSON.parse(ind.linkFile);
+        } catch {
+          // Kalau bukan JSON (link lama), jadikan array
+          files = [{ name: 'File', url: ind.linkFile }];
+        }
+      }
+
+      // Buat HTML untuk daftar file
+      const fileListHtml = files.map((f, i) => `
+        <div style="display:flex; align-items:center; gap:4px; padding:2px 0; border-bottom:1px dashed var(--border-light);">
+          <span class="material-icons" style="font-size:14px; color:var(--primary);">${getFileIcon(f.name)}</span>
+          <span style="flex:1; font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${f.name}">${f.name}</span>
+          <span style="font-size:9px; color:var(--text-light);">${formatFileSize(f.size)}</span>
+          <a href="${f.url || f.data}" target="_blank" class="btn-icon" style="padding:2px;" title="Lihat file">
+            <span class="material-icons" style="font-size:14px;">visibility</span>
+          </a>
+          ${!isLocked ? `
+            <button class="btn-icon" style="padding:2px; color:var(--danger);" onclick="deleteFile(${ind.no}, ${i})" title="Hapus">
+              <span class="material-icons" style="font-size:14px;">delete</span>
             </button>
-          </div>
-        </div>`;
+          ` : ''}
+        </div>
+      `).join('');
+
+      tableHtml += `
+        <tr id="indRow-${ind.no}">
+          <td><span style="font-family:'JetBrains Mono';font-weight:700">${ind.no}</span></td>
+          <td style="max-width:240px;font-size:13px">${ind.nama}</td>
+          <td style="text-align:center">${ind.bobot}</td>
+          <td>${isLocked ? `<span>${ind.target}</span>` : `<input type="number" id="t-${ind.no}" value="${ind.target}" min="0" max="100" step="0.01" onchange="saveIndikator(${ind.no})" style="width:70px; padding:4px; border:1.5px solid var(--border); border-radius:4px;">`}</td>
+          <td>${isLocked ? `<span>${ind.realisasi}</span>` : `<input type="number" id="r-${ind.no}" value="${ind.realisasi}" min="0" step="0.01" onchange="saveIndikator(${ind.no})" style="width:70px; padding:4px; border:1.5px solid var(--border); border-radius:4px;">`}</td>
+          <td class="rasio-cell" id="rasio-${ind.no}">${(ind.realisasiRasio * 100).toFixed(1)}%</td>
+          <td class="rasio-cell" id="nilai-${ind.no}">${parseFloat(ind.nilaiTerbobot).toFixed(2)}</td>
+          <td>
+            ${!isLocked ? `
+              <div style="display:flex; flex-direction:column; gap:6px;">
+                <div style="display:flex; gap:4px;">
+                  <input type="file" id="file-${ind.no}" style="display:none;" multiple accept=".pdf,.jpg,.jpeg,.png,.doc,.docx">
+                  <button class="btn btn-secondary btn-sm" onclick="document.getElementById('file-${ind.no}').click()" style="flex:1; padding:6px;">
+                    <span class="material-icons" style="font-size:16px;">cloud_upload</span> Upload
+                  </button>
+                  <button class="btn-icon" onclick="uploadFiles(${ind.no})" title="Upload file">
+                    <span class="material-icons">attach_file</span>
+                  </button>
+                </div>
+                <div id="file-list-${ind.no}" style="max-height:80px; overflow-y:auto; padding:2px; background:var(--border-light); border-radius:4px;">
+                  ${fileListHtml || '<div style="padding:4px; text-align:center; color:var(--text-light); font-size:11px;">Belum ada file</div>'}
+                </div>
+              </div>
+            ` : (files.length > 0 ? `
+              <div style="max-height:100px; overflow-y:auto;">
+                ${fileListHtml}
+              </div>
+            ` : '-')}
+          </td>
+        </tr>`;
     }
+
+    document.getElementById('indikatorInputBody').innerHTML = tableHtml;
+
+  } catch (e) {
+    toast(e.message, 'error');
+    console.error(e);
+  }
+}
 
     // TABLE INDIKATOR
     document.getElementById('indikatorInputBody').innerHTML = inds.map(ind => `

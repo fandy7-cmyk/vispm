@@ -495,22 +495,35 @@ async function deleteUsulan(idUsulan) {
 let currentIndikatorUsulan = null;
 let indikatorData = [];
 
-// Buka/buat folder Google Drive otomatis
+// GANTI fungsi openGDriveFolder dengan yang ini
 async function openGDriveFolder(kodePKM, tahun, bulan, namaBulan) {
   const btn = document.getElementById('btnOpenDrive');
   if (btn) {
-    btn.innerHTML = '<span class="material-icons" style="animation:spin 0.8s linear infinite;font-size:16px">refresh</span> Membuat folder...';
+    btn.innerHTML = '<span class="material-icons" style="animation:spin 0.8s linear infinite;font-size:16px">refresh</span> Membuka folder...';
     btn.disabled = true;
   }
+  
   try {
-    const result = await API.get('drive', { kodePKM, tahun, bulan, namaBulan });
-    window.open(result.folderUrl, '_blank');
-    if (btn) {
-      btn.innerHTML = '<span class="material-icons" style="font-size:16px">open_in_new</span> Buka Google Drive';
-      btn.disabled = false;
+    console.log('Opening folder:', { kodePKM, tahun, bulan, namaBulan });
+    
+    const response = await fetch(`/api/drive?kodePKM=${encodeURIComponent(kodePKM)}&tahun=${tahun}&bulan=${bulan}&namaBulan=${encodeURIComponent(namaBulan)}`);
+    const result = await response.json();
+    
+    console.log('Drive response:', result);
+    
+    if (!result.success) {
+      throw new Error(result.message || 'Gagal membuka folder');
     }
+    
+    // Buka folder di tab baru
+    window.open(result.data.folderUrl, '_blank');
+    
+    toast('Folder berhasil dibuka', 'success');
+    
   } catch (e) {
-    toast('Gagal membuka Google Drive: ' + e.message, 'error');
+    console.error('Open folder error:', e);
+    toast('Gagal membuka folder: ' + e.message, 'error');
+  } finally {
     if (btn) {
       btn.innerHTML = '<span class="material-icons" style="font-size:16px">open_in_new</span> Buka Google Drive';
       btn.disabled = false;

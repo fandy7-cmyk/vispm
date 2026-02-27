@@ -26,13 +26,16 @@ async function getDriveClient() {
 // Fungsi untuk membuat folder jika belum ada
 async function findOrCreateFolder(drive, name, parentId) {
   try {
+    // Escape single quotes in name
+    const escapedName = name.replace(/'/g, "\\'");
+    
     // Cari folder existing
     const response = await drive.files.list({
-      q: `name='${name.replace(/'/g, "\\'")}' and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+      q: `name='${escapedName}' and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
       fields: 'files(id, name)'
     });
 
-    if (response.data.files.length > 0) {
+    if (response.data.files && response.data.files.length > 0) {
       return response.data.files[0].id;
     }
 
@@ -55,69 +58,46 @@ async function findOrCreateFolder(drive, name, parentId) {
   }
 }
 
-// Handler utama
-exports.handler = async (event) => {
-  // Handle CORS
-  if (event.httpMethod === 'OPTIONS') {
-    return {
-      statusCode: 200,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-        'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS'
-      },
-      body: ''
-    };
+// Handler GET - Buka folder
+async function handleGetRequest(event) {
+  const params = event.queryStringParameters || {};
+  const { kodePKM, tahun, bulan, namaBulan } = params;
+
+  if (!kodePKM || !tahun || !bulan) {
+    return err('Parameter kodePKM, tahun, bulan diperlukan');
   }
 
-  // GET - Buka folder
-  if (event.httpMethod === 'GET') {
-    const params = event.queryStringParameters || {};
-    const { kodePKM, tahun, bulan, namaBulan } = params;
-
-    if (!kodePKM || !tahun || !bulan) {
-      return err('Parameter kodePKM, tahun, bulan diperlukan');
-    }
-
-    if (!process.env.GOOGLE_SERVICE_ACCOUNT) {
-      return err('Google Service Account belum dikonfigurasi');
-    }
-
-    try {
-      // GANTI INI DENGAN ID FOLDER GOOGLE DRIVE ANDA!!!
-      const ROOT_FOLDER_ID = '1WYRRcm5oxbCaPx8s9XNUkTUe1b85wuDG';
-      
-      const drive = await getDriveClient();
-
-      // Buat struktur folder: ROOT / PKM / Tahun / Bulan
-      const pkmFolderId = await findOrCreateFolder(drive, kodePKM, ROOT_FOLDER_ID);
-      const tahunFolderId = await findOrCreateFolder(drive, tahun.toString(), pkmFolderId);
-      const bulanFolderId = await findOrCreateFolder(drive, `${String(bulan).padStart(2,'0')}-${namaBulan || 'Bulan'}`, tahunFolderId);
-
-      const folderUrl = `https://drive.google.com/drive/folders/${bulanFolderId}`;
-
-      return ok({ 
-        folderId: bulanFolderId, 
-        folderUrl,
-        pkmFolderId,
-        tahunFolderId 
-      });
-    } catch (e) {
-      console.error('Drive error:', e);
-      return err('Error Google Drive: ' + e.message, 500);
-    }
+  if (!process.env.GOOGLE_SERVICE_ACCOUNT) {
+    return err('Google Service Account belum dikonfigurasi');
   }
 
-  // POST - Upload file
-  if (event.httpMethod === 'POST') {
-    return await handleFileUpload(event);
+  try {
+    // GANTI INI DENGAN ID FOLDER GOOGLE DRIVE ANDA!!!
+    const ROOT_FOLDER_ID = '1WYRRcm5oxbCaPx8s9XNUkTUe1b85wuDG';
+    
+    const drive = await getDriveClient();
+
+    // Buat struktur folder: ROOT / PKM / Tahun / Bulan
+    const pkmFolderId = await findOrCreateFolder(drive, kodePKM, ROOT_FOLDER_ID);
+    const tahunFolderId = await findOrCreateFolder(drive, tahun.toString(), pkmFolderId);
+    const bulanFolderId = await findOrCreateFolder(drive, `${String(bulan).padStart(2,'0')}-${namaBulan || 'Bulan'}`, tahunFolderId);
+
+    const folderUrl = `https://drive.google.com/drive/folders/${bulanFolderId}`;
+
+    return ok({ 
+      folderId: bulanFolderId, 
+      folderUrl,
+      pkmFolderId,
+      tahunFolderId 
+    });
+  } catch (e) {
+    console.error('Drive GET error:', e);
+    return err('Error Google Drive: ' + e.message, 500);
   }
+}
 
-  return err('Method tidak diizinkan', 405);
-};
-
-// Fungsi untuk handle file upload
-async function handleFileUpload(event) {
+// Handler POST - Upload file
+async function handlePostRequest(event) {
   try {
     // Parse multipart form data
     const form = new formidable.IncomingForm();
@@ -205,7 +185,6 @@ async function handleFileUpload(event) {
       });
     } catch (permError) {
       console.warn('Warning: Gagal set permission:', permError.message);
-      // Lanjutkan walau permission gagal
     }
 
     // Simpan ke database
@@ -273,3 +252,41 @@ async function handleFileUpload(event) {
     return err('Gagal upload file: ' + error.message, 500);
   }
 }
+
+// Handler utama
+exports.handler = async (event) => {
+  // Handle CORS preflight
+  if (event.httpMethod === 'OPTIONS') {
+    return {
+      statusCode: 200,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
+      },
+      body: ''
+    };
+  }
+
+  // Route berdasarkan method
+  if (event.httpMethod === 'GET') {
+    return await handleGetRequest(event);
+  }
+  
+  if (event.httpMethod === 'POST') {
+    return await handlePostRequest(event);
+  }
+
+  // Method tidak diizinkan
+  return {
+    statusCode: 405,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ 
+      success: false, 
+      message: 'Method tidak diizinkan' 
+    })
+  };
+};

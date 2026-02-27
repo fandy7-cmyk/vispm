@@ -474,9 +474,18 @@ textarea.form-control { resize: vertical; }
       <button class="btn-icon" onclick="closeModal('indikatorModal')"><span class="material-icons">close</span></button>
     </div>
     <div class="modal-body">
-      <div class="info-card info" id="indModalInfo">
+      <!-- SPM di atas -->
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:linear-gradient(135deg,#0d9488,#06b6d4);border-radius:10px;margin-bottom:12px;color:white">
+        <div>
+          <div style="font-size:11px;opacity:0.8;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px">Indeks SPM (Kinerja × Beban Kerja)</div>
+          <div style="font-size:30px;font-weight:800;font-family:'JetBrains Mono',monospace;line-height:1" id="indModalSPMTop">0.00</div>
+        </div>
+        <span class="material-icons" style="font-size:40px;opacity:0.3">assessment</span>
+      </div>
+      <!-- Info upload -->
+      <div class="info-card info" id="indModalInfo" style="margin-bottom:10px">
         <span class="material-icons">info</span>
-        <div class="info-card-text">Isi target dan realisasi setiap indikator. Nilai akan dihitung otomatis.</div>
+        <div class="info-card-text">Isi target dan realisasi, lalu klik Upload untuk setiap indikator.</div>
       </div>
       <div class="table-container">
         <table class="ind-table">
@@ -489,9 +498,9 @@ textarea.form-control { resize: vertical; }
           <tbody id="indikatorInputBody"></tbody>
         </table>
       </div>
-      <div style="margin-top:16px;padding:12px 16px;background:var(--border-light);border-radius:10px;display:flex;justify-content:space-between;align-items:center;">
-        <span style="font-size:13px;color:var(--text-light);">Indeks SPM (Kinerja × Beban Kerja)</span>
-        <span style="font-size:18px;font-weight:800;color:var(--primary);font-family:'JetBrains Mono',monospace;" id="indModalSPM">0.0000</span>
+      <div style="margin-top:12px;padding:10px 16px;background:var(--border-light);border-radius:10px;display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:13px;color:var(--text-light);">Total Indeks SPM</span>
+        <span style="font-size:20px;font-weight:800;color:var(--primary);font-family:'JetBrains Mono',monospace;" id="indModalSPM">0.00</span>
       </div>
     </div>
     <div class="modal-footer">

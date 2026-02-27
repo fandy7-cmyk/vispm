@@ -2,11 +2,18 @@ const { ok, err, cors } = require('./db');
 
 async function getAccessToken() {
   const raw = process.env.GOOGLE_SERVICE_ACCOUNT;
-  if (!raw) throw new Error('GOOGLE_SERVICE_ACCOUNT belum dikonfigurasi di environment variables');
-  
+  if (!raw) throw new Error('ENV_MISSING: GOOGLE_SERVICE_ACCOUNT belum dikonfigurasi di Netlify');
+
   let credentials;
-  try { credentials = JSON.parse(raw); } 
-  catch(e) { throw new Error('Format GOOGLE_SERVICE_ACCOUNT tidak valid (harus JSON)'); }
+  try {
+    // Handle jika value mengandung newline atau escape chars
+    credentials = JSON.parse(raw);
+  } catch(e) {
+    throw new Error('ENV_INVALID: Format JSON tidak valid - ' + e.message);
+  }
+
+  if (!credentials.private_key) throw new Error('ENV_NO_KEY: private_key tidak ditemukan dalam credentials');
+  if (!credentials.client_email) throw new Error('ENV_NO_EMAIL: client_email tidak ditemukan');
 
   const crypto = require('crypto');
   const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url');
@@ -30,8 +37,11 @@ async function getAccessToken() {
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`
   });
+  
   const data = await res.json();
-  if (!data.access_token) throw new Error('Token error: ' + JSON.stringify(data));
+  if (!data.access_token) {
+    throw new Error('TOKEN_FAIL: ' + JSON.stringify(data));
+  }
   return data.access_token;
 }
 
@@ -49,13 +59,13 @@ async function findOrCreateFolder(token, name, parentId) {
     body: JSON.stringify({ name, mimeType: 'application/vnd.google-apps.folder', parents: [parentId] })
   });
   const createData = await createRes.json();
-  if (!createData.id) throw new Error('Gagal buat folder: ' + JSON.stringify(createData));
+  if (!createData.id) throw new Error('FOLDER_FAIL: ' + JSON.stringify(createData));
   return createData.id;
 }
 
 async function uploadFile(token, fileName, mimeType, base64Data, folderId) {
   const metadata = { name: fileName, parents: [folderId] };
-  const boundary = '-------314159265358979323846';
+  const boundary = 'spm_boundary_314159';
   const fileContent = Buffer.from(base64Data, 'base64');
 
   const body = Buffer.concat([
@@ -71,14 +81,14 @@ async function uploadFile(token, fileName, mimeType, base64Data, folderId) {
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': `multipart/related; boundary="${boundary}"`,
-      'Content-Length': body.length
+      'Content-Length': String(body.length)
     },
     body
   });
   const data = await res.json();
-  if (!data.id) throw new Error('Upload gagal: ' + JSON.stringify(data));
-  
-  // Make file publicly readable
+  if (!data.id) throw new Error('UPLOAD_FAIL: ' + JSON.stringify(data));
+
+  // Make publicly readable
   await fetch(`https://www.googleapis.com/drive/v3/files/${data.id}/permissions`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -97,30 +107,27 @@ exports.handler = async (event) => {
     const { kodePKM, tahun, bulan, namaBulan, noIndikator, fileName, mimeType, fileData } = body;
 
     if (!kodePKM || !tahun || !bulan || !fileName || !fileData) {
-      return err('Data tidak lengkap');
+      return err('Data tidak lengkap: butuh kodePKM, tahun, bulan, fileName, fileData');
     }
 
     const token = await getAccessToken();
-    const ROOT_FOLDER_ID = '1WYRRcm5oxbCaPx8s9XNUkTUe1b85wuDG';
+    const ROOT = '1WYRRcm5oxbCaPx8s9XNUkTUe1b85wuDG';
 
-    // Buat struktur: ROOT / PKM / Tahun / Bulan / Indikator-N
-    const pkmFolderId = await findOrCreateFolder(token, kodePKM, ROOT_FOLDER_ID);
-    const tahunFolderId = await findOrCreateFolder(token, tahun.toString(), pkmFolderId);
-    const bulanFolderId = await findOrCreateFolder(token, `${String(bulan).padStart(2,'0')}-${namaBulan||bulan}`, tahunFolderId);
-    const indFolderId = noIndikator 
-      ? await findOrCreateFolder(token, `Indikator-${noIndikator}`, bulanFolderId)
-      : bulanFolderId;
+    const pkmId = await findOrCreateFolder(token, kodePKM, ROOT);
+    const tahunId = await findOrCreateFolder(token, String(tahun), pkmId);
+    const bulanId = await findOrCreateFolder(token, `${String(bulan).padStart(2,'0')}-${namaBulan||bulan}`, tahunId);
+    const targetId = noIndikator ? await findOrCreateFolder(token, `Indikator-${noIndikator}`, bulanId) : bulanId;
 
-    const result = await uploadFile(token, fileName, mimeType || 'application/octet-stream', fileData, indFolderId);
+    const result = await uploadFile(token, fileName, mimeType || 'application/octet-stream', fileData, targetId);
 
-    return ok({ 
-      fileId: result.id, 
-      fileName: result.name, 
+    return ok({
+      fileId: result.id,
+      fileName: result.name,
       fileUrl: result.url,
-      folderUrl: `https://drive.google.com/drive/folders/${indFolderId}`
+      folderUrl: `https://drive.google.com/drive/folders/${targetId}`
     });
   } catch (e) {
-    console.error('Drive upload error:', e);
-    return err('Upload error: ' + e.message, 500);
+    console.error('Drive upload error:', e.message);
+    return err(e.message, 500);
   }
 };

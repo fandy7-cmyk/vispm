@@ -80,7 +80,7 @@ async function getIndikatorUsulan(pool, idUsulan) {
   );
   return ok(result.rows.map(r => ({
     id: r.id, no: r.no_indikator, nama: r.nama_indikator,
-    target: parseFloat(r.target)||0, realisasi: parseFloat(r.realisasi)||0,
+    target: parseFloat(r.target)||0, capaian: parseFloat(r.capaian)||0,
     realisasiRasio: parseFloat(r.realisasi_rasio)||0, bobot: r.bobot||0,
     nilaiTerbobot: parseFloat(r.nilai_terbobot)||0, status: r.status||'Draft',
     approvedBy: r.approved_by||'', approvedRole: r.approved_role||'',
@@ -142,36 +142,53 @@ async function buatUsulan(pool, body) {
 }
 
 async function updateIndikator(pool, body) {
-  const { idUsulan, noIndikator, target, realisasi, catatan, linkFile } = body;
+  const { idUsulan, noIndikator, target, capaian, catatan, linkFile } = body;
   const lockCheck = await pool.query('SELECT is_locked FROM usulan_header WHERE id_usulan=$1', [idUsulan]);
   if (lockCheck.rows.length === 0) return err('Usulan tidak ditemukan');
   if (lockCheck.rows[0].is_locked) return err('Usulan sudah terkunci');
+  
+  // Rumus: rasio = capaian / target (max 1.00, 2 desimal)
+  const t = parseFloat(target) || 0;
+  const c = parseFloat(capaian) || 0;
   let rasio = 0;
-  if (parseFloat(target) > 0) { rasio = parseFloat(realisasi)/parseFloat(target); if (rasio>1) rasio=1; }
-  const bobotResult = await pool.query('SELECT bobot FROM usulan_indikator WHERE id_usulan=$1 AND no_indikator=$2', [idUsulan,noIndikator]);
-  const bobot = bobotResult.rows.length > 0 ? parseInt(bobotResult.rows[0].bobot)||0 : 0;
-  const nilaiTerbobot = rasio * bobot;
-  await pool.query(`UPDATE usulan_indikator SET target=$1,realisasi=$2,realisasi_rasio=$3,nilai_terbobot=$4,catatan=$5,link_file=$6 WHERE id_usulan=$7 AND no_indikator=$8`,
-    [parseFloat(target)||0,parseFloat(realisasi)||0,rasio,nilaiTerbobot,catatan||'',linkFile||'',idUsulan,noIndikator]);
+  if (t > 0) { rasio = Math.round(Math.min(c / t, 1) * 100) / 100; }
+  
+  const bobotResult = await pool.query('SELECT bobot FROM usulan_indikator WHERE id_usulan=$1 AND no_indikator=$2', [idUsulan, noIndikator]);
+  const bobot = bobotResult.rows.length > 0 ? parseInt(bobotResult.rows[0].bobot) || 0 : 0;
+  // nilai = bobot * rasio
+  const nilaiTerbobot = Math.round(rasio * bobot * 100) / 100;
+  
+  await pool.query(
+    `UPDATE usulan_indikator SET target=$1, capaian=$2, realisasi_rasio=$3, nilai_terbobot=$4, catatan=$5, link_file=$6 WHERE id_usulan=$7 AND no_indikator=$8`,
+    [t, c, rasio, nilaiTerbobot, catatan||'', linkFile||'', idUsulan, noIndikator]
+  );
   await hitungSPM(pool, idUsulan);
   return ok({ message: 'Indikator berhasil diupdate', rasio, nilaiTerbobot });
 }
 
 async function hitungSPM(pool, idUsulan) {
-  const r = await pool.query('SELECT realisasi_rasio,bobot FROM usulan_indikator WHERE id_usulan=$1', [idUsulan]);
-  let totalNilai=0, totalBobot=0;
-  for (const row of r.rows) { const b=parseInt(row.bobot)||0; totalNilai+=(parseFloat(row.realisasi_rasio)||0)*b; totalBobot+=b; }
-  const indeksKinerja = totalBobot>0 ? totalNilai/totalBobot : 0;
+  const r = await pool.query('SELECT realisasi_rasio, bobot, nilai_terbobot FROM usulan_indikator WHERE id_usulan=$1', [idUsulan]);
+  let totalNilai = 0, totalBobot = 0;
+  for (const row of r.rows) {
+    totalNilai += parseFloat(row.nilai_terbobot) || 0;  // nilai = bobot * rasio
+    totalBobot += parseInt(row.bobot) || 0;
+  }
+  // indeks_kinerja = total_nilai / total_bobot
+  const indeksKinerja = totalBobot > 0 ? Math.round((totalNilai / totalBobot) * 10000) / 10000 : 0;
   const h = await pool.query('SELECT indeks_beban_kerja FROM usulan_header WHERE id_usulan=$1', [idUsulan]);
-  const indeksBeban = h.rows.length>0 ? parseFloat(h.rows[0].indeks_beban_kerja)||0 : 0;
-  const indeksSPM = indeksKinerja*indeksBeban;
-  await pool.query(`UPDATE usulan_header SET total_nilai=$1,indeks_kinerja_spm=$2,indeks_spm=$3 WHERE id_usulan=$4`, [totalNilai,indeksKinerja,indeksSPM,idUsulan]);
+  const indeksBeban = h.rows.length > 0 ? parseFloat(h.rows[0].indeks_beban_kerja) || 0 : 0;
+  // indeks_spm = indeks_kinerja * indeks_beban_kerja
+  const indeksSPM = Math.round(indeksKinerja * indeksBeban * 100) / 100;
+  await pool.query(
+    `UPDATE usulan_header SET total_nilai=$1, indeks_kinerja_spm=$2, indeks_spm=$3 WHERE id_usulan=$4`,
+    [totalNilai, indeksKinerja, indeksSPM, idUsulan]
+  );
   return indeksSPM;
 }
 
 async function submitUsulan(pool, body) {
   const { idUsulan, email } = body;
-  const indResult = await pool.query('SELECT no_indikator, link_file FROM usulan_indikator WHERE id_usulan=$1', [idUsulan]);
+  const indResult = await pool.query('SELECT no_indikator, link_file, capaian FROM usulan_indikator WHERE id_usulan=$1', [idUsulan]);
   const missing = indResult.rows.filter(r => !r.link_file || r.link_file.trim()==='');
   if (missing.length > 0) return err(`Data dukung belum lengkap. Indikator no. ${missing.map(r=>r.no_indikator).join(', ')} belum ada link file bukti.`);
   const result = await pool.query('SELECT status_global FROM usulan_header WHERE id_usulan=$1', [idUsulan]);

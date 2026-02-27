@@ -495,14 +495,27 @@ async function deleteUsulan(idUsulan) {
 let currentIndikatorUsulan = null;
 let indikatorData = [];
 
-// Root Google Drive folder
-const GDRIVE_ROOT = '1WYRRcm5oxbCaPx8s9XNUkTUe1b85wuDG';
-
-function getGDriveUrl(kodePKM, tahun, bulan) {
-  // Buka root folder — operator upload ke folder PKM/tahun/bulan secara manual
-  // Karena folder sub tidak bisa dibuat otomatis tanpa API, kita buka root folder
-  // dan tampilkan path yang harus dituju
-  return `https://drive.google.com/drive/folders/${GDRIVE_ROOT}`;
+// Buka/buat folder Google Drive otomatis
+async function openGDriveFolder(kodePKM, tahun, bulan, namaBulan) {
+  const btn = document.getElementById('btnOpenDrive');
+  if (btn) {
+    btn.innerHTML = '<span class="material-icons" style="animation:spin 0.8s linear infinite;font-size:16px">refresh</span> Membuat folder...';
+    btn.disabled = true;
+  }
+  try {
+    const result = await API.get('drive', { kodePKM, tahun, bulan, namaBulan });
+    window.open(result.folderUrl, '_blank');
+    if (btn) {
+      btn.innerHTML = '<span class="material-icons" style="font-size:16px">open_in_new</span> Buka Google Drive';
+      btn.disabled = false;
+    }
+  } catch (e) {
+    toast('Gagal membuka Google Drive: ' + e.message, 'error');
+    if (btn) {
+      btn.innerHTML = '<span class="material-icons" style="font-size:16px">open_in_new</span> Buka Google Drive';
+      btn.disabled = false;
+    }
+  }
 }
 
 async function openIndikatorModal(idUsulan) {
@@ -525,15 +538,18 @@ async function openIndikatorModal(idUsulan) {
     if (infoEl) {
       infoEl.innerHTML = `
         <span class="material-icons">folder</span>
-        <div class="info-card-text">
+        <div class="info-card-text" style="flex:1">
           Upload file bukti ke Google Drive pada folder:
           <strong>${detail.kodePKM} / ${detail.tahun} / ${namaBulan}</strong>
           — lalu paste link file di kolom "Link Bukti".
-          <a href="${getGDriveUrl(detail.kodePKM, detail.tahun, detail.bulan)}" target="_blank"
-            style="color:var(--primary);font-weight:700;display:inline-flex;align-items:center;gap:4px;margin-left:8px">
-            <span class="material-icons" style="font-size:16px">open_in_new</span>Buka Google Drive
-          </a>
-        </div>`;
+        </div>
+        <button id="btnOpenDrive" class="btn btn-primary btn-sm"
+          onclick="openGDriveFolder('${detail.kodePKM}', ${detail.tahun}, ${detail.bulan}, '${namaBulan}')"
+          style="flex-shrink:0;margin-left:12px">
+          <span class="material-icons" style="font-size:16px">open_in_new</span> Buka Google Drive
+        </button>`;
+      infoEl.style.display = 'flex';
+      infoEl.style.alignItems = 'center';
     }
 
     document.getElementById('indikatorInputBody').innerHTML = inds.map(ind => `

@@ -1,206 +1,99 @@
-const { getPool, ok, err } = require('./db');
-const { google } = require('googleapis');
-const formidable = require('formidable-serverless');
-const fs = require('fs');
+const { ok, err, cors } = require('./db');
 
-// Inisialisasi Google Drive API
-async function getDriveClient() {
-  try {
-    const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT);
-    
-    const auth = new google.auth.JWT(
-      credentials.client_email,
-      null,
-      credentials.private_key,
-      ['https://drive.google.com/drive/folders/1WYRRcm5oxbCaPx8s9XNUkTUe1b85wuDG']
-    );
-    
-    return google.drive({ version: 'v3', auth });
-  } catch (error) {
-    console.error('Drive client error:', error);
-    throw error;
-  }
+// Google Drive API helper using JWT (Service Account)
+async function getAccessToken() {
+  const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT);
+  
+  const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url');
+  const now = Math.floor(Date.now() / 1000);
+  const payload = Buffer.from(JSON.stringify({
+    iss: credentials.client_email,
+    scope: 'https://www.googleapis.com/auth/drive',
+    aud: 'https://oauth2.googleapis.com/token',
+    exp: now + 3600,
+    iat: now
+  })).toString('base64url');
+
+  const signingInput = `${header}.${payload}`;
+  
+  // Import private key and sign
+  const privateKey = credentials.private_key;
+  const crypto = require('crypto');
+  const sign = crypto.createSign('RSA-SHA256');
+  sign.update(signingInput);
+  const signature = sign.sign(privateKey, 'base64url');
+  
+  const jwt = `${signingInput}.${signature}`;
+  
+  const res = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`
+  });
+  
+  const data = await res.json();
+  if (!data.access_token) throw new Error('Gagal mendapat access token: ' + JSON.stringify(data));
+  return data.access_token;
 }
 
-// Fungsi membuat folder
-async function findOrCreateFolder(drive, name, parentId) {
-  try {
-    // Cari folder yang sudah ada
-    const response = await drive.files.list({
-      q: `name='${name.replace(/'/g, "\\'")}' and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
-      fields: 'files(id, name)'
-    });
-
-    if (response.data.files.length > 0) {
-      return response.data.files[0].id;
-    }
-
-    // Buat folder baru
-    const fileMetadata = {
-      name: name,
+async function findOrCreateFolder(token, name, parentId) {
+  // Search existing folder
+  const searchRes = await fetch(
+    `https://www.googleapis.com/drive/v3/files?q=name='${encodeURIComponent(name)}' and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false&fields=files(id,name)`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  const searchData = await searchRes.json();
+  
+  if (searchData.files && searchData.files.length > 0) {
+    return searchData.files[0].id;
+  }
+  
+  // Create new folder
+  const createRes = await fetch('https://www.googleapis.com/drive/v3/files', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      name,
       mimeType: 'application/vnd.google-apps.folder',
       parents: [parentId]
-    };
-
-    const folder = await drive.files.create({
-      resource: fileMetadata,
-      fields: 'id'
-    });
-
-    return folder.data.id;
-  } catch (error) {
-    console.error('Folder error:', error);
-    throw error;
-  }
+    })
+  });
+  const createData = await createRes.json();
+  if (!createData.id) throw new Error('Gagal membuat folder: ' + JSON.stringify(createData));
+  return createData.id;
 }
 
-// Handler utama
 exports.handler = async (event) => {
-  // CORS
-  if (event.httpMethod === 'OPTIONS') {
-    return {
-      statusCode: 200,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type',
-        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
-      },
-      body: ''
-    };
+  if (event.httpMethod === 'OPTIONS') return cors();
+
+  const params = event.queryStringParameters || {};
+  const { kodePKM, tahun, bulan, namaBulan } = params;
+
+  if (!kodePKM || !tahun || !bulan) {
+    return err('Parameter kodePKM, tahun, bulan diperlukan');
   }
 
-  const pool = getPool();
-
-  // GET - Buka folder
-  if (event.httpMethod === 'GET') {
-    try {
-      const params = event.queryStringParameters || {};
-      const { kodePKM, tahun, bulan, namaBulan } = params;
-
-      if (!kodePKM || !tahun || !bulan) {
-        return err('Parameter kodePKM, tahun, bulan diperlukan', 400);
-      }
-
-      const ROOT_FOLDER_ID = '1WYRRcm5oxbCaPx8s9XNUkTUe1b85wuDG';
-      const drive = await getDriveClient();
-
-      // Buat struktur folder
-      const pkmFolder = await findOrCreateFolder(drive, kodePKM, ROOT_FOLDER_ID);
-      const tahunFolder = await findOrCreateFolder(drive, tahun.toString(), pkmFolder);
-      const bulanFolder = await findOrCreateFolder(drive, `${String(bulan).padStart(2,'0')}-${namaBulan || 'Bulan'}`, tahunFolder);
-
-      return {
-        statusCode: 200,
-        headers: { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          success: true,
-          data: {
-            folderId: bulanFolder,
-            folderUrl: `https://drive.google.com/drive/folders/${bulanFolder}`
-          }
-        })
-      };
-
-    } catch (error) {
-      console.error('GET error:', error);
-      return err(error.message, 500);
-    }
+  if (!process.env.GOOGLE_SERVICE_ACCOUNT) {
+    return err('Google Service Account belum dikonfigurasi');
   }
 
-  // POST - Upload file
-  if (event.httpMethod === 'POST') {
-    try {
-      const form = new formidable.IncomingForm();
-      
-      const { fields, files } = await new Promise((resolve, reject) => {
-        form.parse(event, (err, fields, files) => {
-          if (err) reject(err);
-          resolve({ fields, files });
-        });
-      });
+  try {
+    const ROOT_FOLDER_ID = '1WYRRcm5oxbCaPx8s9XNUkTUe1b85wuDG';
+    const token = await getAccessToken();
 
-      const { idUsulan, noIndikator, kodePKM, tahun, bulan, namaBulan, email } = fields;
-      const uploadedFile = files.file;
+    // Buat struktur folder: ROOT / PKM / Tahun / Bulan
+    const pkmFolderId = await findOrCreateFolder(token, kodePKM, ROOT_FOLDER_ID);
+    const tahunFolderId = await findOrCreateFolder(token, tahun.toString(), pkmFolderId);
+    const bulanFolderId = await findOrCreateFolder(token, `${String(bulan).padStart(2,'0')}-${namaBulan || bulan}`, tahunFolderId);
 
-      if (!uploadedFile) {
-        return err('Tidak ada file', 400);
-      }
+    const folderUrl = `https://drive.google.com/drive/folders/${bulanFolderId}`;
 
-      // Validasi file
-      const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-      if (!allowedTypes.includes(uploadedFile.type)) {
-        return err('Tipe file tidak diizinkan', 400);
-      }
-
-      if (uploadedFile.size > 10 * 1024 * 1024) {
-        return err('File maksimal 10MB', 400);
-      }
-
-      const ROOT_FOLDER_ID = '1WYRRcm5oxbCaPx8s9XNUkTUe1b85wuDG';
-      const drive = await getDriveClient();
-
-      // Buat folder
-      const pkmFolder = await findOrCreateFolder(drive, kodePKM, ROOT_FOLDER_ID);
-      const tahunFolder = await findOrCreateFolder(drive, tahun.toString(), pkmFolder);
-      const bulanFolder = await findOrCreateFolder(drive, `${String(bulan).padStart(2,'0')}-${namaBulan}`, tahunFolder);
-      const indFolder = await findOrCreateFolder(drive, `Indikator-${noIndikator}`, bulanFolder);
-
-      // Upload file
-      const fileContent = fs.readFileSync(uploadedFile.path);
-      
-      const response = await drive.files.create({
-        resource: {
-          name: `${Date.now()}-${uploadedFile.name}`,
-          parents: [indFolder]
-        },
-        media: {
-          mimeType: uploadedFile.type,
-          body: fileContent
-        },
-        fields: 'id,name,webViewLink'
-      });
-
-      // Set public access
-      await drive.permissions.create({
-        fileId: response.data.id,
-        requestBody: { role: 'reader', type: 'anyone' }
-      });
-
-      // Simpan ke database
-      await pool.query(
-        `INSERT INTO usulan_bukti (id_usulan, no_indikator, file_name, file_url, file_size, uploaded_by)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [idUsulan, parseInt(noIndikator), response.data.name, response.data.webViewLink, uploadedFile.size, email]
-      );
-
-      // Update link_file di usulan_indikator
-      await pool.query(
-        `UPDATE usulan_indikator SET link_file = $1 
-         WHERE id_usulan = $2 AND no_indikator = $3`,
-        [response.data.webViewLink, idUsulan, parseInt(noIndikator)]
-      );
-
-      // Hapus file sementara
-      fs.unlinkSync(uploadedFile.path);
-
-      return {
-        statusCode: 200,
-        headers: { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          success: true,
-          data: {
-            message: 'File berhasil diupload',
-            fileUrl: response.data.webViewLink,
-            fileName: response.data.name
-          }
-        })
-      };
-
-    } catch (error) {
-      console.error('POST error:', error);
-      return err(error.message, 500);
-    }
+    return ok({ folderId: bulanFolderId, folderUrl });
+  } catch (e) {
+    console.error('Drive error:', e);
+    return err('Error Google Drive: ' + e.message, 500);
   }
-
-  return err('Method not allowed', 405);
 };

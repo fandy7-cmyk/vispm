@@ -431,22 +431,23 @@ async function renderInput() {
 async function loadMyUsulan() {
   try {
     const rows = await API.getUsulan({ email_operator: currentUser.email });
-    document.getElementById('myUsulanTable').innerHTML = `
+    document.getElementById('myUsulanTable').innerHTML = rows.length ? `
       <div class="table-container"><table>
-        <thead><tr><th>ID Usulan</th><th>Puskesmas</th><th>Periode</th><th>Status</th><th>Aksi</th></tr></thead>
-        <tbody>${rows.length ? rows.map(u => `<tr>
+        <thead><tr><th>ID Usulan</th><th>Puskesmas</th><th>Periode</th><th>Progress Verifikasi</th><th>Aksi</th></tr></thead>
+        <tbody>${rows.map(u => `<tr>
           <td><span style="font-family:'JetBrains Mono',monospace;font-weight:600;font-size:12px;">${u.idUsulan}</span></td>
           <td>${u.namaPKM || u.kodePKM}</td>
           <td>${u.namaBulan} ${u.tahun}</td>
-          <td>${statusBadge(u.statusGlobal)}</td>
+          <td style="min-width:220px">${renderStatusBar(u)}</td>
           <td>
             <button class="btn-icon view" onclick="viewDetail('${u.idUsulan}')"><span class="material-icons">visibility</span></button>
             ${u.statusGlobal === 'Draft' ? `<button class="btn-icon edit" onclick="openIndikatorModal('${u.idUsulan}')"><span class="material-icons">edit</span></button>` : ''}
             ${u.statusGlobal === 'Draft' ? `<button class="btn-icon del" onclick="deleteUsulan('${u.idUsulan}')"><span class="material-icons">delete</span></button>` : ''}
+            ${u.statusGlobal === 'Ditolak' ? `<button class="btn btn-secondary btn-sm" onclick="openIndikatorModal('${u.idUsulan}')"><span class="material-icons" style="font-size:14px">restart_alt</span> Perbaiki</button>` : ''}
           </td>
-        </tr>`).join('') : `<tr><td colspan="5"><div class="empty-state" style="padding:24px"><p>Belum ada usulan</p></div></td></tr>`}
+        </tr>`).join('')}
         </tbody>
-      </table></div>`;
+      </table></div>` : `<div class="empty-state" style="padding:32px"><span class="material-icons">inbox</span><p>Belum ada usulan</p></div>`;
   } catch (e) { toast(e.message, 'error'); }
 }
 
@@ -454,26 +455,15 @@ async function createUsulan() {
   const kodePKM = document.getElementById('inputPKM').value;
   const tahun = document.getElementById('inputTahun').value;
   const bulan = document.getElementById('inputBulan').value;
-  const namaBulan = BULAN_NAMA[parseInt(bulan)];
-
   if (!kodePKM) return toast('Pilih puskesmas terlebih dahulu', 'error');
-
-  // Cek apakah sudah ada usulan untuk periode ini
   setLoading(true);
   try {
-    const existing = await API.getUsulan({ email_operator: currentUser.email });
-    const duplikat = existing.find(u => u.kodePKM === kodePKM && u.tahun == tahun && u.bulan == bulan);
-    if (duplikat) {
-      setLoading(false);
-      return toast(`Usulan untuk ${namaBulan} ${tahun} sudah ada (${duplikat.idUsulan}). Setiap puskesmas hanya dapat mengajukan 1 usulan per periode.`, 'warning');
-    }
-
     const result = await API.buatUsulan({ kodePKM, tahun: parseInt(tahun), bulan: parseInt(bulan), emailOperator: currentUser.email });
-    toast(`Usulan ${result.idUsulan} berhasil dibuat`);
+    toast(`Usulan ${result.idUsulan} berhasil dibuat! Silakan isi data indikator.`, 'success');
     loadMyUsulan();
-    setTimeout(() => openIndikatorModal(result.idUsulan), 500);
+    setTimeout(() => openIndikatorModal(result.idUsulan), 600);
   } catch (e) {
-    toast(e.message, 'error');
+    toast(e.message, 'warning');
   } finally {
     setLoading(false);
   }
@@ -495,35 +485,30 @@ async function deleteUsulan(idUsulan) {
 let currentIndikatorUsulan = null;
 let indikatorData = [];
 
-// FUNGSI UNTUK MEMBUKA GOOGLE DRIVE (1 FOLDER SAJA)
-async function openGDriveFolder() {
+// Buka/buat folder Google Drive otomatis
+async function openGDriveFolder(kodePKM, tahun, bulan, namaBulan, idUsulan) {
   const btn = document.getElementById('btnOpenDrive');
-  if (btn) {
-    btn.innerHTML = '<span class="material-icons" style="animation:spin 0.8s linear infinite;font-size:16px">refresh</span> Membuka...';
-    btn.disabled = true;
-  }
-  
+  if (btn) { btn.innerHTML = '<span class="material-icons" style="font-size:15px;animation:spin 0.8s linear infinite">refresh</span> Membuat folder...'; btn.disabled = true; }
   try {
-    // LANGSUNG BUKA ROOT FOLDER (GANTI DENGAN LINK FOLDER ANDA)
-    const folderUrl = 'https://drive.google.com/drive/folders/1WYRRcm5oxbCaPx8s9XNUkTUe1b85wuDG';
-    
-    // Buka folder di tab baru
-    window.open(folderUrl, '_blank');
-    
-    toast('Folder berhasil dibuka', 'success');
-    
-  } catch (e) {
-    console.error('Open folder error:', e);
-    toast('Gagal membuka folder: ' + e.message, 'error');
-  } finally {
-    if (btn) {
-      btn.innerHTML = '<span class="material-icons" style="font-size:16px">open_in_new</span> Buka Google Drive';
-      btn.disabled = false;
+    const result = await API.get('drive', { kodePKM, tahun, bulan, namaBulan });
+    // Save folder URL to DB
+    if (idUsulan) {
+      await fetch(`/api/usulan?action=drive-folder`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idUsulan, driveFolderId: result.folderId, driveFolderUrl: result.folderUrl })
+      });
     }
+    window.open(result.folderUrl, '_blank');
+    if (btn) { btn.innerHTML = '<span class="material-icons" style="font-size:15px">folder_open</span> Buka Folder Drive'; btn.disabled = false; }
+    // Update link info
+    const linkEl = document.getElementById('driveFolderLink');
+    if (linkEl) { linkEl.href = result.folderUrl; linkEl.style.display = 'inline-flex'; }
+  } catch (e) {
+    toast('Gagal membuka Google Drive: ' + e.message, 'error');
+    if (btn) { btn.innerHTML = '<span class="material-icons" style="font-size:15px">open_in_new</span> Buka Google Drive'; btn.disabled = false; }
   }
 }
 
-// FUNGSI UTAMA UNTUK MEMBUKA MODAL INDIKATOR
 async function openIndikatorModal(idUsulan) {
   currentIndikatorUsulan = idUsulan;
   document.getElementById('indModalId').textContent = idUsulan;
@@ -531,11 +516,7 @@ async function openIndikatorModal(idUsulan) {
   document.getElementById('indikatorInputBody').innerHTML = `<tr><td colspan="8"><div class="empty-state" style="padding:20px"><p>Memuat data...</p></div></td></tr>`;
 
   try {
-    const [detail, inds] = await Promise.all([
-      API.getDetailUsulan(idUsulan), 
-      API.getIndikatorUsulan(idUsulan)
-    ]);
-    
+    const [detail, inds] = await Promise.all([API.getDetailUsulan(idUsulan), API.getIndikatorUsulan(idUsulan)]);
     indikatorData = inds;
     const isLocked = detail.isLocked || detail.statusGlobal !== 'Draft';
     const namaBulan = BULAN_NAMA[detail.bulan] || detail.bulan;
@@ -543,88 +524,40 @@ async function openIndikatorModal(idUsulan) {
     document.getElementById('indModalSPM').textContent = parseFloat(detail.indeksSPM).toFixed(4);
     document.getElementById('btnSubmitFromModal').style.display = isLocked ? 'none' : 'flex';
 
-    // Generate tabel dengan tombol upload
-    let tableHtml = '';
-    
-    for (const ind of inds) {
-      // Parse existing files dari link_file
-      let files = [];
-      if (ind.linkFile) {
-        try {
-          files = JSON.parse(ind.linkFile);
-        } catch {
-          // Kalau bukan JSON (link lama), jadikan array
-          files = [{ name: 'File', url: ind.linkFile }];
-        }
-      }
-
-      // Buat HTML untuk daftar file
-      const fileListHtml = files.map((f, i) => `
-        <div style="display:flex; align-items:center; gap:4px; padding:2px 0; border-bottom:1px dashed var(--border-light);">
-          <span class="material-icons" style="font-size:14px; color:var(--primary);">${getFileIcon(f.name)}</span>
-          <span style="flex:1; font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${f.name}">${f.name}</span>
-          <span style="font-size:9px; color:var(--text-light);">${formatFileSize(f.size)}</span>
-          <a href="${f.url || f.data}" target="_blank" class="btn-icon" style="padding:2px;" title="Lihat file">
-            <span class="material-icons" style="font-size:14px;">visibility</span>
-          </a>
-          ${!isLocked ? `
-            <button class="btn-icon" style="padding:2px; color:var(--danger);" onclick="deleteFile(${ind.no}, ${i})" title="Hapus">
-              <span class="material-icons" style="font-size:14px;">delete</span>
-            </button>
-          ` : ''}
+    // Update info drive di modal
+    const infoEl = document.getElementById('indModalInfo');
+    if (infoEl && !isLocked) {
+      infoEl.innerHTML = `
+        <span class="material-icons" style="color:#0d9488;flex-shrink:0">folder</span>
+        <div class="info-card-text" style="flex:1;font-size:12.5px">
+          <strong>Wajib upload bukti tiap indikator.</strong>
+          Upload ke Google Drive folder:
+          <strong>${detail.kodePKM} / ${detail.tahun} / ${namaBulan}</strong>
+          lalu paste link di kolom "Link Bukti" ↓
+          ${detail.driveFolderUrl ? `<a id="driveFolderLink" href="${detail.driveFolderUrl}" target="_blank" style="display:inline-flex;align-items:center;gap:3px;color:#0d9488;font-weight:700;margin-left:8px"><span class="material-icons" style="font-size:13px">open_in_new</span>Buka folder</a>` : ''}
         </div>
-      `).join('');
-
-      tableHtml += `
-        <tr id="indRow-${ind.no}">
-          <td><span style="font-family:'JetBrains Mono';font-weight:700">${ind.no}</span></td>
-          <td style="max-width:240px;font-size:13px">${ind.nama}</td>
-          <td style="text-align:center">${ind.bobot}</td>
-          <td>${isLocked ? `<span>${ind.target}</span>` : `<input type="number" id="t-${ind.no}" value="${ind.target}" min="0" max="100" step="0.01" onchange="saveIndikator(${ind.no})" style="width:70px; padding:4px; border:1.5px solid var(--border); border-radius:4px;">`}</td>
-          <td>${isLocked ? `<span>${ind.realisasi}</span>` : `<input type="number" id="r-${ind.no}" value="${ind.realisasi}" min="0" step="0.01" onchange="saveIndikator(${ind.no})" style="width:70px; padding:4px; border:1.5px solid var(--border); border-radius:4px;">`}</td>
-          <td class="rasio-cell" id="rasio-${ind.no}">${(ind.realisasiRasio * 100).toFixed(1)}%</td>
-          <td class="rasio-cell" id="nilai-${ind.no}">${parseFloat(ind.nilaiTerbobot).toFixed(2)}</td>
-          <td>
-            ${!isLocked ? `
-              <div style="display:flex; flex-direction:column; gap:6px;">
-                <div style="display:flex; gap:4px;">
-                  <input type="file" id="file-${ind.no}" style="display:none;" multiple accept=".pdf,.jpg,.jpeg,.png,.doc,.docx">
-                  <button class="btn btn-secondary btn-sm" onclick="document.getElementById('file-${ind.no}').click()" style="flex:1; padding:6px;">
-                    <span class="material-icons" style="font-size:16px;">cloud_upload</span> Upload
-                  </button>
-                  <button class="btn-icon" onclick="uploadFiles(${ind.no})" title="Upload file">
-                    <span class="material-icons">attach_file</span>
-                  </button>
-                </div>
-                <div id="file-list-${ind.no}" style="max-height:80px; overflow-y:auto; padding:2px; background:var(--border-light); border-radius:4px;">
-                  ${fileListHtml || '<div style="padding:4px; text-align:center; color:var(--text-light); font-size:11px;">Belum ada file</div>'}
-                </div>
-              </div>
-            ` : (files.length > 0 ? `
-              <div style="max-height:100px; overflow-y:auto;">
-                ${fileListHtml}
-              </div>
-            ` : '-')}
-          </td>
-        </tr>`;
+        <button id="btnOpenDrive" class="btn btn-primary btn-sm"
+          onclick="openGDriveFolder('${detail.kodePKM}', ${detail.tahun}, ${detail.bulan}, '${namaBulan}', '${idUsulan}')"
+          style="flex-shrink:0;margin-left:8px;font-size:12px">
+          <span class="material-icons" style="font-size:14px">drive_folder_upload</span> Buat/Buka Folder
+        </button>`;
+      infoEl.style.display = 'flex';
+      infoEl.style.alignItems = 'center';
+      infoEl.style.gap = '10px';
+    } else if (infoEl && isLocked) {
+      infoEl.innerHTML = detail.driveFolderUrl
+        ? `<span class="material-icons" style="color:#0d9488">folder</span><div class="info-card-text" style="flex:1">Folder Google Drive: <a href="${detail.driveFolderUrl}" target="_blank" style="color:#0d9488;font-weight:700">Lihat Folder Bukti ↗</a></div>`
+        : `<span class="material-icons">info</span><div class="info-card-text">Usulan terkunci</div>`;
+      infoEl.style.display = 'flex';
     }
 
-    document.getElementById('indikatorInputBody').innerHTML = tableHtml;
-
-  } catch (e) {
-    toast(e.message, 'error');
-    console.error(e);
-  }
-}
-
-    // TABLE INDIKATOR
     document.getElementById('indikatorInputBody').innerHTML = inds.map(ind => `
       <tr id="indRow-${ind.no}">
         <td><span style="font-family:'JetBrains Mono';font-weight:700">${ind.no}</span></td>
         <td style="max-width:240px;font-size:13px">${ind.nama}</td>
         <td style="text-align:center">${ind.bobot}</td>
-        <td>${isLocked ? `<span>${ind.target}</span>` : `<input type="number" id="t-${ind.no}" value="${ind.target}" min="0" max="100" step="0.01" onchange="saveIndikator(${ind.no})" style="width:70px;">`}</td>
-        <td>${isLocked ? `<span>${ind.realisasi}</span>` : `<input type="number" id="r-${ind.no}" value="${ind.realisasi}" min="0" step="0.01" onchange="saveIndikator(${ind.no})" style="width:70px;">`}</td>
+        <td>${isLocked ? `<span>${ind.target}</span>` : `<input type="number" id="t-${ind.no}" value="${ind.target}" min="0" max="100" step="0.01" onchange="saveIndikator(${ind.no})">`}</td>
+        <td>${isLocked ? `<span>${ind.realisasi}</span>` : `<input type="number" id="r-${ind.no}" value="${ind.realisasi}" min="0" step="0.01" onchange="saveIndikator(${ind.no})">`}</td>
         <td class="rasio-cell" id="rasio-${ind.no}">${(ind.realisasiRasio * 100).toFixed(1)}%</td>
         <td class="rasio-cell" id="nilai-${ind.no}">${parseFloat(ind.nilaiTerbobot).toFixed(2)}</td>
         <td>
@@ -687,11 +620,34 @@ async function viewDetail(idUsulan) {
   document.getElementById('detailModalId').textContent = idUsulan;
   showModal('detailModal');
   document.getElementById('detailModalBody').innerHTML = `<div class="empty-state"><p>Memuat...</p></div>`;
-
   try {
     const [detail, inds] = await Promise.all([API.getDetailUsulan(idUsulan), API.getIndikatorUsulan(idUsulan)]);
+    const vp = detail.verifikasiProgram || [];
+    const vpHtml = vp.length ? `
+      <div style="margin-top:16px">
+        <div style="font-weight:700;font-size:13px;margin-bottom:8px;display:flex;align-items:center;gap:6px">
+          <span class="material-icons" style="font-size:16px;color:var(--primary)">groups</span>
+          Progress Verifikasi Pengelola Program (${vp.filter(v=>v.status==='Selesai').length}/${vp.length} selesai)
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px">
+          ${vp.map(v => `<div style="background:${v.status==='Selesai'?'#e6fffa':'#f8fafc'};border:1.5px solid ${v.status==='Selesai'?'#0d9488':'#e2e8f0'};border-radius:8px;padding:10px">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+              <span class="material-icons" style="font-size:15px;color:${v.status==='Selesai'?'#0d9488':'#94a3b8'}">${v.status==='Selesai'?'check_circle':'hourglass_top'}</span>
+              <span style="font-size:12.5px;font-weight:700;color:${v.status==='Selesai'?'#0d9488':'#64748b'}">${v.nama_program||v.email_program}</span>
+            </div>
+            <div style="font-size:11px;color:#94a3b8">Indikator: ${v.indikator_akses||'Semua'}</div>
+            ${v.status==='Selesai'&&v.verified_at?`<div style="font-size:10.5px;color:#0d9488">${formatDateTime(v.verified_at)}</div>`:''}
+            ${v.catatan?`<div style="font-size:11px;color:#64748b;margin-top:3px;font-style:italic">"${v.catatan}"</div>`:''}
+          </div>`).join('')}
+        </div>
+      </div>` : '';
 
-    document.getElementById('detailModalBody').innerHTML = `
+    // Show/hide PDF btn
+  const pdfBtn = document.getElementById('btnDownloadPDF');
+  if (pdfBtn) pdfBtn.style.display = detail.statusGlobal === 'Selesai' ? 'inline-flex' : 'none';
+
+  document.getElementById('detailModalBody').innerHTML = `
+      <div style="margin-bottom:16px">${renderStatusBar({...detail, vpProgress: detail.verifikasiProgram ? {total:vp.length,selesai:vp.filter(v=>v.status==='Selesai').length} : null})}</div>
       <div class="detail-grid">
         <div class="detail-item"><label>Puskesmas</label><span>${detail.namaPKM}</span></div>
         <div class="detail-item"><label>Periode</label><span>${detail.namaBulan} ${detail.tahun}</span></div>
@@ -699,28 +655,32 @@ async function viewDetail(idUsulan) {
         <div class="detail-item"><label>Dibuat Oleh</label><span>${detail.createdBy}</span></div>
         <div class="detail-item"><label>Indeks Kinerja</label><span style="font-family:'JetBrains Mono'">${parseFloat(detail.indeksKinerja).toFixed(4)}</span></div>
         <div class="detail-item"><label>Indeks Beban</label><span style="font-family:'JetBrains Mono'">${parseFloat(detail.indeksBeban).toFixed(2)}</span></div>
-        <div class="detail-item" style="grid-column:span 2"><label>Indeks SPM</label><span style="font-family:'JetBrains Mono';font-size:20px;color:var(--primary);font-weight:800">${parseFloat(detail.indeksSPM).toFixed(4)}</span></div>
+        <div class="detail-item" style="grid-column:span 2">
+          <label>Indeks SPM</label>
+          <span style="font-family:'JetBrains Mono';font-size:22px;color:var(--primary);font-weight:800">${parseFloat(detail.indeksSPM).toFixed(4)}</span>
+        </div>
       </div>
-      <div style="font-weight:700;font-size:13.5px;margin-bottom:10px;">Detail Indikator</div>
-      <div class="table-container">
+      ${detail.driveFolderUrl ? `<div style="margin-bottom:12px"><a href="${detail.driveFolderUrl}" target="_blank" class="btn btn-secondary btn-sm"><span class="material-icons" style="font-size:14px">folder_open</span> Lihat Folder Bukti Google Drive</a></div>` : ''}
+      <div style="font-weight:700;font-size:13.5px;margin-bottom:8px">Detail Indikator</div>
+      <div class="table-container" style="max-height:280px;overflow-y:auto">
         <table>
-          <thead><tr><th>No</th><th>Indikator</th><th>Target</th><th>Realisasi</th><th>Rasio</th><th>Bobot</th><th>Nilai</th></tr></thead>
+          <thead><tr><th>No</th><th>Indikator</th><th>Target</th><th>Realisasi</th><th>Rasio</th><th>Bobot</th><th>Nilai</th><th>Bukti</th></tr></thead>
           <tbody>${inds.map(i => `<tr>
-            <td>${i.no}</td><td style="max-width:260px;font-size:13px">${i.nama}</td>
+            <td>${i.no}</td><td style="max-width:220px;font-size:12.5px">${i.nama}</td>
             <td>${i.target}</td><td>${i.realisasi}</td>
-            <td class="rasio-cell">${(i.realisasiRasio * 100).toFixed(1)}%</td>
+            <td class="rasio-cell">${(i.realisasiRasio*100).toFixed(1)}%</td>
             <td>${i.bobot}</td><td class="rasio-cell">${parseFloat(i.nilaiTerbobot).toFixed(2)}</td>
+            <td>${i.linkFile?`<a href="${i.linkFile}" target="_blank" style="color:var(--primary);display:inline-flex;align-items:center;gap:2px;font-size:12px"><span class="material-icons" style="font-size:13px">open_in_new</span>Lihat</a>`:'-'}</td>
           </tr>`).join('')}</tbody>
         </table>
       </div>
-      <div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
-        ${approvalBox('Kapus', detail.statusProgram === 'Disetujui' ? detail.finalApprovedBy : '', detail.finalApprovedAt)}
-        ${approvalBox('Program', detail.statusFinal === 'Disetujui' ? detail.finalApprovedBy : '', '')}
-        ${approvalBox('Admin', detail.statusGlobal === 'Selesai' ? detail.finalApprovedBy : '', detail.finalApprovedAt)}
+      ${vpHtml}
+      <div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+        ${approvalBox('Kapus', detail.kapusApprovedBy, detail.kapusApprovedAt)}
+        ${approvalBox('Program', vp.length && vp.every(v=>v.status==='Selesai') ? 'Semua selesai' : '', '')}
+        ${approvalBox('Admin', detail.adminApprovedBy, detail.adminApprovedAt)}
       </div>`;
-  } catch (e) {
-    toast(e.message, 'error');
-  }
+  } catch (e) { toast(e.message, 'error'); }
 }
 
 function approvalBox(label, by, at) {
@@ -733,6 +693,12 @@ function approvalBox(label, by, at) {
   </div>`;
 }
 
+
+// ============== LAPORAN PDF ==============
+function downloadLaporanPDF(idUsulan) {
+  window.open(`/api/laporan-pdf?id=${idUsulan}`, '_blank');
+  toast('Membuka laporan PDF...', 'success');
+}
 // ============== VERIFIKASI ==============
 async function renderVerifikasi() {
   const role = currentUser.role;
@@ -827,12 +793,22 @@ async function doApprove() {
   const role = currentUser.role;
   setLoading(true);
   try {
-    if (role === 'Kapus') await API.approveKapus({ idUsulan: verifCurrentUsulan, email: currentUser.email, catatan });
-    else if (role === 'Pengelola Program') await API.approveProgram({ idUsulan: verifCurrentUsulan, email: currentUser.email, catatan });
-    else if (role === 'Admin') await API.approveAdmin({ idUsulan: verifCurrentUsulan, email: currentUser.email, catatan });
-    toast('Usulan berhasil disetujui!');
+    let result;
+    if (role === 'Kapus') result = await API.approveKapus({ idUsulan: verifCurrentUsulan, email: currentUser.email, catatan });
+    else if (role === 'Pengelola Program') result = await API.approveProgram({ idUsulan: verifCurrentUsulan, email: currentUser.email, catatan });
+    else if (role === 'Admin') result = await API.approveAdmin({ idUsulan: verifCurrentUsulan, email: currentUser.email, catatan });
+
+    toast(result?.message || 'Berhasil disetujui!', 'success');
     closeModal('verifikasiModal');
     renderVerifikasi();
+
+    // Admin: offer PDF download after final approve
+    if (role === 'Admin') {
+      setTimeout(() => {
+        showConfirm({ title: 'Laporan Tersedia', message: 'Usulan selesai diverifikasi. Download laporan PDF sekarang?', type: 'warning',
+          onConfirm: () => downloadLaporanPDF(verifCurrentUsulan) });
+      }, 800);
+    }
   } catch (e) { toast(e.message, 'error'); }
   finally { setLoading(false); }
 }
@@ -1543,270 +1519,3 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.key === 'Enter') doLogin();
   });
 });
-
-// ============== FUNGSI UPLOAD FILE ==============
-
-// Ikon file berdasarkan ekstensi
-function getFileIcon(filename) {
-  const ext = filename.split('.').pop().toLowerCase();
-  if (ext === 'pdf') return 'picture_as_pdf';
-  if (['jpg', 'jpeg', 'png'].includes(ext)) return 'image';
-  if (['doc', 'docx'].includes(ext)) return 'description';
-  if (['xls', 'xlsx'].includes(ext)) return 'table_chart';
-  return 'insert_drive_file';
-}
-
-// Format ukuran file
-function formatFileSize(bytes) {
-  if (!bytes) return '';
-  if (bytes < 1024) return bytes + ' B';
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-}
-
-// Baca file sebagai Base64
-function readFileAsBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
-// Upload file untuk indikator tertentu
-async function uploadFiles(noIndikator) {
-  const fileInput = document.getElementById(`file-${noIndikator}`);
-  
-  if (!fileInput.files || fileInput.files.length === 0) {
-    toast('Pilih file terlebih dahulu', 'warning');
-    return;
-  }
-
-  // Validasi jumlah file (max 5 file per upload)
-  if (fileInput.files.length > 5) {
-    toast('Maksimal 5 file dalam satu kali upload', 'warning');
-    return;
-  }
-
-  const files = Array.from(fileInput.files);
-  const uploadedFiles = [];
-  
-  setLoading(true);
-  
-  try {
-    for (const file of files) {
-      // Validasi ukuran (max 5MB per file)
-      if (file.size > 5 * 1024 * 1024) {
-        toast(`File ${file.name} terlalu besar (max 5MB)`, 'error');
-        continue;
-      }
-
-      // Validasi tipe file
-      const allowedTypes = [
-        'application/pdf',
-        'image/jpeg', 'image/jpg', 'image/png',
-        'application/msword',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-      ];
-      
-      const fileType = file.type.toLowerCase();
-      if (!allowedTypes.some(t => fileType.includes(t))) {
-        toast(`Tipe file ${file.name} tidak diizinkan. Hanya PDF, JPG, PNG, DOC, DOCX`, 'error');
-        continue;
-      }
-
-      // Baca file sebagai Base64
-      const base64 = await readFileAsBase64(file);
-      
-      uploadedFiles.push({
-        name: file.name,
-        type: file.type,
-        size: file.size,
-        data: base64,
-        uploadedAt: new Date().toISOString()
-      });
-    }
-
-    if (uploadedFiles.length === 0) {
-      setLoading(false);
-      return;
-    }
-
-    // Ambil data file yang sudah ada
-    const currentInd = indikatorData.find(i => i.no === noIndikator);
-    let existingFiles = [];
-    
-    if (currentInd?.linkFile) {
-      try {
-        existingFiles = JSON.parse(currentInd.linkFile);
-      } catch {
-        // Konversi link lama ke format baru
-        existingFiles = [{ name: 'File', url: currentInd.linkFile }];
-      }
-    }
-
-    // Gabungkan file lama dan baru
-    const allFiles = [...existingFiles, ...uploadedFiles];
-    
-    // Simpan ke database
-    await saveIndikatorWithFiles(noIndikator, allFiles);
-    
-    // Update tampilan daftar file
-    await updateFileList(noIndikator, allFiles);
-    
-    // Reset input file
-    fileInput.value = '';
-    
-    toast(`${uploadedFiles.length} file berhasil diupload`, 'success');
-    
-  } catch (error) {
-    console.error('Upload error:', error);
-    toast('Gagal upload: ' + error.message, 'error');
-  } finally {
-    setLoading(false);
-  }
-}
-
-// Simpan file ke database
-async function saveIndikatorWithFiles(noIndikator, files) {
-  const target = parseFloat(document.getElementById(`t-${noIndikator}`)?.value) || 0;
-  const realisasi = parseFloat(document.getElementById(`r-${noIndikator}`)?.value) || 0;
-  
-  // Simpan files sebagai JSON string
-  const linkFile = JSON.stringify(files);
-
-  const result = await API.updateIndikatorUsulan({
-    idUsulan: currentIndikatorUsulan,
-    noIndikator,
-    target,
-    realisasi,
-    linkFile
-  });
-
-  // Update UI
-  document.getElementById(`rasio-${noIndikator}`).textContent = (result.rasio * 100).toFixed(1) + '%';
-  document.getElementById(`nilai-${noIndikator}`).textContent = parseFloat(result.nilaiTerbobot).toFixed(2);
-
-  // Refresh SPM
-  const detail = await API.getDetailUsulan(currentIndikatorUsulan);
-  document.getElementById('indModalSPM').textContent = parseFloat(detail.indeksSPM).toFixed(4);
-  
-  // Update indikatorData
-  const indIndex = indikatorData.findIndex(i => i.no === noIndikator);
-  if (indIndex >= 0) {
-    indikatorData[indIndex].linkFile = linkFile;
-  }
-}
-
-// Update tampilan daftar file
-async function updateFileList(noIndikator, files) {
-  const container = document.getElementById(`file-list-${noIndikator}`);
-  if (!container) return;
-
-  if (!files || files.length === 0) {
-    container.innerHTML = '<div style="padding:4px; text-align:center; color:var(--text-light); font-size:11px;">Belum ada file</div>';
-    return;
-  }
-
-  container.innerHTML = files.map((file, index) => `
-    <div style="display:flex; align-items:center; gap:4px; padding:2px 0; border-bottom:1px dashed var(--border-light);">
-      <span class="material-icons" style="font-size:14px; color:var(--primary);">${getFileIcon(file.name)}</span>
-      <span style="flex:1; font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${file.name}">${file.name}</span>
-      <span style="font-size:9px; color:var(--text-light);">${formatFileSize(file.size)}</span>
-      <a href="${file.data || file.url}" target="_blank" class="btn-icon" style="padding:2px;" title="Lihat file">
-        <span class="material-icons" style="font-size:14px;">visibility</span>
-      </a>
-      <button class="btn-icon" style="padding:2px; color:var(--danger);" onclick="deleteFile(${noIndikator}, ${index})" title="Hapus">
-        <span class="material-icons" style="font-size:14px;">delete</span>
-      </button>
-    </div>
-  `).join('');
-}
-
-// Hapus file
-async function deleteFile(noIndikator, fileIndex) {
-  showConfirm({
-    title: 'Hapus File',
-    message: 'Yakin ingin menghapus file ini?',
-    type: 'warning',
-    onConfirm: async () => {
-      try {
-        // Ambil data file yang ada
-        const currentInd = indikatorData.find(i => i.no === noIndikator);
-        let files = [];
-        
-        if (currentInd?.linkFile) {
-          try {
-            files = JSON.parse(currentInd.linkFile);
-          } catch {
-            files = [{ name: 'File', url: currentInd.linkFile }];
-          }
-        }
-        
-        // Hapus file berdasarkan index
-        files.splice(fileIndex, 1);
-        
-        // Simpan kembali
-        await saveIndikatorWithFiles(noIndikator, files);
-        
-        // Update tampilan
-        await updateFileList(noIndikator, files);
-        
-        toast('File berhasil dihapus', 'success');
-        
-      } catch (error) {
-        toast('Gagal hapus file: ' + error.message, 'error');
-      }
-    }
-  });
-}
-
-// Override fungsi saveIndikator yang lama
-async function saveIndikator(noIndikator) {
-  const target = parseFloat(document.getElementById(`t-${noIndikator}`)?.value) || 0;
-  const realisasi = parseFloat(document.getElementById(`r-${noIndikator}`)?.value) || 0;
-  
-  // Ambil data file yang sudah ada (jangan diubah)
-  const currentInd = indikatorData.find(i => i.no === noIndikator);
-  let files = [];
-  if (currentInd?.linkFile) {
-    try {
-      files = JSON.parse(currentInd.linkFile);
-    } catch {
-      files = [{ name: 'File', url: currentInd.linkFile }];
-    }
-  }
-  
-  // Simpan dengan files yang sudah ada
-  const linkFile = JSON.stringify(files);
-
-  try {
-    const result = await API.updateIndikatorUsulan({
-      idUsulan: currentIndikatorUsulan,
-      noIndikator,
-      target,
-      realisasi,
-      linkFile
-    });
-
-    // Update UI
-    document.getElementById(`rasio-${noIndikator}`).textContent = (result.rasio * 100).toFixed(1) + '%';
-    document.getElementById(`nilai-${noIndikator}`).textContent = parseFloat(result.nilaiTerbobot).toFixed(2);
-
-    // Refresh SPM
-    const detail = await API.getDetailUsulan(currentIndikatorUsulan);
-    document.getElementById('indModalSPM').textContent = parseFloat(detail.indeksSPM).toFixed(4);
-    
-    // Update indikatorData
-    const indIndex = indikatorData.findIndex(i => i.no === noIndikator);
-    if (indIndex >= 0) {
-      indikatorData[indIndex].target = target;
-      indikatorData[indIndex].realisasi = realisasi;
-      indikatorData[indIndex].linkFile = linkFile;
-    }
-    
-  } catch (e) {
-    toast(e.message, 'error');
-  }
-}

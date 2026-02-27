@@ -474,10 +474,11 @@ textarea.form-control { resize: vertical; }
       <button class="btn-icon" onclick="closeModal('indikatorModal')"><span class="material-icons">close</span></button>
     </div>
     <div class="modal-body">
-      <div class="info-card info" id="indModalInfo">
-        <span class="material-icons">info</span>
-        <div class="info-card-text">Isi target dan realisasi setiap indikator. Nilai akan dihitung otomatis.</div>
+      <!-- INFO CARD BARU - DIKOSONGKAN, ISI NYA DARI JAVASCRIPT -->
+      <div class="info-card info" id="indModalInfo" style="padding:0; background:transparent; border:none;">
+        <!-- Konten akan diisi oleh JavaScript -->
       </div>
+      
       <div class="table-container">
         <table class="ind-table">
           <thead>
@@ -490,8 +491,8 @@ textarea.form-control { resize: vertical; }
         </table>
       </div>
       <div style="margin-top:16px;padding:12px 16px;background:var(--border-light);border-radius:10px;display:flex;justify-content:space-between;align-items:center;">
-        <span style="font-size:13px;color:var(--text-light);">Indeks SPM (Kinerja × Beban Kerja)</span>
-        <span style="font-size:18px;font-weight:800;color:var(--primary);font-family:'JetBrains Mono',monospace;" id="indModalSPM">0.0000</span>
+        <span style="font-size:13px;color:var(--text-light);">Indeks SPM</span>
+        <span style="font-size:18px;font-weight:800;color:var(--primary);font-family:'JetBrains Mono',monospace;" id="indModalSPM">0.00</span>
       </div>
     </div>
     <div class="modal-footer">
@@ -502,7 +503,7 @@ textarea.form-control { resize: vertical; }
     </div>
   </div>
 </div>
-
+  
 <!-- DETAIL USULAN MODAL -->
 <div class="modal" id="detailModal">
   <div class="modal-card lg">

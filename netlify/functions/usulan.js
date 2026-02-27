@@ -131,7 +131,7 @@ async function buatUsulan(pool, body) {
       [idUsulan,tahun,bulan,periodeKey,kodePKM,totalBobot,indeksBeban,emailOperator]
     );
     for (const ind of indResult.rows) {
-      await client.query(`INSERT INTO usulan_indikator (id_usulan,no_indikator,target,realisasi,realisasi_rasio,bobot,nilai_terbobot,status) VALUES ($1,$2,0,0,0,$3,0,'Draft')`, [idUsulan,ind.no_indikator,parseInt(ind.bobot)||0]);
+      await client.query(`INSERT INTO usulan_indikator (id_usulan,no_indikator,target,capaian,realisasi_rasio,bobot,nilai_terbobot,status) VALUES ($1,$2,0,0,0,$3,0,'Draft')`, [idUsulan,ind.no_indikator,parseInt(ind.bobot)||0]);
     }
     for (const pp of ppResult.rows) {
       await client.query(`INSERT INTO verifikasi_program (id_usulan,email_program,nama_program,indikator_akses,status,created_at) VALUES ($1,$2,$3,$4,'Menunggu',NOW())`, [idUsulan,pp.email,pp.nama,pp.indikator_akses||'']);
@@ -143,47 +143,91 @@ async function buatUsulan(pool, body) {
 
 async function updateIndikator(pool, body) {
   const { idUsulan, noIndikator, target, capaian, catatan, linkFile } = body;
+
   const lockCheck = await pool.query('SELECT is_locked FROM usulan_header WHERE id_usulan=$1', [idUsulan]);
   if (lockCheck.rows.length === 0) return err('Usulan tidak ditemukan');
   if (lockCheck.rows[0].is_locked) return err('Usulan sudah terkunci');
-  
-  // Rumus: rasio = capaian / target (max 1.00, 2 desimal)
+
   const t = parseFloat(target) || 0;
   const c = parseFloat(capaian) || 0;
+
+  // Rumus rasio: capaian / target, maks 1.00, 2 angka di belakang koma
   let rasio = 0;
-  if (t > 0) { rasio = Math.round(Math.min(c / t, 1) * 100) / 100; }
-  
-  const bobotResult = await pool.query('SELECT bobot FROM usulan_indikator WHERE id_usulan=$1 AND no_indikator=$2', [idUsulan, noIndikator]);
-  const bobot = bobotResult.rows.length > 0 ? parseInt(bobotResult.rows[0].bobot) || 0 : 0;
-  // nilai = bobot * rasio
-  const nilaiTerbobot = Math.round(rasio * bobot * 100) / 100;
-  
-  await pool.query(
-    `UPDATE usulan_indikator SET target=$1, capaian=$2, realisasi_rasio=$3, nilai_terbobot=$4, catatan=$5, link_file=$6 WHERE id_usulan=$7 AND no_indikator=$8`,
-    [t, c, rasio, nilaiTerbobot, catatan||'', linkFile||'', idUsulan, noIndikator]
+  if (t > 0) rasio = Math.round(Math.min(c / t, 1) * 100) / 100;
+
+  // Ambil bobot indikator ini
+  const bobotRes = await pool.query(
+    'SELECT bobot FROM usulan_indikator WHERE id_usulan=$1 AND no_indikator=$2',
+    [idUsulan, noIndikator]
   );
-  await hitungSPM(pool, idUsulan);
-  return ok({ message: 'Indikator berhasil diupdate', rasio, nilaiTerbobot });
+  const bobot = bobotRes.rows.length > 0 ? parseInt(bobotRes.rows[0].bobot) || 0 : 0;
+
+  // nilai = bobot * rasio
+  const nilaiTerbobot = Math.round(bobot * rasio * 100) / 100;
+
+  // Update — link_file hanya diupdate kalau ada nilainya
+  if (linkFile !== undefined && linkFile !== null && linkFile !== '') {
+    await pool.query(
+      'UPDATE usulan_indikator SET target=$1, capaian=$2, realisasi_rasio=$3, nilai_terbobot=$4, catatan=$5, link_file=$6 WHERE id_usulan=$7 AND no_indikator=$8',
+      [t, c, rasio, nilaiTerbobot, catatan || '', linkFile, idUsulan, noIndikator]
+    );
+  } else {
+    await pool.query(
+      'UPDATE usulan_indikator SET target=$1, capaian=$2, realisasi_rasio=$3, nilai_terbobot=$4, catatan=$5 WHERE id_usulan=$6 AND no_indikator=$7',
+      [t, c, rasio, nilaiTerbobot, catatan || '', idUsulan, noIndikator]
+    );
+  }
+
+  const spm = await hitungSPM(pool, idUsulan);
+  return ok({ message: 'Indikator berhasil diupdate', rasio, nilaiTerbobot, indeksSPM: spm.indeksSPM });
 }
 
 async function hitungSPM(pool, idUsulan) {
-  const r = await pool.query('SELECT realisasi_rasio, bobot, nilai_terbobot FROM usulan_indikator WHERE id_usulan=$1', [idUsulan]);
+  // 1. Hitung total nilai dan total bobot dari semua indikator
+  const r = await pool.query(
+    'SELECT bobot, capaian, realisasi_rasio FROM usulan_indikator WHERE id_usulan=$1',
+    [idUsulan]
+  );
+
   let totalNilai = 0, totalBobot = 0;
   for (const row of r.rows) {
-    totalNilai += parseFloat(row.nilai_terbobot) || 0;  // nilai = bobot * rasio
-    totalBobot += parseInt(row.bobot) || 0;
+    const bobot = parseInt(row.bobot) || 0;
+    const rasio = parseFloat(row.realisasi_rasio) || 0;
+    // nilai = bobot * rasio  (rasio sudah = capaian/target, max 1.00)
+    totalNilai += Math.round(bobot * rasio * 100) / 100;
+    totalBobot += bobot;
   }
-  // indeks_kinerja = total_nilai / total_bobot
-  const indeksKinerja = totalBobot > 0 ? Math.round((totalNilai / totalBobot) * 10000) / 10000 : 0;
-  const h = await pool.query('SELECT indeks_beban_kerja FROM usulan_header WHERE id_usulan=$1', [idUsulan]);
-  const indeksBeban = h.rows.length > 0 ? parseFloat(h.rows[0].indeks_beban_kerja) || 0 : 0;
-  // indeks_spm = indeks_kinerja * indeks_beban_kerja
-  const indeksSPM = Math.round(indeksKinerja * indeksBeban * 100) / 100;
-  await pool.query(
-    `UPDATE usulan_header SET total_nilai=$1, indeks_kinerja_spm=$2, indeks_spm=$3 WHERE id_usulan=$4`,
-    [totalNilai, indeksKinerja, indeksSPM, idUsulan]
+
+  // 2. Indeks kinerja SPM = total_nilai / total_bobot (semua 12 indikator)
+  const indeksKinerja = totalBobot > 0
+    ? Math.round((totalNilai / totalBobot) * 10000) / 10000
+    : 0;
+
+  // 3. Ambil indeks beban kerja LANGSUNG dari master_puskesmas berdasarkan kode_pkm usulan
+  const hdr = await pool.query(
+    `SELECT uh.kode_pkm, mp.indeks_beban_kerja
+     FROM usulan_header uh
+     JOIN master_puskesmas mp ON uh.kode_pkm = mp.kode_pkm
+     WHERE uh.id_usulan = $1`,
+    [idUsulan]
   );
-  return indeksSPM;
+  const indeksBeban = hdr.rows.length > 0
+    ? parseFloat(hdr.rows[0].indeks_beban_kerja) || 0
+    : 0;
+
+  // 4. Indeks SPM = indeks_kinerja * indeks_beban_kerja puskesmas
+  const indeksSPM = Math.round(indeksKinerja * indeksBeban * 100) / 100;
+
+  // 5. Simpan hasil ke usulan_header (update indeks_beban_kerja juga agar sinkron)
+  await pool.query(
+    `UPDATE usulan_header
+     SET total_nilai=$1, total_bobot=$2, indeks_kinerja_spm=$3,
+         indeks_beban_kerja=$4, indeks_spm=$5
+     WHERE id_usulan=$6`,
+    [totalNilai, totalBobot, indeksKinerja, indeksBeban, indeksSPM, idUsulan]
+  );
+
+  return { indeksKinerja, indeksBeban, indeksSPM, totalNilai, totalBobot };
 }
 
 async function submitUsulan(pool, body) {

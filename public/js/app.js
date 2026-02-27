@@ -551,24 +551,35 @@ async function openIndikatorModal(idUsulan) {
       infoEl.style.display = 'flex';
     }
 
+    // Update SPM top display
+    const spmTopEl = document.getElementById('indModalSPMTop');
+    if (spmTopEl) spmTopEl.textContent = parseFloat(detail.indeksSPM).toFixed(2);
+    document.getElementById('indModalSPM').textContent = parseFloat(detail.indeksSPM).toFixed(2);
+
     document.getElementById('indikatorInputBody').innerHTML = inds.map(ind => `
       <tr id="indRow-${ind.no}">
         <td><span style="font-family:'JetBrains Mono';font-weight:700">${ind.no}</span></td>
-        <td style="max-width:240px;font-size:13px">${ind.nama}</td>
+        <td style="max-width:200px;font-size:12.5px">${ind.nama}</td>
         <td style="text-align:center">${ind.bobot}</td>
-        <td>${isLocked ? `<span>${ind.target}</span>` : `<input type="number" id="t-${ind.no}" value="${ind.target}" min="0" max="100" step="0.01" onchange="saveIndikator(${ind.no})">`}</td>
-        <td>${isLocked ? `<span>${ind.realisasi}</span>` : `<input type="number" id="r-${ind.no}" value="${ind.realisasi}" min="0" step="0.01" onchange="saveIndikator(${ind.no})">`}</td>
+        <td>${isLocked ? `<span>${ind.target}</span>` : `<input type="number" id="t-${ind.no}" value="${ind.target}" min="0" max="100" step="0.01" onchange="saveIndikator(${ind.no})" style="width:68px">`}</td>
+        <td>${isLocked ? `<span>${ind.realisasi}</span>` : `<input type="number" id="r-${ind.no}" value="${ind.realisasi}" min="0" step="0.01" onchange="saveIndikator(${ind.no})" style="width:68px">`}</td>
         <td class="rasio-cell" id="rasio-${ind.no}">${(ind.realisasiRasio * 100).toFixed(1)}%</td>
         <td class="rasio-cell" id="nilai-${ind.no}">${parseFloat(ind.nilaiTerbobot).toFixed(2)}</td>
-        <td>
+        <td style="min-width:90px">
           ${isLocked
-            ? (ind.linkFile ? `<a href="${ind.linkFile}" target="_blank" style="color:var(--primary);display:inline-flex;align-items:center;gap:2px"><span class="material-icons" style="font-size:15px">open_in_new</span>Lihat</a>` : '-')
-            : `<div style="display:flex;align-items:center;gap:4px">
-                <input type="text" id="link-${ind.no}" value="${ind.linkFile||''}" placeholder="Paste link Drive..."
-                  style="width:130px;padding:4px 6px;border:1.5px solid var(--border);border-radius:6px;font-size:12px"
-                  onchange="saveIndikator(${ind.no})">
-                ${ind.linkFile ? `<a href="${ind.linkFile}" target="_blank" class="btn-icon view" title="Buka"><span class="material-icons" style="font-size:15px">open_in_new</span></a>` : ''}
-               </div>`
+            ? (ind.linkFile
+                ? `<a href="${ind.linkFile}" target="_blank" style="color:var(--primary);display:inline-flex;align-items:center;gap:2px;font-size:12px"><span class="material-icons" style="font-size:14px">open_in_new</span>Lihat</a>`
+                : '<span style="color:#94a3b8;font-size:12px">-</span>')
+            : `<div id="uploadCell-${ind.no}" style="display:flex;flex-direction:column;gap:3px">
+                ${ind.linkFile
+                  ? `<a href="${ind.linkFile}" target="_blank" style="font-size:11px;color:#0d9488;display:flex;align-items:center;gap:2px"><span class="material-icons" style="font-size:12px">check_circle</span>Lihat</a>`
+                  : `<span style="font-size:11px;color:#ef4444;display:flex;align-items:center;gap:2px"><span class="material-icons" style="font-size:11px">error_outline</span>Belum</span>`
+                }
+                <label style="display:inline-flex;align-items:center;gap:3px;padding:3px 7px;background:#e6fffa;color:#0d9488;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;border:1.5px solid #99f6e4;white-space:nowrap">
+                  <span class="material-icons" style="font-size:13px">upload_file</span>Upload
+                  <input type="file" multiple style="display:none" onchange="uploadBuktiIndikator(event,${ind.no},'${idUsulan}','${detail.kodePKM}',${detail.tahun},${detail.bulan},'${namaBulan}')">
+                </label>
+              </div>`
           }
         </td>
       </tr>`).join('');
@@ -577,6 +588,71 @@ async function openIndikatorModal(idUsulan) {
   }
 }
 
+
+// ============== UPLOAD BUKTI INDIKATOR ==============
+async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, tahun, bulan, namaBulan) {
+  const files = Array.from(event.target.files);
+  if (!files.length) return;
+
+  const cell = document.getElementById(`uploadCell-${noIndikator}`);
+  const statusDiv = document.createElement('div');
+  statusDiv.style.cssText = 'font-size:11px;color:#0891b2';
+  statusDiv.innerHTML = `<span class="material-icons" style="font-size:12px;animation:spin 0.8s linear infinite;vertical-align:middle">refresh</span> Mengupload ${files.length} file...`;
+  cell.insertBefore(statusDiv, cell.firstChild);
+
+  const uploadedLinks = [];
+  for (const file of files) {
+    try {
+      // Read file as base64
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result.split(',')[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const res = await fetch('/api/drive-upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          kodePKM, tahun, bulan, namaBulan, noIndikator,
+          fileName: file.name, mimeType: file.type || 'application/octet-stream', fileData: base64
+        })
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Upload gagal');
+      uploadedLinks.push(result.fileUrl);
+    } catch (e) {
+      toast(`Gagal upload ${file.name}: ${e.message}`, 'error');
+    }
+  }
+
+  if (uploadedLinks.length > 0) {
+    // Save the last (or combined) link — use folder URL if multiple
+    const linkToSave = uploadedLinks.length === 1 ? uploadedLinks[0] : uploadedLinks[0];
+    
+    // Update DB
+    const tVal = parseFloat(document.getElementById(`t-${noIndikator}`)?.value) || 0;
+    const rVal = parseFloat(document.getElementById(`r-${noIndikator}`)?.value) || 0;
+    await API.updateIndikatorUsulan({ idUsulan, noIndikator, target: tVal, realisasi: rVal, linkFile: linkToSave });
+
+    // Refresh cell
+    statusDiv.remove();
+    const linkContainer = cell.querySelector('a, span');
+    if (linkContainer) linkContainer.outerHTML = `<a href="${linkToSave}" target="_blank" style="font-size:11px;color:#0d9488;display:flex;align-items:center;gap:2px"><span class="material-icons" style="font-size:13px">check_circle</span>${uploadedLinks.length} file terupload</a>`;
+
+    // Refresh SPM
+    const detail = await API.getDetailUsulan(idUsulan);
+    const spmVal = parseFloat(detail.indeksSPM).toFixed(2);
+    document.getElementById('indModalSPM').textContent = spmVal;
+    const topEl = document.getElementById('indModalSPMTop');
+    if (topEl) topEl.textContent = spmVal;
+
+    toast(`${uploadedLinks.length} file berhasil diupload ke Google Drive!`, 'success');
+  } else {
+    statusDiv.remove();
+  }
+}
 async function saveIndikator(noIndikator) {
   const target = parseFloat(document.getElementById(`t-${noIndikator}`)?.value) || 0;
   const realisasi = parseFloat(document.getElementById(`r-${noIndikator}`)?.value) || 0;
@@ -594,7 +670,9 @@ async function saveIndikator(noIndikator) {
 
     // Refresh SPM
     const detail = await API.getDetailUsulan(currentIndikatorUsulan);
-    document.getElementById('indModalSPM').textContent = parseFloat(detail.indeksSPM).toFixed(4);
+    const spmVal = parseFloat(detail.indeksSPM).toFixed(2);
+    document.getElementById('indModalSPM').textContent = spmVal;
+    document.getElementById('indModalSPMTop').textContent = spmVal;
   } catch (e) {
     toast(e.message, 'error');
   }

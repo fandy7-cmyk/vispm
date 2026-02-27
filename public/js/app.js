@@ -656,17 +656,48 @@ async function saveIndikator(noIndikator) {
 
 async function submitUsulanFromModal() {
   showConfirm({
-    title: 'Submit Usulan', message: 'Submit usulan ke Kepala Puskesmas untuk diverifikasi?',
+    title: 'Submit Usulan',
+    message: 'Submit usulan ke Kepala Puskesmas untuk diverifikasi?',
     type: 'warning', icon: 'send',
     onConfirm: async () => {
-      try {
-        await API.submitUsulan({ idUsulan: currentIndikatorUsulan, email: currentUser.email });
-        toast('Usulan berhasil disubmit ke Kapus!');
-        closeModal('indikatorModal');
-        loadMyUsulan();
-      } catch (e) { toast(e.message, 'error'); }
+      await doSubmitUsulan(false);
     }
   });
+}
+
+async function doSubmitUsulan(forceSubmit) {
+  try {
+    const res = await fetch(`/api/usulan?action=submit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idUsulan: currentIndikatorUsulan, email: currentUser.email, forceSubmit })
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      toast(data.error || 'Submit gagal', 'error');
+      return;
+    }
+
+    // Ada indikator yang belum ada bukti — minta konfirmasi
+    if (data.needConfirm) {
+      showConfirm({
+        title: 'Bukti Belum Lengkap',
+        message: `${data.missingCount} indikator (no. ${data.missingNos.join(', ')}) belum ada file bukti.
+
+Tetap submit sekarang?`,
+        type: 'danger', icon: 'warning',
+        onConfirm: async () => { await doSubmitUsulan(true); }
+      });
+      return;
+    }
+
+    toast('Usulan berhasil disubmit ke Kapus!', 'success');
+    closeModal('indikatorModal');
+    loadMyUsulan();
+  } catch (e) {
+    toast(e.message, 'error');
+  }
 }
 
 // ============== DETAIL MODAL ==============

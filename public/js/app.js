@@ -454,15 +454,23 @@ async function createUsulan() {
   const kodePKM = document.getElementById('inputPKM').value;
   const tahun = document.getElementById('inputTahun').value;
   const bulan = document.getElementById('inputBulan').value;
+  const namaBulan = BULAN_NAMA[parseInt(bulan)];
 
   if (!kodePKM) return toast('Pilih puskesmas terlebih dahulu', 'error');
 
+  // Cek apakah sudah ada usulan untuk periode ini
   setLoading(true);
   try {
+    const existing = await API.getUsulan({ email_operator: currentUser.email });
+    const duplikat = existing.find(u => u.kodePKM === kodePKM && u.tahun == tahun && u.bulan == bulan);
+    if (duplikat) {
+      setLoading(false);
+      return toast(`Usulan untuk ${namaBulan} ${tahun} sudah ada (${duplikat.idUsulan}). Setiap puskesmas hanya dapat mengajukan 1 usulan per periode.`, 'warning');
+    }
+
     const result = await API.buatUsulan({ kodePKM, tahun: parseInt(tahun), bulan: parseInt(bulan), emailOperator: currentUser.email });
     toast(`Usulan ${result.idUsulan} berhasil dibuat`);
     loadMyUsulan();
-    // Auto open indikator modal
     setTimeout(() => openIndikatorModal(result.idUsulan), 500);
   } catch (e) {
     toast(e.message, 'error');
@@ -487,6 +495,16 @@ async function deleteUsulan(idUsulan) {
 let currentIndikatorUsulan = null;
 let indikatorData = [];
 
+// Root Google Drive folder
+const GDRIVE_ROOT = '1WYRRcm5oxbCaPx8s9XNUkTUe1b85wuDG';
+
+function getGDriveUrl(kodePKM, tahun, bulan) {
+  // Buka root folder — operator upload ke folder PKM/tahun/bulan secara manual
+  // Karena folder sub tidak bisa dibuat otomatis tanpa API, kita buka root folder
+  // dan tampilkan path yang harus dituju
+  return `https://drive.google.com/drive/folders/${GDRIVE_ROOT}`;
+}
+
 async function openIndikatorModal(idUsulan) {
   currentIndikatorUsulan = idUsulan;
   document.getElementById('indModalId').textContent = idUsulan;
@@ -497,20 +515,47 @@ async function openIndikatorModal(idUsulan) {
     const [detail, inds] = await Promise.all([API.getDetailUsulan(idUsulan), API.getIndikatorUsulan(idUsulan)]);
     indikatorData = inds;
     const isLocked = detail.isLocked || detail.statusGlobal !== 'Draft';
+    const namaBulan = BULAN_NAMA[detail.bulan] || detail.bulan;
 
     document.getElementById('indModalSPM').textContent = parseFloat(detail.indeksSPM).toFixed(4);
     document.getElementById('btnSubmitFromModal').style.display = isLocked ? 'none' : 'flex';
 
+    // Update info drive di modal
+    const infoEl = document.getElementById('indModalInfo');
+    if (infoEl) {
+      infoEl.innerHTML = `
+        <span class="material-icons">folder</span>
+        <div class="info-card-text">
+          Upload file bukti ke Google Drive pada folder:
+          <strong>${detail.kodePKM} / ${detail.tahun} / ${namaBulan}</strong>
+          — lalu paste link file di kolom "Link Bukti".
+          <a href="${getGDriveUrl(detail.kodePKM, detail.tahun, detail.bulan)}" target="_blank"
+            style="color:var(--primary);font-weight:700;display:inline-flex;align-items:center;gap:4px;margin-left:8px">
+            <span class="material-icons" style="font-size:16px">open_in_new</span>Buka Google Drive
+          </a>
+        </div>`;
+    }
+
     document.getElementById('indikatorInputBody').innerHTML = inds.map(ind => `
       <tr id="indRow-${ind.no}">
         <td><span style="font-family:'JetBrains Mono';font-weight:700">${ind.no}</span></td>
-        <td style="max-width:280px;font-size:13px">${ind.nama}</td>
+        <td style="max-width:240px;font-size:13px">${ind.nama}</td>
         <td style="text-align:center">${ind.bobot}</td>
         <td>${isLocked ? `<span>${ind.target}</span>` : `<input type="number" id="t-${ind.no}" value="${ind.target}" min="0" max="100" step="0.01" onchange="saveIndikator(${ind.no})">`}</td>
         <td>${isLocked ? `<span>${ind.realisasi}</span>` : `<input type="number" id="r-${ind.no}" value="${ind.realisasi}" min="0" step="0.01" onchange="saveIndikator(${ind.no})">`}</td>
         <td class="rasio-cell" id="rasio-${ind.no}">${(ind.realisasiRasio * 100).toFixed(1)}%</td>
         <td class="rasio-cell" id="nilai-${ind.no}">${parseFloat(ind.nilaiTerbobot).toFixed(2)}</td>
-        <td>${isLocked ? (ind.linkFile ? `<a href="${ind.linkFile}" target="_blank" style="color:var(--primary)">Lihat</a>` : '-') : `<input type="text" id="link-${ind.no}" value="${ind.linkFile||''}" placeholder="URL bukti" style="width:100px;padding:4px 6px;border:1.5px solid var(--border);border-radius:6px;font-size:12px">`}</td>
+        <td>
+          ${isLocked
+            ? (ind.linkFile ? `<a href="${ind.linkFile}" target="_blank" style="color:var(--primary);display:inline-flex;align-items:center;gap:2px"><span class="material-icons" style="font-size:15px">open_in_new</span>Lihat</a>` : '-')
+            : `<div style="display:flex;align-items:center;gap:4px">
+                <input type="text" id="link-${ind.no}" value="${ind.linkFile||''}" placeholder="Paste link Drive..."
+                  style="width:130px;padding:4px 6px;border:1.5px solid var(--border);border-radius:6px;font-size:12px"
+                  onchange="saveIndikator(${ind.no})">
+                ${ind.linkFile ? `<a href="${ind.linkFile}" target="_blank" class="btn-icon view" title="Buka"><span class="material-icons" style="font-size:15px">open_in_new</span></a>` : ''}
+               </div>`
+          }
+        </td>
       </tr>`).join('');
   } catch (e) {
     toast(e.message, 'error');

@@ -12,7 +12,7 @@ exports.handler = async (event) => {
       const onlyAktif = params.aktif === 'true';
       let query = 'SELECT kode_pkm, nama_puskesmas, indeks_beban_kerja, aktif FROM master_puskesmas';
       if (onlyAktif) query += ' WHERE aktif = true';
-      query += ' ORDER BY nama_puskesmas';
+      query += ' ORDER BY kode_pkm';
       const result = await pool.query(query);
       return ok(result.rows.map(r => ({
         kode: r.kode_pkm,

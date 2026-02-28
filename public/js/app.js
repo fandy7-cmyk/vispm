@@ -503,12 +503,15 @@ async function loadMyUsulan() {
           <td><span style="font-family:'JetBrains Mono',monospace;font-weight:600;font-size:12px;">${u.idUsulan}</span></td>
           <td>${u.namaPKM || u.kodePKM}</td>
           <td>${u.namaBulan} ${u.tahun}</td>
-          <td style="min-width:220px">${renderStatusBar(u)}</td>
+          <td style="min-width:220px">
+            ${renderStatusBar(u)}
+            ${u.statusGlobal === 'Ditolak' && u.alasanTolak ? `<div style="margin-top:4px;font-size:11px;color:#dc2626;background:#fef2f2;border-radius:5px;padding:3px 7px;display:inline-block"><span style="font-weight:700">Ditolak:</span> ${u.alasanTolak}</div>` : ''}
+          </td>
           <td>
             <button class="btn-icon view" onclick="viewDetail('${u.idUsulan}')"><span class="material-icons">visibility</span></button>
             ${u.statusGlobal === 'Draft' ? `<button class="btn-icon edit" onclick="openIndikatorModal('${u.idUsulan}')"><span class="material-icons">edit</span></button>` : ''}
             ${u.statusGlobal === 'Draft' ? `<button class="btn-icon del" onclick="deleteUsulan('${u.idUsulan}')"><span class="material-icons">delete</span></button>` : ''}
-            ${u.statusGlobal === 'Ditolak' ? `<button class="btn btn-secondary btn-sm" onclick="openIndikatorModal('${u.idUsulan}')"><span class="material-icons" style="font-size:14px">restart_alt</span> Perbaiki</button>` : ''}
+            ${u.statusGlobal === 'Ditolak' ? `<button class="btn btn-warning btn-sm" onclick="openIndikatorModal('${u.idUsulan}')" style="background:#f59e0b;color:white;border-color:#f59e0b"><span class="material-icons" style="font-size:14px">restart_alt</span> Perbaiki & Ajukan Ulang</button>` : ''}
           </td>
         </tr>`).join('')}
         </tbody>
@@ -622,20 +625,37 @@ async function openIndikatorModal(idUsulan) {
   try {
     const [detail, inds] = await Promise.all([API.getDetailUsulan(idUsulan), API.getIndikatorUsulan(idUsulan)]);
     indikatorData = inds;
-    const isLocked = detail.isLocked || detail.statusGlobal !== 'Draft';
+    // Ditolak = bisa diedit ulang seperti Draft
+    // Draft & Ditolak = bisa diedit. Status lain = read-only
+    const isLocked = detail.statusGlobal !== 'Draft' && detail.statusGlobal !== 'Ditolak';
     const namaBulan = BULAN_NAMA[detail.bulan] || detail.bulan;
 
     document.getElementById('indModalSPM').textContent = parseFloat(detail.indeksSPM).toFixed(2);
     const isDraft = detail.statusGlobal === 'Draft';
-    document.getElementById('btnSubmitFromModal').style.display = (isDraft && !isLocked) ? 'flex' : 'none';
-    // Kalau sudah disubmit sebelumnya, tampilkan info status
-    if (!isDraft) {
-      const _ln = document.getElementById('indModalLockNotif');
-      if (_ln) {
+    const isDitolak = detail.statusGlobal === 'Ditolak';
+    const canSubmit = isDraft || isDitolak;
+    const submitBtn = document.getElementById('btnSubmitFromModal');
+    if (submitBtn) {
+      submitBtn.style.display = canSubmit ? 'flex' : 'none';
+      // Ubah label tombol untuk ajukan ulang
+      submitBtn.innerHTML = isDitolak
+        ? '<span class="material-icons">refresh</span> Ajukan Ulang ke Kapus'
+        : '<span class="material-icons">send</span> Submit ke Kapus';
+    }
+    // Tampilkan banner status (bukan Draft dan bukan Ditolak = read-only)
+    const _ln = document.getElementById('indModalLockNotif');
+    if (_ln) {
+      if (isDitolak && detail.alasanTolak) {
+        _ln.innerHTML = `<span class="material-icons" style="color:#ef4444;font-size:18px">cancel</span><div><div style="font-weight:700;color:#dc2626">Ditolak oleh ${detail.ditolakOleh||'Verifikator'}</div><div style="font-size:12px;color:#7f1d1d">Alasan: ${detail.alasanTolak}</div></div>`;
+        _ln.style.cssText = 'display:flex;align-items:flex-start;gap:8px;padding:10px 14px;background:#fef2f2;border-radius:8px;border:1.5px solid #fca5a5;flex:1;font-size:13px';
+      } else if (!canSubmit) {
         const statusIcon = detail.statusGlobal === 'Selesai' ? 'verified' : 'hourglass_top';
         const statusColor = detail.statusGlobal === 'Selesai' ? '#0d9488' : '#f59e0b';
         _ln.innerHTML = `<span class="material-icons" style="color:${statusColor};font-size:18px">${statusIcon}</span><span style="font-weight:600;color:${statusColor}">Status: ${detail.statusGlobal}</span>`;
         _ln.style.display = 'flex';
+      } else {
+        _ln.style.display = 'none';
+        _ln.innerHTML = '';
       }
     }
 
@@ -833,16 +853,17 @@ async function doSubmitUsulan(forceSubmit) {
       return;
     }
 
-    toast('✅ Usulan berhasil disubmit ke Kepala Puskesmas!', 'success');
-    // Tampilkan notifikasi di dalam modal, JANGAN tutup modal
+    const successMsg = raw.data?.message || raw.message || 'Usulan berhasil disubmit!';
+    toast('✅ ' + successMsg, 'success');
+    // Tampilkan notifikasi sukses di dalam modal
     const lockNotif = document.getElementById('indModalLockNotif');
     if (lockNotif) {
-      lockNotif.innerHTML = '<span class="material-icons" style="color:#0d9488;font-size:18px">check_circle</span><span style="font-weight:600;color:#0d9488">Berhasil disubmit ke Kepala Puskesmas. Status: Menunggu Verifikasi Kapus.</span>';
-      lockNotif.style.display = 'flex';
+      lockNotif.innerHTML = `<span class="material-icons" style="color:#0d9488;font-size:18px">check_circle</span><span style="font-weight:600;color:#0d9488">${successMsg} Status: Menunggu Verifikasi Kapus.</span>`;
+      lockNotif.style.cssText = 'display:flex;align-items:center;gap:8px;padding:8px 14px;background:#e6fffa;border-radius:8px;border:1.5px solid #0d9488;flex:1;font-size:13px';
     }
     // Sembunyikan tombol submit
-    const submitBtn = document.getElementById('btnSubmitFromModal');
-    if (submitBtn) submitBtn.style.display = 'none';
+    const submitBtn2 = document.getElementById('btnSubmitFromModal');
+    if (submitBtn2) submitBtn2.style.display = 'none';
     loadMyUsulan();
   } catch (e) {
     toast(e.message, 'error');
@@ -909,15 +930,32 @@ async function viewDetail(idUsulan) {
   const pdfBtn = document.getElementById('btnDownloadPDF');
   if (pdfBtn) pdfBtn.style.display = detail.statusGlobal === 'Selesai' ? 'inline-flex' : 'none';
 
+  // Banner alasan penolakan — tampil paling atas kalau ditolak
+  const rejectionBanner = detail.statusGlobal === 'Ditolak' ? `
+    <div style="background:#fef2f2;border:2px solid #fca5a5;border-radius:10px;padding:14px 16px;margin-bottom:16px;display:flex;gap:12px;align-items:flex-start">
+      <span class="material-icons" style="color:#ef4444;font-size:22px;flex-shrink:0">cancel</span>
+      <div>
+        <div style="font-weight:700;font-size:14px;color:#dc2626;margin-bottom:4px">
+          Usulan Ditolak oleh ${detail.ditolakOleh || 'Verifikator'}
+        </div>
+        <div style="font-size:13px;color:#7f1d1d;background:#fee2e2;border-radius:6px;padding:8px 12px;margin-top:4px">
+          <span style="font-weight:600">Alasan:</span> ${detail.alasanTolak || '(tidak ada keterangan)'}
+        </div>
+        <div style="font-size:12px;color:#ef4444;margin-top:8px;display:flex;align-items:center;gap:4px">
+          <span class="material-icons" style="font-size:14px">info</span>
+          Perbaiki data dan ajukan ulang melalui tombol <strong>Perbaiki</strong>.
+        </div>
+      </div>
+    </div>` : '';
+
   document.getElementById('detailModalBody').innerHTML = `
+      ${rejectionBanner}
       <div style="margin-bottom:16px">${renderStatusBar({...detail, vpProgress: detail.verifikasiProgram ? {total:vp.length,selesai:vp.filter(v=>v.status==='Selesai').length} : null})}</div>
       <div class="detail-grid">
         <div class="detail-item"><label>Puskesmas</label><span>${detail.namaPKM}</span></div>
         <div class="detail-item"><label>Periode</label><span>${detail.namaBulan} ${detail.tahun}</span></div>
         <div class="detail-item"><label>Status</label><span>${statusBadge(detail.statusGlobal)}</span></div>
         <div class="detail-item"><label>Dibuat Oleh</label><span>${detail.createdBy}</span></div>
-        <div class="detail-item"><label>Indeks Kinerja</label><span style="font-family:'JetBrains Mono'">${parseFloat(detail.indeksKinerja).toFixed(2)}</span></div>
-        <div class="detail-item"><label>Indeks Beban</label><span style="font-family:'JetBrains Mono'">${parseFloat(detail.indeksBeban).toFixed(2)}</span></div>
         <div class="detail-item" style="grid-column:span 2">
           <label>Indeks SPM</label>
           <span style="font-family:'JetBrains Mono';font-size:22px;color:var(--primary);font-weight:800">${parseFloat(detail.indeksSPM).toFixed(2)}</span>
@@ -939,20 +977,28 @@ async function viewDetail(idUsulan) {
       </div>
       ${vpHtml}
       <div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
-        ${approvalBox('Kapus', detail.kapusApprovedBy, detail.kapusApprovedAt)}
-        ${approvalBox('Program', vp.length && vp.every(v=>v.status==='Selesai') ? 'Semua selesai' : '', '')}
-        ${approvalBox('Admin', detail.adminApprovedBy, detail.adminApprovedAt)}
+        ${approvalBox('Kapus', detail.kapusApprovedBy, detail.kapusApprovedAt, detail.statusKapus==='Ditolak' ? detail.kapusCatatan : '')}
+        ${approvalBox('Program', vp.length && vp.every(v=>v.status==='Selesai') ? 'Semua selesai' : '', '', detail.statusProgram==='Ditolak' ? detail.adminCatatan : '')}
+        ${approvalBox('Admin', detail.adminApprovedBy, detail.adminApprovedAt, detail.statusGlobal==='Ditolak' && detail.statusKapus!=='Ditolak' && detail.statusProgram!=='Ditolak' ? detail.adminCatatan : '')}
       </div>`;
   } catch (e) { toast(e.message, 'error'); }
 }
 
-function approvalBox(label, by, at) {
-  const color = by ? 'var(--success-light)' : 'var(--border-light)';
-  const textColor = by ? '#065f46' : 'var(--text-light)';
-  return `<div style="background:${color};border-radius:10px;padding:12px;">
-    <div style="font-size:11px;font-weight:700;color:${textColor};text-transform:uppercase;letter-spacing:0.5px">${label}</div>
-    <div style="font-size:13px;margin-top:4px;font-weight:600">${by || 'Belum'}</div>
+function approvalBox(label, by, at, alasanTolak = '') {
+  const isDitolak = !!alasanTolak;
+  const color = isDitolak ? '#fef2f2' : by ? '#e6fffa' : '#f8fafc';
+  const borderColor = isDitolak ? '#fca5a5' : by ? '#0d9488' : '#e2e8f0';
+  const textColor = isDitolak ? '#dc2626' : by ? '#065f46' : '#94a3b8';
+  const icon = isDitolak ? 'cancel' : by ? 'check_circle' : 'hourglass_empty';
+  const iconColor = isDitolak ? '#ef4444' : by ? '#0d9488' : '#cbd5e1';
+  return `<div style="background:${color};border:1.5px solid ${borderColor};border-radius:10px;padding:12px;">
+    <div style="display:flex;align-items:center;gap:5px;margin-bottom:4px">
+      <span class="material-icons" style="font-size:14px;color:${iconColor}">${icon}</span>
+      <span style="font-size:11px;font-weight:700;color:${textColor};text-transform:uppercase;letter-spacing:0.5px">${label}</span>
+    </div>
+    <div style="font-size:13px;font-weight:600;color:${textColor}">${isDitolak ? 'Ditolak' : (by || 'Belum')}</div>
     ${at ? `<div style="font-size:11px;color:var(--text-light)">${formatDateTime(at)}</div>` : ''}
+    ${isDitolak && alasanTolak ? `<div style="font-size:11px;color:#7f1d1d;margin-top:4px;font-style:italic">"${alasanTolak}"</div>` : ''}
   </div>`;
 }
 

@@ -375,15 +375,24 @@ function renderUsulanTable(rows, role) {
     return `<div class="empty-state" style="padding:32px"><span class="material-icons">inbox</span><p>Belum ada data usulan</p></div>`;
   }
   const actionBtn = (u) => {
+    const viewBtn = `<button class="btn-icon view" onclick="viewDetail('${u.idUsulan}')" title="Detail"><span class="material-icons">visibility</span></button>`;
     if (role === 'operator') {
-      return `<button class="btn-icon view" onclick="viewDetail('${u.idUsulan}')" title="Detail"><span class="material-icons">visibility</span></button>
-              ${u.statusGlobal === 'Draft' ? `<button class="btn-icon edit" onclick="openIndikatorModal('${u.idUsulan}')" title="Input"><span class="material-icons">edit</span></button>` : ''}`;
+      return viewBtn +
+        (u.statusGlobal === 'Draft' ? `<button class="btn-icon edit" onclick="openIndikatorModal('${u.idUsulan}')" title="Input"><span class="material-icons">edit</span></button>` : '') +
+        (u.statusGlobal === 'Ditolak' ? `<button class="btn-icon edit" onclick="openIndikatorModal('${u.idUsulan}')" title="Perbaiki"><span class="material-icons">restart_alt</span></button>` : '');
     }
+    // Tombol verifikasi hanya muncul kalau status SESUAI tahapan role
+    const canVerif =
+      (role === 'kapus'   && u.statusGlobal === 'Menunggu Kapus') ||
+      (role === 'program' && u.statusGlobal === 'Menunggu Program') ||
+      (role === 'admin'   && u.statusGlobal === 'Menunggu Admin');
+    const verifBtn = canVerif
+      ? `<button class="btn-icon approve" onclick="openVerifikasi('${u.idUsulan}')" title="Verifikasi Sekarang" style="animation:pulse 1.5s infinite"><span class="material-icons">rate_review</span></button>`
+      : `<button class="btn-icon" title="Menunggu tahap sebelumnya" style="opacity:0.35;cursor:not-allowed" disabled><span class="material-icons">lock</span></button>`;
     if (['kapus', 'program', 'admin'].includes(role)) {
-      return `<button class="btn-icon view" onclick="viewDetail('${u.idUsulan}')" title="Detail"><span class="material-icons">visibility</span></button>
-              <button class="btn-icon approve" onclick="openVerifikasi('${u.idUsulan}')" title="Verifikasi"><span class="material-icons">rate_review</span></button>`;
+      return viewBtn + verifBtn;
     }
-    return `<button class="btn-icon view" onclick="viewDetail('${u.idUsulan}')" title="Detail"><span class="material-icons">visibility</span></button>`;
+    return viewBtn;
   };
 
   return `<div class="table-container"><table>
@@ -602,6 +611,11 @@ async function openGDriveFolder(kodePKM, tahun, bulan, namaBulan, idUsulan) {
 async function openIndikatorModal(idUsulan) {
   currentIndikatorUsulan = idUsulan;
   document.getElementById('indModalId').textContent = idUsulan;
+  // Reset notifikasi dan tombol submit ke state awal
+  const _lockNotif = document.getElementById('indModalLockNotif');
+  if (_lockNotif) { _lockNotif.style.display = 'none'; _lockNotif.innerHTML = ''; }
+  const _submitBtn = document.getElementById('btnSubmitFromModal');
+  if (_submitBtn) _submitBtn.style.display = '';
   showModal('indikatorModal');
   document.getElementById('indikatorInputBody').innerHTML = `<tr><td colspan="8"><div class="empty-state" style="padding:20px"><p>Memuat data...</p></div></td></tr>`;
 
@@ -612,7 +626,18 @@ async function openIndikatorModal(idUsulan) {
     const namaBulan = BULAN_NAMA[detail.bulan] || detail.bulan;
 
     document.getElementById('indModalSPM').textContent = parseFloat(detail.indeksSPM).toFixed(2);
-    document.getElementById('btnSubmitFromModal').style.display = isLocked ? 'none' : 'flex';
+    const isDraft = detail.statusGlobal === 'Draft';
+    document.getElementById('btnSubmitFromModal').style.display = (isDraft && !isLocked) ? 'flex' : 'none';
+    // Kalau sudah disubmit sebelumnya, tampilkan info status
+    if (!isDraft) {
+      const _ln = document.getElementById('indModalLockNotif');
+      if (_ln) {
+        const statusIcon = detail.statusGlobal === 'Selesai' ? 'verified' : 'hourglass_top';
+        const statusColor = detail.statusGlobal === 'Selesai' ? '#0d9488' : '#f59e0b';
+        _ln.innerHTML = `<span class="material-icons" style="color:${statusColor};font-size:18px">${statusIcon}</span><span style="font-weight:600;color:${statusColor}">Status: ${detail.statusGlobal}</span>`;
+        _ln.style.display = 'flex';
+      }
+    }
 
     // Sembunyikan info card - tidak diperlukan lagi
     const infoEl = document.getElementById('indModalInfo');
@@ -804,7 +829,15 @@ async function doSubmitUsulan(forceSubmit) {
     }
 
     toast('✅ Usulan berhasil disubmit ke Kepala Puskesmas!', 'success');
-    closeModal('indikatorModal');
+    // Tampilkan notifikasi di dalam modal, JANGAN tutup modal
+    const lockNotif = document.getElementById('indModalLockNotif');
+    if (lockNotif) {
+      lockNotif.innerHTML = '<span class="material-icons" style="color:#0d9488;font-size:18px">check_circle</span><span style="font-weight:600;color:#0d9488">Berhasil disubmit ke Kepala Puskesmas. Status: Menunggu Verifikasi Kapus.</span>';
+      lockNotif.style.display = 'flex';
+    }
+    // Sembunyikan tombol submit
+    const submitBtn = document.getElementById('btnSubmitFromModal');
+    if (submitBtn) submitBtn.style.display = 'none';
     loadMyUsulan();
   } catch (e) {
     toast(e.message, 'error');
@@ -942,6 +975,10 @@ async function renderVerifikasi() {
       <div class="tab" onclick="loadVerifTab('Selesai')">Selesai</div>
       <div class="tab" onclick="loadVerifTab('Ditolak')">Ditolak</div>
     </div>` : ''}
+    ${role === 'Kapus' ? `<div class="tabs" id="verifTabs">
+      <div class="tab active" onclick="loadVerifTab('Menunggu Kapus')">Menunggu Verifikasi</div>
+      <div class="tab" onclick="loadVerifTab('semua')">Semua Usulan PKM Ini</div>
+    </div>` : ''}
     <div class="card">
       <div class="card-body" style="padding:0" id="verifTable">
         <div class="empty-state" style="padding:32px"><span class="material-icons">hourglass_empty</span><p>Memuat data...</p></div>
@@ -961,9 +998,16 @@ async function loadVerifData(status) {
   const params = {};
   const role = currentUser.role;
 
-  if (role === 'Kapus') { params.kode_pkm = currentUser.kodePKM; params.status = 'Menunggu Kapus'; }
-  else if (role === 'Pengelola Program') { params.status = 'Menunggu Program'; }
-  else if (role === 'Admin' && status !== 'semua') { params.status = status; }
+  if (role === 'Kapus') {
+    if (!currentUser.kodePKM) { toast('Akun Kapus tidak terhubung ke puskesmas. Hubungi Admin.', 'error'); return; }
+    params.kode_pkm = currentUser.kodePKM; // SELALU filter by PKM
+    if (status && status !== 'semua') params.status = status;
+    // kalau 'semua' → tidak set params.status → tampilkan semua
+  } else if (role === 'Pengelola Program') {
+    params.status = 'Menunggu Program';
+  } else if (role === 'Admin' && status !== 'semua') {
+    params.status = status;
+  }
 
   try {
     const rows = await API.getUsulan(params);
@@ -1124,12 +1168,12 @@ async function loadLaporan() {
 
     document.getElementById('lapTable').innerHTML = `
       <div class="table-container"><table>
-        <thead><tr><th>No</th><th>Puskesmas</th><th>Periode</th><th>Indeks Beban Kinerja</th><th>Indeks SPM</th><th>Status</th><th>Aksi</th></tr></thead>
+        <thead><tr><th>No</th><th>Puskesmas</th><th>Periode</th><th>Tgl Dibuat</th><th>Indeks SPM</th><th>Status</th><th>Aksi</th></tr></thead>
         <tbody>${result.data.map(r => `<tr>
           <td>${r.no}</td>
           <td>${r.namaPKM}</td>
           <td>${r.namaBulan} ${r.tahun}</td>
-          <td class="rasio-cell">${parseFloat(r.indeksBeban||0).toFixed(2)}</td>
+          <td style="font-size:11.5px;color:var(--text-light)">${formatDateTime(r.createdAt)}</td>
           <td class="rasio-cell" style="font-weight:700;color:var(--primary)">${parseFloat(r.indeksSPM||0).toFixed(2)}</td>
           <td>${statusBadge(r.statusGlobal)}</td>
           <td><button class="btn-icon view" onclick="viewDetail('${r.idUsulan}')"><span class="material-icons">visibility</span></button></td>
@@ -1143,8 +1187,8 @@ function exportLaporan() {
   const data = window._laporanData;
   if (!data || !data.length) return toast('Tidak ada data untuk diekspor', 'warning');
 
-  const headers = ['No','ID Usulan','Puskesmas','Periode','Indeks Beban Kinerja','Indeks SPM','Status'];
-  const rows = data.map(r => [r.no, r.idUsulan, r.namaPKM, `${r.namaBulan} ${r.tahun}`, parseFloat(r.indeksBeban||0).toFixed(2), parseFloat(r.indeksSPM||0).toFixed(2), r.statusGlobal]);
+  const headers = ['No','ID Usulan','Puskesmas','Periode','Tgl Dibuat','Indeks SPM','Status'];
+  const rows = data.map(r => [r.no, r.idUsulan, r.namaPKM, `${r.namaBulan} ${r.tahun}`, formatDateTime(r.createdAt), parseFloat(r.indeksSPM||0).toFixed(2), r.statusGlobal]);
   const csv = [headers, ...rows].map(r => r.map(c => `"${c}"`).join(',')).join('\n');
 
   const blob = new Blob([csv], { type: 'text/csv' });
@@ -1197,13 +1241,13 @@ async function renderUsers() {
           <div id="pkmContainer" style="display:none" class="form-group"><label>Puskesmas</label>
             <select class="form-control" id="uPKM"><option value="">Pilih Puskesmas</option></select></div>
           <div id="jabatanContainer" style="display:none" class="form-group">
-            <label>Jabatan / Bidang Tanggung Jawab</label>
-            <select class="form-control" id="uJabatan">
-              <option value="">-- Pilih Jabatan --</option>
-            </select>
+            <label>Jabatan / Bidang Tanggung Jawab <span style="font-size:11px;color:var(--text-light)">(bisa pilih lebih dari satu)</span></label>
+            <div id="jabatanCheckboxList" style="max-height:180px;overflow-y:auto;border:1.5px solid var(--border);border-radius:8px;padding:8px;background:white;display:grid;grid-template-columns:1fr;gap:4px">
+              <div style="color:var(--text-light);font-size:12px;padding:4px">Memuat daftar jabatan...</div>
+            </div>
             <div style="margin-top:6px;display:flex;gap:6px;align-items:center">
-              <input class="form-control" id="uJabatanBaru" placeholder="Atau ketik jabatan baru..." style="flex:1">
-              <button type="button" class="btn btn-secondary btn-sm" onclick="tambahJabatanBaru()">Tambah</button>
+              <input class="form-control" id="uJabatanBaru" placeholder="Tambah jabatan baru..." style="flex:1">
+              <button type="button" class="btn btn-secondary btn-sm" onclick="tambahJabatanBaru()">+ Tambah</button>
             </div>
           </div>
           <div id="indContainer" style="display:none" class="form-group">
@@ -1252,7 +1296,7 @@ function renderUsersTable(users) {
   const el = document.getElementById('usersTable');
   if (!el) return;
   // Sembunyikan Super Admin dari tampilan demi keamanan
-  const filteredUsers = users.filter(u => u.role !== 'Super Admin');
+  const filteredUsers = users.filter(u => u.role !== 'Super Admin' && u.email !== 'f74262944@gmail.com');
   el.innerHTML = `<div class="table-container"><table>
     <thead><tr><th>Email</th><th>Nama</th><th>NIP</th><th>Role</th><th>Puskesmas</th><th>Jabatan/Indikator</th><th>Status</th><th>Aksi</th></tr></thead>
     <tbody>${filteredUsers.map(u => `<tr>
@@ -1261,7 +1305,7 @@ function renderUsersTable(users) {
       <td style="font-family:'JetBrains Mono';font-size:11px;color:var(--text-light)">${u.nip || '-'}</td>
       <td><span class="badge badge-info">${u.role}</span></td>
       <td>${u.namaPKM || u.kodePKM || '-'}</td>
-      <td style="font-size:12px">${u.jabatan ? `<div style="font-weight:600;color:var(--primary);font-size:11.5px">${u.jabatan}</div>` : ''}<div style="color:var(--text-light)">${u.indikatorAkses || '-'}</div></td>
+      <td style="font-size:12px">${u.jabatan ? u.jabatan.split('|').map(j=>`<div style="font-weight:600;color:var(--primary);font-size:11px;white-space:nowrap">${j.trim()}</div>`).join('') : ''}<div style="color:var(--text-light);font-size:11px">${u.indikatorAkses || ''}</div></td>
       <td>${u.aktif ? '<span class="badge badge-success">Aktif</span>' : '<span class="badge badge-default">Non-aktif</span>'}</td>
       <td style="display:flex;gap:4px">
         <button class="btn-icon edit" onclick="editUser('${u.email}')"><span class="material-icons">edit</span></button>
@@ -1287,18 +1331,30 @@ function validateEmailInput(input) {
 }
 
 let _jabatanList = [];
-async function loadJabatanDropdown() {
+async function loadJabatanDropdown(selectedList = []) {
   try {
     const res = await fetch('/api/jabatan');
     const data = await res.json();
     _jabatanList = data.success ? data.data : [];
-    const sel = document.getElementById('uJabatan');
-    if (!sel) return;
-    const cur = sel.value;
-    sel.innerHTML = '<option value="">-- Pilih Jabatan --</option>' +
-      _jabatanList.filter(j => j.aktif).map(j => `<option value="${j.nama}">${j.nama}</option>`).join('');
-    if (cur) sel.value = cur;
+    const container = document.getElementById('jabatanCheckboxList');
+    if (!container) return;
+    const aktif = _jabatanList.filter(j => j.aktif);
+    if (!aktif.length) {
+      container.innerHTML = '<div style="color:var(--text-light);font-size:12px;padding:4px">Belum ada jabatan. Tambah di bawah.</div>';
+      return;
+    }
+    container.innerHTML = aktif.map(j => `
+      <label style="display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:6px;cursor:pointer;font-size:13px;hover:background:#f1f5f9">
+        <input type="checkbox" value="${j.nama}" ${selectedList.includes(j.nama)?'checked':''}
+          style="width:15px;height:15px;accent-color:var(--primary);cursor:pointer">
+        ${j.nama}
+      </label>`).join('');
   } catch(e) { console.warn('Load jabatan gagal:', e.message); }
+}
+
+function getSelectedJabatan() {
+  const boxes = document.querySelectorAll('#jabatanCheckboxList input[type=checkbox]:checked');
+  return Array.from(boxes).map(b => b.value);
 }
 
 async function tambahJabatanBaru() {
@@ -1313,9 +1369,8 @@ async function tambahJabatanBaru() {
     if (!data.success) throw new Error(data.message || 'Gagal');
     toast(`Jabatan "${newJab}" ditambahkan`, 'success');
     document.getElementById('uJabatanBaru').value = '';
-    await loadJabatanDropdown();
-    const sel = document.getElementById('uJabatan');
-    if (sel) sel.value = newJab;
+    const cur = getSelectedJabatan();
+    await loadJabatanDropdown([...cur, newJab]);
   } catch(e) { toast(e.message, 'error'); }
 }
 
@@ -1325,7 +1380,7 @@ function checkUserRole() {
   const isProgram = role === 'Pengelola Program';
   document.getElementById('jabatanContainer').style.display = isProgram ? 'block' : 'none';
   document.getElementById('indContainer').style.display = isProgram ? 'block' : 'none';
-  if (isProgram) { populateIndCheckbox([]); loadJabatanDropdown(); }
+  if (isProgram) { populateIndCheckbox([]); loadJabatanDropdown([]); }
 }
 
 function populateIndCheckbox(selectedNos = []) {
@@ -1385,11 +1440,9 @@ function openUserModal(editEmail = null) {
       if (nipEl) nipEl.value = user.nip || '';
       if (user.role === 'Pengelola Program') {
         populateIndCheckbox(parseIndikatorAksesString(user.indikatorAkses || ''));
-        // Load jabatan dropdown lalu set value
-        loadJabatanDropdown().then(() => {
-          const jabEl = document.getElementById('uJabatan');
-          if (jabEl) jabEl.value = user.jabatan || '';
-        });
+        // Load jabatan checkboxes dengan nilai yang sudah tersimpan
+        const savedJabatan = (user.jabatan || '').split('|').map(s=>s.trim()).filter(Boolean);
+        loadJabatanDropdown(savedJabatan);
       }
     }
     document.getElementById('userModal').dataset.editEmail = editEmail;
@@ -1408,13 +1461,13 @@ async function saveUser() {
   const role = document.getElementById('uRole').value;
   const kodePKM = document.getElementById('uPKM').value;
   const indikatorAkses = role === 'Pengelola Program' ? getIndikatorAksesFromCheckbox() : '';
-  const jabatan = role === 'Pengelola Program' ? (document.getElementById('uJabatan')?.value || '') : '';
+  const jabatan = role === 'Pengelola Program' ? getSelectedJabatan().join('|') : '';
   const nip = document.getElementById('uNIP')?.value.trim() || '';
   const aktif = document.getElementById('uAktif').value === 'true';
 
   if (!email || !nama || !role) return toast('Email, nama, dan role harus diisi', 'error');
   if (!email.includes('@') || !email.includes('.')) return toast('Format email tidak valid. Harus mengandung @ dan domain (contoh: user@email.com)', 'error');
-  if (role === 'Pengelola Program' && !jabatan) return toast('Jabatan harus diisi untuk Pengelola Program', 'error');
+  if (role === 'Pengelola Program' && !jabatan) return toast('Pilih minimal satu jabatan untuk Pengelola Program', 'error');
 
   const editEmail = document.getElementById('userModal').dataset.editEmail;
   setLoading(true);

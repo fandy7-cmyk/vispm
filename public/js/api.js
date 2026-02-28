@@ -191,7 +191,7 @@ function showConfirm({ title, message, onConfirm, type = 'danger' }) {
   const btn = document.getElementById('confirmActionBtn');
 
   if (titleEl) titleEl.textContent = title;
-  if (msgEl) msgEl.textContent = message;
+  if (msgEl) msgEl.innerHTML = message;
   if (icon) icon.textContent = type === 'warning' ? 'warning' : 'delete';
   if (header) header.className = 'confirm-header ' + (type === 'warning' ? 'warning' : 'danger');
   if (btn) btn.className = 'btn btn-' + (type === 'warning' ? 'primary' : 'danger');

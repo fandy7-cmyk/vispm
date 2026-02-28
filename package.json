@@ -6,8 +6,6 @@
     "dev": "netlify dev"
   },
   "dependencies": {
-    "pg": "^8.11.3",
-    "googleapis": "^128.0.0",
-    "formidable-serverless": "^1.1.1"
+    "pg": "^8.11.3"
   }
 }

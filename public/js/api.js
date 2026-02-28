@@ -75,7 +75,12 @@ const API = {
   rejectUsulan: (data) => API.post('usulan?action=reject', data),
 
   // Laporan
-  getLaporan: (params) => API.get('laporan', params)
+  getLaporan: (params) => API.get('laporan', params),
+
+  // Jabatan
+  getJabatan: () => API.get('jabatan'),
+  saveJabatan: (data) => API.post('jabatan', data),
+  deleteJabatan: (id) => API.del('jabatan', { id })
 };
 
 // Utils

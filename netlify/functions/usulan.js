@@ -20,8 +20,14 @@ exports.handler = async (event) => {
     if (method === 'POST' && path === 'approve-admin') return await approveAdmin(pool, body);
     if (method === 'POST' && path === 'reject') return await rejectUsulan(pool, body);
     if (method === 'PUT' && path === 'drive-folder') return await saveDriveFolder(pool, body);
+    if (method === 'POST' && path === 'admin-reset') return await adminResetUsulan(pool, body);
     if (method === 'DELETE') {
-      const { idUsulan } = JSON.parse(event.body || '{}');
+      const delBody = JSON.parse(event.body || '{}');
+      const { idUsulan } = delBody;
+      if (!idUsulan) return err('idUsulan diperlukan');
+      // Hapus cascade
+      await pool.query('DELETE FROM verifikasi_program WHERE id_usulan=$1', [idUsulan]);
+      await pool.query('DELETE FROM usulan_indikator WHERE id_usulan=$1', [idUsulan]);
       await pool.query('DELETE FROM usulan_header WHERE id_usulan=$1', [idUsulan]);
       return ok({ message: 'Usulan berhasil dihapus' });
     }
@@ -107,10 +113,23 @@ async function buatUsulan(pool, body) {
   const { kodePKM, tahun, bulan, emailOperator } = body;
   if (!kodePKM || !tahun || !bulan || !emailOperator) return err('Data tidak lengkap');
   const periodeCheck = await pool.query(
-    `SELECT id FROM periode_input WHERE tahun=$1 AND bulan=$2 AND status='Aktif' AND tanggal_mulai<=CURRENT_DATE AND tanggal_selesai>=CURRENT_DATE`,
+    `SELECT id, tanggal_mulai, tanggal_selesai FROM periode_input
+     WHERE tahun=$1 AND bulan=$2 AND status='Aktif'`,
     [tahun, bulan]
   );
-  if (periodeCheck.rows.length === 0) return err('Periode input untuk bulan ini sudah ditutup atau belum dibuka');
+  if (periodeCheck.rows.length === 0) return err('Periode input untuk bulan/tahun ini belum diaktifkan. Hubungi Admin.');
+  // Cek rentang tanggal jika ada
+  const p = periodeCheck.rows[0];
+  if (p.tanggal_mulai && p.tanggal_selesai) {
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const mulai = new Date(p.tanggal_mulai);
+    mulai.setHours(0,0,0,0);
+    const selesai = new Date(p.tanggal_selesai);
+    selesai.setHours(23,59,59);
+    if (today < mulai) return err(`Periode input belum dimulai. Mulai ${mulai.toLocaleDateString('id-ID')}.`);
+    if (today > selesai) return err(`Periode input sudah ditutup pada ${selesai.toLocaleDateString('id-ID')}.`);
+  }
   const dupCheck = await pool.query(`SELECT id_usulan FROM usulan_header WHERE created_by=$1 AND tahun=$2 AND bulan=$3`, [emailOperator, tahun, bulan]);
   if (dupCheck.rows.length > 0) return err(`Anda sudah memiliki usulan untuk periode ini (${dupCheck.rows[0].id_usulan}). Setiap operator hanya dapat mengajukan 1 usulan per periode.`);
   const periodeKey = `${tahun}-${String(bulan).padStart(2,'0')}-01`;
@@ -203,31 +222,19 @@ async function hitungSPM(pool, idUsulan) {
     ? Math.round((totalNilai / totalBobot) * 10000) / 10000
     : 0;
 
-  // 3. Ambil indeks beban kerja LANGSUNG dari master_puskesmas berdasarkan kode_pkm usulan
-  const hdr = await pool.query(
-    `SELECT uh.kode_pkm, mp.indeks_beban_kerja
-     FROM usulan_header uh
-     JOIN master_puskesmas mp ON uh.kode_pkm = mp.kode_pkm
-     WHERE uh.id_usulan = $1`,
-    [idUsulan]
-  );
-  const indeksBeban = hdr.rows.length > 0
-    ? parseFloat(hdr.rows[0].indeks_beban_kerja) || 0
-    : 0;
+  // 3. Indeks SPM = indeks_kinerja * 0.33 (angka tetap)
+  const INDEKS_BEBAN_TETAP = 0.33;
+  const indeksSPM = Math.round(indeksKinerja * INDEKS_BEBAN_TETAP * 100) / 100;
 
-  // 4. Indeks SPM = indeks_kinerja * indeks_beban_kerja puskesmas
-  const indeksSPM = Math.round(indeksKinerja * indeksBeban * 100) / 100;
-
-  // 5. Simpan hasil ke usulan_header (update indeks_beban_kerja juga agar sinkron)
+  // 4. Simpan hasil ke usulan_header
   await pool.query(
     `UPDATE usulan_header
-     SET total_nilai=$1, total_bobot=$2, indeks_kinerja_spm=$3,
-         indeks_beban_kerja=$4, indeks_spm=$5
-     WHERE id_usulan=$6`,
-    [totalNilai, totalBobot, indeksKinerja, indeksBeban, indeksSPM, idUsulan]
+     SET total_nilai=$1, total_bobot=$2, indeks_kinerja_spm=$3, indeks_spm=$4
+     WHERE id_usulan=$5`,
+    [totalNilai, totalBobot, indeksKinerja, indeksSPM, idUsulan]
   );
 
-  return { indeksKinerja, indeksBeban, indeksSPM, totalNilai, totalBobot };
+  return { indeksKinerja, indeksBeban: INDEKS_BEBAN_TETAP, indeksSPM, totalNilai, totalBobot };
 }
 
 async function submitUsulan(pool, body) {
@@ -349,4 +356,27 @@ function mapHeader(r) {
     finalApprovedBy:r.final_approved_by||'', finalApprovedAt:r.final_approved_at,
     driveFolderUrl:r.drive_folder_url||'', driveFolderId:r.drive_folder_id||''
   };
+}
+
+// ===== ADMIN: FORCE UNLOCK & EDIT USULAN =====
+// Endpoint: POST /api/usulan?action=admin-unlock  { idUsulan, email }
+// Endpoint: POST /api/usulan?action=admin-reset   { idUsulan, email }
+
+async function adminResetUsulan(pool, body) {
+  const { idUsulan, email } = body;
+  if (!idUsulan) return err('idUsulan diperlukan');
+  // Admin reset: unlock dan kembalikan ke Draft
+  await pool.query(
+    `UPDATE usulan_header SET is_locked=false, status_global='Draft',
+     status_kapus='Menunggu', status_program='Menunggu', status_final='Menunggu',
+     kapus_approved_by=NULL, admin_approved_by=NULL
+     WHERE id_usulan=$1`,
+    [idUsulan]
+  );
+  await pool.query(
+    `UPDATE verifikasi_program SET status='Menunggu', verified_at=NULL WHERE id_usulan=$1`,
+    [idUsulan]
+  );
+  await logAktivitas(pool, email, 'Admin', 'Reset', idUsulan, 'Direset oleh Admin');
+  return ok({ message: 'Usulan berhasil direset ke Draft' });
 }

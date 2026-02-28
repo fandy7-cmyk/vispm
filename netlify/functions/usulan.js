@@ -202,9 +202,12 @@ async function updateIndikator(pool, body) {
 }
 
 async function hitungSPM(pool, idUsulan) {
-  // 1. Hitung total nilai dan total bobot dari semua indikator
+  const KONSTANTA = 0.33;
+  // Fungsi pembulatan 2 desimal sesuai aturan matematika standar
+  const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
+
   const r = await pool.query(
-    'SELECT bobot, capaian, realisasi_rasio FROM usulan_indikator WHERE id_usulan=$1',
+    'SELECT bobot, realisasi_rasio FROM usulan_indikator WHERE id_usulan=$1',
     [idUsulan]
   );
 
@@ -212,29 +215,24 @@ async function hitungSPM(pool, idUsulan) {
   for (const row of r.rows) {
     const bobot = parseInt(row.bobot) || 0;
     const rasio = parseFloat(row.realisasi_rasio) || 0;
-    // nilai = bobot * rasio  (rasio sudah = capaian/target, max 1.00)
-    totalNilai += Math.round(bobot * rasio * 100) / 100;
+    // nilai = bobot * rasio — akumulasi dengan presisi penuh dulu
+    totalNilai += bobot * rasio;
     totalBobot += bobot;
   }
 
-  // 2. Indeks kinerja SPM = total_nilai / total_bobot (semua 12 indikator)
-  const indeksKinerja = totalBobot > 0
-    ? Math.round((totalNilai / totalBobot) * 10000) / 10000
-    : 0;
+  // Rumus: indeks_kinerja = total_nilai / total_bobot (pembulatan 2 desimal)
+  const indeksKinerja = totalBobot > 0 ? round2(totalNilai / totalBobot) : 0;
 
-  // 3. Indeks SPM = indeks_kinerja * 0.33 (angka tetap)
-  const INDEKS_BEBAN_TETAP = 0.33;
-  const indeksSPM = Math.round(indeksKinerja * INDEKS_BEBAN_TETAP * 100) / 100;
+  // Rumus: indeks_spm = indeks_kinerja * 0.33 (pembulatan 2 desimal)
+  // Contoh: 6/7 = 0.857142... → 0.86; 7/7 = 1.00 → 1.00
+  const indeksSPM = round2(indeksKinerja * KONSTANTA);
 
-  // 4. Simpan hasil ke usulan_header
   await pool.query(
-    `UPDATE usulan_header
-     SET total_nilai=$1, total_bobot=$2, indeks_kinerja_spm=$3, indeks_spm=$4
-     WHERE id_usulan=$5`,
-    [totalNilai, totalBobot, indeksKinerja, indeksSPM, idUsulan]
+    `UPDATE usulan_header SET total_nilai=$1, total_bobot=$2, indeks_kinerja_spm=$3, indeks_spm=$4 WHERE id_usulan=$5`,
+    [round2(totalNilai), totalBobot, indeksKinerja, indeksSPM, idUsulan]
   );
 
-  return { indeksKinerja, indeksBeban: INDEKS_BEBAN_TETAP, indeksSPM, totalNilai, totalBobot };
+  return { indeksKinerja, indeksBeban: KONSTANTA, indeksSPM, totalNilai: round2(totalNilai), totalBobot };
 }
 
 async function submitUsulan(pool, body) {

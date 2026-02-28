@@ -82,6 +82,7 @@ function buildSidebar() {
       ]},
       { label: 'Kelola Master', items: [
         { id: 'users', icon: 'group', label: 'Kelola User' },
+        { id: 'jabatan', icon: 'badge', label: 'Kelola Jabatan' },
         { id: 'pkm', icon: 'local_hospital', label: 'Kelola Puskesmas' },
         { id: 'indikator', icon: 'monitor_heart', label: 'Kelola Indikator' },
         { id: 'periode', icon: 'event_available', label: 'Periode Input' }
@@ -141,8 +142,8 @@ function setActiveNav(page) {
 // ============== ROUTING ==============
 const PAGE_TITLES = {
   dashboard: 'Dashboard', verifikasi: 'Verifikasi', laporan: 'Laporan',
-  users: 'Kelola User', pkm: 'Kelola Puskesmas', indikator: 'Kelola Indikator',
-  periode: 'Periode Input', input: 'Input Usulan'
+  users: 'Kelola User', jabatan: 'Kelola Jabatan', pkm: 'Kelola Puskesmas',
+  indikator: 'Kelola Indikator', periode: 'Periode Input', input: 'Input Usulan'
 };
 
 function loadPage(page) {
@@ -158,6 +159,7 @@ function loadPage(page) {
     verifikasi: renderVerifikasi,
     laporan: renderLaporan,
     'kelola-usulan': renderKelolaUsulan,
+    jabatan: renderJabatan,
     users: renderUsers,
     pkm: renderPKM,
     indikator: renderIndikator,
@@ -1558,6 +1560,140 @@ async function deleteUser(email) {
         allUsers = await API.getUsers();
         renderUsersTable(allUsers);
       } catch (e) { toast(e.message, 'error'); }
+    }
+  });
+}
+
+
+
+// ============== KELOLA JABATAN ==============
+let _jabatanAllList = [];
+
+async function renderJabatan() {
+  document.getElementById('mainContent').innerHTML = `
+    <div class="page-header">
+      <h1><span class="material-icons">badge</span>Kelola Jabatan Pengelola Program</h1>
+      <button class="btn btn-primary" onclick="openJabatanModal()">
+        <span class="material-icons">add</span>Tambah Jabatan
+      </button>
+    </div>
+    <div class="card">
+      <div class="card-body" style="padding:0" id="jabatanTable">
+        <div class="empty-state" style="padding:32px"><p>Memuat...</p></div>
+      </div>
+    </div>
+
+    <!-- Modal Tambah/Edit Jabatan -->
+    <div class="modal" id="jabatanModal">
+      <div class="modal-card" style="max-width:420px">
+        <div class="modal-header">
+          <span class="material-icons">badge</span>
+          <span id="jabatanModalTitle">Tambah Jabatan</span>
+          <button class="btn-icon" onclick="closeModal('jabatanModal')"><span class="material-icons">close</span></button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Nama Jabatan</label>
+            <input class="form-control" id="jNama" placeholder="Contoh: Pengelola Program Gizi Kabupaten">
+          </div>
+          <div class="form-group">
+            <label>Status</label>
+            <select class="form-control" id="jAktif">
+              <option value="true">Aktif</option>
+              <option value="false">Non-aktif</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" onclick="closeModal('jabatanModal')">Batal</button>
+          <button class="btn btn-primary" onclick="saveJabatan()"><span class="material-icons">save</span>Simpan</button>
+        </div>
+      </div>
+    </div>`;
+
+  await loadJabatanTable();
+}
+
+async function loadJabatanTable() {
+  try {
+    const res = await fetch('/api/jabatan');
+    const data = await res.json();
+    _jabatanAllList = data.success ? data.data : [];
+    const el = document.getElementById('jabatanTable');
+    if (!el) return;
+
+    if (!_jabatanAllList.length) {
+      el.innerHTML = `<div class="empty-state" style="padding:32px"><span class="material-icons">badge</span><p>Belum ada jabatan. Klik Tambah Jabatan untuk mulai.</p></div>`;
+      return;
+    }
+
+    el.innerHTML = `<div class="table-container"><table>
+      <thead><tr><th>No</th><th>Nama Jabatan</th><th>Status</th><th>Aksi</th></tr></thead>
+      <tbody>${_jabatanAllList.map((j, i) => `<tr>
+        <td>${i + 1}</td>
+        <td style="font-weight:500">${j.nama}</td>
+        <td>${j.aktif
+          ? '<span style="background:#d1fae5;color:#065f46;padding:2px 10px;border-radius:20px;font-size:12px;font-weight:600">Aktif</span>'
+          : '<span style="background:#f1f5f9;color:#94a3b8;padding:2px 10px;border-radius:20px;font-size:12px;font-weight:600">Non-aktif</span>'}</td>
+        <td>
+          <button class="btn-icon edit" onclick="openJabatanModal(${j.id})" title="Edit"><span class="material-icons">edit</span></button>
+          <button class="btn-icon del" onclick="deleteJabatan(${j.id}, '${j.nama.replace(/'/g, "\'")}')" title="Hapus"><span class="material-icons">delete</span></button>
+        </td>
+      </tr>`).join('')}
+      </tbody>
+    </table></div>`;
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+let _editJabatanId = null;
+
+function openJabatanModal(id = null) {
+  _editJabatanId = id;
+  const jabatan = id ? _jabatanAllList.find(j => j.id === id) : null;
+  document.getElementById('jabatanModalTitle').textContent = id ? 'Edit Jabatan' : 'Tambah Jabatan';
+  document.getElementById('jNama').value = jabatan ? jabatan.nama : '';
+  document.getElementById('jAktif').value = jabatan ? String(jabatan.aktif) : 'true';
+  showModal('jabatanModal');
+  setTimeout(() => document.getElementById('jNama').focus(), 100);
+}
+
+async function saveJabatan() {
+  const nama = document.getElementById('jNama').value.trim();
+  const aktif = document.getElementById('jAktif').value === 'true';
+  if (!nama) return toast('Nama jabatan wajib diisi', 'error');
+
+  try {
+    const res = await fetch('/api/jabatan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nama, aktif, id: _editJabatanId })
+    });
+    const data = await res.json();
+    if (!data.success) return toast(data.message || 'Gagal menyimpan', 'error');
+    toast(`Jabatan "${nama}" berhasil ${_editJabatanId ? 'diperbarui' : 'ditambahkan'}`, 'success');
+    closeModal('jabatanModal');
+    await loadJabatanTable();
+    // Refresh dropdown jabatan kalau sedang buka form user
+    if (document.getElementById('jabatanCheckboxList')) {
+      const cur = getSelectedJabatan();
+      await loadJabatanDropdown(cur);
+    }
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function deleteJabatan(id, nama) {
+  showConfirm({
+    title: 'Hapus Jabatan',
+    message: `Hapus jabatan "<strong>${nama}</strong>"? Pastikan tidak ada user yang masih menggunakan jabatan ini.`,
+    type: 'danger',
+    onConfirm: async () => {
+      try {
+        const res = await fetch(`/api/jabatan?id=${id}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (!data.success) return toast(data.message || 'Gagal menghapus', 'error');
+        toast(`Jabatan "${nama}" berhasil dihapus`, 'success');
+        await loadJabatanTable();
+      } catch(e) { toast(e.message, 'error'); }
     }
   });
 }

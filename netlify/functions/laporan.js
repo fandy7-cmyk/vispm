@@ -60,6 +60,19 @@ exports.handler = async (event) => {
       'Juli','Agustus','September','Oktober','November','Desember'];
     const s = countResult.rows[0];
 
+    // Helper format tanggal
+    const formatDateTime = (date) => {
+      if (!date) return '-';
+      const d = new Date(date);
+      return d.toLocaleString('id-ID', { 
+        day: '2-digit', 
+        month: 'short', 
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    };
+
     const data = dataResult.rows.map((r, i) => ({
       no: i + 1,
       idUsulan: r.id_usulan,
@@ -70,12 +83,12 @@ exports.handler = async (event) => {
       namaBulan: bulanNama[r.bulan] || '',
       totalIndikator: parseInt(r.total_indikator) || 0,
       totalNilai: parseFloat(r.total_nilai) ? parseFloat(r.total_nilai).toFixed(2) : '0',
-      indeksKinerja: parseFloat(r.indeks_kinerja_spm) ? parseFloat(r.indeks_kinerja_spm).toFixed(2) : '0',
-      indeksBeban: parseFloat(r.indeks_beban_kerja) ? parseFloat(r.indeks_beban_kerja).toFixed(2) : '0',
+      // HAPUS indeksKinerja dan indeksBeban
+      // TAMBAH timestamp pembuatan
+      createdAt: formatDateTime(r.created_at),
+      createdBy: r.created_by || '',
       indeksSPM: parseFloat(r.indeks_spm) ? parseFloat(r.indeks_spm).toFixed(2) : '0',
       statusGlobal: r.status_global || 'Draft',
-      createdBy: r.created_by || '',
-      createdAt: r.created_at,
       finalApprovedBy: r.final_approved_by || '',
       finalApprovedAt: r.final_approved_at
     }));

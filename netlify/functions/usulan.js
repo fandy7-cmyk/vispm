@@ -246,21 +246,58 @@ async function submitUsulan(pool, body) {
   // Izinkan submit dari Draft ATAU Ditolak (ajukan ulang setelah diperbaiki)
   if (statusSaatIni !== 'Draft' && statusSaatIni !== 'Ditolak') return err('Usulan tidak dapat disubmit pada status ini');
 
-  // Kalau resubmit dari Ditolak: reset semua verifikasi sebelumnya
+  // Kalau resubmit dari Ditolak: reset sesuai level penolakan
   if (statusSaatIni === 'Ditolak') {
-    await pool.query(
-      `UPDATE usulan_header SET
-        status_kapus='Menunggu', status_program='Menunggu', status_final='Menunggu',
-        kapus_approved_by=NULL, kapus_approved_at=NULL,
-        admin_approved_by=NULL, admin_approved_at=NULL,
-        final_approved_by=NULL, final_approved_at=NULL
-       WHERE id_usulan=$1`,
-      [idUsulan]
-    );
-    await pool.query(
-      `UPDATE verifikasi_program SET status='Menunggu', catatan=NULL, verified_at=NULL WHERE id_usulan=$1`,
-      [idUsulan]
-    );
+    const tolakInfo = await pool.query('SELECT status_kapus, status_program FROM usulan_header WHERE id_usulan=$1', [idUsulan]);
+    const { status_kapus, status_program } = tolakInfo.rows[0];
+
+    if (status_kapus === 'Ditolak') {
+      // Ditolak Kapus → reset semua dari awal
+      await pool.query(
+        `UPDATE usulan_header SET
+          status_kapus='Menunggu', status_program='Menunggu', status_final='Menunggu',
+          kapus_approved_by=NULL, kapus_approved_at=NULL, kapus_catatan=NULL,
+          admin_approved_by=NULL, admin_approved_at=NULL, admin_catatan=NULL,
+          final_approved_by=NULL, final_approved_at=NULL
+         WHERE id_usulan=$1`,
+        [idUsulan]
+      );
+      await pool.query(
+        `UPDATE verifikasi_program SET status='Menunggu', catatan=NULL, verified_at=NULL WHERE id_usulan=$1`,
+        [idUsulan]
+      );
+    } else if (status_program === 'Ditolak') {
+      // Ditolak Pengelola Program → Kapus sudah approve (tidak perlu ulang)
+      // Hanya reset yang berstatus 'Ditolak', yang sudah 'Selesai' TETAP Selesai
+      await pool.query(
+        `UPDATE verifikasi_program SET status='Menunggu', catatan=NULL, verified_at=NULL
+         WHERE id_usulan=$1 AND status='Ditolak'`,
+        [idUsulan]
+      );
+      // Reset header ke Menunggu Program, hapus catatan tolak
+      await pool.query(
+        `UPDATE usulan_header SET
+          status_program='Menunggu', status_final='Menunggu',
+          admin_approved_by=NULL, admin_approved_at=NULL, admin_catatan=NULL,
+          final_approved_by=NULL, final_approved_at=NULL
+         WHERE id_usulan=$1`,
+        [idUsulan]
+      );
+    } else {
+      // Ditolak Admin → Kapus sudah approve, reset program dan admin saja
+      await pool.query(
+        `UPDATE verifikasi_program SET status='Menunggu', catatan=NULL, verified_at=NULL WHERE id_usulan=$1`,
+        [idUsulan]
+      );
+      await pool.query(
+        `UPDATE usulan_header SET
+          status_program='Menunggu', status_final='Menunggu',
+          admin_approved_by=NULL, admin_approved_at=NULL, admin_catatan=NULL,
+          final_approved_by=NULL, final_approved_at=NULL
+         WHERE id_usulan=$1`,
+        [idUsulan]
+      );
+    }
   }
 
   // Cek indikator yang belum ada bukti
@@ -285,11 +322,33 @@ async function submitUsulan(pool, body) {
     };
   }
 
-  // Submit — update status ke Menunggu Kapus
-  await pool.query(`UPDATE usulan_header SET status_global='Menunggu Kapus', is_locked=true WHERE id_usulan=$1`, [idUsulan]);
+  // Tentukan status tujuan submit:
+  // - Dari Draft → Menunggu Kapus (normal)
+  // - Dari Ditolak Kapus → Menunggu Kapus (ulang dari awal)
+  // - Dari Ditolak Program → Menunggu Program (Kapus skip, langsung ke program)
+  // - Dari Ditolak Admin → Menunggu Program (ulang dari program)
+  let targetStatus = 'Menunggu Kapus';
+  if (statusSaatIni === 'Ditolak') {
+    const tolakInfo = await pool.query('SELECT status_kapus, status_program FROM usulan_header WHERE id_usulan=$1', [idUsulan]);
+    const { status_kapus, status_program } = tolakInfo.rows[0];
+    if (status_kapus !== 'Ditolak') {
+      // Kapus sudah approve sebelumnya → langsung ke Menunggu Program
+      targetStatus = 'Menunggu Program';
+    }
+  }
+
+  await pool.query(
+    `UPDATE usulan_header SET status_global=$1, is_locked=true WHERE id_usulan=$2`,
+    [targetStatus, idUsulan]
+  );
   const isResubmit = statusSaatIni === 'Ditolak';
-  await logAktivitas(pool, email, 'Operator', isResubmit ? 'Ajukan Ulang' : 'Submit', idUsulan, isResubmit ? 'Diajukan ulang ke Kapus setelah perbaikan' : 'Disubmit ke Kapus');
-  return ok({ message: isResubmit ? 'Usulan berhasil diajukan ulang ke Kapus!' : 'Usulan berhasil disubmit ke Kapus' });
+  await logAktivitas(pool, email, 'Operator', isResubmit ? 'Ajukan Ulang' : 'Submit', idUsulan,
+    isResubmit ? `Diajukan ulang — diteruskan ke ${targetStatus}` : 'Disubmit ke Kapus'
+  );
+  return ok({ message: isResubmit
+    ? `Usulan berhasil diajukan ulang! Diteruskan ke ${targetStatus}.`
+    : 'Usulan berhasil disubmit ke Kapus'
+  });
 }
 
 async function approveKapus(pool, body) {
@@ -320,20 +379,39 @@ async function approveProgram(pool, body) {
   const { idUsulan, email, catatan } = body;
   const result = await pool.query('SELECT status_global FROM usulan_header WHERE id_usulan=$1', [idUsulan]);
   if (result.rows.length===0) return err('Usulan tidak ditemukan');
-  if (result.rows[0].status_global !== 'Menunggu Program') return err('Usulan tidak dalam status Menunggu Program');
+  // Izinkan approve kalau status Menunggu Program ATAU Ditolak (ada yang tolak tapi yang lain masih bisa approve)
+  if (!['Menunggu Program','Ditolak'].includes(result.rows[0].status_global)) return err('Usulan tidak dalam tahap verifikasi program');
+
   const vpCheck = await pool.query('SELECT id, status FROM verifikasi_program WHERE id_usulan=$1 AND email_program=$2', [idUsulan, email]);
   if (vpCheck.rows.length===0) return err('Anda tidak terdaftar sebagai pengelola program untuk usulan ini');
   if (vpCheck.rows[0].status==='Selesai') return err('Anda sudah memverifikasi usulan ini');
-  await pool.query(`UPDATE verifikasi_program SET status='Selesai',catatan=$1,verified_at=NOW() WHERE id_usulan=$2 AND email_program=$3`, [catatan||'',idUsulan,email]);
+
+  await pool.query(
+    `UPDATE verifikasi_program SET status='Selesai', catatan=$1, verified_at=NOW() WHERE id_usulan=$2 AND email_program=$3`,
+    [catatan||'', idUsulan, email]
+  );
   await logAktivitas(pool, email, 'Pengelola Program', 'Approve', idUsulan, catatan||'Disetujui');
+
   const allVP = await pool.query('SELECT status FROM verifikasi_program WHERE id_usulan=$1', [idUsulan]);
-  const allDone = allVP.rows.every(r => r.status==='Selesai');
+  const allDone = allVP.rows.every(r => r.status === 'Selesai');
+  const stillRejected = allVP.rows.filter(r => r.status === 'Ditolak').length;
+  const stillWaiting = allVP.rows.filter(r => r.status === 'Menunggu').length;
+
   if (allDone) {
-    await pool.query(`UPDATE usulan_header SET status_program='Selesai',status_global='Menunggu Admin' WHERE id_usulan=$1`, [idUsulan]);
+    // Semua approve → lanjut ke Admin
+    await pool.query(
+      `UPDATE usulan_header SET status_program='Selesai', status_global='Menunggu Admin' WHERE id_usulan=$1`,
+      [idUsulan]
+    );
     return ok({ message: 'Semua pengelola program selesai — usulan diteruskan ke Admin.', allDone: true });
   }
-  const remaining = allVP.rows.filter(r => r.status!=='Selesai').length;
-  return ok({ message: `Verifikasi Anda disimpan. Masih menunggu ${remaining} pengelola program lain.`, allDone: false });
+
+  // Ada yang masih menolak atau menunggu
+  const remaining = stillWaiting + stillRejected;
+  const msg = stillRejected > 0
+    ? `Verifikasi Anda disimpan. Masih ada ${stillRejected} penolakan yang belum diselesaikan operator.`
+    : `Verifikasi Anda disimpan. Masih menunggu ${remaining} pengelola program lain.`;
+  return ok({ message: msg, allDone: false });
 }
 
 async function approveAdmin(pool, body) {
@@ -354,24 +432,65 @@ async function rejectUsulan(pool, body) {
   const { idUsulan, email, role, alasan } = body;
   if (!alasan || !alasan.trim()) return err('Alasan penolakan wajib diisi');
 
-  // Reset verifikasi program jika ditolak di level manapun
-  await pool.query(`UPDATE verifikasi_program SET status='Menunggu',catatan=null,verified_at=null WHERE id_usulan=$1`, [idUsulan]);
+  if (role === 'Pengelola Program') {
+    // Skema: hanya ubah status si penolak → 'Ditolak'
+    // Yang lain TIDAK direset — tetap bisa approve / sudah approve
+    await pool.query(
+      `UPDATE verifikasi_program SET status='Ditolak', catatan=$1, verified_at=NOW()
+       WHERE id_usulan=$2 AND email_program=$3`,
+      [alasan.trim(), idUsulan, email]
+    );
 
-  // Simpan alasan penolakan di kolom yang sesuai, reset status ke Draft agar bisa diedit ulang
-  // Gunakan kapus_catatan untuk tolak Kapus, admin_catatan untuk tolak Admin/Program
-  const isKapus = role === 'Kapus';
-  await pool.query(
-    `UPDATE usulan_header SET
-      status_global='Ditolak',
-      is_locked=false,
-      status_kapus=CASE WHEN $2='Kapus' THEN 'Ditolak' ELSE 'Menunggu' END,
-      status_program=CASE WHEN $2 IN ('Pengelola Program','Admin') THEN 'Ditolak' ELSE 'Menunggu' END,
-      kapus_approved_by=CASE WHEN $2='Kapus' THEN NULL ELSE kapus_approved_by END,
-      kapus_catatan=CASE WHEN $2='Kapus' THEN $3 ELSE kapus_catatan END,
-      admin_catatan=CASE WHEN $2 IN ('Pengelola Program','Admin') THEN $3 ELSE admin_catatan END
-     WHERE id_usulan=$1`,
-    [idUsulan, role, alasan.trim()]
-  );
+    // Ambil nama pengelola yang menolak
+    const vpRow = await pool.query(
+      'SELECT nama_program FROM verifikasi_program WHERE id_usulan=$1 AND email_program=$2',
+      [idUsulan, email]
+    );
+    const namaPengelola = vpRow.rows[0]?.nama_program || email;
+
+    // Status header tetap 'Menunggu Program' tapi tandai ada yang menolak
+    // Simpan info siapa yang menolak di admin_catatan sementara
+    await pool.query(
+      `UPDATE usulan_header SET
+        status_global='Ditolak',
+        is_locked=false,
+        status_program='Ditolak',
+        admin_catatan=$1
+       WHERE id_usulan=$2`,
+      [`Ditolak oleh ${namaPengelola}: ${alasan.trim()}`, idUsulan]
+    );
+
+  } else if (role === 'Kapus') {
+    // Kapus tolak → reset semua, operator mulai dari awal
+    await pool.query(
+      `UPDATE verifikasi_program SET status='Menunggu', catatan=NULL, verified_at=NULL WHERE id_usulan=$1`,
+      [idUsulan]
+    );
+    await pool.query(
+      `UPDATE usulan_header SET
+        status_global='Ditolak', is_locked=false,
+        status_kapus='Ditolak', status_program='Menunggu',
+        kapus_approved_by=NULL, kapus_catatan=$1
+       WHERE id_usulan=$2`,
+      [alasan.trim(), idUsulan]
+    );
+
+  } else {
+    // Admin tolak → reset semua verifikasi program
+    await pool.query(
+      `UPDATE verifikasi_program SET status='Menunggu', catatan=NULL, verified_at=NULL WHERE id_usulan=$1`,
+      [idUsulan]
+    );
+    await pool.query(
+      `UPDATE usulan_header SET
+        status_global='Ditolak', is_locked=false,
+        status_kapus='Menunggu', status_program='Menunggu',
+        admin_catatan=$1
+       WHERE id_usulan=$2`,
+      [alasan.trim(), idUsulan]
+    );
+  }
+
   await logAktivitas(pool, email, role, 'Tolak', idUsulan, alasan.trim());
   return ok({ message: 'Usulan ditolak. Operator dapat memperbaiki dan mengajukan ulang.' });
 }
@@ -384,13 +503,26 @@ async function logAktivitas(pool, email, role, aksi, idUsulan, detail) {
 function mapHeader(r) {
   const bn = ['','Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
   const isDitolak = (r.status_global||'') === 'Ditolak';
-  // Tentukan alasan tolak: kapus_catatan jika ditolak Kapus, admin_catatan jika Program/Admin
-  const alasanTolak = isDitolak
-    ? ((r.status_kapus||'')==='Ditolak' ? r.kapus_catatan : r.admin_catatan) || ''
-    : '';
-  const ditolakOleh = isDitolak
-    ? ((r.status_kapus||'')==='Ditolak' ? 'Kepala Puskesmas' : 'Pengelola Program / Admin')
-    : '';
+
+  let alasanTolak = '', ditolakOleh = '';
+  if (isDitolak) {
+    if ((r.status_kapus||'') === 'Ditolak') {
+      // Ditolak Kapus
+      ditolakOleh = 'Kepala Puskesmas';
+      alasanTolak = r.kapus_catatan || '';
+    } else if ((r.status_program||'') === 'Ditolak') {
+      // Ditolak Pengelola Program — nama spesifik ada di admin_catatan (format: "Ditolak oleh X: alasan")
+      const raw = r.admin_catatan || '';
+      ditolakOleh = raw.startsWith('Ditolak oleh ')
+        ? raw.split(':')[0].replace('Ditolak oleh ', '').trim()
+        : 'Pengelola Program';
+      alasanTolak = raw.includes(':') ? raw.split(':').slice(1).join(':').trim() : raw;
+    } else {
+      // Ditolak Admin
+      ditolakOleh = 'Admin';
+      alasanTolak = r.admin_catatan || '';
+    }
+  }
   return {
     idUsulan:r.id_usulan, tahun:r.tahun, bulan:r.bulan, namaBulan:bn[r.bulan]||'',
     periodeKey:r.periode_key, kodePKM:r.kode_pkm, namaPKM:r.nama_puskesmas||r.kode_pkm,

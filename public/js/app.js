@@ -12,7 +12,7 @@ async function doLogin() {
   const btn = document.getElementById('authBtn');
   const status = document.getElementById('authStatus');
   btn.disabled = true;
-  btn.innerHTML = '<span class="material-icons" style="animation:spin 0.8s linear infinite">refresh</span> Memeriksa...';
+  btn.innerHTML = '<span class="material-icons" style="animation:spin 0.8s linear infinite">refresh</span> Loading...';
   setAuthStatus('Memeriksa akses...', '');
 
   try {

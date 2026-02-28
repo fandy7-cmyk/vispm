@@ -401,44 +401,53 @@ function renderUsulanTable(rows, role) {
 
 // ============== INPUT USULAN (OPERATOR) ==============
 async function renderInput() {
-  let pkmList = [], periodeAktif = null;
+  let pkmList = [], periodeAktif = null, allPeriode = [], periodeOptions = [];
   try {
-    pkmList = await API.getPKM(true);
-    const periodeRes = await API.get('periode');
-    const today = new Date();
-    periodeAktif = periodeRes.find(p => p.isAktifToday);
-  } catch (e) {}
+    [pkmList] = await Promise.all([API.getPKM(true)]);
+    try {
+      const periodeRes = await API.get('periode');
+      allPeriode = Array.isArray(periodeRes) ? periodeRes : [];
+      // Periode "Aktif" status (bukan cek hari ini) - semua yg berstatus Aktif bisa dipilih
+      periodeOptions = allPeriode.filter(p => p.status === 'Aktif');
+      periodeAktif = allPeriode.find(p => p.isAktifToday);
+    } catch(e2) { /* periode API mungkin gagal, tetap lanjut */ }
+  } catch (e) { toast(e.message, 'error'); }
 
   const isOp = currentUser.role === 'Operator';
   const pkmSelect = isOp && currentUser.kodePKM
     ? `<select class="form-control" id="inputPKM" disabled><option value="${currentUser.kodePKM}">${currentUser.namaPKM || currentUser.kodePKM}</option></select>`
     : `<select class="form-control" id="inputPKM"><option value="">Pilih Puskesmas</option>${pkmList.map(p => `<option value="${p.kode}">${p.nama}</option>`).join('')}</select>`;
 
-  if (isOp && currentUser.kodePKM) {
-    setTimeout(() => { const el = document.getElementById('inputPKM'); if (el) el.value = currentUser.kodePKM; }, 100);
-  }
-
-  // Siapkan option tahun & bulan dari periode aktif saja
-  const allPeriode = Array.isArray(periodeRes) ? periodeRes : [];
-  const periodeOptions = allPeriode.filter(p => p.status === 'Aktif');
-  const tahunAktif = [...new Set(periodeOptions.map(p => p.tahun))].sort();
-  const defaultTahun = periodeAktif ? periodeAktif.tahun : CURRENT_YEAR;
-  const defaultBulan = periodeAktif ? periodeAktif.bulan : CURRENT_BULAN;
+  // Tahun yang bisa dipilih: ambil dari periode berstatus Aktif
+  // Jika tidak ada periode sama sekali, tampilkan tahun default
+  const tahunAktif = [...new Set(periodeOptions.map(p => parseInt(p.tahun)))].sort();
+  const defaultTahun = periodeAktif ? periodeAktif.tahun : (tahunAktif[0] || CURRENT_YEAR);
   const tahunSelectHtml = tahunAktif.length
     ? tahunAktif.map(y => `<option value="${y}" ${y == defaultTahun ? 'selected' : ''}>${y}</option>`).join('')
     : `<option value="${defaultTahun}">${defaultTahun}</option>`;
+
+  // Info banner periode
+  const periodeBanner = periodeAktif
+    ? `<div class="info-card info"><span class="material-icons">event</span><div class="info-card-text"><strong>Periode Aktif Hari Ini:</strong> ${periodeAktif.namaBulan} ${periodeAktif.tahun} — s/d ${formatDate(periodeAktif.tanggalSelesai)}</div></div>`
+    : periodeOptions.length
+      ? `<div class="info-card warning"><span class="material-icons">schedule</span><div class="info-card-text">Ada periode aktif tapi di luar rentang tanggal hari ini. Pilih periode sesuai yang diizinkan Admin.</div></div>`
+      : `<div class="info-card warning"><span class="material-icons">warning</span><div class="info-card-text">Tidak ada periode input aktif saat ini. Hubungi Admin.</div></div>`;
 
   document.getElementById('mainContent').innerHTML = `
     <div class="page-header">
       <h1><span class="material-icons">edit</span>Input Usulan Baru</h1>
     </div>
-    ${periodeAktif ? `<div class="info-card info"><span class="material-icons">event</span><div class="info-card-text"><strong>Periode Aktif:</strong> ${periodeAktif.namaBulan} ${periodeAktif.tahun} — s/d ${formatDate(periodeAktif.tanggalSelesai)}</div></div>` : '<div class="info-card warning"><span class="material-icons">warning</span><div class="info-card-text">Tidak ada periode input aktif. Hubungi Admin.</div></div>'}
+    ${periodeBanner}
     <div class="card">
       <div class="card-header-bar"><span class="card-title"><span class="material-icons">add_circle</span>Buat Usulan</span></div>
       <div class="card-body">
         <div class="form-row">
           <div class="form-group"><label>Puskesmas</label>${pkmSelect}</div>
-          <div class="form-group"><label>Tahun</label><select class="form-control" id="inputTahun" onchange="updateBulanOptions()">${tahunSelectHtml}</select></div>
+          <div class="form-group"><label>Tahun</label>
+            <select class="form-control" id="inputTahun" onchange="updateBulanOptions()">
+              ${tahunAktif.length ? tahunSelectHtml : `<option value="${defaultTahun}">${defaultTahun}</option>`}
+            </select>
+          </div>
         </div>
         <div class="form-row">
           <div class="form-group"><label>Bulan</label><select class="form-control" id="inputBulan"></select></div>
@@ -455,7 +464,7 @@ async function renderInput() {
       <div class="card-body" style="padding:0" id="myUsulanTable"></div>
     </div>`;
 
-  // Simpan periodeOptions untuk dipakai updateBulanOptions
+  // Simpan semua periodeOptions (berstatus Aktif) untuk updateBulanOptions
   window._periodeInputAktif = periodeOptions;
   setTimeout(() => updateBulanOptions(), 50);
   loadMyUsulan();
@@ -505,14 +514,35 @@ async function createUsulan() {
   const namaBulanTxt = BULAN_NAMA[bulan] || 'bulan ini';
   if (!kodePKM) return toast('Pilih puskesmas terlebih dahulu', 'error');
 
+  // Cek apakah periode yang dipilih valid (berstatus Aktif)
+  const periodeOptions = window._periodeInputAktif || [];
+  if (periodeOptions.length > 0) {
+    const periodeValid = periodeOptions.find(p => parseInt(p.tahun) == tahun && parseInt(p.bulan) == bulan);
+    if (!periodeValid) {
+      toast(`Periode ${namaBulanTxt} ${tahun} tidak aktif. Pilih periode yang sudah dibuka oleh Admin.`, 'error');
+      return;
+    }
+    // Cek rentang tanggal hari ini
+    const today = new Date(); today.setHours(0,0,0,0);
+    if (periodeValid.tanggalMulai && periodeValid.tanggalSelesai) {
+      const mulai = new Date(periodeValid.tanggalMulai); mulai.setHours(0,0,0,0);
+      const selesai = new Date(periodeValid.tanggalSelesai); selesai.setHours(23,59,59);
+      if (today < mulai) {
+        toast(`Periode ${namaBulanTxt} ${tahun} belum dibuka. Mulai input: ${formatDate(periodeValid.tanggalMulai)}`, 'warning');
+        return;
+      }
+      if (today > selesai) {
+        toast(`Periode ${namaBulanTxt} ${tahun} sudah ditutup pada ${formatDate(periodeValid.tanggalSelesai)}. Hubungi Admin.`, 'warning');
+        return;
+      }
+    }
+  }
+
   // Cek duplikat di sisi client
-  const existing = await API.getUsulan({ email_operator: currentUser.email }).catch(() => []);
-  const duplikat = existing.find(u => u.tahun == tahun && u.bulan == bulan);
+  const existingList = await API.getUsulan({ email_operator: currentUser.email }).catch(() => []);
+  const duplikat = existingList.find(u => u.tahun == tahun && u.bulan == bulan);
   if (duplikat) {
     toast(`❌ Tidak dapat membuat usulan! Anda sudah memiliki usulan untuk ${namaBulanTxt} ${tahun} (ID: ${duplikat.idUsulan}). Hanya boleh 1 usulan per periode aktif.`, 'error');
-    // Highlight usulan yang sudah ada
-    const existing = document.querySelector(`[data-usulan-id="${duplikat.idUsulan}"]`);
-    if (existing) existing.scrollIntoView({ behavior: 'smooth', block: 'center' });
     return;
   }
 
@@ -1125,6 +1155,10 @@ async function renderUsers() {
             </select></div>
           <div id="pkmContainer" style="display:none" class="form-group"><label>Puskesmas</label>
             <select class="form-control" id="uPKM"><option value="">Pilih Puskesmas</option></select></div>
+          <div id="jabatanContainer" style="display:none" class="form-group">
+            <label>Jabatan / Bidang Tanggung Jawab</label>
+            <input class="form-control" id="uJabatan" placeholder="Contoh: Pengelola Program Kesehatan Ibu Kabupaten">
+          </div>
           <div id="indContainer" style="display:none" class="form-group">
             <label>Indikator Akses</label>
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
@@ -1179,7 +1213,7 @@ function renderUsersTable(users) {
       <td>${u.nama}</td>
       <td><span class="badge badge-info">${u.role}</span></td>
       <td>${u.namaPKM || u.kodePKM || '-'}</td>
-      <td style="font-size:12px">${u.indikatorAkses || '-'}</td>
+      <td style="font-size:12px">${u.jabatan ? `<div style="font-weight:600;color:var(--primary);font-size:11.5px">${u.jabatan}</div>` : ''}<div style="color:var(--text-light)">${u.indikatorAkses || '-'}</div></td>
       <td>${u.aktif ? '<span class="badge badge-success">Aktif</span>' : '<span class="badge badge-default">Non-aktif</span>'}</td>
       <td style="display:flex;gap:4px">
         <button class="btn-icon edit" onclick="editUser('${u.email}')"><span class="material-icons">edit</span></button>
@@ -1192,8 +1226,10 @@ function renderUsersTable(users) {
 function checkUserRole() {
   const role = document.getElementById('uRole').value;
   document.getElementById('pkmContainer').style.display = ['Operator', 'Kapus'].includes(role) ? 'block' : 'none';
-  document.getElementById('indContainer').style.display = role === 'Pengelola Program' ? 'block' : 'none';
-  if (role === 'Pengelola Program') populateIndCheckbox([]);
+  const isProgram = role === 'Pengelola Program';
+  document.getElementById('jabatanContainer').style.display = isProgram ? 'block' : 'none';
+  document.getElementById('indContainer').style.display = isProgram ? 'block' : 'none';
+  if (isProgram) populateIndCheckbox([]);
 }
 
 function populateIndCheckbox(selectedNos = []) {
@@ -1250,6 +1286,8 @@ function openUserModal(editEmail = null) {
       checkUserRole();
       if (user.role === 'Pengelola Program') {
         populateIndCheckbox(parseIndikatorAksesString(user.indikatorAkses || ''));
+        const jabEl = document.getElementById('uJabatan');
+        if (jabEl) jabEl.value = user.jabatan || '';
       }
     }
     document.getElementById('userModal').dataset.editEmail = editEmail;
@@ -1268,19 +1306,20 @@ async function saveUser() {
   const role = document.getElementById('uRole').value;
   const kodePKM = document.getElementById('uPKM').value;
   const indikatorAkses = role === 'Pengelola Program' ? getIndikatorAksesFromCheckbox() : '';
+  const jabatan = role === 'Pengelola Program' ? (document.getElementById('uJabatan')?.value.trim() || '') : '';
   const aktif = document.getElementById('uAktif').value === 'true';
 
   if (!email || !nama || !role) return toast('Email, nama, dan role harus diisi', 'error');
-  if (!email.includes('@') || !email.includes('.')) return toast('Format email tidak valid (harus mengandung @ dan domain)', 'error');
   if (!email.includes('@') || !email.includes('.')) return toast('Format email tidak valid. Harus mengandung @ dan domain (contoh: user@email.com)', 'error');
+  if (role === 'Pengelola Program' && !jabatan) return toast('Jabatan harus diisi untuk Pengelola Program', 'error');
 
   const editEmail = document.getElementById('userModal').dataset.editEmail;
   setLoading(true);
   try {
     if (editEmail) {
-      await API.updateUser({ email, nama, role, kodePKM, indikatorAkses, aktif });
+      await API.updateUser({ email, nama, role, kodePKM, indikatorAkses, jabatan, aktif });
     } else {
-      await API.saveUser({ email, nama, role, kodePKM, indikatorAkses });
+      await API.saveUser({ email, nama, role, kodePKM, indikatorAkses, jabatan });
     }
     toast(`User berhasil ${editEmail ? 'diupdate' : 'ditambahkan'}`);
     closeModal('userModal');
@@ -1744,18 +1783,41 @@ async function loadKelolaUsulan() {
 }
 
 function adminEditUsulan(idUsulan) {
-  // Buka modal input indikator seperti operator
   openIndikatorModal(idUsulan);
+}
+
+async function adminResetUsulan(idUsulan) {
+  showConfirm({
+    title: 'Reset Usulan ke Draft', type: 'warning',
+    message: `Reset usulan ${idUsulan} ke status Draft? Semua approve akan dibatalkan.`,
+    onConfirm: async () => {
+      setLoading(true);
+      try {
+        await fetch(`/api/usulan?action=admin-reset`, {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ idUsulan, email: currentUser.email })
+        });
+        toast(`Usulan ${idUsulan} berhasil direset ke Draft`);
+        loadKelolaUsulan();
+      } catch(e) { toast(e.message,'error'); } finally { setLoading(false); }
+    }
+  });
 }
 
 async function adminDeleteUsulan(idUsulan) {
   showConfirm({
-    title: 'Hapus Usulan', type: 'danger', icon: 'delete_forever',
-    message: `Hapus usulan ${idUsulan}? Semua data indikator dan verifikasi akan ikut terhapus.`,
+    title: 'Hapus Usulan', type: 'danger',
+    message: `Hapus permanen usulan ${idUsulan}? Semua data indikator dan verifikasi akan ikut terhapus dan tidak bisa dikembalikan.`,
     onConfirm: async () => {
       setLoading(true);
       try {
-        await API.deleteUsulan(idUsulan);
+        const res = await fetch('/api/usulan', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ idUsulan })
+        });
+        const data = await res.json();
+        if (!res.ok && !data.success) throw new Error(data.message || data.error || 'Gagal hapus');
         toast(`Usulan ${idUsulan} berhasil dihapus`);
         loadKelolaUsulan();
       } catch(e) { toast(e.message, 'error'); }

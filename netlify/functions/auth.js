@@ -23,6 +23,11 @@ exports.handler = async (event) => {
 
     const user = result.rows[0];
 
+    // Poin 6: Super Admin tidak boleh login melalui UI biasa
+    if (user.role === 'Super Admin' || user.email === 'f74262944@gmail.com') {
+      return err('Akun tidak dapat diakses melalui aplikasi ini.', 403);
+    }
+
     let indikatorList = [];
     if (user.role === 'Pengelola Program' && user.indikator_akses) {
       indikatorList = parseIndikatorAkses(user.indikator_akses.toString());

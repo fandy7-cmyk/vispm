@@ -805,26 +805,31 @@ async function doSubmitUsulan(forceSubmit) {
     });
     const raw = await res.json();
 
-    // Response sukses: {success:true, data:{message}} 
-    // Response needConfirm: {success:false, needConfirm:true, missingCount, missingNos, message}
-    // Response error: {success:false, message:...} dengan statusCode 400/500
-    if (!res.ok) {
-      toast(raw.message || raw.error || 'Submit gagal', 'error');
-      return;
-    }
-
-    // Cek needConfirm (belum upload bukti)
+    // needConfirm datang sebagai statusCode 200 tapi success:false
     if (raw.needConfirm) {
       const nos = (raw.missingNos || []).join(', ');
-      toast(`Data dukung belum lengkap! Indikator no. ${nos} belum ada file bukti. Upload dulu sebelum submit.`, 'error');
+      // Highlight tombol upload yang kurang
       (raw.missingNos || []).forEach(no => {
         const label = document.getElementById(`uploadLabel-${no}`);
         if (label) {
           label.style.boxShadow = '0 0 0 3px rgba(239,68,68,0.5)';
           label.style.transform = 'scale(1.05)';
-          setTimeout(() => { label.style.boxShadow = ''; label.style.transform = ''; }, 2500);
+          setTimeout(() => { label.style.boxShadow = ''; label.style.transform = ''; }, 3000);
         }
       });
+      // Tanya user apakah tetap mau submit tanpa bukti
+      showConfirm({
+        title: 'Data Dukung Belum Lengkap',
+        message: `${raw.missingCount} indikator (no. ${nos}) belum ada file bukti. Tetap submit ke Kapus?`,
+        type: 'warning',
+        onConfirm: () => doSubmitUsulan(true) // forceSubmit = true
+      });
+      return;
+    }
+
+    // Error dari backend (statusCode 4xx/5xx) atau success:false
+    if (!res.ok || !raw.success) {
+      toast(raw.message || raw.error || 'Submit gagal', 'error');
       return;
     }
 

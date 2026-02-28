@@ -249,7 +249,7 @@ async function submitUsulan(pool, body) {
   );
   const missing = indResult.rows.filter(r => !r.link_file || r.link_file.trim() === '');
 
-  // Kalau ada yang kurang DAN belum force → kembalikan warning, bukan error keras
+  // Kalau ada yang kurang DAN belum force → kembalikan warning untuk konfirmasi user
   if (missing.length > 0 && !forceSubmit) {
     return {
       statusCode: 200,
@@ -264,7 +264,8 @@ async function submitUsulan(pool, body) {
     };
   }
 
-  await pool.query(`UPDATE usulan_header SET status_global='Menunggu Kapus' WHERE id_usulan=$1`, [idUsulan]);
+  // Submit — update status ke Menunggu Kapus
+  await pool.query(`UPDATE usulan_header SET status_global='Menunggu Kapus', is_locked=true WHERE id_usulan=$1`, [idUsulan]);
   await logAktivitas(pool, email, 'Operator', 'Submit', idUsulan, 'Disubmit ke Kapus');
   return ok({ message: 'Usulan berhasil disubmit ke Kapus' });
 }

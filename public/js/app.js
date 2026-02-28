@@ -911,18 +911,31 @@ async function viewDetail(idUsulan) {
       <div style="margin-top:16px">
         <div style="font-weight:700;font-size:13px;margin-bottom:8px;display:flex;align-items:center;gap:6px">
           <span class="material-icons" style="font-size:16px;color:var(--primary)">groups</span>
-          Progress Verifikasi Pengelola Program (${vp.filter(v=>v.status==='Selesai').length}/${vp.length} selesai)
+          Progress Verifikasi Pengelola Program
+          (${vp.filter(v=>v.status==='Selesai').length} selesai
+          ${vp.filter(v=>v.status==='Ditolak').length ? `· <span style="color:#ef4444">${vp.filter(v=>v.status==='Ditolak').length} menolak</span>` : ''}
+          · ${vp.filter(v=>v.status==='Menunggu').length} menunggu dari ${vp.length})
         </div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px">
-          ${vp.map(v => `<div style="background:${v.status==='Selesai'?'#e6fffa':'#f8fafc'};border:1.5px solid ${v.status==='Selesai'?'#0d9488':'#e2e8f0'};border-radius:8px;padding:10px">
-            <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
-              <span class="material-icons" style="font-size:15px;color:${v.status==='Selesai'?'#0d9488':'#94a3b8'}">${v.status==='Selesai'?'check_circle':'hourglass_top'}</span>
-              <span style="font-size:12.5px;font-weight:700;color:${v.status==='Selesai'?'#0d9488':'#64748b'}">${v.nama_program||v.email_program}</span>
-            </div>
-            <div style="font-size:11px;color:#94a3b8">Indikator: ${v.indikator_akses||'Semua'}</div>
-            ${v.status==='Selesai'&&v.verified_at?`<div style="font-size:10.5px;color:#0d9488">${formatDateTime(v.verified_at)}</div>`:''}
-            ${v.catatan?`<div style="font-size:11px;color:#64748b;margin-top:3px;font-style:italic">"${v.catatan}"</div>`:''}
-          </div>`).join('')}
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px">
+          ${vp.map(v => {
+            const isDitolakVP = v.status === 'Ditolak';
+            const isSelesai = v.status === 'Selesai';
+            const bg = isDitolakVP ? '#fef2f2' : isSelesai ? '#e6fffa' : '#f8fafc';
+            const border = isDitolakVP ? '#fca5a5' : isSelesai ? '#0d9488' : '#e2e8f0';
+            const icon = isDitolakVP ? 'cancel' : isSelesai ? 'check_circle' : 'hourglass_top';
+            const iconColor = isDitolakVP ? '#ef4444' : isSelesai ? '#0d9488' : '#94a3b8';
+            const nameColor = isDitolakVP ? '#dc2626' : isSelesai ? '#0d9488' : '#64748b';
+            return `<div style="background:${bg};border:1.5px solid ${border};border-radius:8px;padding:10px">
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+                <span class="material-icons" style="font-size:15px;color:${iconColor}">${icon}</span>
+                <span style="font-size:12.5px;font-weight:700;color:${nameColor}">${v.nama_program||v.email_program}</span>
+              </div>
+              <div style="font-size:11px;color:#94a3b8">Indikator: ${v.indikator_akses||'Semua'}</div>
+              ${v.verified_at ? `<div style="font-size:10.5px;color:${iconColor}">${formatDateTime(v.verified_at)}</div>` : ''}
+              ${isDitolakVP && v.catatan ? `<div style="font-size:11px;color:#7f1d1d;margin-top:4px;background:#fee2e2;border-radius:4px;padding:4px 6px"><span style="font-weight:700">Alasan:</span> ${v.catatan}</div>` : ''}
+              ${isSelesai && v.catatan ? `<div style="font-size:11px;color:#065f46;margin-top:3px;font-style:italic">"${v.catatan}"</div>` : ''}
+            </div>`;
+          }).join('')}
         </div>
       </div>` : '';
 

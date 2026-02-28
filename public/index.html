@@ -504,7 +504,8 @@ textarea.form-control { resize: vertical; }
         <span style="font-size:20px;font-weight:800;color:var(--primary);font-family:'JetBrains Mono',monospace;" id="indModalSPM">0.00</span>
       </div>
     </div>
-    <div class="modal-footer">
+    <div class="modal-footer" style="flex-wrap:wrap;gap:10px">
+      <div id="indModalLockNotif" style="display:none;align-items:center;gap:8px;padding:8px 14px;background:#e6fffa;border-radius:8px;border:1.5px solid #0d9488;flex:1;min-width:200px;font-size:13px"></div>
       <button class="btn btn-secondary" onclick="closeModal('indikatorModal')">Tutup</button>
       <button class="btn btn-primary" onclick="submitUsulanFromModal()" id="btnSubmitFromModal">
         <span class="material-icons">send</span> Submit ke Kapus

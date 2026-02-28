@@ -1,9 +1,8 @@
-// ============== GLOBAL STATE ==============
+// ============== APP STATE ==============
 let currentUser = null;
 let currentPage = '';
-let pageData = {};
-let verifCurrentUsulan = null;
-let allUsers = [], allPKMList = [], allIndList = [], allJabatan = [];
+let pageData = {}; // cache per page
+let verifCurrentUsulan = null; // for verifikasi modal
 
 // ============== AUTH ==============
 async function doLogin() {
@@ -13,7 +12,7 @@ async function doLogin() {
   const btn = document.getElementById('authBtn');
   const status = document.getElementById('authStatus');
   btn.disabled = true;
-  btn.innerHTML = '<span class="material-icons" style="animation:spin 0.8s linear infinite">refresh</span> Loading...';
+  btn.innerHTML = '<span class="material-icons" style="animation:spin 0.8s linear infinite">refresh</span> Memeriksa...';
   setAuthStatus('Memeriksa akses...', '');
 
   try {
@@ -47,10 +46,14 @@ function startApp() {
   document.getElementById('authScreen').style.display = 'none';
   document.getElementById('appLayout').style.display = 'flex';
 
+  // Set user info
   document.getElementById('sidebarName').textContent = currentUser.nama || currentUser.email;
   let roleText = currentUser.role;
+  if (currentUser.namaPKM) {
+    roleText = `${currentUser.role}`;
+  }
   document.getElementById('sidebarRole').textContent = roleText;
-  
+  // Tampilkan nama puskesmas di bawah role kalau ada
   const sidebarPKMEl = document.getElementById('sidebarPKM');
   if (sidebarPKMEl) {
     if (currentUser.namaPKM) {
@@ -139,7 +142,7 @@ function setActiveNav(page) {
 const PAGE_TITLES = {
   dashboard: 'Dashboard', verifikasi: 'Verifikasi', laporan: 'Laporan',
   users: 'Kelola User', pkm: 'Kelola Puskesmas', indikator: 'Kelola Indikator',
-  periode: 'Periode Input', input: 'Input Usulan', 'kelola-usulan': 'Kelola Semua Usulan'
+  periode: 'Periode Input', input: 'Input Usulan'
 };
 
 function loadPage(page) {
@@ -181,8 +184,9 @@ function closeSidebar() {
   document.getElementById('sidebarOverlay').classList.remove('show');
 }
 
-// ============== HELPER FUNCTIONS ==============
+// ============== HELPER: YEAR SELECT ==============
 function yearOptions(selected, maxYear) {
+  // Gunakan maxYear dari parameter, atau ambil dari state global, minimal CURRENT_YEAR+3
   const max = maxYear || window._maxPeriodeTahun || Math.max(CURRENT_YEAR + 3, 2030);
   const min = Math.min(2024, CURRENT_YEAR);
   let html = '';
@@ -195,147 +199,6 @@ function yearOptions(selected, maxYear) {
 function bulanOptions(selected) {
   const months = BULAN_NAMA.slice(1);
   return months.map((m, i) => `<option value="${i+1}" ${(i+1) == selected ? 'selected' : ''}>${m}</option>`).join('');
-}
-
-function formatDate(d) {
-  if (!d) return '-';
-  try {
-    const dt = new Date(d);
-    return dt.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
-  } catch { return '-'; }
-}
-
-function formatDateTime(d) {
-  if (!d) return '-';
-  try {
-    const dt = new Date(d);
-    return dt.toLocaleString('id-ID', { 
-      day: '2-digit', month: 'short', year: 'numeric', 
-      hour: '2-digit', minute: '2-digit' 
-    });
-  } catch { return '-'; }
-}
-
-function statusBadge(status) {
-  const map = {
-    'Draft': 'badge-default',
-    'Menunggu Kapus': 'badge-warning',
-    'Menunggu Program': 'badge-info',
-    'Menunggu Admin': 'badge-primary',
-    'Selesai': 'badge-success',
-    'Ditolak': 'badge-danger',
-    'Disetujui': 'badge-success',
-    'Menunggu': 'badge-warning'
-  };
-  const cls = map[status] || 'badge-default';
-  return `<span class="badge ${cls}">${status || '-'}</span>`;
-}
-
-function statCard(color, icon, label, value) {
-  return `<div class="stat-card">
-    <div class="stat-icon ${color}"><span class="material-icons">${icon}</span></div>
-    <div class="stat-info"><div class="stat-label">${label}</div><div class="stat-value">${value ?? 0}</div></div>
-  </div>`;
-}
-
-function renderChart(data) {
-  if (!data || data.length === 0) return `<div class="empty-state"><p>Belum ada data chart</p></div>`;
-  const max = Math.max(...data.map(d => d.total || 0), 1);
-  return `<div class="chart-container">${data.map(d => `
-    <div class="chart-bar-wrap">
-      <div class="chart-bar-val">${d.total}</div>
-      <div class="chart-bar" style="height:${Math.max(((d.total || 0) / max) * 160, 4)}px" title="${d.bulan}: ${d.total} usulan"></div>
-      <div class="chart-bar-lbl">${d.bulan}</div>
-    </div>`).join('')}</div>`;
-}
-
-// ============== STATUS BAR ==============
-function renderStatusBar(u) {
-  const vp = u.vpProgress;
-  const steps = [
-    { label: 'Input', icon: 'edit_note', done: true, active: u.statusGlobal === 'Draft', rejected: false },
-    { label: 'Kapus', icon: 'person', done: u.statusKapus === 'Selesai', active: u.statusGlobal === 'Menunggu Kapus', rejected: u.statusKapus === 'Ditolak' },
-    { label: 'Program', icon: 'groups', done: u.statusProgram === 'Selesai', active: u.statusGlobal === 'Menunggu Program', rejected: u.statusProgram === 'Ditolak',
-      partial: vp && vp.selesai > 0 && vp.selesai < vp.total, vpText: vp ? vp.selesai + '/' + vp.total : '' },
-    { label: 'Admin', icon: 'admin_panel_settings', done: u.statusGlobal === 'Selesai', active: u.statusGlobal === 'Menunggu Admin', rejected: false },
-  ];
-  const isDitolak = u.statusGlobal === 'Ditolak';
-  return `<div style="display:flex;align-items:center;gap:0;padding:4px 0">${steps.map((s, i) => {
-    let color = '#cbd5e1', textColor = '#94a3b8', bg = 'white';
-    let icon = s.icon;
-    if (s.done) { color='#0d9488'; textColor='#0d9488'; bg='#e6fffa'; icon='check_circle'; }
-    else if (isDitolak && s.rejected) { color='#ef4444'; textColor='#ef4444'; bg='#fef2f2'; icon='cancel'; }
-    else if (s.active) { color='#f59e0b'; textColor='#d97706'; bg='#fffbeb'; icon='hourglass_top'; }
-    else if (s.partial) { color='#06b6d4'; textColor='#0891b2'; bg='#ecfeff'; icon='hourglass_top'; }
-    return '<div style="display:flex;align-items:center;flex:1">' +
-      '<div style="display:flex;flex-direction:column;align-items:center;gap:1px;flex:1">' +
-        '<div style="width:28px;height:28px;border-radius:50%;background:' + bg + ';border:2px solid ' + color + ';display:flex;align-items:center;justify-content:center">' +
-          '<span class="material-icons" style="font-size:15px;color:' + color + '">' + icon + '</span>' +
-        '</div>' +
-        '<span style="font-size:10px;font-weight:700;color:' + textColor + ';white-space:nowrap">' + s.label + '</span>' +
-        (s.vpText && !s.done ? '<span style="font-size:9px;color:#0891b2">' + s.vpText + '</span>' : '') +
-      '</div>' +
-      (i < steps.length-1 ? '<div style="flex:1;height:2px;background:' + (s.done ? '#0d9488' : '#e2e8f0') + ';margin-bottom:18px;min-width:8px"></div>' : '') +
-    '</div>';
-  }).join('')}</div>`;
-}
-
-// ============== USULAN TABLE ==============
-function renderUsulanTable(rows, role) {
-  if (!rows || rows.length === 0) {
-    return `<div class="empty-state" style="padding:32px"><span class="material-icons">inbox</span><p>Belum ada data usulan</p></div>`;
-  }
-  
-  const actionBtn = (u) => {
-    // Operator
-    if (role === 'operator') {
-      return `<button class="btn-icon view" onclick="viewDetail('${u.idUsulan}')" title="Detail"><span class="material-icons">visibility</span></button>
-              ${u.statusGlobal === 'Draft' ? `<button class="btn-icon edit" onclick="openIndikatorModal('${u.idUsulan}')" title="Input"><span class="material-icons">edit</span></button>` : ''}
-              ${u.statusGlobal === 'Draft' ? `<button class="btn-icon del" onclick="deleteUsulan('${u.idUsulan}')" title="Hapus"><span class="material-icons">delete</span></button>` : ''}`;
-    }
-    
-    // Kapus - hanya muncul jika status = 'Menunggu Kapus'
-    if (role === 'kapus') {
-      return `<button class="btn-icon view" onclick="viewDetail('${u.idUsulan}')" title="Detail"><span class="material-icons">visibility</span></button>
-              ${u.statusGlobal === 'Menunggu Kapus' ? 
-                `<button class="btn-icon approve" onclick="openVerifikasi('${u.idUsulan}')" title="Verifikasi">
-                  <span class="material-icons">rate_review</span>
-                </button>` : ''}`;
-    }
-    
-    // Pengelola Program - hanya jika status = 'Menunggu Program'
-    if (role === 'program') {
-      return `<button class="btn-icon view" onclick="viewDetail('${u.idUsulan}')" title="Detail"><span class="material-icons">visibility</span></button>
-              ${u.statusGlobal === 'Menunggu Program' ? 
-                `<button class="btn-icon approve" onclick="openVerifikasi('${u.idUsulan}')" title="Verifikasi">
-                  <span class="material-icons">rate_review</span>
-                </button>` : ''}`;
-    }
-    
-    // Admin
-    if (role === 'admin') {
-      return `<button class="btn-icon view" onclick="viewDetail('${u.idUsulan}')" title="Detail"><span class="material-icons">visibility</span></button>
-              ${u.statusGlobal === 'Menunggu Admin' ? 
-                `<button class="btn-icon approve" onclick="openVerifikasi('${u.idUsulan}')" title="Verifikasi">
-                  <span class="material-icons">rate_review</span>
-                </button>` : ''}`;
-    }
-    
-    // Default (view only)
-    return `<button class="btn-icon view" onclick="viewDetail('${u.idUsulan}')" title="Detail"><span class="material-icons">visibility</span></button>`;
-  };
-
-  return `<div class="table-container"><table>
-    <thead><tr><th>ID Usulan</th><th>Puskesmas</th><th>Periode</th><th>Status</th><th>Dibuat</th><th>Aksi</th></tr></thead>
-    <tbody>${rows.map(u => `<tr>
-      <td><span style="font-family:'JetBrains Mono',monospace;font-weight:600;font-size:12px;">${u.idUsulan}</span></td>
-      <td>${u.namaPKM || u.kodePKM}</td>
-      <td>${u.namaBulan || ''} ${u.tahun}</td>
-      <td>${statusBadge(u.statusGlobal)}</td>
-      <td style="font-size:12px;color:var(--text-light)">${formatDate(u.createdAt)}</td>
-      <td style="display:flex;gap:4px">${actionBtn(u)}</td>
-    </tr>`).join('')}</tbody>
-  </table></div>`;
 }
 
 // ============== DASHBOARD ==============
@@ -385,6 +248,7 @@ function renderAdminDashboard(el, d) {
       </div>
     </div>`;
 
+  // Load recent usulan
   API.getUsulan({ tahun: CURRENT_YEAR }).then(rows => {
     document.getElementById('recentTable').innerHTML = renderUsulanTable(rows.slice(0, 10), 'admin');
   }).catch(() => {});
@@ -487,6 +351,54 @@ function renderKadisDashboard(el, d) {
     </div>`;
 }
 
+function statCard(color, icon, label, value) {
+  return `<div class="stat-card">
+    <div class="stat-icon ${color}"><span class="material-icons">${icon}</span></div>
+    <div class="stat-info"><div class="stat-label">${label}</div><div class="stat-value">${value ?? 0}</div></div>
+  </div>`;
+}
+
+function renderChart(data) {
+  if (!data || data.length === 0) return `<div class="empty-state"><p>Belum ada data chart</p></div>`;
+  const max = Math.max(...data.map(d => d.total || 0), 1);
+  return `<div class="chart-container">${data.map(d => `
+    <div class="chart-bar-wrap">
+      <div class="chart-bar-val">${d.total}</div>
+      <div class="chart-bar" style="height:${Math.max(((d.total || 0) / max) * 160, 4)}px" title="${d.bulan}: ${d.total} usulan"></div>
+      <div class="chart-bar-lbl">${d.bulan}</div>
+    </div>`).join('')}</div>`;
+}
+
+// ============== USULAN TABLE HELPER ==============
+function renderUsulanTable(rows, role) {
+  if (!rows || rows.length === 0) {
+    return `<div class="empty-state" style="padding:32px"><span class="material-icons">inbox</span><p>Belum ada data usulan</p></div>`;
+  }
+  const actionBtn = (u) => {
+    if (role === 'operator') {
+      return `<button class="btn-icon view" onclick="viewDetail('${u.idUsulan}')" title="Detail"><span class="material-icons">visibility</span></button>
+              ${u.statusGlobal === 'Draft' ? `<button class="btn-icon edit" onclick="openIndikatorModal('${u.idUsulan}')" title="Input"><span class="material-icons">edit</span></button>` : ''}`;
+    }
+    if (['kapus', 'program', 'admin'].includes(role)) {
+      return `<button class="btn-icon view" onclick="viewDetail('${u.idUsulan}')" title="Detail"><span class="material-icons">visibility</span></button>
+              <button class="btn-icon approve" onclick="openVerifikasi('${u.idUsulan}')" title="Verifikasi"><span class="material-icons">rate_review</span></button>`;
+    }
+    return `<button class="btn-icon view" onclick="viewDetail('${u.idUsulan}')" title="Detail"><span class="material-icons">visibility</span></button>`;
+  };
+
+  return `<div class="table-container"><table>
+    <thead><tr><th>ID Usulan</th><th>Puskesmas</th><th>Periode</th><th>Status</th><th>Dibuat</th><th>Aksi</th></tr></thead>
+    <tbody>${rows.map(u => `<tr>
+      <td><span style="font-family:'JetBrains Mono',monospace;font-weight:600;font-size:12px;">${u.idUsulan}</span></td>
+      <td>${u.namaPKM || u.kodePKM}</td>
+      <td>${u.namaBulan || ''} ${u.tahun}</td>
+      <td>${statusBadge(u.statusGlobal)}</td>
+      <td style="font-size:12px;color:var(--text-light)">${formatDate(u.createdAt)}</td>
+      <td>${actionBtn(u)}</td>
+    </tr>`).join('')}</tbody>
+  </table></div>`;
+}
+
 // ============== INPUT USULAN (OPERATOR) ==============
 async function renderInput() {
   let pkmList = [], periodeAktif = null, allPeriode = [], periodeOptions = [];
@@ -495,9 +407,10 @@ async function renderInput() {
     try {
       const periodeRes = await API.get('periode');
       allPeriode = Array.isArray(periodeRes) ? periodeRes : [];
+      // Periode "Aktif" status (bukan cek hari ini) - semua yg berstatus Aktif bisa dipilih
       periodeOptions = allPeriode.filter(p => p.status === 'Aktif');
       periodeAktif = allPeriode.find(p => p.isAktifToday);
-    } catch(e2) { }
+    } catch(e2) { /* periode API mungkin gagal, tetap lanjut */ }
   } catch (e) { toast(e.message, 'error'); }
 
   const isOp = currentUser.role === 'Operator';
@@ -505,12 +418,15 @@ async function renderInput() {
     ? `<select class="form-control" id="inputPKM" disabled><option value="${currentUser.kodePKM}">${currentUser.namaPKM || currentUser.kodePKM}</option></select>`
     : `<select class="form-control" id="inputPKM"><option value="">Pilih Puskesmas</option>${pkmList.map(p => `<option value="${p.kode}">${p.nama}</option>`).join('')}</select>`;
 
+  // Tahun yang bisa dipilih: ambil dari periode berstatus Aktif
+  // Jika tidak ada periode sama sekali, tampilkan tahun default
   const tahunAktif = [...new Set(periodeOptions.map(p => parseInt(p.tahun)))].sort();
   const defaultTahun = periodeAktif ? periodeAktif.tahun : (tahunAktif[0] || CURRENT_YEAR);
   const tahunSelectHtml = tahunAktif.length
     ? tahunAktif.map(y => `<option value="${y}" ${y == defaultTahun ? 'selected' : ''}>${y}</option>`).join('')
     : `<option value="${defaultTahun}">${defaultTahun}</option>`;
 
+  // Info banner periode
   const periodeBanner = periodeAktif
     ? `<div class="info-card info"><span class="material-icons">event</span><div class="info-card-text"><strong>Periode Aktif Hari Ini:</strong> ${periodeAktif.namaBulan} ${periodeAktif.tahun} — s/d ${formatDate(periodeAktif.tanggalSelesai)}</div></div>`
     : periodeOptions.length
@@ -548,6 +464,7 @@ async function renderInput() {
       <div class="card-body" style="padding:0" id="myUsulanTable"></div>
     </div>`;
 
+  // Simpan semua periodeOptions (berstatus Aktif) untuk updateBulanOptions
   window._periodeInputAktif = periodeOptions;
   setTimeout(() => updateBulanOptions(), 50);
   loadMyUsulan();
@@ -562,6 +479,7 @@ function updateBulanOptions() {
   if (bulanForTahun.length) {
     sel.innerHTML = bulanForTahun.map(p => `<option value="${p.bulan}">${p.namaBulan || BULAN_NAMA[p.bulan]}</option>`).join('');
   } else {
+    // Fallback: semua bulan
     sel.innerHTML = BULAN_NAMA.slice(1).map((m,i) => `<option value="${i+1}">${m}</option>`).join('');
   }
 }
@@ -577,7 +495,7 @@ async function loadMyUsulan() {
           <td>${u.namaPKM || u.kodePKM}</td>
           <td>${u.namaBulan} ${u.tahun}</td>
           <td style="min-width:220px">${renderStatusBar(u)}</td>
-          <td style="display:flex;gap:4px">
+          <td>
             <button class="btn-icon view" onclick="viewDetail('${u.idUsulan}')"><span class="material-icons">visibility</span></button>
             ${u.statusGlobal === 'Draft' ? `<button class="btn-icon edit" onclick="openIndikatorModal('${u.idUsulan}')"><span class="material-icons">edit</span></button>` : ''}
             ${u.statusGlobal === 'Draft' ? `<button class="btn-icon del" onclick="deleteUsulan('${u.idUsulan}')"><span class="material-icons">delete</span></button>` : ''}
@@ -596,6 +514,7 @@ async function createUsulan() {
   const namaBulanTxt = BULAN_NAMA[bulan] || 'bulan ini';
   if (!kodePKM) return toast('Pilih puskesmas terlebih dahulu', 'error');
 
+  // Cek apakah periode yang dipilih valid (berstatus Aktif)
   const periodeOptions = window._periodeInputAktif || [];
   if (periodeOptions.length > 0) {
     const periodeValid = periodeOptions.find(p => parseInt(p.tahun) == tahun && parseInt(p.bulan) == bulan);
@@ -603,6 +522,7 @@ async function createUsulan() {
       toast(`Periode ${namaBulanTxt} ${tahun} tidak aktif. Pilih periode yang sudah dibuka oleh Admin.`, 'error');
       return;
     }
+    // Cek rentang tanggal hari ini
     const today = new Date(); today.setHours(0,0,0,0);
     if (periodeValid.tanggalMulai && periodeValid.tanggalSelesai) {
       const mulai = new Date(periodeValid.tanggalMulai); mulai.setHours(0,0,0,0);
@@ -618,6 +538,7 @@ async function createUsulan() {
     }
   }
 
+  // Cek duplikat di sisi client
   const existingList = await API.getUsulan({ email_operator: currentUser.email }).catch(() => []);
   const duplikat = existingList.find(u => u.tahun == tahun && u.bulan == bulan);
   if (duplikat) {
@@ -654,11 +575,13 @@ async function deleteUsulan(idUsulan) {
 let currentIndikatorUsulan = null;
 let indikatorData = [];
 
+// Buka/buat folder Google Drive otomatis
 async function openGDriveFolder(kodePKM, tahun, bulan, namaBulan, idUsulan) {
   const btn = document.getElementById('btnOpenDrive');
   if (btn) { btn.innerHTML = '<span class="material-icons" style="font-size:15px;animation:spin 0.8s linear infinite">refresh</span> Membuat folder...'; btn.disabled = true; }
   try {
     const result = await API.get('drive', { kodePKM, tahun, bulan, namaBulan });
+    // Save folder URL to DB
     if (idUsulan) {
       await fetch(`/api/usulan?action=drive-folder`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
@@ -667,6 +590,7 @@ async function openGDriveFolder(kodePKM, tahun, bulan, namaBulan, idUsulan) {
     }
     window.open(result.folderUrl, '_blank');
     if (btn) { btn.innerHTML = '<span class="material-icons" style="font-size:15px">folder_open</span> Buka Folder Drive'; btn.disabled = false; }
+    // Update link info
     const linkEl = document.getElementById('driveFolderLink');
     if (linkEl) { linkEl.href = result.folderUrl; linkEl.style.display = 'inline-flex'; }
   } catch (e) {
@@ -690,9 +614,11 @@ async function openIndikatorModal(idUsulan) {
     document.getElementById('indModalSPM').textContent = parseFloat(detail.indeksSPM).toFixed(2);
     document.getElementById('btnSubmitFromModal').style.display = isLocked ? 'none' : 'flex';
 
+    // Sembunyikan info card - tidak diperlukan lagi
     const infoEl = document.getElementById('indModalInfo');
     if (infoEl) infoEl.style.display = 'none';
 
+    // Update SPM top display
     const spmTopEl = document.getElementById('indModalSPMTop');
     if (spmTopEl) spmTopEl.textContent = parseFloat(detail.indeksSPM).toFixed(2);
     document.getElementById('indModalSPM').textContent = parseFloat(detail.indeksSPM).toFixed(2);
@@ -731,6 +657,7 @@ async function openIndikatorModal(idUsulan) {
   }
 }
 
+
 // ============== UPLOAD BUKTI INDIKATOR ==============
 async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, tahun, bulan, namaBulan) {
   const files = Array.from(event.target.files);
@@ -745,6 +672,7 @@ async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, tahun
   const uploadedLinks = [];
   for (const file of files) {
     try {
+      // Read file as base64
       const base64 = await new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(reader.result.split(',')[1]);
@@ -761,6 +689,7 @@ async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, tahun
         })
       });
       const result = await res.json();
+      // ok() wraps data in {success:true, data:{...}}
       if (!res.ok || !result.success) throw new Error(result.data?.error || result.message || result.error || 'Upload gagal');
       const fileUrl = result.data?.fileUrl || result.fileUrl;
       if (!fileUrl) throw new Error('URL file tidak ditemukan dalam response');
@@ -771,18 +700,20 @@ async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, tahun
   }
 
   if (uploadedLinks.length > 0) {
-    const linkToSave = uploadedLinks[0];
+    const linkToSave = uploadedLinks[0]; // sudah berisi fileUrl yang benar
     const tVal = parseFloat(document.getElementById(`t-${noIndikator}`)?.value) || 0;
     const cVal = parseFloat(document.getElementById(`c-${noIndikator}`)?.value) || 0;
     await API.updateIndikatorUsulan({ idUsulan, noIndikator, target: tVal, capaian: cVal, linkFile: linkToSave });
 
     statusDiv.remove();
 
+    // Update link tampilan
     const existingLink = cell.querySelector('a');
     const newLinkHtml = `<a href="${linkToSave}" target="_blank" style="font-size:10.5px;color:#0d9488;display:flex;align-items:center;gap:1px"><span class="material-icons" style="font-size:11px">open_in_new</span>${uploadedLinks.length} file</a>`;
     if (existingLink) existingLink.outerHTML = newLinkHtml;
     else cell.insertAdjacentHTML('afterbegin', newLinkHtml);
 
+    // Ubah tombol upload → hijau
     const label = document.getElementById(`uploadLabel-${noIndikator}`);
     if (label) {
       label.style.cssText = 'display:inline-flex;align-items:center;gap:3px;padding:4px 9px;background:#0d9488;color:white;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:600;border:1.5px solid #0d9488;white-space:nowrap';
@@ -790,6 +721,7 @@ async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, tahun
       label.childNodes[1] && (label.childNodes[1].textContent = 'Ganti');
     }
 
+    // Refresh SPM
     const spmDetail = await API.getDetailUsulan(idUsulan);
     const spmVal = parseFloat(spmDetail.indeksSPM).toFixed(2);
     document.getElementById('indModalSPM').textContent = spmVal;
@@ -801,12 +733,12 @@ async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, tahun
     statusDiv.remove();
   }
 }
-
 async function saveIndikator(noIndikator) {
   const target  = parseFloat(document.getElementById(`t-${noIndikator}`)?.value) || 0;
   const capaian = parseFloat(document.getElementById(`c-${noIndikator}`)?.value) || 0;
 
   try {
+    // Kirim update — tanpa linkFile supaya link yg sudah ada tidak terhapus
     const res = await fetch('/api/usulan?action=indikator', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -815,6 +747,7 @@ async function saveIndikator(noIndikator) {
     const result = await res.json();
     if (!res.ok) { toast(result.error || 'Gagal simpan', 'error'); return; }
 
+    // Update SPM display langsung dari response (tanpa extra API call)
     if (result.indeksSPM !== undefined) {
       const spmVal = parseFloat(result.indeksSPM).toFixed(2);
       document.getElementById('indModalSPM').textContent = spmVal;
@@ -847,11 +780,15 @@ async function doSubmitUsulan(forceSubmit) {
     });
     const raw = await res.json();
 
+    // Response sukses: {success:true, data:{message}} 
+    // Response needConfirm: {success:false, needConfirm:true, missingCount, missingNos, message}
+    // Response error: {success:false, message:...} dengan statusCode 400/500
     if (!res.ok) {
       toast(raw.message || raw.error || 'Submit gagal', 'error');
       return;
     }
 
+    // Cek needConfirm (belum upload bukti)
     if (raw.needConfirm) {
       const nos = (raw.missingNos || []).join(', ');
       toast(`Data dukung belum lengkap! Indikator no. ${nos} belum ada file bukti. Upload dulu sebelum submit.`, 'error');
@@ -867,7 +804,7 @@ async function doSubmitUsulan(forceSubmit) {
     }
 
     toast('✅ Usulan berhasil disubmit ke Kepala Puskesmas!', 'success');
-    closeModal('indikatorModal'); // <-- PERBAIKAN ISU #1: MODAL OTOMATIS TUTUP
+    closeModal('indikatorModal');
     loadMyUsulan();
   } catch (e) {
     toast(e.message, 'error');
@@ -876,7 +813,9 @@ async function doSubmitUsulan(forceSubmit) {
   }
 }
 
+// Preview SPM saat oninput (kalkulasi di client tanpa hit server)
 function previewSPM(changedNo) {
+  // Hitung SPM preview dari semua input yang ada di DOM
   const rows = document.querySelectorAll('[id^="t-"]');
   let totalNilai = 0, totalBobot = 0;
   rows.forEach(tEl => {
@@ -894,6 +833,7 @@ function previewSPM(changedNo) {
   const round2 = n => Math.round((n + Number.EPSILON) * 100) / 100;
   const indeksKinerja = totalBobot > 0 ? round2(totalNilai / totalBobot) : 0;
   const indeksSPM = round2(indeksKinerja * 0.33);
+  // Update display dengan tanda bahwa ini preview (belum tersimpan)
   const topEl = document.getElementById('indModalSPMTop');
   const botEl = document.getElementById('indModalSPM');
   if (topEl) topEl.textContent = indeksSPM.toFixed(2);
@@ -927,18 +867,23 @@ async function viewDetail(idUsulan) {
         </div>
       </div>` : '';
 
-    const pdfBtn = document.getElementById('btnDownloadPDF');
-    if (pdfBtn) pdfBtn.style.display = detail.statusGlobal === 'Selesai' ? 'inline-flex' : 'none';
+    // Show/hide PDF btn
+  const pdfBtn = document.getElementById('btnDownloadPDF');
+  if (pdfBtn) pdfBtn.style.display = detail.statusGlobal === 'Selesai' ? 'inline-flex' : 'none';
 
-    document.getElementById('detailModalBody').innerHTML = `
+  document.getElementById('detailModalBody').innerHTML = `
       <div style="margin-bottom:16px">${renderStatusBar({...detail, vpProgress: detail.verifikasiProgram ? {total:vp.length,selesai:vp.filter(v=>v.status==='Selesai').length} : null})}</div>
       <div class="detail-grid">
         <div class="detail-item"><label>Puskesmas</label><span>${detail.namaPKM}</span></div>
         <div class="detail-item"><label>Periode</label><span>${detail.namaBulan} ${detail.tahun}</span></div>
         <div class="detail-item"><label>Status</label><span>${statusBadge(detail.statusGlobal)}</span></div>
         <div class="detail-item"><label>Dibuat Oleh</label><span>${detail.createdBy}</span></div>
-        <div class="detail-item"><label>Dibuat Pada</label><span>${formatDateTime(detail.createdAt)}</span></div>
-        <div class="detail-item"><label>Indeks SPM</label><span style="font-family:'JetBrains Mono';font-size:16px;font-weight:800;color:var(--primary)">${parseFloat(detail.indeksSPM).toFixed(2)}</span></div>
+        <div class="detail-item"><label>Indeks Kinerja</label><span style="font-family:'JetBrains Mono'">${parseFloat(detail.indeksKinerja).toFixed(2)}</span></div>
+        <div class="detail-item"><label>Indeks Beban</label><span style="font-family:'JetBrains Mono'">${parseFloat(detail.indeksBeban).toFixed(2)}</span></div>
+        <div class="detail-item" style="grid-column:span 2">
+          <label>Indeks SPM</label>
+          <span style="font-family:'JetBrains Mono';font-size:22px;color:var(--primary);font-weight:800">${parseFloat(detail.indeksSPM).toFixed(2)}</span>
+        </div>
       </div>
       ${detail.driveFolderUrl ? `<div style="margin-bottom:12px"><a href="${detail.driveFolderUrl}" target="_blank" class="btn btn-secondary btn-sm"><span class="material-icons" style="font-size:14px">folder_open</span> Lihat Folder Bukti Google Drive</a></div>` : ''}
       <div style="font-weight:700;font-size:13.5px;margin-bottom:8px">Detail Indikator</div>
@@ -973,19 +918,19 @@ function approvalBox(label, by, at) {
   </div>`;
 }
 
+
 // ============== LAPORAN PDF ==============
 function downloadLaporanPDF(idUsulan) {
   window.open(`/api/laporan-pdf?id=${idUsulan}`, '_blank');
   toast('Membuka laporan PDF...', 'success');
 }
-
 // ============== VERIFIKASI ==============
 async function renderVerifikasi() {
   const role = currentUser.role;
   let statusFilter = '';
   if (role === 'Kapus') statusFilter = 'Menunggu Kapus';
   else if (role === 'Pengelola Program') statusFilter = 'Menunggu Program';
-  else if (role === 'Admin') statusFilter = '';
+  else if (role === 'Admin') statusFilter = ''; // all
 
   document.getElementById('mainContent').innerHTML = `
     <div class="page-header">
@@ -1016,22 +961,13 @@ async function loadVerifData(status) {
   const params = {};
   const role = currentUser.role;
 
-  if (role === 'Kapus') { 
-    params.kode_pkm = currentUser.kodePKM; 
-    params.status = 'Menunggu Kapus';
-  }
-  else if (role === 'Pengelola Program') { 
-    params.status = 'Menunggu Program';
-  }
-  else if (role === 'Admin' && status !== 'semua') { 
-    params.status = status; 
-  }
+  if (role === 'Kapus') { params.kode_pkm = currentUser.kodePKM; params.status = 'Menunggu Kapus'; }
+  else if (role === 'Pengelola Program') { params.status = 'Menunggu Program'; }
+  else if (role === 'Admin' && status !== 'semua') { params.status = status; }
 
   try {
     const rows = await API.getUsulan(params);
-    const verifRole = role === 'Kapus' ? 'kapus' : 
-                      role === 'Pengelola Program' ? 'program' : 
-                      'admin';
+    const verifRole = role === 'Kapus' ? 'kapus' : role === 'Pengelola Program' ? 'program' : 'admin';
     document.getElementById('verifTable').innerHTML = renderUsulanTable(rows, verifRole);
   } catch (e) { toast(e.message, 'error'); }
 }
@@ -1051,9 +987,10 @@ async function openVerifikasi(idUsulan) {
       <div class="detail-item"><label>Periode</label><span>${detail.namaBulan} ${detail.tahun}</span></div>
       <div class="detail-item"><label>Status</label><span>${statusBadge(detail.statusGlobal)}</span></div>
       <div class="detail-item"><label>Dibuat</label><span>${detail.createdBy}</span></div>
-      <div class="detail-item"><label>Dibuat Pada</label><span>${formatDateTime(detail.createdAt)}</span></div>
+      <div class="detail-item"><label>Indeks Kinerja</label><span style="font-family:'JetBrains Mono'">${parseFloat(detail.indeksKinerja).toFixed(2)}</span></div>
       <div class="detail-item"><label>Indeks SPM</label><span style="font-family:'JetBrains Mono';font-size:16px;font-weight:800;color:var(--primary)">${parseFloat(detail.indeksSPM).toFixed(2)}</span></div>`;
 
+    // Filter inds for program role
     let displayInds = inds;
     if (currentUser.role === 'Pengelola Program' && currentUser.indikatorAkses.length > 0) {
       displayInds = inds.filter(i => currentUser.indikatorAkses.includes(parseInt(i.no)));
@@ -1066,6 +1003,7 @@ async function openVerifikasi(idUsulan) {
       <td>${i.bobot}</td><td class="rasio-cell">${parseFloat(i.nilaiTerbobot).toFixed(2)}</td>
     </tr>`).join('');
 
+    // Adjust buttons based on status
     const canApprove = (currentUser.role === 'Kapus' && detail.statusGlobal === 'Menunggu Kapus') ||
       (currentUser.role === 'Pengelola Program' && detail.statusGlobal === 'Menunggu Program') ||
       (currentUser.role === 'Admin' && detail.statusGlobal === 'Menunggu Admin');
@@ -1089,6 +1027,7 @@ async function doApprove() {
     closeModal('verifikasiModal');
     renderVerifikasi();
 
+    // Admin: offer PDF download after final approve
     if (role === 'Admin') {
       setTimeout(() => {
         showConfirm({ title: 'Laporan Tersedia', message: 'Usulan selesai diverifikasi. Download laporan PDF sekarang?', type: 'warning',
@@ -1112,7 +1051,7 @@ async function doReject() {
   finally { setLoading(false); }
 }
 
-// ============== LAPORAN (dengan timestamp) ==============
+// ============== LAPORAN ==============
 async function renderLaporan() {
   const role = currentUser.role;
   document.getElementById('mainContent').innerHTML = `
@@ -1143,6 +1082,7 @@ async function renderLaporan() {
       <div class="card-body" style="padding:0" id="lapTable"></div>
     </div>`;
 
+  // Load PKM list for filter
   if (['Admin','Kadis'].includes(role)) {
     API.getPKM().then(pkm => {
       const sel = document.getElementById('lapPKM');
@@ -1184,20 +1124,12 @@ async function loadLaporan() {
 
     document.getElementById('lapTable').innerHTML = `
       <div class="table-container"><table>
-        <thead><tr>
-          <th>No</th>
-          <th>Puskesmas</th>
-          <th>Periode</th>
-          <th>Dibuat Pada</th>
-          <th>Indeks SPM</th>
-          <th>Status</th>
-          <th>Aksi</th>
-        </tr></thead>
+        <thead><tr><th>No</th><th>Puskesmas</th><th>Periode</th><th>Indeks Beban Kinerja</th><th>Indeks SPM</th><th>Status</th><th>Aksi</th></tr></thead>
         <tbody>${result.data.map(r => `<tr>
           <td>${r.no}</td>
           <td>${r.namaPKM}</td>
           <td>${r.namaBulan} ${r.tahun}</td>
-          <td style="font-size:12px;color:var(--text-light)">${r.createdAt}</td>
+          <td class="rasio-cell">${parseFloat(r.indeksBeban||0).toFixed(2)}</td>
           <td class="rasio-cell" style="font-weight:700;color:var(--primary)">${parseFloat(r.indeksSPM||0).toFixed(2)}</td>
           <td>${statusBadge(r.statusGlobal)}</td>
           <td><button class="btn-icon view" onclick="viewDetail('${r.idUsulan}')"><span class="material-icons">visibility</span></button></td>
@@ -1211,16 +1143,8 @@ function exportLaporan() {
   const data = window._laporanData;
   if (!data || !data.length) return toast('Tidak ada data untuk diekspor', 'warning');
 
-  const headers = ['No','ID Usulan','Puskesmas','Periode','Dibuat Pada','Indeks SPM','Status'];
-  const rows = data.map(r => [
-    r.no, 
-    r.idUsulan, 
-    r.namaPKM, 
-    `${r.namaBulan} ${r.tahun}`,
-    r.createdAt,
-    parseFloat(r.indeksSPM||0).toFixed(2), 
-    r.statusGlobal
-  ]);
+  const headers = ['No','ID Usulan','Puskesmas','Periode','Indeks Beban Kinerja','Indeks SPM','Status'];
+  const rows = data.map(r => [r.no, r.idUsulan, r.namaPKM, `${r.namaBulan} ${r.tahun}`, parseFloat(r.indeksBeban||0).toFixed(2), parseFloat(r.indeksSPM||0).toFixed(2), r.statusGlobal]);
   const csv = [headers, ...rows].map(r => r.map(c => `"${c}"`).join(',')).join('\n');
 
   const blob = new Blob([csv], { type: 'text/csv' });
@@ -1230,7 +1154,9 @@ function exportLaporan() {
   toast('File CSV berhasil diunduh');
 }
 
-// ============== ADMIN - USERS (dengan multiple jabatan) ==============
+// ============== ADMIN - USERS ==============
+let allUsers = [], allPKMList = [], allIndList = [];
+
 async function renderUsers() {
   document.getElementById('mainContent').innerHTML = `
     <div class="page-header">
@@ -1250,8 +1176,7 @@ async function renderUsers() {
       </div>
       <div style="padding:0" id="usersTable"></div>
     </div>
-    
-    <!-- USER MODAL dengan MULTIPLE JABATAN -->
+    <!-- USER MODAL -->
     <div class="modal" id="userModal">
       <div class="modal-card">
         <div class="modal-header"><span class="material-icons">person_add</span><h3 id="userModalTitle">Tambah User</h3>
@@ -1271,19 +1196,16 @@ async function renderUsers() {
             </select></div>
           <div id="pkmContainer" style="display:none" class="form-group"><label>Puskesmas</label>
             <select class="form-control" id="uPKM"><option value="">Pilih Puskesmas</option></select></div>
-          
-          <!-- MULTIPLE JABATAN - CHECKBOX LIST -->
           <div id="jabatanContainer" style="display:none" class="form-group">
-            <label>Jabatan / Bidang Tanggung Jawab (bisa pilih lebih dari satu)</label>
-            <div style="border:1.5px solid var(--border);border-radius:8px;padding:12px;max-height:200px;overflow-y:auto;background:white">
-              <div id="jabatanCheckboxList"></div>
-            </div>
-            <div style="margin-top:8px;display:flex;gap:6px;align-items:center">
-              <input class="form-control" id="uJabatanBaru" placeholder="Tambah jabatan baru..." style="flex:1">
+            <label>Jabatan / Bidang Tanggung Jawab</label>
+            <select class="form-control" id="uJabatan">
+              <option value="">-- Pilih Jabatan --</option>
+            </select>
+            <div style="margin-top:6px;display:flex;gap:6px;align-items:center">
+              <input class="form-control" id="uJabatanBaru" placeholder="Atau ketik jabatan baru..." style="flex:1">
               <button type="button" class="btn btn-secondary btn-sm" onclick="tambahJabatanBaru()">Tambah</button>
             </div>
           </div>
-          
           <div id="indContainer" style="display:none" class="form-group">
             <label>Indikator Akses</label>
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
@@ -1307,22 +1229,12 @@ async function renderUsers() {
 
   // Load data
   try {
-    [allUsers, allPKMList, allIndList, allJabatan] = await Promise.all([
-      API.getUsers(), 
-      API.getPKM(), 
-      API.getIndikator(),
-      API.getJabatan()
-    ]);
+    [allUsers, allPKMList, allIndList] = await Promise.all([API.getUsers(), API.getPKM(), API.getIndikator()]);
     renderUsersTable(allUsers);
 
     // Fill PKM dropdown
     const pkmSel = document.getElementById('uPKM');
-    if (pkmSel) {
-      allPKMList.forEach(p => pkmSel.innerHTML += `<option value="${p.kode}">${p.nama}</option>`);
-    }
-    
-    // Load jabatan checkbox
-    loadJabatanCheckbox();
+    allPKMList.forEach(p => pkmSel.innerHTML += `<option value="${p.kode}">${p.nama}</option>`);
   } catch (e) { toast(e.message, 'error'); }
 }
 
@@ -1339,36 +1251,17 @@ function filterUsers() {
 function renderUsersTable(users) {
   const el = document.getElementById('usersTable');
   if (!el) return;
-  
-  // Super Admin sudah difilter di backend, tapi tetap amankan
+  // Sembunyikan Super Admin dari tampilan demi keamanan
   const filteredUsers = users.filter(u => u.role !== 'Super Admin');
-  
   el.innerHTML = `<div class="table-container"><table>
-    <thead><tr>
-      <th>Email</th>
-      <th>Nama</th>
-      <th>NIP</th>
-      <th>Role</th>
-      <th>Puskesmas</th>
-      <th>Jabatan</th>
-      <th>Indikator</th>
-      <th>Status</th>
-      <th>Aksi</th>
-    </tr></thead>
+    <thead><tr><th>Email</th><th>Nama</th><th>NIP</th><th>Role</th><th>Puskesmas</th><th>Jabatan/Indikator</th><th>Status</th><th>Aksi</th></tr></thead>
     <tbody>${filteredUsers.map(u => `<tr>
       <td style="font-family:'JetBrains Mono';font-size:12px">${u.email}</td>
       <td>${u.nama}</td>
       <td style="font-family:'JetBrains Mono';font-size:11px;color:var(--text-light)">${u.nip || '-'}</td>
       <td><span class="badge badge-info">${u.role}</span></td>
       <td>${u.namaPKM || u.kodePKM || '-'}</td>
-      <td style="font-size:12px">
-        ${u.jabatanList && u.jabatanList.length 
-          ? u.jabatanList.map(j => 
-              `<span class="badge badge-primary" style="margin:2px;display:inline-block">${j.nama}</span>`
-            ).join('') 
-          : '-'}
-      </td>
-      <td style="font-size:11px;color:var(--text-light)">${u.indikatorAkses || '-'}</td>
+      <td style="font-size:12px">${u.jabatan ? `<div style="font-weight:600;color:var(--primary);font-size:11.5px">${u.jabatan}</div>` : ''}<div style="color:var(--text-light)">${u.indikatorAkses || '-'}</div></td>
       <td>${u.aktif ? '<span class="badge badge-success">Aktif</span>' : '<span class="badge badge-default">Non-aktif</span>'}</td>
       <td style="display:flex;gap:4px">
         <button class="btn-icon edit" onclick="editUser('${u.email}')"><span class="material-icons">edit</span></button>
@@ -1393,24 +1286,19 @@ function validateEmailInput(input) {
   }
 }
 
-// ============== MULTIPLE JABATAN FUNCTIONS ==============
-function loadJabatanCheckbox() {
-  const container = document.getElementById('jabatanCheckboxList');
-  if (!container) return;
-  
-  container.innerHTML = allJabatan.filter(j => j.aktif).map(j => `
-    <label style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:13px"
-      onmouseover="this.style.background='var(--border-light)'" onmouseout="this.style.background=''">
-      <input type="checkbox" id="jab_cb_${j.id}" value="${j.id}" 
-        style="width:16px;height:16px;accent-color:var(--primary);cursor:pointer">
-      <span>${j.nama}</span>
-    </label>
-  `).join('');
-}
-
-function getSelectedJabatanIds() {
-  return [...document.querySelectorAll('#jabatanCheckboxList input[type="checkbox"]:checked')]
-    .map(cb => parseInt(cb.value));
+let _jabatanList = [];
+async function loadJabatanDropdown() {
+  try {
+    const res = await fetch('/api/jabatan');
+    const data = await res.json();
+    _jabatanList = data.success ? data.data : [];
+    const sel = document.getElementById('uJabatan');
+    if (!sel) return;
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">-- Pilih Jabatan --</option>' +
+      _jabatanList.filter(j => j.aktif).map(j => `<option value="${j.nama}">${j.nama}</option>`).join('');
+    if (cur) sel.value = cur;
+  } catch(e) { console.warn('Load jabatan gagal:', e.message); }
 }
 
 async function tambahJabatanBaru() {
@@ -1425,10 +1313,9 @@ async function tambahJabatanBaru() {
     if (!data.success) throw new Error(data.message || 'Gagal');
     toast(`Jabatan "${newJab}" ditambahkan`, 'success');
     document.getElementById('uJabatanBaru').value = '';
-    
-    // Reload jabatan
-    allJabatan = await API.getJabatan();
-    loadJabatanCheckbox();
+    await loadJabatanDropdown();
+    const sel = document.getElementById('uJabatan');
+    if (sel) sel.value = newJab;
   } catch(e) { toast(e.message, 'error'); }
 }
 
@@ -1438,10 +1325,7 @@ function checkUserRole() {
   const isProgram = role === 'Pengelola Program';
   document.getElementById('jabatanContainer').style.display = isProgram ? 'block' : 'none';
   document.getElementById('indContainer').style.display = isProgram ? 'block' : 'none';
-  if (isProgram) { 
-    populateIndCheckbox([]); 
-    loadJabatanCheckbox();
-  }
+  if (isProgram) { populateIndCheckbox([]); loadJabatanDropdown(); }
 }
 
 function populateIndCheckbox(selectedNos = []) {
@@ -1485,12 +1369,6 @@ function openUserModal(editEmail = null) {
   document.getElementById('uRole').value = 'Operator';
   document.getElementById('uPKM').value = '';
   document.getElementById('uAktif').value = 'true';
-  
-  // Reset checkbox jabatan
-  setTimeout(() => {
-    document.querySelectorAll('#jabatanCheckboxList input[type="checkbox"]').forEach(cb => cb.checked = false);
-  }, 100);
-  
   checkUserRole();
 
   if (editEmail) {
@@ -1501,24 +1379,17 @@ function openUserModal(editEmail = null) {
       document.getElementById('uRole').value = user.role;
       document.getElementById('uPKM').value = user.kodePKM || '';
       document.getElementById('uAktif').value = user.aktif ? 'true' : 'false';
-      
+      checkUserRole();
+      // Isi NIP
       const nipEl = document.getElementById('uNIP');
       if (nipEl) nipEl.value = user.nip || '';
-      
-      checkUserRole();
-      
       if (user.role === 'Pengelola Program') {
         populateIndCheckbox(parseIndikatorAksesString(user.indikatorAkses || ''));
-        
-        // Set jabatan yang dipilih
-        if (user.jabatanList && user.jabatanList.length) {
-          setTimeout(() => {
-            user.jabatanList.forEach(j => {
-              const cb = document.getElementById(`jab_cb_${j.id}`);
-              if (cb) cb.checked = true;
-            });
-          }, 300);
-        }
+        // Load jabatan dropdown lalu set value
+        loadJabatanDropdown().then(() => {
+          const jabEl = document.getElementById('uJabatan');
+          if (jabEl) jabEl.value = user.jabatan || '';
+        });
       }
     }
     document.getElementById('userModal').dataset.editEmail = editEmail;
@@ -1537,28 +1408,21 @@ async function saveUser() {
   const role = document.getElementById('uRole').value;
   const kodePKM = document.getElementById('uPKM').value;
   const indikatorAkses = role === 'Pengelola Program' ? getIndikatorAksesFromCheckbox() : '';
-  const jabatanIds = role === 'Pengelola Program' ? getSelectedJabatanIds() : [];
+  const jabatan = role === 'Pengelola Program' ? (document.getElementById('uJabatan')?.value || '') : '';
   const nip = document.getElementById('uNIP')?.value.trim() || '';
   const aktif = document.getElementById('uAktif').value === 'true';
 
   if (!email || !nama || !role) return toast('Email, nama, dan role harus diisi', 'error');
   if (!email.includes('@') || !email.includes('.')) return toast('Format email tidak valid. Harus mengandung @ dan domain (contoh: user@email.com)', 'error');
-  if (role === 'Pengelola Program' && jabatanIds.length === 0) return toast('Pilih minimal satu jabatan untuk Pengelola Program', 'error');
+  if (role === 'Pengelola Program' && !jabatan) return toast('Jabatan harus diisi untuk Pengelola Program', 'error');
 
   const editEmail = document.getElementById('userModal').dataset.editEmail;
   setLoading(true);
   try {
-    const userData = { 
-      email, nama, nip, role, kodePKM, 
-      indikatorAkses, 
-      jabatanIds,  // <-- array of jabatan IDs
-      aktif 
-    };
-    
     if (editEmail) {
-      await API.updateUser(userData);
+      await API.updateUser({ email, nama, nip, role, kodePKM, indikatorAkses, jabatan, aktif });
     } else {
-      await API.saveUser(userData);
+      await API.saveUser({ email, nama, nip, role, kodePKM, indikatorAkses, jabatan });
     }
     toast(`User berhasil ${editEmail ? 'diupdate' : 'ditambahkan'}`);
     closeModal('userModal');
@@ -1943,7 +1807,26 @@ async function savePeriode() {
   finally { setLoading(false); }
 }
 
-// ============== KELOLA SEMUA USULAN ==============
+// ============== GLOBAL HELPERS ==============
+function showModal(id) { document.getElementById(id)?.classList.add('show'); }
+function closeModal(id) { document.getElementById(id)?.classList.remove('show'); }
+function setLoading(show) { document.getElementById('globalLoader').classList.toggle('show', show); }
+
+// Close modal on backdrop click
+document.addEventListener('click', (e) => {
+  if (e.target.classList.contains('modal')) {
+    e.target.classList.remove('show');
+  }
+});
+
+// Enter key on auth
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('authEmail').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') doLogin();
+  });
+});
+
+// ============ KELOLA SEMUA USULAN (SUPER ADMIN) ============
 async function renderKelolaUsulan() {
   document.getElementById('mainContent').innerHTML = `
     <div class="page-header">
@@ -1983,14 +1866,14 @@ async function loadKelolaUsulan() {
       return;
     }
     el.innerHTML = `<div class="table-container"><table>
-      <thead><tr><th>ID Usulan</th><th>Puskesmas</th><th>Operator</th><th>Periode</th><th>Dibuat</th><th>Status</th><th>Aksi</th></tr></thead>
+      <thead><tr><th>ID Usulan</th><th>Puskesmas</th><th>Operator</th><th>Periode</th><th>Status</th><th>Dibuat</th><th>Aksi</th></tr></thead>
       <tbody>${rows.map(u => `<tr>
         <td><span style="font-family:'JetBrains Mono',monospace;font-weight:600;font-size:12px">${u.idUsulan}</span></td>
         <td>${u.namaPKM || u.kodePKM}</td>
         <td style="font-size:12px">${u.createdBy || '-'}</td>
         <td>${u.namaBulan || ''} ${u.tahun}</td>
-        <td style="font-size:12px;color:var(--text-light)">${formatDate(u.createdAt)}</td>
         <td>${statusBadge(u.statusGlobal)}</td>
+        <td style="font-size:12px;color:var(--text-light)">${formatDate(u.createdAt)}</td>
         <td style="display:flex;gap:4px">
           <button class="btn-icon view" onclick="viewDetail('${u.idUsulan}')" title="Detail"><span class="material-icons">visibility</span></button>
           <button class="btn-icon edit" onclick="adminEditUsulan('${u.idUsulan}')" title="Edit"><span class="material-icons">edit</span></button>
@@ -2045,81 +1928,3 @@ async function adminDeleteUsulan(idUsulan) {
     }
   });
 }
-
-// ============== GLOBAL FUNCTIONS ==============
-function toast(msg, type = 'success', title = null) {
-  const t = type === 'success' ? { icon: 'check_circle', cls: 'success', title: title || 'Berhasil' }
-    : type === 'error' ? { icon: 'error', cls: 'error', title: title || 'Error' }
-    : { icon: 'warning', cls: 'warning', title: title || 'Perhatian' };
-
-  const el = document.getElementById('toastNotification');
-  if (!el) return;
-  el.className = `toast ${t.cls}`;
-  document.getElementById('toastIcon').textContent = t.icon;
-  document.getElementById('toastTitle').textContent = t.title;
-  document.getElementById('toastMessage').textContent = msg;
-  el.classList.add('show');
-  clearTimeout(window._toastTimer);
-  window._toastTimer = setTimeout(() => el.classList.remove('show'), 4000);
-}
-
-function closeToast() {
-  document.getElementById('toastNotification').classList.remove('show');
-}
-
-function showConfirm({ title, message, onConfirm, type = 'danger' }) {
-  window._confirmCallback = onConfirm;
-  const el = document.getElementById('confirmModal');
-  if (!el) return;
-
-  const header = document.getElementById('confirmHeader');
-  const titleEl = document.getElementById('confirmTitle');
-  const msgEl = document.getElementById('confirmMessage');
-  const icon = document.getElementById('confirmIcon');
-  const btn = document.getElementById('confirmActionBtn');
-
-  if (titleEl) titleEl.textContent = title;
-  if (msgEl) msgEl.textContent = message;
-  if (icon) icon.textContent = type === 'warning' ? 'warning' : 'delete';
-  if (header) header.className = 'confirm-header ' + (type === 'warning' ? 'warning' : 'danger');
-  if (btn) btn.className = 'btn btn-' + (type === 'warning' ? 'primary' : 'danger');
-
-  el.classList.add('show');
-}
-
-function closeConfirmModal() {
-  const el = document.getElementById('confirmModal');
-  if (el) el.classList.remove('show');
-}
-
-function executeConfirm() {
-  closeConfirmModal();
-  if (window._confirmCallback) window._confirmCallback();
-}
-
-function setLoading(show) {
-  const el = document.getElementById('globalLoader');
-  if (el) el.classList.toggle('show', show);
-}
-
-function showModal(id) { document.getElementById(id)?.classList.add('show'); }
-function closeModal(id) { document.getElementById(id)?.classList.remove('show'); }
-
-// Constants
-const BULAN_NAMA = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-  'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
-const CURRENT_YEAR = new Date().getFullYear();
-const CURRENT_BULAN = new Date().getMonth() + 1;
-
-// Event Listeners
-document.addEventListener('click', (e) => {
-  if (e.target.classList.contains('modal')) {
-    e.target.classList.remove('show');
-  }
-});
-
-document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('authEmail').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') doLogin();
-  });
-});

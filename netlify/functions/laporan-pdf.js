@@ -42,9 +42,15 @@ exports.handler = async (event) => {
     const bulanNama = ['','Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
     const bulan = bulanNama[h.bulan] || h.bulan;
     const indeksSPM = parseFloat(h.indeks_spm) || 0;
-    const indeksKinerja = parseFloat(h.indeks_kinerja_spm) || 0;
-    const indeksBeban = parseFloat(h.indeks_beban_kerja) || 0;
     const now = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+    
+    // Format tanggal pembuatan
+    const createdAtFormatted = h.created_at 
+      ? new Date(h.created_at).toLocaleString('id-ID', { 
+          day: '2-digit', month: 'long', year: 'numeric', 
+          hour: '2-digit', minute: '2-digit' 
+        })
+      : '-';
 
     const spmColor = indeksSPM >= 1 ? '#0d9488' : indeksSPM >= 0.75 ? '#f59e0b' : '#ef4444';
     const spmLabel = indeksSPM >= 1 ? 'MEMENUHI TARGET' : indeksSPM >= 0.75 ? 'MENDEKATI TARGET' : 'DI BAWAH TARGET';
@@ -121,20 +127,17 @@ exports.handler = async (event) => {
   </div>
 </div>
 
-<!-- SPM SCORE -->
+<!-- SPM SCORE (HANYA INDEKS SPM) -->
 <div style="margin:0 32px 24px;text-align:center">
   <div style="display:inline-block;background:white;border:3px solid ${spmColor};border-radius:20px;padding:20px 48px;box-shadow:0 4px 20px rgba(0,0,0,0.08)">
     <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Indeks SPM</div>
     <div style="font-size:48px;font-weight:800;color:${spmColor};font-family:monospace;line-height:1">${indeksSPM.toFixed(4)}</div>
     <div style="margin-top:8px;padding:4px 16px;background:${spmColor};color:white;border-radius:20px;font-size:11px;font-weight:700">${spmLabel}</div>
-    <div style="margin-top:12px;display:flex;gap:24px;font-size:12px;color:#64748b">
-      <div><span style="color:#94a3b8">Indeks Kinerja:</span> <strong>${indeksKinerja.toFixed(4)}</strong></div>
-      <div><span style="color:#94a3b8">Indeks Beban:</span> <strong>${indeksBeban.toFixed(2)}</strong></div>
-    </div>
+    <!-- INDEKS KINERJA DAN BEBAN DIHAPUS -->
   </div>
 </div>
 
-<!-- INFO GRID -->
+<!-- INFO GRID (DIGANTI TIMESTAMP) -->
 <div style="margin:0 32px 24px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
   <div style="background:#f8fafc;border-radius:10px;padding:14px">
     <div style="font-size:11px;color:#94a3b8;margin-bottom:4px">Puskesmas</div>
@@ -147,9 +150,9 @@ exports.handler = async (event) => {
     <div style="font-size:12px;color:#64748b">Input: ${h.created_by||'-'}</div>
   </div>
   <div style="background:#e6fffa;border-radius:10px;padding:14px;border:1px solid #99f6e4">
-    <div style="font-size:11px;color:#0d9488;margin-bottom:4px">Final Disetujui</div>
-    <div style="font-weight:700;color:#0d9488">${h.admin_approved_by||h.final_approved_by||'-'}</div>
-    <div style="font-size:12px;color:#0d9488">${h.admin_approved_at ? new Date(h.admin_approved_at).toLocaleDateString('id-ID') : '-'}</div>
+    <div style="font-size:11px;color:#0d9488;margin-bottom:4px">Dibuat Pada</div>
+    <div style="font-weight:700;color:#0d9488">${createdAtFormatted}</div>
+    <div style="font-size:12px;color:#0d9488">Oleh: ${h.created_by||'-'}</div>
   </div>
 </div>
 

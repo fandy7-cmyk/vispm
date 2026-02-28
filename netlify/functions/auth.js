@@ -6,12 +6,14 @@ exports.handler = async (event) => {
   try {
     const pool = getPool();
     const { email } = JSON.parse(event.body || '{}');
-
     if (!email) return err('Email diperlukan');
 
     const result = await pool.query(
-      `SELECT email, nama, role, kode_pkm, indikator_akses, aktif
-       FROM users WHERE LOWER(email) = LOWER($1) AND aktif = true`,
+      `SELECT u.email, u.nama, u.nip, u.role, u.kode_pkm, u.indikator_akses,
+              u.jabatan, u.aktif, p.nama_puskesmas
+       FROM users u
+       LEFT JOIN master_puskesmas p ON u.kode_pkm = p.kode_pkm
+       WHERE LOWER(u.email) = LOWER($1) AND u.aktif = true`,
       [email.trim()]
     );
 
@@ -21,7 +23,6 @@ exports.handler = async (event) => {
 
     const user = result.rows[0];
 
-    // Parse indikator_akses for Pengelola Program
     let indikatorList = [];
     if (user.role === 'Pengelola Program' && user.indikator_akses) {
       indikatorList = parseIndikatorAkses(user.indikator_akses.toString());
@@ -30,8 +31,11 @@ exports.handler = async (event) => {
     return ok({
       email: user.email,
       nama: user.nama,
+      nip: user.nip || '',
       role: user.role,
       kodePKM: user.kode_pkm || '',
+      namaPKM: user.nama_puskesmas || '',
+      jabatan: user.jabatan || '',
       indikatorAkses: indikatorList,
       indikatorAksesString: user.indikator_akses ? user.indikator_akses.toString() : ''
     });

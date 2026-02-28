@@ -271,9 +271,20 @@ async function submitUsulan(pool, body) {
 
 async function approveKapus(pool, body) {
   const { idUsulan, email, catatan } = body;
-  const result = await pool.query('SELECT status_global FROM usulan_header WHERE id_usulan=$1', [idUsulan]);
+  const result = await pool.query(
+    `SELECT uh.status_global, uh.kode_pkm, u.kode_pkm as kapus_pkm
+     FROM usulan_header uh
+     LEFT JOIN users u ON LOWER(u.email)=LOWER($2) AND u.role='Kapus'
+     WHERE uh.id_usulan=$1`,
+    [idUsulan, email]
+  );
   if (result.rows.length===0) return err('Usulan tidak ditemukan');
-  if (result.rows[0].status_global !== 'Menunggu Kapus') return err('Usulan tidak dalam status Menunggu Kapus');
+  const row = result.rows[0];
+  if (row.status_global !== 'Menunggu Kapus') return err('Usulan tidak dalam status Menunggu Kapus');
+  // Poin 5: Kapus hanya bisa verifikasi PKM-nya sendiri
+  if (row.kapus_pkm && row.kode_pkm !== row.kapus_pkm) {
+    return err('Anda hanya dapat memverifikasi usulan dari puskesmas Anda sendiri');
+  }
   await pool.query(
     `UPDATE usulan_header SET status_kapus='Selesai',status_global='Menunggu Program',kapus_approved_by=$1,kapus_approved_at=NOW(),kapus_catatan=$2 WHERE id_usulan=$3`,
     [email, catatan||'', idUsulan]

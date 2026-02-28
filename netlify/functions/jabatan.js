@@ -4,32 +4,49 @@ exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors();
   const pool = getPool();
   const method = event.httpMethod;
+  const params = event.queryStringParameters || {};
+
   try {
     if (method === 'GET') {
       const r = await pool.query('SELECT id, nama_jabatan, aktif FROM master_jabatan ORDER BY nama_jabatan');
       return ok(r.rows.map(x => ({ id: x.id, nama: x.nama_jabatan, aktif: x.aktif })));
     }
-    const body = JSON.parse(event.body || '{}');
-    if (method === 'POST') {
-      const { nama } = body;
-      if (!nama) return err('Nama jabatan diperlukan');
-      const exists = await pool.query('SELECT id FROM master_jabatan WHERE LOWER(nama_jabatan)=LOWER($1)', [nama]);
-      if (exists.rows.length > 0) return err('Jabatan sudah ada');
-      const r = await pool.query('INSERT INTO master_jabatan (nama_jabatan) VALUES ($1) RETURNING id', [nama]);
-      return ok({ id: r.rows[0].id, message: 'Jabatan ditambahkan' });
+
+    if (method === 'DELETE') {
+      const id = params.id || JSON.parse(event.body || '{}').id;
+      if (!id) return err('ID jabatan diperlukan');
+      await pool.query('DELETE FROM master_jabatan WHERE id=$1', [id]);
+      return ok({ message: 'Jabatan berhasil dihapus' });
     }
+
+    const body = JSON.parse(event.body || '{}');
+
+    if (method === 'POST') {
+      const { id, nama, aktif } = body;
+      if (!nama || !nama.trim()) return err('Nama jabatan diperlukan');
+      if (id) {
+        // Update
+        await pool.query('UPDATE master_jabatan SET nama_jabatan=$1, aktif=$2 WHERE id=$3', [nama.trim(), aktif !== false, id]);
+        return ok({ id, message: 'Jabatan berhasil diperbarui' });
+      } else {
+        // Create
+        const exists = await pool.query('SELECT id FROM master_jabatan WHERE LOWER(nama_jabatan)=LOWER($1)', [nama.trim()]);
+        if (exists.rows.length > 0) return err(`Jabatan "${nama.trim()}" sudah ada`);
+        const r = await pool.query('INSERT INTO master_jabatan (nama_jabatan, aktif) VALUES ($1, true) RETURNING id', [nama.trim()]);
+        return ok({ id: r.rows[0].id, message: 'Jabatan berhasil ditambahkan' });
+      }
+    }
+
     if (method === 'PUT') {
       const { id, nama, aktif } = body;
-      await pool.query('UPDATE master_jabatan SET nama_jabatan=$1, aktif=$2 WHERE id=$3', [nama, aktif !== false, id]);
+      if (!id || !nama) return err('ID dan nama diperlukan');
+      await pool.query('UPDATE master_jabatan SET nama_jabatan=$1, aktif=$2 WHERE id=$3', [nama.trim(), aktif !== false, id]);
       return ok({ message: 'Jabatan diupdate' });
     }
-    if (method === 'DELETE') {
-      const { id } = body;
-      await pool.query('DELETE FROM master_jabatan WHERE id=$1', [id]);
-      return ok({ message: 'Jabatan dihapus' });
-    }
+
     return err('Method tidak diizinkan', 405);
   } catch(e) {
+    console.error('Jabatan error:', e);
     return err('Error: ' + e.message, 500);
   }
 };

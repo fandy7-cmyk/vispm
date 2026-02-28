@@ -4,8 +4,6 @@
 
 [functions]
   node_bundler = "esbuild"
-  external_node_modules = ["googleapis", "formidable-serverless"]
-  included_files = ["netlify/functions/**"]
 
 [[redirects]]
   from = "/api/*"

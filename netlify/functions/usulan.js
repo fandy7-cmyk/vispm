@@ -163,9 +163,11 @@ async function buatUsulan(pool, body) {
 async function updateIndikator(pool, body) {
   const { idUsulan, noIndikator, target, capaian, catatan, linkFile } = body;
 
-  const lockCheck = await pool.query('SELECT is_locked FROM usulan_header WHERE id_usulan=$1', [idUsulan]);
+  const lockCheck = await pool.query('SELECT is_locked, status_global FROM usulan_header WHERE id_usulan=$1', [idUsulan]);
   if (lockCheck.rows.length === 0) return err('Usulan tidak ditemukan');
-  if (lockCheck.rows[0].is_locked) return err('Usulan sudah terkunci');
+  const { is_locked, status_global } = lockCheck.rows[0];
+  // Boleh edit kalau: tidak terkunci, ATAU status Ditolak (operator perbaiki)
+  if (is_locked && status_global !== 'Ditolak') return err('Usulan sudah terkunci dan tidak dapat diedit');
 
   const t = parseFloat(target) || 0;
   const c = parseFloat(capaian) || 0;
@@ -240,7 +242,26 @@ async function submitUsulan(pool, body) {
 
   const result = await pool.query('SELECT status_global FROM usulan_header WHERE id_usulan=$1', [idUsulan]);
   if (result.rows.length === 0) return err('Usulan tidak ditemukan');
-  if (result.rows[0].status_global !== 'Draft') return err('Usulan sudah pernah disubmit');
+  const statusSaatIni = result.rows[0].status_global;
+  // Izinkan submit dari Draft ATAU Ditolak (ajukan ulang setelah diperbaiki)
+  if (statusSaatIni !== 'Draft' && statusSaatIni !== 'Ditolak') return err('Usulan tidak dapat disubmit pada status ini');
+
+  // Kalau resubmit dari Ditolak: reset semua verifikasi sebelumnya
+  if (statusSaatIni === 'Ditolak') {
+    await pool.query(
+      `UPDATE usulan_header SET
+        status_kapus='Menunggu', status_program='Menunggu', status_final='Menunggu',
+        kapus_approved_by=NULL, kapus_approved_at=NULL,
+        admin_approved_by=NULL, admin_approved_at=NULL,
+        final_approved_by=NULL, final_approved_at=NULL
+       WHERE id_usulan=$1`,
+      [idUsulan]
+    );
+    await pool.query(
+      `UPDATE verifikasi_program SET status='Menunggu', catatan=NULL, verified_at=NULL WHERE id_usulan=$1`,
+      [idUsulan]
+    );
+  }
 
   // Cek indikator yang belum ada bukti
   const indResult = await pool.query(
@@ -266,8 +287,9 @@ async function submitUsulan(pool, body) {
 
   // Submit — update status ke Menunggu Kapus
   await pool.query(`UPDATE usulan_header SET status_global='Menunggu Kapus', is_locked=true WHERE id_usulan=$1`, [idUsulan]);
-  await logAktivitas(pool, email, 'Operator', 'Submit', idUsulan, 'Disubmit ke Kapus');
-  return ok({ message: 'Usulan berhasil disubmit ke Kapus' });
+  const isResubmit = statusSaatIni === 'Ditolak';
+  await logAktivitas(pool, email, 'Operator', isResubmit ? 'Ajukan Ulang' : 'Submit', idUsulan, isResubmit ? 'Diajukan ulang ke Kapus setelah perbaikan' : 'Disubmit ke Kapus');
+  return ok({ message: isResubmit ? 'Usulan berhasil diajukan ulang ke Kapus!' : 'Usulan berhasil disubmit ke Kapus' });
 }
 
 async function approveKapus(pool, body) {
@@ -330,18 +352,28 @@ async function approveAdmin(pool, body) {
 
 async function rejectUsulan(pool, body) {
   const { idUsulan, email, role, alasan } = body;
-  if (role==='Pengelola Program') {
-    await pool.query(`UPDATE verifikasi_program SET status='Menunggu',catatan=null,verified_at=null WHERE id_usulan=$1`, [idUsulan]);
-  }
+  if (!alasan || !alasan.trim()) return err('Alasan penolakan wajib diisi');
+
+  // Reset verifikasi program jika ditolak di level manapun
+  await pool.query(`UPDATE verifikasi_program SET status='Menunggu',catatan=null,verified_at=null WHERE id_usulan=$1`, [idUsulan]);
+
+  // Simpan alasan penolakan di kolom yang sesuai, reset status ke Draft agar bisa diedit ulang
+  // Gunakan kapus_catatan untuk tolak Kapus, admin_catatan untuk tolak Admin/Program
+  const isKapus = role === 'Kapus';
   await pool.query(
-    `UPDATE usulan_header SET status_global='Ditolak',is_locked=false,
-     status_kapus=CASE WHEN $2='Kapus' THEN 'Ditolak' ELSE status_kapus END,
-     status_program=CASE WHEN $2='Pengelola Program' THEN 'Ditolak' ELSE status_program END
+    `UPDATE usulan_header SET
+      status_global='Ditolak',
+      is_locked=false,
+      status_kapus=CASE WHEN $2='Kapus' THEN 'Ditolak' ELSE 'Menunggu' END,
+      status_program=CASE WHEN $2 IN ('Pengelola Program','Admin') THEN 'Ditolak' ELSE 'Menunggu' END,
+      kapus_approved_by=CASE WHEN $2='Kapus' THEN NULL ELSE kapus_approved_by END,
+      kapus_catatan=CASE WHEN $2='Kapus' THEN $3 ELSE kapus_catatan END,
+      admin_catatan=CASE WHEN $2 IN ('Pengelola Program','Admin') THEN $3 ELSE admin_catatan END
      WHERE id_usulan=$1`,
-    [idUsulan, role]
+    [idUsulan, role, alasan.trim()]
   );
-  await logAktivitas(pool, email, role, 'Reject', idUsulan, alasan||'Ditolak');
-  return ok({ message: 'Usulan ditolak' });
+  await logAktivitas(pool, email, role, 'Tolak', idUsulan, alasan.trim());
+  return ok({ message: 'Usulan ditolak. Operator dapat memperbaiki dan mengajukan ulang.' });
 }
 
 async function logAktivitas(pool, email, role, aksi, idUsulan, detail) {
@@ -351,6 +383,14 @@ async function logAktivitas(pool, email, role, aksi, idUsulan, detail) {
 
 function mapHeader(r) {
   const bn = ['','Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  const isDitolak = (r.status_global||'') === 'Ditolak';
+  // Tentukan alasan tolak: kapus_catatan jika ditolak Kapus, admin_catatan jika Program/Admin
+  const alasanTolak = isDitolak
+    ? ((r.status_kapus||'')==='Ditolak' ? r.kapus_catatan : r.admin_catatan) || ''
+    : '';
+  const ditolakOleh = isDitolak
+    ? ((r.status_kapus||'')==='Ditolak' ? 'Kepala Puskesmas' : 'Pengelola Program / Admin')
+    : '';
   return {
     idUsulan:r.id_usulan, tahun:r.tahun, bulan:r.bulan, namaBulan:bn[r.bulan]||'',
     periodeKey:r.periode_key, kodePKM:r.kode_pkm, namaPKM:r.nama_puskesmas||r.kode_pkm,
@@ -364,7 +404,8 @@ function mapHeader(r) {
     kapusCatatan:r.kapus_catatan||'', adminApprovedBy:r.admin_approved_by||'',
     adminApprovedAt:r.admin_approved_at, adminCatatan:r.admin_catatan||'',
     finalApprovedBy:r.final_approved_by||'', finalApprovedAt:r.final_approved_at,
-    driveFolderUrl:r.drive_folder_url||'', driveFolderId:r.drive_folder_id||''
+    driveFolderUrl:r.drive_folder_url||'', driveFolderId:r.drive_folder_id||'',
+    alasanTolak, ditolakOleh
   };
 }
 

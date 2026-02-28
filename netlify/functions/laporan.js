@@ -70,9 +70,9 @@ exports.handler = async (event) => {
       namaBulan: bulanNama[r.bulan] || '',
       totalIndikator: parseInt(r.total_indikator) || 0,
       totalNilai: parseFloat(r.total_nilai) ? parseFloat(r.total_nilai).toFixed(2) : '0',
-      indeksKinerja: parseFloat(r.indeks_kinerja_spm) ? parseFloat(r.indeks_kinerja_spm).toFixed(4) : '0',
+      indeksKinerja: parseFloat(r.indeks_kinerja_spm) ? parseFloat(r.indeks_kinerja_spm).toFixed(2) : '0',
       indeksBeban: parseFloat(r.indeks_beban_kerja) ? parseFloat(r.indeks_beban_kerja).toFixed(2) : '0',
-      indeksSPM: parseFloat(r.indeks_spm) ? parseFloat(r.indeks_spm).toFixed(4) : '0',
+      indeksSPM: parseFloat(r.indeks_spm) ? parseFloat(r.indeks_spm).toFixed(2) : '0',
       statusGlobal: r.status_global || 'Draft',
       createdBy: r.created_by || '',
       createdAt: r.created_at,
@@ -86,7 +86,7 @@ exports.handler = async (event) => {
         total: parseInt(s.total) || 0,
         selesai: parseInt(s.selesai) || 0,
         pending: parseInt(s.pending) || 0,
-        rataSPM: parseFloat(s.rata_spm) ? parseFloat(s.rata_spm).toFixed(4) : '0'
+        rataSPM: parseFloat(s.rata_spm) ? parseFloat(s.rata_spm).toFixed(2) : '0'
       }
     });
   } catch (e) {

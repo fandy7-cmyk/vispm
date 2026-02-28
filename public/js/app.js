@@ -48,7 +48,21 @@ function startApp() {
 
   // Set user info
   document.getElementById('sidebarName').textContent = currentUser.nama || currentUser.email;
-  document.getElementById('sidebarRole').textContent = currentUser.role;
+  let roleText = currentUser.role;
+  if (currentUser.namaPKM) {
+    roleText = `${currentUser.role}`;
+  }
+  document.getElementById('sidebarRole').textContent = roleText;
+  // Tampilkan nama puskesmas di bawah role kalau ada
+  const sidebarPKMEl = document.getElementById('sidebarPKM');
+  if (sidebarPKMEl) {
+    if (currentUser.namaPKM) {
+      sidebarPKMEl.textContent = currentUser.namaPKM;
+      sidebarPKMEl.style.display = 'block';
+    } else {
+      sidebarPKMEl.style.display = 'none';
+    }
+  }
   document.getElementById('sidebarAvatar').textContent = (currentUser.nama || 'U')[0].toUpperCase();
   document.getElementById('topbarUser').textContent = currentUser.nama || currentUser.email;
 
@@ -71,6 +85,9 @@ function buildSidebar() {
         { id: 'pkm', icon: 'local_hospital', label: 'Kelola Puskesmas' },
         { id: 'indikator', icon: 'monitor_heart', label: 'Kelola Indikator' },
         { id: 'periode', icon: 'event_available', label: 'Periode Input' }
+      ]},
+      { label: 'Manajemen', items: [
+        { id: 'kelola-usulan', icon: 'manage_accounts', label: 'Kelola Semua Usulan' }
       ]}
     ],
     'Operator': [
@@ -140,6 +157,7 @@ function loadPage(page) {
     dashboard: renderDashboard,
     verifikasi: renderVerifikasi,
     laporan: renderLaporan,
+    'kelola-usulan': renderKelolaUsulan,
     users: renderUsers,
     pkm: renderPKM,
     indikator: renderIndikator,
@@ -167,9 +185,12 @@ function closeSidebar() {
 }
 
 // ============== HELPER: YEAR SELECT ==============
-function yearOptions(selected) {
+function yearOptions(selected, maxYear) {
+  // Gunakan maxYear dari parameter, atau ambil dari state global, minimal CURRENT_YEAR+3
+  const max = maxYear || window._maxPeriodeTahun || Math.max(CURRENT_YEAR + 3, 2030);
+  const min = Math.min(2024, CURRENT_YEAR);
   let html = '';
-  for (let y = 2024; y <= 2027; y++) {
+  for (let y = min; y <= max; y++) {
     html += `<option value="${y}" ${y == selected ? 'selected' : ''}>${y}</option>`;
   }
   return html;
@@ -390,13 +411,22 @@ async function renderInput() {
 
   const isOp = currentUser.role === 'Operator';
   const pkmSelect = isOp && currentUser.kodePKM
-    ? `<select class="form-control" id="inputPKM" disabled><option value="${currentUser.kodePKM}">${currentUser.kodePKM}</option></select>`
+    ? `<select class="form-control" id="inputPKM" disabled><option value="${currentUser.kodePKM}">${currentUser.namaPKM || currentUser.kodePKM}</option></select>`
     : `<select class="form-control" id="inputPKM"><option value="">Pilih Puskesmas</option>${pkmList.map(p => `<option value="${p.kode}">${p.nama}</option>`).join('')}</select>`;
 
   if (isOp && currentUser.kodePKM) {
-    // auto set
     setTimeout(() => { const el = document.getElementById('inputPKM'); if (el) el.value = currentUser.kodePKM; }, 100);
   }
+
+  // Siapkan option tahun & bulan dari periode aktif saja
+  const allPeriode = Array.isArray(periodeRes) ? periodeRes : [];
+  const periodeOptions = allPeriode.filter(p => p.status === 'Aktif');
+  const tahunAktif = [...new Set(periodeOptions.map(p => p.tahun))].sort();
+  const defaultTahun = periodeAktif ? periodeAktif.tahun : CURRENT_YEAR;
+  const defaultBulan = periodeAktif ? periodeAktif.bulan : CURRENT_BULAN;
+  const tahunSelectHtml = tahunAktif.length
+    ? tahunAktif.map(y => `<option value="${y}" ${y == defaultTahun ? 'selected' : ''}>${y}</option>`).join('')
+    : `<option value="${defaultTahun}">${defaultTahun}</option>`;
 
   document.getElementById('mainContent').innerHTML = `
     <div class="page-header">
@@ -408,10 +438,10 @@ async function renderInput() {
       <div class="card-body">
         <div class="form-row">
           <div class="form-group"><label>Puskesmas</label>${pkmSelect}</div>
-          <div class="form-group"><label>Tahun</label><select class="form-control" id="inputTahun">${yearOptions(CURRENT_YEAR)}</select></div>
+          <div class="form-group"><label>Tahun</label><select class="form-control" id="inputTahun" onchange="updateBulanOptions()">${tahunSelectHtml}</select></div>
         </div>
         <div class="form-row">
-          <div class="form-group"><label>Bulan</label><select class="form-control" id="inputBulan">${bulanOptions(CURRENT_BULAN)}</select></div>
+          <div class="form-group"><label>Bulan</label><select class="form-control" id="inputBulan"></select></div>
         </div>
         <div style="display:flex;justify-content:flex-end;">
           <button class="btn btn-primary" onclick="createUsulan()">
@@ -425,7 +455,24 @@ async function renderInput() {
       <div class="card-body" style="padding:0" id="myUsulanTable"></div>
     </div>`;
 
+  // Simpan periodeOptions untuk dipakai updateBulanOptions
+  window._periodeInputAktif = periodeOptions;
+  setTimeout(() => updateBulanOptions(), 50);
   loadMyUsulan();
+}
+
+function updateBulanOptions() {
+  const tahun = parseInt(document.getElementById('inputTahun')?.value);
+  const sel = document.getElementById('inputBulan');
+  if (!sel) return;
+  const periodeOptions = window._periodeInputAktif || [];
+  const bulanForTahun = periodeOptions.filter(p => p.tahun == tahun);
+  if (bulanForTahun.length) {
+    sel.innerHTML = bulanForTahun.map(p => `<option value="${p.bulan}">${p.namaBulan || BULAN_NAMA[p.bulan]}</option>`).join('');
+  } else {
+    // Fallback: semua bulan
+    sel.innerHTML = BULAN_NAMA.slice(1).map((m,i) => `<option value="${i+1}">${m}</option>`).join('');
+  }
 }
 
 async function loadMyUsulan() {
@@ -453,12 +500,25 @@ async function loadMyUsulan() {
 
 async function createUsulan() {
   const kodePKM = document.getElementById('inputPKM').value;
-  const tahun = document.getElementById('inputTahun').value;
-  const bulan = document.getElementById('inputBulan').value;
+  const tahun = parseInt(document.getElementById('inputTahun').value);
+  const bulan = parseInt(document.getElementById('inputBulan').value);
+  const namaBulanTxt = BULAN_NAMA[bulan] || 'bulan ini';
   if (!kodePKM) return toast('Pilih puskesmas terlebih dahulu', 'error');
+
+  // Cek duplikat di sisi client
+  const existing = await API.getUsulan({ email_operator: currentUser.email }).catch(() => []);
+  const duplikat = existing.find(u => u.tahun == tahun && u.bulan == bulan);
+  if (duplikat) {
+    toast(`❌ Tidak dapat membuat usulan! Anda sudah memiliki usulan untuk ${namaBulanTxt} ${tahun} (ID: ${duplikat.idUsulan}). Hanya boleh 1 usulan per periode aktif.`, 'error');
+    // Highlight usulan yang sudah ada
+    const existing = document.querySelector(`[data-usulan-id="${duplikat.idUsulan}"]`);
+    if (existing) existing.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+
   setLoading(true);
   try {
-    const result = await API.buatUsulan({ kodePKM, tahun: parseInt(tahun), bulan: parseInt(bulan), emailOperator: currentUser.email });
+    const result = await API.buatUsulan({ kodePKM, tahun, bulan, emailOperator: currentUser.email });
     toast(`Usulan ${result.idUsulan} berhasil dibuat! Silakan isi data indikator.`, 'success');
     loadMyUsulan();
     setTimeout(() => openIndikatorModal(result.idUsulan), 600);
@@ -521,7 +581,7 @@ async function openIndikatorModal(idUsulan) {
     const isLocked = detail.isLocked || detail.statusGlobal !== 'Draft';
     const namaBulan = BULAN_NAMA[detail.bulan] || detail.bulan;
 
-    document.getElementById('indModalSPM').textContent = parseFloat(detail.indeksSPM).toFixed(4);
+    document.getElementById('indModalSPM').textContent = parseFloat(detail.indeksSPM).toFixed(2);
     document.getElementById('btnSubmitFromModal').style.display = isLocked ? 'none' : 'flex';
 
     // Sembunyikan info card - tidak diperlukan lagi
@@ -752,11 +812,11 @@ async function viewDetail(idUsulan) {
         <div class="detail-item"><label>Periode</label><span>${detail.namaBulan} ${detail.tahun}</span></div>
         <div class="detail-item"><label>Status</label><span>${statusBadge(detail.statusGlobal)}</span></div>
         <div class="detail-item"><label>Dibuat Oleh</label><span>${detail.createdBy}</span></div>
-        <div class="detail-item"><label>Indeks Kinerja</label><span style="font-family:'JetBrains Mono'">${parseFloat(detail.indeksKinerja).toFixed(4)}</span></div>
+        <div class="detail-item"><label>Indeks Kinerja</label><span style="font-family:'JetBrains Mono'">${parseFloat(detail.indeksKinerja).toFixed(2)}</span></div>
         <div class="detail-item"><label>Indeks Beban</label><span style="font-family:'JetBrains Mono'">${parseFloat(detail.indeksBeban).toFixed(2)}</span></div>
         <div class="detail-item" style="grid-column:span 2">
           <label>Indeks SPM</label>
-          <span style="font-family:'JetBrains Mono';font-size:22px;color:var(--primary);font-weight:800">${parseFloat(detail.indeksSPM).toFixed(4)}</span>
+          <span style="font-family:'JetBrains Mono';font-size:22px;color:var(--primary);font-weight:800">${parseFloat(detail.indeksSPM).toFixed(2)}</span>
         </div>
       </div>
       ${detail.driveFolderUrl ? `<div style="margin-bottom:12px"><a href="${detail.driveFolderUrl}" target="_blank" class="btn btn-secondary btn-sm"><span class="material-icons" style="font-size:14px">folder_open</span> Lihat Folder Bukti Google Drive</a></div>` : ''}
@@ -861,8 +921,8 @@ async function openVerifikasi(idUsulan) {
       <div class="detail-item"><label>Periode</label><span>${detail.namaBulan} ${detail.tahun}</span></div>
       <div class="detail-item"><label>Status</label><span>${statusBadge(detail.statusGlobal)}</span></div>
       <div class="detail-item"><label>Dibuat</label><span>${detail.createdBy}</span></div>
-      <div class="detail-item"><label>Indeks Kinerja</label><span style="font-family:'JetBrains Mono'">${parseFloat(detail.indeksKinerja).toFixed(4)}</span></div>
-      <div class="detail-item"><label>Indeks SPM</label><span style="font-family:'JetBrains Mono';font-size:16px;font-weight:800;color:var(--primary)">${parseFloat(detail.indeksSPM).toFixed(4)}</span></div>`;
+      <div class="detail-item"><label>Indeks Kinerja</label><span style="font-family:'JetBrains Mono'">${parseFloat(detail.indeksKinerja).toFixed(2)}</span></div>
+      <div class="detail-item"><label>Indeks SPM</label><span style="font-family:'JetBrains Mono';font-size:16px;font-weight:800;color:var(--primary)">${parseFloat(detail.indeksSPM).toFixed(2)}</span></div>`;
 
     // Filter inds for program role
     let displayInds = inds;
@@ -998,16 +1058,13 @@ async function loadLaporan() {
 
     document.getElementById('lapTable').innerHTML = `
       <div class="table-container"><table>
-        <thead><tr><th>No</th><th>Puskesmas</th><th>Periode</th><th>Indikator</th><th>Total Nilai</th><th>Indeks Kinerja</th><th>Indeks Beban</th><th>Indeks SPM</th><th>Status</th><th>Aksi</th></tr></thead>
+        <thead><tr><th>No</th><th>Puskesmas</th><th>Periode</th><th>Indeks Beban Kinerja</th><th>Indeks SPM</th><th>Status</th><th>Aksi</th></tr></thead>
         <tbody>${result.data.map(r => `<tr>
           <td>${r.no}</td>
           <td>${r.namaPKM}</td>
           <td>${r.namaBulan} ${r.tahun}</td>
-          <td style="text-align:center">${r.totalIndikator}</td>
-          <td class="rasio-cell">${r.totalNilai}</td>
-          <td class="rasio-cell">${r.indeksKinerja}</td>
-          <td class="rasio-cell">${r.indeksBeban}</td>
-          <td class="rasio-cell" style="font-weight:700;color:var(--primary)">${r.indeksSPM}</td>
+          <td class="rasio-cell">${parseFloat(r.indeksBeban||0).toFixed(2)}</td>
+          <td class="rasio-cell" style="font-weight:700;color:var(--primary)">${parseFloat(r.indeksSPM||0).toFixed(2)}</td>
           <td>${statusBadge(r.statusGlobal)}</td>
           <td><button class="btn-icon view" onclick="viewDetail('${r.idUsulan}')"><span class="material-icons">visibility</span></button></td>
         </tr>`).join('')}
@@ -1020,8 +1077,8 @@ function exportLaporan() {
   const data = window._laporanData;
   if (!data || !data.length) return toast('Tidak ada data untuk diekspor', 'warning');
 
-  const headers = ['No','ID Usulan','Puskesmas','Periode','Total Nilai','Indeks Kinerja','Indeks Beban','Indeks SPM','Status'];
-  const rows = data.map(r => [r.no, r.idUsulan, r.namaPKM, `${r.namaBulan} ${r.tahun}`, r.totalNilai, r.indeksKinerja, r.indeksBeban, r.indeksSPM, r.statusGlobal]);
+  const headers = ['No','ID Usulan','Puskesmas','Periode','Indeks Beban Kinerja','Indeks SPM','Status'];
+  const rows = data.map(r => [r.no, r.idUsulan, r.namaPKM, `${r.namaBulan} ${r.tahun}`, parseFloat(r.indeksBeban||0).toFixed(2), parseFloat(r.indeksSPM||0).toFixed(2), r.statusGlobal]);
   const csv = [headers, ...rows].map(r => r.map(c => `"${c}"`).join(',')).join('\n');
 
   const blob = new Blob([csv], { type: 'text/csv' });
@@ -1113,9 +1170,11 @@ function filterUsers() {
 function renderUsersTable(users) {
   const el = document.getElementById('usersTable');
   if (!el) return;
+  // Sembunyikan Super Admin dari tampilan demi keamanan
+  const filteredUsers = users.filter(u => u.role !== 'Super Admin');
   el.innerHTML = `<div class="table-container"><table>
     <thead><tr><th>Email</th><th>Nama</th><th>Role</th><th>Puskesmas</th><th>Indikator</th><th>Status</th><th>Aksi</th></tr></thead>
-    <tbody>${users.map(u => `<tr>
+    <tbody>${filteredUsers.map(u => `<tr>
       <td style="font-family:'JetBrains Mono';font-size:12px">${u.email}</td>
       <td>${u.nama}</td>
       <td><span class="badge badge-info">${u.role}</span></td>
@@ -1212,6 +1271,8 @@ async function saveUser() {
   const aktif = document.getElementById('uAktif').value === 'true';
 
   if (!email || !nama || !role) return toast('Email, nama, dan role harus diisi', 'error');
+  if (!email.includes('@') || !email.includes('.')) return toast('Format email tidak valid (harus mengandung @ dan domain)', 'error');
+  if (!email.includes('@') || !email.includes('.')) return toast('Format email tidak valid. Harus mengandung @ dan domain (contoh: user@email.com)', 'error');
 
   const editEmail = document.getElementById('userModal').dataset.editEmail;
   setLoading(true);
@@ -1269,7 +1330,8 @@ async function renderPKM() {
         <div class="modal-body">
           <div class="form-group"><label>Kode *</label><input class="form-control" id="pKode" placeholder="Maks 10 karakter" maxlength="10"></div>
           <div class="form-group"><label>Nama Puskesmas *</label><input class="form-control" id="pNama" placeholder="Nama lengkap puskesmas"></div>
-          <div class="form-group"><label>Indeks Beban Kerja</label><input class="form-control" id="pIndeks" type="number" step="0.01" min="0" placeholder="Contoh: 1.5"></div>
+          <div class="form-group"><label>Indeks Beban Kerja</label><input class="form-control" id="pIndeks" type="number" step="0.0001" min="0" placeholder="Contoh: 1.5"></div>
+          <div class="form-group"><label>Indeks Kesulitan Wilayah</label><input class="form-control" id="pIndeksKesulitan" type="number" step="0.0001" min="0" placeholder="Contoh: 1.2"></div>
           <div class="form-group"><label>Status</label><select class="form-control" id="pAktif"><option value="true">Aktif</option><option value="false">Non-aktif</option></select></div>
         </div>
         <div class="modal-footer">
@@ -1299,11 +1361,12 @@ function renderPKMTable(pkm) {
   const el = document.getElementById('pkmTable');
   if (!el) return;
   el.innerHTML = `<div class="table-container"><table>
-    <thead><tr><th>Kode</th><th>Nama Puskesmas</th><th>Indeks Beban</th><th>Status</th><th>Aksi</th></tr></thead>
+    <thead><tr><th>Kode</th><th>Nama Puskesmas</th><th>Indeks Beban Kerja</th><th>Indeks Kesulitan Wilayah</th><th>Status</th><th>Aksi</th></tr></thead>
     <tbody>${pkm.map(p => `<tr>
       <td><span style="font-family:'JetBrains Mono';font-weight:700">${p.kode}</span></td>
       <td>${p.nama}</td>
-      <td class="rasio-cell">${parseFloat(p.indeks).toFixed(2)}</td>
+      <td class="rasio-cell">${parseFloat(p.indeks||0).toFixed(2)}</td>
+      <td class="rasio-cell">${parseFloat(p.indeksKesulitan||0).toFixed(2)}</td>
       <td>${p.aktif ? '<span class="badge badge-success">Aktif</span>' : '<span class="badge badge-default">Non-aktif</span>'}</td>
       <td style="display:flex;gap:4px">
         <button class="btn-icon edit" onclick="editPKM('${p.kode}')"><span class="material-icons">edit</span></button>
@@ -1326,6 +1389,7 @@ function openPKMModal(editKode = null) {
       document.getElementById('pKode').value = p.kode;
       document.getElementById('pNama').value = p.nama;
       document.getElementById('pIndeks').value = p.indeks;
+      document.getElementById('pIndeksKesulitan').value = p.indeksKesulitan || '';
       document.getElementById('pAktif').value = p.aktif ? 'true' : 'false';
     }
     document.getElementById('pkmModal').dataset.editKode = editKode;
@@ -1339,13 +1403,14 @@ async function savePKM() {
   const kode = document.getElementById('pKode').value.trim();
   const nama = document.getElementById('pNama').value.trim();
   const indeks = document.getElementById('pIndeks').value;
+  const indeksKesulitan = document.getElementById('pIndeksKesulitan').value;
   const aktif = document.getElementById('pAktif').value === 'true';
   if (!kode || !nama) return toast('Kode dan nama harus diisi', 'error');
   const editKode = document.getElementById('pkmModal').dataset.editKode;
   setLoading(true);
   try {
-    if (editKode) await API.updatePKM({ kode, nama, indeks, aktif });
-    else await API.savePKM({ kode, nama, indeks, aktif });
+    if (editKode) await API.updatePKM({ kode, nama, indeks, indeksKesulitan, aktif });
+    else await API.savePKM({ kode, nama, indeks, indeksKesulitan, aktif });
     toast(`Puskesmas berhasil ${editKode ? 'diupdate' : 'ditambahkan'}`);
     closeModal('pkmModal');
     allPKM = await API.getPKM();
@@ -1496,7 +1561,7 @@ async function renderPeriode() {
     <div class="card">
       <div class="card-body" style="padding:12px 16px">
         <select class="form-control" id="filterTahunPeriode" style="width:150px" onchange="loadPeriodeGrid()">
-          ${yearOptions(currentTahun)}
+          ${yearOptions(currentTahun, CURRENT_YEAR + 10)}
         </select>
       </div>
       <div class="card-body">
@@ -1510,7 +1575,7 @@ async function renderPeriode() {
           <button class="btn-icon" onclick="closeModal('periodeModal')"><span class="material-icons">close</span></button></div>
         <div class="modal-body">
           <div class="form-row">
-            <div class="form-group"><label>Tahun</label><select class="form-control" id="pTahun">${yearOptions(currentTahun)}</select></div>
+            <div class="form-group"><label>Tahun</label><select class="form-control" id="pTahun">${yearOptions(currentTahun, CURRENT_YEAR + 10)}</select></div>
             <div class="form-group"><label>Bulan</label><select class="form-control" id="pBulan">${bulanOptions(CURRENT_BULAN)}</select></div>
           </div>
           <div class="form-row">
@@ -1618,3 +1683,83 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.key === 'Enter') doLogin();
   });
 });
+
+// ============ KELOLA SEMUA USULAN (SUPER ADMIN) ============
+async function renderKelolaUsulan() {
+  document.getElementById('mainContent').innerHTML = `
+    <div class="page-header">
+      <h1><span class="material-icons">admin_panel_settings</span>Kelola Semua Usulan</h1>
+    </div>
+    <div class="card">
+      <div class="card-body" style="padding:12px 16px">
+        <div class="filter-row">
+          <select class="form-control" id="kuTahun" onchange="loadKelolaUsulan()" style="width:120px">${yearOptions(CURRENT_YEAR)}</select>
+          <select class="form-control" id="kuBulan" onchange="loadKelolaUsulan()" style="width:140px">
+            <option value="">Semua Bulan</option>${bulanOptions('')}
+          </select>
+          <select class="form-control" id="kuStatus" onchange="loadKelolaUsulan()" style="width:160px">
+            <option value="">Semua Status</option>
+            <option>Draft</option><option>Menunggu Kapus</option><option>Menunggu Program</option>
+            <option>Menunggu Admin</option><option>Selesai</option><option>Ditolak</option>
+          </select>
+        </div>
+      </div>
+      <div id="kuTable" style="padding:0"></div>
+    </div>`;
+  loadKelolaUsulan();
+}
+
+async function loadKelolaUsulan() {
+  const params = { tahun: document.getElementById('kuTahun')?.value };
+  const bulan = document.getElementById('kuBulan')?.value;
+  const status = document.getElementById('kuStatus')?.value;
+  if (bulan) params.bulan = bulan;
+  if (status) params.status = status;
+
+  try {
+    const rows = await API.getUsulan(params);
+    const el = document.getElementById('kuTable');
+    if (!rows.length) {
+      el.innerHTML = `<div class="empty-state" style="padding:32px"><span class="material-icons">inbox</span><p>Tidak ada usulan</p></div>`;
+      return;
+    }
+    el.innerHTML = `<div class="table-container"><table>
+      <thead><tr><th>ID Usulan</th><th>Puskesmas</th><th>Operator</th><th>Periode</th><th>Status</th><th>Dibuat</th><th>Aksi</th></tr></thead>
+      <tbody>${rows.map(u => `<tr>
+        <td><span style="font-family:'JetBrains Mono',monospace;font-weight:600;font-size:12px">${u.idUsulan}</span></td>
+        <td>${u.namaPKM || u.kodePKM}</td>
+        <td style="font-size:12px">${u.createdBy || '-'}</td>
+        <td>${u.namaBulan || ''} ${u.tahun}</td>
+        <td>${statusBadge(u.statusGlobal)}</td>
+        <td style="font-size:12px;color:var(--text-light)">${formatDate(u.createdAt)}</td>
+        <td style="display:flex;gap:4px">
+          <button class="btn-icon view" onclick="viewDetail('${u.idUsulan}')" title="Detail"><span class="material-icons">visibility</span></button>
+          <button class="btn-icon edit" onclick="adminEditUsulan('${u.idUsulan}')" title="Edit"><span class="material-icons">edit</span></button>
+          <button class="btn-icon del" onclick="adminDeleteUsulan('${u.idUsulan}')" title="Hapus"><span class="material-icons">delete</span></button>
+        </td>
+      </tr>`).join('')}
+      </tbody>
+    </table></div>`;
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+function adminEditUsulan(idUsulan) {
+  // Buka modal input indikator seperti operator
+  openIndikatorModal(idUsulan);
+}
+
+async function adminDeleteUsulan(idUsulan) {
+  showConfirm({
+    title: 'Hapus Usulan', type: 'danger', icon: 'delete_forever',
+    message: `Hapus usulan ${idUsulan}? Semua data indikator dan verifikasi akan ikut terhapus.`,
+    onConfirm: async () => {
+      setLoading(true);
+      try {
+        await API.deleteUsulan(idUsulan);
+        toast(`Usulan ${idUsulan} berhasil dihapus`);
+        loadKelolaUsulan();
+      } catch(e) { toast(e.message, 'error'); }
+      finally { setLoading(false); }
+    }
+  });
+}

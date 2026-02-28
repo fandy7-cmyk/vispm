@@ -22,10 +22,10 @@ exports.handler = async (event) => {
     if (method === 'PUT' && path === 'drive-folder') return await saveDriveFolder(pool, body);
     if (method === 'POST' && path === 'admin-reset') return await adminResetUsulan(pool, body);
     if (method === 'DELETE') {
-      const delBody = JSON.parse(event.body || '{}');
-      const { idUsulan } = delBody;
+      const { idUsulan } = body; // body sudah di-parse di atas
       if (!idUsulan) return err('idUsulan diperlukan');
-      // Hapus cascade
+      // Hapus cascade manual karena mungkin belum ada foreign key
+      await pool.query('DELETE FROM log_aktivitas WHERE id_usulan=$1', [idUsulan]).catch(()=>{});
       await pool.query('DELETE FROM verifikasi_program WHERE id_usulan=$1', [idUsulan]);
       await pool.query('DELETE FROM usulan_indikator WHERE id_usulan=$1', [idUsulan]);
       await pool.query('DELETE FROM usulan_header WHERE id_usulan=$1', [idUsulan]);

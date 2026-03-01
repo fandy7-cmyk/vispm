@@ -1,238 +1,191 @@
 const { getPool, cors } = require('./db');
+const PDFDocument = require('pdfkit');
 
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors();
 
   const params = event.queryStringParameters || {};
   const idUsulan = params.id;
-
-  if (!idUsulan) {
-    return { statusCode: 400, headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ error: 'ID usulan diperlukan' }) };
-  }
+  if (!idUsulan) return { statusCode: 400, headers: { 'Access-Control-Allow-Origin': '*' }, body: 'ID diperlukan' };
 
   const pool = getPool();
-
   try {
-    // Get usulan detail
     const hdrResult = await pool.query(
       `SELECT uh.*, p.nama_puskesmas FROM usulan_header uh
        LEFT JOIN master_puskesmas p ON uh.kode_pkm = p.kode_pkm
-       WHERE uh.id_usulan = $1`,
-      [idUsulan]
+       WHERE uh.id_usulan = $1`, [idUsulan]
     );
-    if (hdrResult.rows.length === 0) {
-      return { statusCode: 404, headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ error: 'Usulan tidak ditemukan' }) };
-    }
+    if (hdrResult.rows.length === 0) return { statusCode: 404, body: 'Tidak ditemukan' };
     const h = hdrResult.rows[0];
 
-    // Get indikator
     const indResult = await pool.query(
       `SELECT ui.*, mi.nama_indikator FROM usulan_indikator ui
        LEFT JOIN master_indikator mi ON ui.no_indikator = mi.no_indikator
-       WHERE ui.id_usulan = $1 ORDER BY ui.no_indikator`,
-      [idUsulan]
+       WHERE ui.id_usulan = $1 ORDER BY ui.no_indikator`, [idUsulan]
     );
 
-    // Get verifikasi program
     const vpResult = await pool.query(
-      `SELECT * FROM verifikasi_program WHERE id_usulan = $1 ORDER BY created_at`,
-      [idUsulan]
+      `SELECT * FROM verifikasi_program WHERE id_usulan = $1 ORDER BY created_at`, [idUsulan]
     );
 
     const bulanNama = ['','Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
     const bulan = bulanNama[h.bulan] || h.bulan;
     const indeksSPM = parseFloat(h.indeks_spm) || 0;
-    const indeksKinerja = parseFloat(h.indeks_kinerja_spm) || 0;
-    const indeksBeban = parseFloat(h.indeks_beban_kerja) || 0;
     const now = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
 
+    // ===== GENERATE PDF =====
+    const doc = new PDFDocument({ size: 'A4', margin: 40, info: { Title: `Laporan SPM ${idUsulan}`, Author: 'VISPM' } });
+    const chunks = [];
+    doc.on('data', chunk => chunks.push(chunk));
+
+    // Helper colors
+    const PRIMARY = '#0d9488';
+    const DARK = '#0f172a';
+    const GRAY = '#64748b';
+    const LIGHT = '#f8fafc';
+
+    const hexToRgb = (hex) => {
+      const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+      return [r, g, b];
+    };
+
+    // ===== HEADER =====
+    doc.rect(0, 0, 595, 90).fill(DARK);
+    doc.fillColor('white').fontSize(18).font('Helvetica-Bold')
+       .text('LAPORAN VERIFIKASI INDEKS SPM', 40, 20);
+    doc.fontSize(11).font('Helvetica')
+       .text(`${h.nama_puskesmas || h.kode_pkm}  —  ${bulan} ${h.tahun}`, 40, 46);
+    doc.fontSize(9).fillColor('#94a3b8')
+       .text(`ID: ${idUsulan}  |  Dicetak: ${now}`, 40, 66);
+
+    // ===== SPM SCORE BOX =====
     const spmColor = indeksSPM >= 1 ? '#0d9488' : indeksSPM >= 0.75 ? '#f59e0b' : '#ef4444';
     const spmLabel = indeksSPM >= 1 ? 'MEMENUHI TARGET' : indeksSPM >= 0.75 ? 'MENDEKATI TARGET' : 'DI BAWAH TARGET';
+    doc.rect(40, 105, 515, 70).fill(LIGHT);
+    doc.rect(40, 105, 4, 70).fill(spmColor);
+    doc.fillColor(spmColor).fontSize(32).font('Helvetica-Bold')
+       .text(indeksSPM.toFixed(4), 55, 115);
+    doc.fillColor(DARK).fontSize(11).font('Helvetica-Bold')
+       .text('INDEKS SPM', 55, 148);
+    doc.fillColor(spmColor).fontSize(10).font('Helvetica-Bold')
+       .text(spmLabel, 200, 130);
 
-    const indHtml = indResult.rows.map((ind, i) => {
+    // Info grid kanan
+    const infoX = 350;
+    doc.fillColor(GRAY).fontSize(8).font('Helvetica')
+       .text('Operator:', infoX, 112).text('Status:', infoX, 128)
+       .text('Kapus:', infoX, 144).text('Admin:', infoX, 160);
+    doc.fillColor(DARK).fontSize(8).font('Helvetica-Bold')
+       .text(h.created_by || '-', infoX + 55, 112)
+       .text(h.status_global || '-', infoX + 55, 128)
+       .text(h.kapus_approved_by || 'Belum', infoX + 55, 144)
+       .text(h.admin_approved_by || 'Belum', infoX + 55, 160);
+
+    // ===== TABEL INDIKATOR =====
+    doc.moveDown(0.5);
+    let y = 190;
+
+    // Header tabel
+    doc.rect(40, y, 515, 20).fill(PRIMARY);
+    doc.fillColor('white').fontSize(8).font('Helvetica-Bold');
+    doc.text('No', 44, y + 6, { width: 20, align: 'center' });
+    doc.text('Nama Indikator', 66, y + 6, { width: 200 });
+    doc.text('Target', 268, y + 6, { width: 45, align: 'center' });
+    doc.text('Capaian', 315, y + 6, { width: 45, align: 'center' });
+    doc.text('Rasio%', 362, y + 6, { width: 50, align: 'center' });
+    doc.text('Bobot', 414, y + 6, { width: 40, align: 'center' });
+    doc.text('Nilai', 456, y + 6, { width: 50, align: 'center' });
+    doc.text('Bukti', 508, y + 6, { width: 45, align: 'center' });
+    y += 20;
+
+    let totalBobot = 0, totalNilai = 0;
+    indResult.rows.forEach((ind, i) => {
       const rasio = parseFloat(ind.realisasi_rasio) || 0;
       const nilai = parseFloat(ind.nilai_terbobot) || 0;
-      const barW = Math.round(rasio * 100);
-      const barColor = rasio >= 1 ? '#0d9488' : rasio >= 0.75 ? '#f59e0b' : '#ef4444';
-      return `<tr style="background:${i%2===0?'#f8fafc':'white'}">
-        <td style="padding:8px 10px;font-weight:700;color:#475569;font-family:monospace;width:32px">${ind.no_indikator}</td>
-        <td style="padding:8px 10px;font-size:11.5px;max-width:240px">${ind.nama_indikator}</td>
-        <td style="padding:8px 10px;text-align:center">${parseFloat(ind.target)||0}</td>
-        <td style="padding:8px 10px;text-align:center">${parseFloat(ind.capaian)||0}</td>
-        <td style="padding:8px 10px;text-align:center">
-          <div style="display:flex;align-items:center;gap:6px">
-            <div style="flex:1;height:6px;background:#e2e8f0;border-radius:3px">
-              <div style="width:${barW}%;height:100%;background:${barColor};border-radius:3px"></div>
-            </div>
-            <span style="font-size:11px;font-weight:700;color:${barColor};min-width:36px">${(rasio*100).toFixed(1)}%</span>
-          </div>
-        </td>
-        <td style="padding:8px 10px;text-align:center">${ind.bobot}</td>
-        <td style="padding:8px 10px;text-align:center;font-weight:700;color:#0d9488">${nilai.toFixed(2)}</td>
-        <td style="padding:8px 10px;text-align:center">${ind.link_file ? `<a href="${ind.link_file}" style="color:#0d9488;font-size:11px">Lihat</a>` : '-'}</td>
-      </tr>`;
-    }).join('');
+      const bobot = parseInt(ind.bobot) || 0;
+      totalBobot += bobot;
+      totalNilai += nilai;
 
-    const vpHtml = vpResult.rows.map(v => `
-      <div style="padding:8px 12px;background:${v.status==='Selesai'?'#e6fffa':'#f8fafc'};border-radius:6px;border:1px solid ${v.status==='Selesai'?'#99f6e4':'#e2e8f0'}">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <span style="font-size:12px;font-weight:700;color:${v.status==='Selesai'?'#0d9488':'#64748b'}">${v.nama_program||v.email_program}</span>
-          <span style="font-size:10px;padding:2px 8px;border-radius:10px;background:${v.status==='Selesai'?'#0d9488':'#94a3b8'};color:white">${v.status}</span>
-        </div>
-        <div style="font-size:10.5px;color:#94a3b8;margin-top:2px">Indikator: ${v.indikator_akses||'Semua'}</div>
-      </div>`).join('');
+      const rowH = 22;
+      const bg = i % 2 === 0 ? '#f8fafc' : '#ffffff';
+      doc.rect(40, y, 515, rowH).fill(bg);
 
-    const html = `<!DOCTYPE html>
-<html lang="id">
-<head>
-<meta charset="UTF-8">
-<title>Laporan SPM - ${idUsulan}</title>
-<style>
-  * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family: 'Segoe UI', Arial, sans-serif; color: #1e293b; background: white; font-size: 13px; }
-  @page { margin: 20mm 15mm; }
-  @media print {
-    .no-print { display: none !important; }
-    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  }
-  .print-btn {
-    position: fixed; top: 20px; right: 20px; padding: 10px 20px;
-    background: #0d9488; color: white; border: none; border-radius: 8px;
-    cursor: pointer; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px;
-  }
-</style>
-</head>
-<body>
-<button class="print-btn no-print" onclick="window.print()">🖨️ Cetak / Download PDF</button>
+      const rColor = rasio >= 1 ? '#0d9488' : rasio >= 0.75 ? '#f59e0b' : '#ef4444';
+      doc.fillColor(DARK).fontSize(7.5).font('Helvetica');
+      doc.text(String(ind.no_indikator), 44, y + 7, { width: 20, align: 'center' });
+      doc.text((ind.nama_indikator || '').substring(0, 52), 66, y + 7, { width: 198 });
+      doc.text(String(parseFloat(ind.target)||0), 268, y + 7, { width: 45, align: 'center' });
+      doc.text(String(parseFloat(ind.capaian)||0), 315, y + 7, { width: 45, align: 'center' });
+      doc.fillColor(rColor).font('Helvetica-Bold')
+         .text((rasio * 100).toFixed(1) + '%', 362, y + 7, { width: 50, align: 'center' });
+      doc.fillColor(DARK).font('Helvetica')
+         .text(String(bobot), 414, y + 7, { width: 40, align: 'center' });
+      doc.fillColor(PRIMARY).font('Helvetica-Bold')
+         .text(nilai.toFixed(2), 456, y + 7, { width: 50, align: 'center' });
+      doc.fillColor(ind.link_file ? PRIMARY : '#94a3b8').font('Helvetica')
+         .text(ind.link_file ? '✓' : '-', 508, y + 7, { width: 45, align: 'center' });
 
-<!-- HEADER -->
-<div style="background:linear-gradient(135deg,#0f172a,#0d9488,#06b6d4);padding:28px 32px;color:white;border-radius:0 0 16px 16px;margin-bottom:24px">
-  <div style="display:flex;justify-content:space-between;align-items:flex-start">
-    <div>
-      <div style="font-size:11px;opacity:0.75;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Laporan Verifikasi</div>
-      <h1 style="font-size:22px;font-weight:800;margin-bottom:4px">Indeks SPM Puskesmas</h1>
-      <div style="font-size:14px;opacity:0.9">${h.nama_puskesmas} — ${bulan} ${h.tahun}</div>
-    </div>
-    <div style="text-align:right">
-      <div style="font-size:11px;opacity:0.7;margin-bottom:4px">ID Usulan</div>
-      <div style="font-family:monospace;font-size:13px;font-weight:700;background:rgba(255,255,255,0.15);padding:4px 12px;border-radius:6px">${idUsulan}</div>
-      <div style="font-size:11px;opacity:0.7;margin-top:8px">Dicetak: ${now}</div>
-    </div>
-  </div>
-</div>
+      // Border baris
+      doc.rect(40, y, 515, rowH).stroke('#e2e8f0');
+      y += rowH;
+    });
 
-<!-- SPM SCORE -->
-<div style="margin:0 32px 24px;text-align:center">
-  <div style="display:inline-block;background:white;border:3px solid ${spmColor};border-radius:20px;padding:20px 48px;box-shadow:0 4px 20px rgba(0,0,0,0.08)">
-    <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Indeks SPM</div>
-    <div style="font-size:48px;font-weight:800;color:${spmColor};font-family:monospace;line-height:1">${indeksSPM.toFixed(4)}</div>
-    <div style="margin-top:8px;padding:4px 16px;background:${spmColor};color:white;border-radius:20px;font-size:11px;font-weight:700">${spmLabel}</div>
-    <div style="margin-top:12px;display:flex;gap:24px;font-size:12px;color:#64748b">
-      <div><span style="color:#94a3b8">Indeks Kinerja:</span> <strong>${indeksKinerja.toFixed(4)}</strong></div>
-      <div><span style="color:#94a3b8">Indeks Beban:</span> <strong>${indeksBeban.toFixed(2)}</strong></div>
-    </div>
-  </div>
-</div>
+    // Footer tabel
+    doc.rect(40, y, 515, 20).fill(DARK);
+    doc.fillColor('white').fontSize(8).font('Helvetica-Bold');
+    doc.text('TOTAL', 44, y + 6, { width: 316 });
+    doc.text(String(totalBobot), 414, y + 6, { width: 40, align: 'center' });
+    doc.fillColor('#5eead4').text(totalNilai.toFixed(2), 456, y + 6, { width: 50, align: 'center' });
+    y += 26;
 
-<!-- INFO GRID -->
-<div style="margin:0 32px 24px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
-  <div style="background:#f8fafc;border-radius:10px;padding:14px">
-    <div style="font-size:11px;color:#94a3b8;margin-bottom:4px">Puskesmas</div>
-    <div style="font-weight:700">${h.nama_puskesmas}</div>
-    <div style="font-size:12px;color:#64748b">${h.kode_pkm}</div>
-  </div>
-  <div style="background:#f8fafc;border-radius:10px;padding:14px">
-    <div style="font-size:11px;color:#94a3b8;margin-bottom:4px">Periode</div>
-    <div style="font-weight:700">${bulan} ${h.tahun}</div>
-    <div style="font-size:12px;color:#64748b">Input: ${h.created_by||'-'}</div>
-  </div>
-  <div style="background:#e6fffa;border-radius:10px;padding:14px;border:1px solid #99f6e4">
-    <div style="font-size:11px;color:#0d9488;margin-bottom:4px">Final Disetujui</div>
-    <div style="font-weight:700;color:#0d9488">${h.admin_approved_by||h.final_approved_by||'-'}</div>
-    <div style="font-size:12px;color:#0d9488">${h.admin_approved_at ? new Date(h.admin_approved_at).toLocaleDateString('id-ID') : '-'}</div>
-  </div>
-</div>
+    // ===== VERIFIKASI PROGRAM =====
+    if (vpResult.rows.length > 0) {
+      if (y > 680) { doc.addPage(); y = 40; }
+      doc.fillColor(DARK).fontSize(10).font('Helvetica-Bold').text('Verifikasi Pengelola Program', 40, y);
+      y += 14;
+      vpResult.rows.forEach(vp => {
+        if (y > 750) { doc.addPage(); y = 40; }
+        const vpColor = vp.status === 'Selesai' ? '#0d9488' : vp.status === 'Ditolak' ? '#ef4444' : '#94a3b8';
+        doc.rect(40, y, 515, 18).fill(vp.status === 'Selesai' ? '#e6fffa' : '#f8fafc').stroke('#e2e8f0');
+        doc.fillColor(vpColor).fontSize(7.5).font('Helvetica-Bold')
+           .text(`[${vp.status}]`, 44, y + 5, { width: 55 });
+        doc.fillColor(DARK).font('Helvetica')
+           .text(vp.nama_program || vp.email_program, 102, y + 5, { width: 250 });
+        doc.fillColor(GRAY)
+           .text(`Ind: ${vp.indikator_akses || 'Semua'}`, 355, y + 5, { width: 150 });
+        y += 18;
+      });
+      y += 6;
+    }
 
-<!-- INDIKATOR TABLE -->
-<div style="margin:0 32px 24px">
-  <div style="font-size:13px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:6px">
-    <span style="color:#0d9488">◆</span> Detail 12 Indikator SPM
-  </div>
-  <table style="width:100%;border-collapse:collapse;font-size:12px;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.08)">
-    <thead>
-      <tr style="background:linear-gradient(135deg,#0d9488,#06b6d4);color:white">
-        <th style="padding:10px;text-align:center">No</th>
-        <th style="padding:10px;text-align:left">Nama Indikator</th>
-        <th style="padding:10px;text-align:center">Target</th>
-        <th style="padding:10px;text-align:center">Capaian</th>
-        <th style="padding:10px;text-align:center;min-width:120px">Capaian</th>
-        <th style="padding:10px;text-align:center">Bobot</th>
-        <th style="padding:10px;text-align:center">Nilai</th>
-        <th style="padding:10px;text-align:center">Bukti</th>
-      </tr>
-    </thead>
-    <tbody>${indHtml}</tbody>
-    <tfoot>
-      <tr style="background:#0f172a;color:white;font-weight:700">
-        <td colspan="5" style="padding:10px 10px 10px 12px">TOTAL</td>
-        <td style="padding:10px;text-align:center">${indResult.rows.reduce((s,r)=>s+(parseInt(r.bobot)||0),0)}</td>
-        <td style="padding:10px;text-align:center;color:#5eead4">${indResult.rows.reduce((s,r)=>s+(parseFloat(r.nilai_terbobot)||0),0).toFixed(2)}</td>
-        <td></td>
-      </tr>
-    </tfoot>
-  </table>
-</div>
+    // ===== FOOTER =====
+    if (y > 760) { doc.addPage(); y = 40; }
+    doc.rect(40, y, 515, 1).fill('#e2e8f0');
+    y += 6;
+    doc.fillColor(GRAY).fontSize(8).font('Helvetica')
+       .text('SPM Puskesmas — Sistem Penilaian Mutu', 40, y)
+       .text(`${idUsulan} | ${now}`, 40, y, { align: 'right', width: 515 });
 
-<!-- VERIFIKASI PROGRAM -->
-${vpResult.rows.length ? `<div style="margin:0 32px 24px">
-  <div style="font-size:13px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:6px">
-    <span style="color:#0d9488">◆</span> Verifikasi Pengelola Program
-  </div>
-  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px">${vpHtml}</div>
-</div>` : ''}
+    doc.end();
 
-<!-- APPROVAL CHAIN -->
-<div style="margin:0 32px 24px">
-  <div style="font-size:13px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:6px">
-    <span style="color:#0d9488">◆</span> Rantai Persetujuan
-  </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
-    <div style="background:#f8fafc;border-radius:10px;padding:14px;border-left:3px solid ${h.kapus_approved_by?'#0d9488':'#e2e8f0'}">
-      <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;font-weight:700;margin-bottom:6px">Kepala Puskesmas</div>
-      <div style="font-weight:700;color:${h.kapus_approved_by?'#0d9488':'#94a3b8'}">${h.kapus_approved_by||'Belum disetujui'}</div>
-      ${h.kapus_approved_at?`<div style="font-size:11px;color:#64748b;margin-top:4px">${new Date(h.kapus_approved_at).toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'})}</div>`:''}
-      ${h.kapus_catatan?`<div style="font-size:11px;font-style:italic;color:#64748b;margin-top:4px">"${h.kapus_catatan}"</div>`:''}
-    </div>
-    <div style="background:#f8fafc;border-radius:10px;padding:14px;border-left:3px solid ${vpResult.rows.every(v=>v.status==='Selesai')&&vpResult.rows.length?'#0d9488':'#e2e8f0'}">
-      <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;font-weight:700;margin-bottom:6px">Pengelola Program</div>
-      <div style="font-weight:700;color:${vpResult.rows.every(v=>v.status==='Selesai')&&vpResult.rows.length?'#0d9488':'#94a3b8'}">${vpResult.rows.length?vpResult.rows.filter(v=>v.status==='Selesai').length+'/'+vpResult.rows.length+' Selesai':'Belum'}</div>
-    </div>
-    <div style="background:${h.admin_approved_by?'#e6fffa':'#f8fafc'};border-radius:10px;padding:14px;border-left:3px solid ${h.admin_approved_by?'#0d9488':'#e2e8f0'}">
-      <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;font-weight:700;margin-bottom:6px">Admin</div>
-      <div style="font-weight:700;color:${h.admin_approved_by?'#0d9488':'#94a3b8'}">${h.admin_approved_by||'Belum disetujui'}</div>
-      ${h.admin_approved_at?`<div style="font-size:11px;color:#64748b;margin-top:4px">${new Date(h.admin_approved_at).toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'})}</div>`:''}
-    </div>
-  </div>
-</div>
-
-<!-- FOOTER -->
-<div style="margin:24px 32px 0;padding-top:16px;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;font-size:11px;color:#94a3b8">
-  <span>SPM Puskesmas — Sistem Penilaian Mutu</span>
-  <span>Dicetak: ${now} | ${idUsulan}</span>
-</div>
-
-</body>
-</html>`;
+    // Tunggu PDF selesai di-generate
+    const pdfBuffer = await new Promise((resolve, reject) => {
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+    });
 
     return {
       statusCode: 200,
       headers: {
-        'Content-Type': 'text/html; charset=utf-8',
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="Laporan_SPM_${idUsulan}.pdf"`,
         'Access-Control-Allow-Origin': '*',
-        'Content-Disposition': `inline; filename="SPM-${idUsulan}.html"`
+        'Content-Length': String(pdfBuffer.length)
       },
-      body: html
+      body: pdfBuffer.toString('base64'),
+      isBase64Encoded: true
     };
+
   } catch (e) {
     console.error('Laporan PDF error:', e);
     return { statusCode: 500, headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ error: e.message }) };

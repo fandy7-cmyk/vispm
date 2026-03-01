@@ -1200,7 +1200,7 @@ async function viewDetail(idUsulan) {
       </div>
       ${detail.driveFolderUrl ? `<div style="margin-bottom:12px"><a href="${detail.driveFolderUrl}" target="_blank" class="btn btn-secondary btn-sm"><span class="material-icons" style="font-size:14px">folder_open</span> Lihat Folder Bukti Google Drive</a></div>` : ''}
       <div style="font-weight:700;font-size:13.5px;margin-bottom:8px">Detail Indikator</div>
-      <div class="table-container" style="max-height:280px;overflow-y:auto">
+      <div class="table-container">
         <table>
           <thead><tr><th>No</th><th>Indikator</th><th>Target</th><th>Capaian</th><th>Rasio</th><th>Bobot</th><th>Nilai</th><th>Bukti</th></tr></thead>
           <tbody>${inds.map(i => `<tr>

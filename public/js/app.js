@@ -5,47 +5,7 @@ let pageData = {}; // cache per page
 let verifCurrentUsulan = null; // for verifikasi modal
 
 // ===== GOOGLE DRIVE CONFIG =====
-window.ACCESS_TOKEN = localStorage.getItem("gdrive_token");
-
-// Auto-refresh token Google OAuth sebelum expired
-async function getValidToken() {
-  const expiry = parseInt(localStorage.getItem('gdrive_token_expiry') || '0');
-  const now = Date.now();
-
-  // Kalau token masih valid (lebih dari 2 menit tersisa), pakai langsung
-  if (window.ACCESS_TOKEN && expiry && now < expiry - 120000) {
-    return window.ACCESS_TOKEN;
-  }
-
-  // Coba refresh pakai refresh_token
-  const refreshToken = localStorage.getItem('gdrive_refresh_token');
-  if (!refreshToken) {
-    // Tidak ada refresh token — minta login ulang ke Google
-    toast('Sesi Google Drive habis. Mengarahkan ke login...', 'warning');
-    setTimeout(() => { window.location.href = '/.netlify/functions/google-login'; }, 1500);
-    return null;
-  }
-
-  try {
-    const res = await fetch('/.netlify/functions/google-refresh', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken })
-    });
-    const data = await res.json();
-    if (!data.access_token) throw new Error(data.error || 'Refresh gagal');
-
-    // Simpan token baru
-    window.ACCESS_TOKEN = data.access_token;
-    localStorage.setItem('gdrive_token', data.access_token);
-    localStorage.setItem('gdrive_token_expiry', String(Date.now() + (data.expires_in - 60) * 1000));
-    return window.ACCESS_TOKEN;
-  } catch(e) {
-    toast('Gagal refresh token Google. Silakan login ulang.', 'error');
-    setTimeout(() => { window.location.href = '/.netlify/functions/google-login'; }, 2000);
-    return null;
-  }
-}
+// Google Drive: menggunakan Service Account (backend)
 window.GDRIVE_FOLDER_ID = "1WYRRcm5oxbCaPx8s9XNUkTUe1b85wuDG";
 
 // ============== AUTH ==============
@@ -834,15 +794,10 @@ async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, tahun
       const bulanAngka = bulanNamaMap[namaBulan] || String(bulan).padStart(2,'0');
       const folderPath = [kodePKM, String(tahun), `${bulanAngka}-${namaBulan}`, 'Indikator', String(noIndikator)];
 
-      // Pastikan token masih valid (auto-refresh kalau perlu)
-      const accessToken = await getValidToken();
-      if (!accessToken) return; // redirect ke login sudah dilakukan di getValidToken
-
       const res = await fetch("/.netlify/functions/drive-upload", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          accessToken,
           fileName: file.name,
           fileBase64: base64,
           folderId: window.GDRIVE_FOLDER_ID,
@@ -950,11 +905,10 @@ async function hapusBukti(idUsulan, noIndikator, fileIndex) {
         // Hard delete dari Google Drive kalau ada fileId
         if (fileToDelete?.id) {
           try {
-            const delToken = await getValidToken();
-            if (delToken) await fetch('/.netlify/functions/drive-delete', {
+            await fetch('/.netlify/functions/drive-delete', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ accessToken: delToken, fileId: fileToDelete.id })
+              body: JSON.stringify({ fileId: fileToDelete.id })
             });
           } catch(e) { console.warn('Drive delete warning:', e); }
         }

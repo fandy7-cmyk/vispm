@@ -789,16 +789,10 @@ async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, tahun
         reader.readAsDataURL(file);
       });
 
-      // Cari atau buat subfolder per indikator
-      // Format: "Indikator {no}" di dalam folder utama
-      const targetFolderId = await getOrCreateIndikatorFolder(
-        window.ACCESS_TOKEN,
-        window.GDRIVE_FOLDER_ID,
-        noIndikator,
-        kodePKM,
-        tahun,
-        namaBulan
-      );
+      // Kirim folderPath ke backend — backend yang buat subfolder
+      const bulanNamaMap = {'Januari':'01','Februari':'02','Maret':'03','April':'04','Mei':'05','Juni':'06','Juli':'07','Agustus':'08','September':'09','Oktober':'10','November':'11','Desember':'12'};
+      const bulanAngka = bulanNamaMap[namaBulan] || String(bulan).padStart(2,'0');
+      const folderPath = [kodePKM, String(tahun), `${bulanAngka}-${namaBulan}`, 'Indikator', String(noIndikator)];
 
       const res = await fetch("/.netlify/functions/drive-upload", {
         method: "POST",
@@ -807,7 +801,8 @@ async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, tahun
           accessToken: window.ACCESS_TOKEN,
           fileName: file.name,
           fileBase64: base64,
-          folderId: targetFolderId
+          folderId: window.GDRIVE_FOLDER_ID,
+          folderPath
         })
       });
 
@@ -883,63 +878,7 @@ async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, tahun
     statusDiv.remove();
   }
 }
-// Cari atau buat subfolder untuk indikator tertentu di Google Drive
-async function getOrCreateIndikatorFolder(accessToken, rootFolderId, noIndikator, kodePKM, tahun, namaBulan) {
-  try {
-    // Level 1: folder PKM (misal: PKM11)
-    const pkmId = await findOrCreateFolder(accessToken, kodePKM, rootFolderId);
-
-    // Level 2: folder tahun (misal: 2026)
-    const tahunId = await findOrCreateFolder(accessToken, String(tahun), pkmId);
-
-    // Level 3: folder bulan (misal: 05-Mei)
-    const bulanNum = String(noIndikator); // ambil dari parameter bulan
-    // Kita perlu bulan dari luar — pakai namaBulan yang sudah dikirim
-    // Format bulan: "05-Mei" — ambil nomor bulan dari nama
-    const bulanNamaMap = {'Januari':'01','Februari':'02','Maret':'03','April':'04','Mei':'05','Juni':'06','Juli':'07','Agustus':'08','September':'09','Oktober':'10','November':'11','Desember':'12'};
-    const bulanAngka = bulanNamaMap[namaBulan] || '00';
-    const bulanFolderName = `${bulanAngka}-${namaBulan}`;
-    const bulanId = await findOrCreateFolder(accessToken, bulanFolderName, tahunId);
-
-    // Level 4: folder Indikator (misal: Indikator)
-    const indParentId = await findOrCreateFolder(accessToken, 'Indikator', bulanId);
-
-    // Level 5: nomor indikator (misal: 1, 2, 3...)
-    const indId = await findOrCreateFolder(accessToken, String(noIndikator), indParentId);
-
-    return indId;
-  } catch (e) {
-    console.warn('Gagal buat subfolder, upload ke root folder:', e);
-    return rootFolderId; // fallback ke root kalau gagal
-  }
-}
-
-// Helper: cari folder by name di parent, kalau tidak ada buat baru
-async function findOrCreateFolder(accessToken, folderName, parentId) {
-  // Cari dulu
-  const searchRes = await fetch(
-    `https://www.googleapis.com/drive/v3/files?q=name='${encodeURIComponent(folderName)}' and mimeType='application/vnd.google-apps.folder' and '${parentId}' in parents and trashed=false&fields=files(id,name)`,
-    { headers: { Authorization: `Bearer ${accessToken}` } }
-  );
-  const searchData = await searchRes.json();
-  if (searchData.files && searchData.files.length > 0) {
-    return searchData.files[0].id; // folder sudah ada
-  }
-
-  // Buat baru
-  const createRes = await fetch('https://www.googleapis.com/drive/v3/files', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      name: folderName,
-      mimeType: 'application/vnd.google-apps.folder',
-      parents: [parentId]
-    })
-  });
-  const folder = await createRes.json();
-  if (!folder.id) throw new Error('Gagal membuat folder: ' + folderName);
-  return folder.id;
-}
+// Folder management dipindah ke backend (drive-upload.js)
 
 // Hapus satu file data dukung berdasarkan index
 async function hapusBukti(idUsulan, noIndikator, fileIndex) {

@@ -12,7 +12,7 @@ async function doLogin() {
   const btn = document.getElementById('authBtn');
   const status = document.getElementById('authStatus');
   btn.disabled = true;
-  btn.innerHTML = '<span class="material-icons" style="animation:spin 0.8s linear infinite">refresh</span> Loading...';
+  btn.innerHTML = '<span class="material-icons" style="animation:spin 0.8s linear infinite">refresh</span> Memeriksa...';
   setAuthStatus('Memeriksa akses...', '');
 
   try {
@@ -386,13 +386,29 @@ function renderUsulanTable(rows, role) {
     // Tombol verifikasi hanya muncul kalau status SESUAI tahapan role
     const canVerif =
       (role === 'kapus'   && u.statusGlobal === 'Menunggu Kapus') ||
-      (role === 'program' && u.statusGlobal === 'Menunggu Program') ||
+      (role === 'program' && (u.statusGlobal === 'Menunggu Program' || u.statusGlobal === 'Ditolak')) ||
       (role === 'admin'   && u.statusGlobal === 'Menunggu Admin');
-    const verifBtn = canVerif
-      ? `<button class="btn-icon approve" onclick="openVerifikasi('${u.idUsulan}')" title="Verifikasi Sekarang" style="animation:pulse 1.5s infinite"><span class="material-icons">rate_review</span></button>`
-      : `<button class="btn-icon" title="Menunggu tahap sebelumnya" style="opacity:0.35;cursor:not-allowed" disabled><span class="material-icons">lock</span></button>`;
+
+    // Untuk Pengelola Program: cek apakah user ini sudah approve (sudahVerif flag dari server)
+    const sudahVerif = role === 'program' && u.sudahVerif === true;
+
+    let verifBtn;
+    if (sudahVerif) {
+      // Sudah approve — tampilkan tombol hijau terkunci
+      verifBtn = `<button class="btn-icon" title="Anda sudah memverifikasi" style="background:#d1fae5;color:#065f46;cursor:default;border:1.5px solid #0d9488" disabled><span class="material-icons">check_circle</span></button>`;
+    } else if (canVerif) {
+      verifBtn = `<button class="btn-icon approve" onclick="openVerifikasi('${u.idUsulan}')" title="Verifikasi Sekarang" style="animation:pulse 1.5s infinite"><span class="material-icons">rate_review</span></button>`;
+    } else {
+      verifBtn = `<button class="btn-icon" title="Menunggu tahap sebelumnya" style="opacity:0.35;cursor:not-allowed" disabled><span class="material-icons">lock</span></button>`;
+    }
+
+    // Tombol download PDF — hanya kalau status Selesai
+    const pdfBtn = u.statusGlobal === 'Selesai'
+      ? `<button class="btn-icon" onclick="downloadLaporanPDF('${u.idUsulan}')" title="Download Laporan PDF" style="background:#e0f2fe;color:#0369a1;border:1.5px solid #0369a1"><span class="material-icons">picture_as_pdf</span></button>`
+      : '';
+
     if (['kapus', 'program', 'admin'].includes(role)) {
-      return viewBtn + verifBtn;
+      return viewBtn + verifBtn + pdfBtn;
     }
     return viewBtn;
   };
@@ -514,6 +530,7 @@ async function loadMyUsulan() {
             ${u.statusGlobal === 'Draft' ? `<button class="btn-icon edit" onclick="openIndikatorModal('${u.idUsulan}')"><span class="material-icons">edit</span></button>` : ''}
             ${u.statusGlobal === 'Draft' ? `<button class="btn-icon del" onclick="deleteUsulan('${u.idUsulan}')"><span class="material-icons">delete</span></button>` : ''}
             ${u.statusGlobal === 'Ditolak' ? `<button class="btn btn-warning btn-sm" onclick="openIndikatorModal('${u.idUsulan}')" style="background:#f59e0b;color:white;border-color:#f59e0b"><span class="material-icons" style="font-size:14px">restart_alt</span> Perbaiki & Ajukan Ulang</button>` : ''}
+            ${u.statusGlobal === 'Selesai' ? `<button class="btn-icon" onclick="downloadLaporanPDF('${u.idUsulan}')" title="Download Laporan PDF" style="background:#e0f2fe;color:#0369a1;border:1.5px solid #0369a1"><span class="material-icons">picture_as_pdf</span></button>` : ''}
           </td>
         </tr>`).join('')}
         </tbody>
@@ -1071,6 +1088,7 @@ async function loadVerifData(status) {
     // kalau 'semua' → tidak set params.status → tampilkan semua
   } else if (role === 'Pengelola Program') {
     params.status = 'Menunggu Program';
+    params.email_program = currentUser.email; // untuk cek sudahVerif per user
   } else if (role === 'Admin' && status !== 'semua') {
     params.status = status;
   }
@@ -1432,7 +1450,7 @@ async function tambahJabatanBaru() {
       body: JSON.stringify({ nama: newJab })
     });
     const data = await res.json();
-    if (!data.success) throw new Error(data.message || 'Gagal');
+    if (!data.success) { toast(data.message || 'Gagal menambah jabatan', 'error'); return; }
     toast(`Jabatan "${newJab}" ditambahkan`, 'success');
     document.getElementById('uJabatanBaru').value = '';
     const cur = getSelectedJabatan();
@@ -1484,12 +1502,26 @@ function parseIndikatorAksesString(str) {
 
 function openUserModal(editEmail = null) {
   document.getElementById('userModalTitle').textContent = editEmail ? 'Edit User' : 'Tambah User';
+  // Reset SEMUA field form terlebih dahulu
   document.getElementById('uEmail').value = '';
   document.getElementById('uEmail').readOnly = !!editEmail;
   document.getElementById('uNama').value = '';
   document.getElementById('uRole').value = 'Operator';
   document.getElementById('uPKM').value = '';
   document.getElementById('uAktif').value = 'true';
+  // Reset NIP
+  const nipResetEl = document.getElementById('uNIP');
+  if (nipResetEl) nipResetEl.value = '';
+  // Reset jabatan checkboxes — hapus semua centang
+  const jabatanBox = document.getElementById('jabatanCheckboxList');
+  if (jabatanBox) {
+    jabatanBox.querySelectorAll('input[type=checkbox]').forEach(cb => cb.checked = false);
+  }
+  // Reset indikator checkboxes
+  const indBox = document.getElementById('indCheckboxList');
+  if (indBox) {
+    indBox.querySelectorAll('input[type=checkbox]').forEach(cb => cb.checked = false);
+  }
   checkUserRole();
 
   if (editEmail) {
@@ -1669,7 +1701,10 @@ async function saveJabatan() {
       body: JSON.stringify({ nama, aktif, id: _editJabatanId })
     });
     const data = await res.json();
-    if (!data.success) return toast(data.message || 'Gagal menyimpan', 'error');
+    if (!data.success) {
+      toast(data.message || 'Gagal menyimpan jabatan', 'error');
+      return;
+    }
     toast(`Jabatan "${nama}" berhasil ${_editJabatanId ? 'diperbarui' : 'ditambahkan'}`, 'success');
     closeModal('jabatanModal');
     await loadJabatanTable();

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>VISPM | Verifikasi Indeks SPM</title>
+<title>Verifikasi Indeks SPM</title>
 <link rel="icon" type="image/png" href="/favicon.png">
 <link rel="apple-touch-icon" href="/favicon.png">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
@@ -274,6 +274,11 @@ textarea.form-control { resize: vertical; }
 .modal-card { background: white; border-radius: var(--radius-xl); width: 500px; max-width: 100%; box-shadow: var(--shadow-lg); margin: auto; animation: modalIn 0.2s ease; }
 .modal-card.lg { width: 760px; }
 .modal-card.xl { width: 900px; }
+/* Fullscreen modal — mengisi area konten (kanan sidebar, bawah topbar) */
+.modal.fullscreen { padding: 0; align-items: stretch; justify-content: flex-end; background: rgba(0,0,0,0.3); }
+.modal.fullscreen .modal-card { width: calc(100% - 260px); max-width: none; height: 100vh; border-radius: 0; margin: 0; display: flex; flex-direction: column; }
+.modal.fullscreen .modal-body { flex: 1; overflow-y: auto; }
+@media (max-width: 768px) { .modal.fullscreen .modal-card { width: 100%; } }
 .modal-header { padding: 20px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
 .modal-header h3 { font-size: 16px; font-weight: 700; flex: 1; }
 .modal-header .material-icons { color: var(--primary); }
@@ -469,8 +474,8 @@ textarea.form-control { resize: vertical; }
 <div class="loader" id="globalLoader"><div class="loader-spinner"></div></div>
 
 <!-- INPUT USULAN MODAL -->
-<div class="modal" id="indikatorModal">
-  <div class="modal-card xl">
+<div class="modal fullscreen" id="indikatorModal">
+  <div class="modal-card">
     <div class="modal-header">
       <span class="material-icons">edit_note</span>
       <h3>Input Data Indikator - <span id="indModalId"></span></h3>
@@ -517,8 +522,8 @@ textarea.form-control { resize: vertical; }
 </div>
 
 <!-- DETAIL USULAN MODAL -->
-<div class="modal" id="detailModal">
-  <div class="modal-card lg">
+<div class="modal fullscreen" id="detailModal">
+  <div class="modal-card">
     <div class="modal-header">
       <span class="material-icons">assignment</span>
       <h3>Detail Usulan - <span id="detailModalId"></span></h3>

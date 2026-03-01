@@ -431,8 +431,8 @@ function renderUsulanTable(rows, role) {
       (role === 'admin'   && u.statusGlobal === 'Menunggu Admin');
 
     // Sudah verifikasi: untuk Kepala Puskesmas cek statusKapus, untuk Program cek myVerifStatus, untuk Admin cek Selesai
-    const sudahVerifKepala = role === 'kepala-puskesmas' && u.statusKapus === 'Selesai';
-    const sudahVerifProgram = role === 'program' && u.sudahVerif === true && u.myVerifStatus === 'Selesai';
+    const sudahVerifKepala = role === 'kepala-puskesmas' && (u.statusKapus === 'Selesai' || u.statusKapus === 'Ditolak');
+    const sudahVerifProgram = role === 'program' && u.sudahVerif === true && (u.myVerifStatus === 'Selesai' || u.myVerifStatus === 'Ditolak');
     const sudahVerifAdmin = role === 'admin' && u.statusGlobal === 'Selesai';
     const sudahVerif = sudahVerifKepala || sudahVerifProgram || sudahVerifAdmin;
 
@@ -1391,19 +1391,58 @@ async function openVerifikasi(idUsulan) {
       displayInds = inds.filter(i => currentUser.indikatorAkses.includes(parseInt(i.no)));
     }
 
-    document.getElementById('verifIndikatorBody').innerHTML = displayInds.map(i => `<tr>
-      <td>${i.no}</td><td style="font-size:13px">${i.nama}</td>
-      <td>${i.target}</td><td>${i.capaian}</td>
-      
-    </tr>`).join('');
+    document.getElementById('verifIndikatorBody').innerHTML = displayInds.map(i => {
+      let buktiHtml = '-';
+      if (i.linkFile) {
+        try {
+          const links = JSON.parse(i.linkFile);
+          if (Array.isArray(links)) {
+            buktiHtml = links.map((f,idx) => `<a href="${f.url||f}" target="_blank" style="display:inline-flex;align-items:center;gap:3px;color:var(--primary);font-size:12px;margin-right:4px"><span class="material-icons" style="font-size:13px">attach_file</span>Bukti ${idx+1}</a>`).join('');
+          } else {
+            buktiHtml = `<a href="${i.linkFile}" target="_blank" style="display:inline-flex;align-items:center;gap:3px;color:var(--primary);font-size:12px"><span class="material-icons" style="font-size:13px">attach_file</span>Lihat</a>`;
+          }
+        } catch {
+          buktiHtml = `<a href="${i.linkFile}" target="_blank" style="display:inline-flex;align-items:center;gap:3px;color:var(--primary);font-size:12px"><span class="material-icons" style="font-size:13px">attach_file</span>Lihat</a>`;
+        }
+      }
+      return `<tr>
+        <td>${i.no}</td><td style="font-size:13px">${i.nama}</td>
+        <td>${i.target}</td><td>${i.capaian}</td>
+        <td>${buktiHtml}</td>
+      </tr>`;
+    }).join('');
 
-    // Adjust buttons based on status
-    const canApprove = (currentUser.role === 'Kepala Puskesmas' && detail.statusGlobal === 'Menunggu Kepala Puskesmas') ||
-      (currentUser.role === 'Pengelola Program' && detail.statusGlobal === 'Menunggu Pengelola Program') ||
-      (currentUser.role === 'Admin' && detail.statusGlobal === 'Menunggu Admin');
+    // Cek apakah user ini sudah verifikasi (approve ATAU tolak = sudah selesai verifikasi)
+    let sudahVerifUser = false;
+    if (currentUser.role === 'Kepala Puskesmas') {
+      sudahVerifUser = detail.statusKapus === 'Selesai' || detail.statusKapus === 'Ditolak';
+    } else if (currentUser.role === 'Pengelola Program') {
+      const myRecord = (detail.verifikasiProgram || []).find(v => v.email_program?.toLowerCase() === currentUser.email?.toLowerCase());
+      sudahVerifUser = myRecord && (myRecord.status === 'Selesai' || myRecord.status === 'Ditolak');
+    } else if (currentUser.role === 'Admin') {
+      sudahVerifUser = detail.statusGlobal === 'Selesai';
+    }
 
-    document.getElementById('btnApprove').disabled = !canApprove;
-    document.getElementById('btnReject').disabled = !canApprove;
+    // Adjust buttons based on status & sudah verifikasi
+    const canApprove = !sudahVerifUser && (
+      (currentUser.role === 'Kepala Puskesmas' && detail.statusGlobal === 'Menunggu Kepala Puskesmas') ||
+      (currentUser.role === 'Pengelola Program' && (detail.statusGlobal === 'Menunggu Pengelola Program' || detail.statusGlobal === 'Ditolak')) ||
+      (currentUser.role === 'Admin' && detail.statusGlobal === 'Menunggu Admin')
+    );
+
+    const btnApprove = document.getElementById('btnApprove');
+    const btnReject = document.getElementById('btnReject');
+
+    if (sudahVerifUser) {
+      // User sudah verifikasi — tombol hijau
+      btnApprove.style.background = '#16a34a';
+      btnApprove.innerHTML = '<span class="material-icons">check_circle</span> Sudah Diverifikasi';
+      btnApprove.disabled = true;
+      btnReject.disabled = true;
+    } else {
+      btnApprove.disabled = !canApprove;
+      btnReject.disabled = !canApprove;
+    }
   } catch (e) { toast(e.message, 'error'); }
 }
 
@@ -1450,9 +1489,23 @@ async function doReject() {
   setLoading(true);
   try {
     await API.rejectUsulan({ idUsulan: verifCurrentUsulan, email: currentUser.email, role: currentUser.role, alasan: catatan });
-    toast('Usulan ditolak');
-    closeModal('verifikasiModal');
-    renderVerifikasi();
+    toast('Usulan ditolak', 'warning');
+
+    // Tombol jadi hijau (sudah diverifikasi = tolak) dan disabled
+    const btnApprove = document.getElementById('btnApprove');
+    const btnReject = document.getElementById('btnReject');
+    if (btnApprove) { btnApprove.disabled = true; }
+    if (btnReject) {
+      btnReject.style.background = '#16a34a';
+      btnReject.style.borderColor = '#16a34a';
+      btnReject.innerHTML = '<span class="material-icons">check_circle</span> Sudah Diverifikasi';
+      btnReject.disabled = true;
+    }
+
+    setTimeout(() => {
+      closeModal('verifikasiModal');
+      renderVerifikasi();
+    }, 800);
   } catch (e) { toast(e.message, 'error'); }
   finally { setLoading(false); }
 }

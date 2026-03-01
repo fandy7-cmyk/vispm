@@ -47,17 +47,16 @@ async function getUsulanList(pool, params) {
   if (params.status && params.status !== 'semua') { where.push(`uh.status_global=$${idx++}`); qParams.push(params.status); }
   if (params.awaiting_admin === 'true') where.push(`uh.status_global='Menunggu Admin'`);
 
-  // Filter khusus Pengelola Program: tampilkan semua usulan yang masih perlu diverifikasi
-  // Artinya: status_global IN ('Menunggu Pengelola Program','Ditolak') DAN user ini belum Selesai
+  // Filter khusus Pengelola Program: tampilkan semua usulan yang ditugaskan ke user ini
+  // termasuk yang sudah Selesai (untuk tampilkan tombol hijau)
   if (params.status_program && params.email_program) {
     const statuses = params.status_program.split(',').map(s => `'${s.trim()}'`).join(',');
     where.push(`uh.status_global IN (${statuses})`);
-    // Hanya tampilkan kalau user ini punya record di verifikasi_program dan belum Selesai
+    // Tampilkan semua yang punya record di verifikasi_program (sudah/belum verifikasi)
     where.push(`EXISTS (
       SELECT 1 FROM verifikasi_program vp
       WHERE vp.id_usulan = uh.id_usulan
       AND LOWER(vp.email_program) = LOWER($${idx++})
-      AND vp.status != 'Selesai'
     )`);
     qParams.push(params.email_program);
   }

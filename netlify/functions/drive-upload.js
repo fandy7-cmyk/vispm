@@ -14,7 +14,8 @@ exports.handler = async (event) => {
       };
     }
 
-    const fileBytes = Buffer.from(fileBase64, "base64");
+    const base64Data = fileBase64.split(",")[1];
+    const fileBytes = Buffer.from(base64Data, "base64");
 
     const metadata = {
       name: fileName,

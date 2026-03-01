@@ -1464,7 +1464,12 @@ function showChangePassword() {
   document.getElementById('cpNew').value = '';
   document.getElementById('cpConfirm').value = '';
   document.getElementById('cpStatus').textContent = '';
-  openModal('changePasswordModal');
+  const modal = document.getElementById('changePasswordModal');
+  modal.style.display = 'flex';
+}
+
+function closeChangePasswordModal() {
+  document.getElementById('changePasswordModal').style.display = 'none';
 }
 
 async function doChangePassword() {
@@ -1480,7 +1485,7 @@ async function doChangePassword() {
   try {
     await API.post('auth', { action: 'change-password', email: currentUser.email, oldPassword: oldPw, newPassword: newPw });
     toast('Password berhasil diubah!', 'success');
-    closeModal('changePasswordModal');
+    closeChangePasswordModal();
   } catch(e) {
     statusEl.textContent = e.message;
   } finally { setLoading(false); }

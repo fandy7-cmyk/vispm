@@ -6,8 +6,6 @@
     "dev": "netlify dev"
   },
   "dependencies": {
-    "pg": "^8.11.3",
-    "googleapis": "^140.0.0",
-    "google-auth-library": "^9.0.0"
+    "pg": "^8.11.3"
   }
 }

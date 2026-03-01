@@ -710,16 +710,31 @@ async function openIndikatorModal(idUsulan) {
             style="width:72px;border:1.5px solid var(--border);border-radius:6px;padding:3px 6px;font-size:13px"
             onchange="saveIndikator(${ind.no})" oninput="previewSPM(${ind.no})">`}</td>
         <td style="min-width:100px;text-align:center">
-          ${isLocked
-            ? (hasBukti ? `<a href="${ind.linkFile}" target="_blank" style="color:#0d9488;display:inline-flex;align-items:center;gap:2px;font-size:12px"><span class="material-icons" style="font-size:14px">open_in_new</span>Lihat</a>` : '<span style="color:#94a3b8;font-size:12px">-</span>')
-            : `<div id="uploadCell-${ind.no}" style="display:flex;flex-direction:column;align-items:center;gap:3px">
-                ${hasBukti ? `<a href="${ind.linkFile}" target="_blank" style="font-size:10.5px;color:#0d9488;display:flex;align-items:center;gap:1px"><span class="material-icons" style="font-size:11px">open_in_new</span>Lihat</a>` : ''}
+          ${(() => {
+            // Parse link_file: bisa string URL tunggal atau JSON array
+            let links = [];
+            if (ind.linkFile) {
+              try { links = JSON.parse(ind.linkFile); if (!Array.isArray(links)) links = [ind.linkFile]; }
+              catch { links = [ind.linkFile]; }
+            }
+            const fileLinksHtml = links.map((url, i) =>
+              `<a href="${url}" target="_blank" style="font-size:10.5px;color:#0d9488;display:flex;align-items:center;gap:1px">
+                <span class="material-icons" style="font-size:11px">open_in_new</span>File ${i+1}
+              </a>`
+            ).join('');
+            if (isLocked) {
+              return links.length
+                ? `<div style="display:flex;flex-direction:column;align-items:center;gap:2px">${fileLinksHtml}</div>`
+                : '<span style="color:#94a3b8;font-size:12px">-</span>';
+            }
+            return `<div id="uploadCell-${ind.no}" style="display:flex;flex-direction:column;align-items:center;gap:3px">
+                ${fileLinksHtml}
                 <label id="uploadLabel-${ind.no}" style="${uploadBtnStyle}">
-                  <span class="material-icons" style="font-size:13px">${hasBukti ? 'cloud_done' : 'upload_file'}</span>${hasBukti ? 'Ganti' : 'Upload'}
+                  <span class="material-icons" style="font-size:13px">${links.length ? 'cloud_done' : 'upload_file'}</span>${links.length ? 'Ganti' : 'Upload'}
                   <input type="file" multiple style="display:none" onchange="uploadBuktiIndikator(event,${ind.no},'${idUsulan}','${detail.kodePKM}',${detail.tahun},${detail.bulan},'${namaBulan}')">
                 </label>
-              </div>`
-          }
+              </div>`;
+          })()}
         </td>
       </tr>`;
     }).join('');
@@ -785,18 +800,32 @@ async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, tahun
   }
 
   if (uploadedLinks.length > 0) {
-    const linkToSave = uploadedLinks[0]; // sudah berisi fileUrl yang benar
+    // Ambil links yang sudah ada sebelumnya, lalu append
+    const existingDetail = await API.getIndikatorUsulan(idUsulan);
+    const existingInd = (existingDetail || []).find(i => i.no === noIndikator || i.noIndikator === noIndikator);
+    let existingLinks = [];
+    if (existingInd?.linkFile) {
+      try { existingLinks = JSON.parse(existingInd.linkFile); if (!Array.isArray(existingLinks)) existingLinks = [existingInd.linkFile]; }
+      catch { existingLinks = [existingInd.linkFile]; }
+    }
+    const allLinks = [...existingLinks, ...uploadedLinks];
+    const linkToSave = JSON.stringify(allLinks);
+
     const tVal = parseFloat(document.getElementById(`t-${noIndikator}`)?.value) || 0;
     const cVal = parseFloat(document.getElementById(`c-${noIndikator}`)?.value) || 0;
     await API.updateIndikatorUsulan({ idUsulan, noIndikator, target: tVal, capaian: cVal, linkFile: linkToSave });
 
     statusDiv.remove();
 
-    // Update link tampilan
-    const existingLink = cell.querySelector('a');
-    const newLinkHtml = `<a href="${linkToSave}" target="_blank" style="font-size:10.5px;color:#0d9488;display:flex;align-items:center;gap:1px"><span class="material-icons" style="font-size:11px">open_in_new</span>${uploadedLinks.length} file</a>`;
-    if (existingLink) existingLink.outerHTML = newLinkHtml;
-    else cell.insertAdjacentHTML('afterbegin', newLinkHtml);
+    // Update tampilan — tampilkan semua link
+    const allLinksHtml = allLinks.map((url, i) =>
+      `<a href="${url}" target="_blank" style="font-size:10.5px;color:#0d9488;display:flex;align-items:center;gap:1px">
+        <span class="material-icons" style="font-size:11px">open_in_new</span>File ${i+1}
+      </a>`
+    ).join('');
+    // Hapus link lama, insert semua link baru
+    cell.querySelectorAll('a').forEach(a => a.remove());
+    cell.insertAdjacentHTML('afterbegin', allLinksHtml);
 
     // Ubah tombol upload → hijau
     const label = document.getElementById(`uploadLabel-${noIndikator}`);

@@ -92,8 +92,8 @@ function renderStatusBar(u) {
   const vp = u.vpProgress;
   const steps = [
     { label: 'Input', icon: 'edit_note', done: true, active: u.statusGlobal === 'Draft', rejected: false },
-    { label: 'Kapus', icon: 'person', done: u.statusKapus === 'Selesai', active: u.statusGlobal === 'Menunggu Kapus', rejected: u.statusKapus === 'Ditolak' },
-    { label: 'Program', icon: 'groups', done: u.statusProgram === 'Selesai', active: u.statusGlobal === 'Menunggu Program', rejected: u.statusProgram === 'Ditolak',
+    { label: 'Kepala Puskesmas', icon: 'person', done: u.statusKapus === 'Selesai', active: u.statusGlobal === 'Menunggu Kepala Puskesmas', rejected: u.statusKapus === 'Ditolak' },
+    { label: 'Pengelola Program', icon: 'groups', done: u.statusProgram === 'Selesai', active: u.statusGlobal === 'Menunggu Pengelola Program', rejected: u.statusProgram === 'Ditolak',
       partial: vp && vp.selesai > 0 && vp.selesai < vp.total, vpText: vp ? vp.selesai + '/' + vp.total : '' },
     { label: 'Admin', icon: 'admin_panel_settings', done: u.statusGlobal === 'Selesai', active: u.statusGlobal === 'Menunggu Admin', rejected: false },
   ];
@@ -137,8 +137,8 @@ function formatDateTime(d) {
 function statusBadge(status) {
   const map = {
     'Draft': 'badge-default',
-    'Menunggu Kapus': 'badge-warning',
-    'Menunggu Program': 'badge-info',
+    'Menunggu Kepala Puskesmas': 'badge-warning',
+    'Menunggu Pengelola Program': 'badge-info',
     'Menunggu Admin': 'badge-primary',
     'Selesai': 'badge-success',
     'Ditolak': 'badge-danger',

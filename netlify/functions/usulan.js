@@ -383,7 +383,7 @@ async function submitUsulan(pool, body) {
   );
   return ok({ message: isResubmit
     ? `Usulan berhasil diajukan ulang! Diteruskan ke ${targetStatus}.`
-    : 'Usulan berhasil disubmit ke Kapus'
+    : 'Usulan berhasil disubmit ke Kepala Puskesmas'
   });
 }
 

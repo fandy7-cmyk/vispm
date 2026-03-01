@@ -89,22 +89,27 @@ exports.handler = async (event) => {
     // ==============================
     // SUCCESS
     // ==============================
+    const fileUrl = `https://drive.google.com/file/d/${result.id}/view`;
     return {
       statusCode: 200,
+      headers: { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' },
       body: JSON.stringify({
         success: true,
+        data: {
+          fileId: result.id,
+          name: result.name,
+          fileUrl: fileUrl
+        },
         fileId: result.id,
-        name: result.name
+        fileUrl: fileUrl
       })
     };
   } catch (err) {
     console.error("UPLOAD ERROR:", err);
-
     return {
       statusCode: 500,
-      body: JSON.stringify({
-        error: err.message
-      })
+      headers: { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ success: false, error: err.message })
     };
   }
 };

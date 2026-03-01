@@ -723,29 +723,37 @@ async function openIndikatorModal(idUsulan) {
               </a>`
             ).join('');
             if (isLocked) {
-              return links.length
-                ? `<div style="display:flex;flex-direction:column;align-items:center;gap:2px">${fileLinksHtml}</div>`
-                : '<span style="color:#94a3b8;font-size:12px">-</span>';
+              if (!links.length) return '<span style="color:#94a3b8;font-size:12px">-</span>';
+              const normL = links.map(f => typeof f === 'string' ? { id: null, url: f } : f);
+              const lockedHtml = normL.map((f, i) =>
+                `<span onclick="previewBukti('${f.url}','${f.id||''}')" title="Preview"
+                  style="font-size:10.5px;color:#0d9488;display:flex;align-items:center;gap:1px;cursor:pointer;text-decoration:underline">
+                  <span class="material-icons" style="font-size:11px">visibility</span>File ${i+1}
+                </span>`
+              ).join('');
+              return `<div style="display:flex;flex-direction:column;align-items:center;gap:2px">${lockedHtml}</div>`;
             }
-            // File links dengan tombol hapus per file
-            const fileLinksWithDelete = links.map((url, i) =>
+            // Normalisasi links ke format {id, url}
+            const normLinks = links.map(f => typeof f === 'string' ? { id: null, url: f, name: 'File' } : f);
+            const fileLinksWithDelete = normLinks.map((f, i) =>
               `<div style="display:flex;align-items:center;gap:4px">
-                <a href="${url}" target="_blank" style="font-size:10.5px;color:#0d9488;display:flex;align-items:center;gap:1px">
-                  <span class="material-icons" style="font-size:11px">open_in_new</span>File ${i+1}
-                </a>
+                <span onclick="previewBukti('${f.url}','${f.id||''}')" title="Preview file"
+                  style="font-size:10.5px;color:#0d9488;display:flex;align-items:center;gap:1px;cursor:pointer;text-decoration:underline">
+                  <span class="material-icons" style="font-size:11px">visibility</span>File ${i+1}
+                </span>
                 <button onclick="hapusBukti('${idUsulan}',${ind.no},${i})" title="Hapus file ini"
                   style="background:none;border:none;cursor:pointer;padding:0;display:flex;align-items:center;color:#ef4444;line-height:1">
                   <span class="material-icons" style="font-size:13px">delete</span>
                 </button>
               </div>`
             ).join('');
-            const btnStyle = links.length
+            const btnStyle = normLinks.length
               ? 'display:inline-flex;align-items:center;gap:3px;padding:4px 9px;background:#0d9488;color:white;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:600;border:1.5px solid #0d9488;white-space:nowrap'
               : 'display:inline-flex;align-items:center;gap:3px;padding:4px 9px;background:#ef4444;color:white;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:600;border:1.5px solid #ef4444;white-space:nowrap';
             return `<div id="uploadCell-${ind.no}" style="display:flex;flex-direction:column;align-items:center;gap:3px">
                 ${fileLinksWithDelete}
                 <label id="uploadLabel-${ind.no}" style="${btnStyle}">
-                  <span class="material-icons" style="font-size:13px">${links.length ? 'cloud_done' : 'upload_file'}</span>${links.length ? 'Ganti' : 'Upload'}
+                  <span class="material-icons" style="font-size:13px">${normLinks.length ? 'cloud_done' : 'upload_file'}</span>${normLinks.length ? 'Ganti' : 'Upload'}
                   <input type="file" multiple style="display:none" onchange="uploadBuktiIndikator(event,${ind.no},'${idUsulan}','${detail.kodePKM}',${detail.tahun},${detail.bulan},'${namaBulan}')">
                 </label>
               </div>`;
@@ -807,8 +815,9 @@ async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, tahun
       // ok() wraps data in {success:true, data:{...}}
       if (!res.ok || !result.success) throw new Error(result.data?.error || result.message || result.error || 'Upload gagal');
       const fileUrl = result.data?.fileUrl || result.fileUrl;
+      const fileId = result.data?.fileId || result.fileId;
       if (!fileUrl) throw new Error('URL file tidak ditemukan dalam response');
-      uploadedLinks.push(fileUrl);
+      uploadedLinks.push({ id: fileId, url: fileUrl, name: file.name });
     } catch (e) {
       toast(`Gagal upload ${file.name}: ${e.message}`, 'error');
     }
@@ -820,8 +829,15 @@ async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, tahun
     const existingInd = (existingDetail || []).find(i => i.no === noIndikator || i.noIndikator === noIndikator);
     let existingLinks = [];
     if (existingInd?.linkFile) {
-      try { existingLinks = JSON.parse(existingInd.linkFile); if (!Array.isArray(existingLinks)) existingLinks = [existingInd.linkFile]; }
-      catch { existingLinks = [existingInd.linkFile]; }
+      try {
+        const parsed = JSON.parse(existingInd.linkFile);
+        if (Array.isArray(parsed)) {
+          // Normalisasi: bisa [{id,url}] atau [string]
+          existingLinks = parsed.map(f => typeof f === 'string' ? { id: null, url: f, name: 'File' } : f);
+        } else {
+          existingLinks = [{ id: null, url: existingInd.linkFile, name: 'File' }];
+        }
+      } catch { existingLinks = [{ id: null, url: existingInd.linkFile, name: 'File' }]; }
     }
     const allLinks = [...existingLinks, ...uploadedLinks];
     const linkToSave = JSON.stringify(allLinks);
@@ -832,14 +848,19 @@ async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, tahun
 
     statusDiv.remove();
 
-    // Update tampilan — tampilkan semua link
-    const allLinksHtml = allLinks.map((url, i) =>
-      `<a href="${url}" target="_blank" style="font-size:10.5px;color:#0d9488;display:flex;align-items:center;gap:1px">
-        <span class="material-icons" style="font-size:11px">open_in_new</span>File ${i+1}
-      </a>`
+    // Update tampilan — tampilkan semua link dengan delete btn
+    const allLinksHtml = allLinks.map((f, i) =>
+      `<div style="display:flex;align-items:center;gap:4px">
+        <span onclick="previewBukti('${f.url||f}','${f.id||''}')" title="Preview file" style="font-size:10.5px;color:#0d9488;display:flex;align-items:center;gap:1px;cursor:pointer">
+          <span class="material-icons" style="font-size:11px">visibility</span>File ${i+1}
+        </span>
+        <button onclick="hapusBukti('${idUsulan}',${noIndikator},${i})" title="Hapus file ini"
+          style="background:none;border:none;cursor:pointer;padding:0;display:flex;align-items:center;color:#ef4444;line-height:1">
+          <span class="material-icons" style="font-size:13px">delete</span>
+        </button>
+      </div>`
     ).join('');
-    // Hapus link lama, insert semua link baru
-    cell.querySelectorAll('a').forEach(a => a.remove());
+    cell.querySelectorAll('div[style*="gap:4px"]').forEach(el => el.remove());
     cell.insertAdjacentHTML('afterbegin', allLinksHtml);
 
     // Ubah tombol upload → hijau
@@ -847,7 +868,7 @@ async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, tahun
     if (label) {
       label.style.cssText = 'display:inline-flex;align-items:center;gap:3px;padding:4px 9px;background:#0d9488;color:white;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:600;border:1.5px solid #0d9488;white-space:nowrap';
       label.querySelector('.material-icons').textContent = 'cloud_done';
-      label.childNodes[1] && (label.childNodes[1].textContent = 'Ganti');
+      if (label.childNodes[1]) label.childNodes[1].textContent = 'Ganti';
     }
 
     // Refresh SPM
@@ -924,7 +945,7 @@ async function findOrCreateFolder(accessToken, folderName, parentId) {
 async function hapusBukti(idUsulan, noIndikator, fileIndex) {
   showConfirm({
     title: 'Hapus Data Dukung',
-    message: `Hapus <strong>File ${fileIndex + 1}</strong> dari indikator ${noIndikator}?`,
+    message: `Hapus <strong>File ${fileIndex + 1}</strong> dari indikator ${noIndikator}?<br><small style="color:#94a3b8">File juga akan dihapus dari Google Drive.</small>`,
     type: 'danger',
     onConfirm: async () => {
       try {
@@ -933,45 +954,59 @@ async function hapusBukti(idUsulan, noIndikator, fileIndex) {
         const existingInd = (existingDetail || []).find(i => i.no === noIndikator || i.noIndikator === noIndikator);
         let links = [];
         if (existingInd?.linkFile) {
-          try { links = JSON.parse(existingInd.linkFile); if (!Array.isArray(links)) links = [existingInd.linkFile]; }
-          catch { links = [existingInd.linkFile]; }
+          try {
+            const parsed = JSON.parse(existingInd.linkFile);
+            links = Array.isArray(parsed)
+              ? parsed.map(f => typeof f === 'string' ? { id: null, url: f, name: 'File' } : f)
+              : [{ id: null, url: existingInd.linkFile, name: 'File' }];
+          } catch { links = [{ id: null, url: existingInd.linkFile, name: 'File' }]; }
         }
-        // Hapus index
+
+        const fileToDelete = links[fileIndex];
+
+        // Hard delete dari Google Drive kalau ada fileId
+        if (fileToDelete?.id && window.ACCESS_TOKEN) {
+          try {
+            await fetch('/.netlify/functions/drive-delete', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ accessToken: window.ACCESS_TOKEN, fileId: fileToDelete.id })
+            });
+          } catch(e) { console.warn('Drive delete warning:', e); }
+        }
+
+        // Hapus dari array dan simpan ke DB
         links.splice(fileIndex, 1);
         const newLinkFile = links.length ? JSON.stringify(links) : '';
         const tVal = parseFloat(document.getElementById(`t-${noIndikator}`)?.value) || 0;
         const cVal = parseFloat(document.getElementById(`c-${noIndikator}`)?.value) || 0;
         await API.updateIndikatorUsulan({ idUsulan, noIndikator, target: tVal, capaian: cVal, linkFile: newLinkFile });
 
-        toast('File berhasil dihapus', 'success');
+        toast('File berhasil dihapus dari sistem dan Google Drive', 'success');
 
-        // Refresh cell
+        // Refresh cell UI
         const cell = document.getElementById(`uploadCell-${noIndikator}`);
         if (cell) {
-          const fileLinksWithDelete = links.map((url, i) =>
+          const newHtml = links.map((f, i) =>
             `<div style="display:flex;align-items:center;gap:4px">
-              <a href="${url}" target="_blank" style="font-size:10.5px;color:#0d9488;display:flex;align-items:center;gap:1px">
-                <span class="material-icons" style="font-size:11px">open_in_new</span>File ${i+1}
-              </a>
+              <span onclick="previewBukti('${f.url}','${f.id||''}')" title="Preview file"
+                style="font-size:10.5px;color:#0d9488;display:flex;align-items:center;gap:1px;cursor:pointer;text-decoration:underline">
+                <span class="material-icons" style="font-size:11px">visibility</span>File ${i+1}
+              </span>
               <button onclick="hapusBukti('${idUsulan}',${noIndikator},${i})" title="Hapus file ini"
                 style="background:none;border:none;cursor:pointer;padding:0;display:flex;align-items:center;color:#ef4444;line-height:1">
                 <span class="material-icons" style="font-size:13px">delete</span>
               </button>
             </div>`
           ).join('');
-          const label = document.getElementById(`uploadLabel-${noIndikator}`);
-          // Hapus semua link lama
-          cell.querySelectorAll('a, button:not(label button)').forEach(el => el.closest('div[style*="flex;align-items:center;gap:4px"]')?.remove());
           cell.querySelectorAll('div[style*="gap:4px"]').forEach(el => el.remove());
-          cell.insertAdjacentHTML('afterbegin', fileLinksWithDelete);
-          // Update tombol style
-          if (label) {
-            if (links.length === 0) {
-              label.style.background = '#ef4444';
-              label.style.borderColor = '#ef4444';
-              label.querySelector('.material-icons').textContent = 'upload_file';
-              if (label.childNodes[1]) label.childNodes[1].textContent = 'Upload';
-            }
+          cell.insertAdjacentHTML('afterbegin', newHtml);
+          const label = document.getElementById(`uploadLabel-${noIndikator}`);
+          if (label && links.length === 0) {
+            label.style.background = '#ef4444';
+            label.style.borderColor = '#ef4444';
+            label.querySelector('.material-icons').textContent = 'upload_file';
+            if (label.childNodes[1]) label.childNodes[1].textContent = 'Upload';
           }
         }
       } catch(e) {
@@ -979,6 +1014,53 @@ async function hapusBukti(idUsulan, noIndikator, fileIndex) {
       }
     }
   });
+}
+
+// Preview file di dalam modal (iframe Google Drive embed)
+function previewBukti(fileUrl, fileId) {
+  // Extract file ID dari URL kalau tidak dikirim langsung
+  if (!fileId && fileUrl) {
+    const match = fileUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    if (match) fileId = match[1];
+  }
+  const embedUrl = fileId
+    ? `https://drive.google.com/file/d/${fileId}/preview`
+    : fileUrl;
+
+  // Buat/update preview modal
+  let modal = document.getElementById('previewBuktiModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'previewBuktiModal';
+    modal.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:3000;justify-content:center;align-items:center;padding:24px';
+    modal.innerHTML = `
+      <div style="background:white;border-radius:12px;width:90%;max-width:900px;height:85vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.4)">
+        <div style="padding:14px 18px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="material-icons" style="color:#0d9488">description</span>
+            <span style="font-weight:700;font-size:14px">Preview Data Dukung</span>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <a id="previewOpenLink" href="${fileUrl}" target="_blank"
+              style="font-size:12px;color:#0d9488;display:flex;align-items:center;gap:3px;text-decoration:none">
+              <span class="material-icons" style="font-size:14px">open_in_new</span>Buka di Drive
+            </a>
+            <button onclick="document.getElementById('previewBuktiModal').style.display='none'"
+              style="background:none;border:none;cursor:pointer;padding:4px;border-radius:6px;display:flex;align-items:center;color:#64748b">
+              <span class="material-icons">close</span>
+            </button>
+          </div>
+        </div>
+        <iframe id="previewBuktiFrame" src="" style="flex:1;border:none;width:100%" allow="autoplay"></iframe>
+      </div>`;
+    document.body.appendChild(modal);
+    // Tutup kalau klik backdrop
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = 'none'; });
+  }
+
+  document.getElementById('previewBuktiFrame').src = embedUrl;
+  document.getElementById('previewOpenLink').href = fileUrl;
+  modal.style.display = 'flex';
 }
 
 async function saveIndikator(noIndikator) {

@@ -1716,22 +1716,14 @@ function renderUsersTable(users) {
 }
 
 function resetUserPassword(email, nama) {
-  showConfirm({
-    title: 'Reset Password',
-    message: `Reset password untuk ${nama} (${email})? Masukkan password baru:`,
-    type: 'warning',
-    inputField: true,
-    inputPlaceholder: 'Password baru (min. 6 karakter)',
-    onConfirm: async (newPassword) => {
-      if (!newPassword || newPassword.length < 6) { toast('Password minimal 6 karakter', 'error'); return; }
-      setLoading(true);
-      try {
-        await API.post('auth', { action: 'reset-password', targetEmail: email, newPassword });
-        toast(`Password ${nama} berhasil direset!`, 'success');
-      } catch(e) { toast(e.message, 'error'); }
-      finally { setLoading(false); }
-    }
-  });
+  const newPassword = prompt(`Reset password untuk ${nama}\n(${email})\n\nMasukkan password baru (min. 6 karakter):`);
+  if (newPassword === null) return; // user cancel
+  if (!newPassword || newPassword.length < 6) { toast('Password minimal 6 karakter', 'error'); return; }
+  setLoading(true);
+  API.post('auth', { action: 'reset-password', targetEmail: email, newPassword })
+    .then(() => toast(`Password ${nama} berhasil direset!`, 'success'))
+    .catch(e => toast(e.message, 'error'))
+    .finally(() => setLoading(false));
 }
 
 function validateEmailInput(input) {

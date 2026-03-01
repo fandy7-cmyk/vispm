@@ -58,7 +58,11 @@ async function uploadFile(token, fileName, mimeType, base64Data, folderId) {
   const fileBytes = Buffer.from(base64Data, 'base64');
   const fileMime  = mimeType || 'application/octet-stream';
   const boundary  = 'SPMboundary1234567890';
-  const metaJson  = JSON.stringify({ name: fileName, parents: [folderId] });
+  const metaJson = JSON.stringify({
+  name: fileName,
+  parents: [folderId],
+  writersCanShare: true
+});
 
   const body = Buffer.concat([
     Buffer.from(`--${boundary}\r\n`),
@@ -72,7 +76,7 @@ async function uploadFile(token, fileName, mimeType, base64Data, folderId) {
 
   // supportsAllDrives=true wajib agar bisa upload ke folder milik akun lain
   const uploadRes = await fetch(
-    'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name&supportsAllDrives=true',
+    'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name&supportsAllDrives=true&ignoreDefaultVisibility=true',
     {
       method: 'POST',
       headers: {

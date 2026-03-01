@@ -665,7 +665,7 @@ async function openIndikatorModal(idUsulan) {
       submitBtn.style.display = canSubmit ? 'flex' : 'none';
       // Ubah label tombol untuk ajukan ulang
       submitBtn.innerHTML = isDitolak
-        ? '<span class="material-icons">refresh</span> Ajukan Ulang ke Kapus'
+        ? '<span class="material-icons">refresh</span> Ajukan Ulang'
         : '<span class="material-icons">send</span> Submit ke Kapus';
     }
     // Tampilkan banner status (bukan Draft dan bukan Ditolak = read-only)

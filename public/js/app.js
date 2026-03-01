@@ -1,4 +1,19 @@
 // ============== APP STATE ==============
+
+// Format timestamp: DD MMMM YYYY, HH:mm
+function formatTS(ts) {
+  if (!ts) return '-';
+  const d = new Date(ts);
+  if (isNaN(d)) return ts;
+  const bulan = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  const tgl = String(d.getDate()).padStart(2,'0');
+  const bln = bulan[d.getMonth()];
+  const thn = d.getFullYear();
+  const jam = String(d.getHours()).padStart(2,'0');
+  const mnt = String(d.getMinutes()).padStart(2,'0');
+  return `${tgl} ${bln} ${thn}, ${jam}:${mnt}`;
+}
+
 let currentUser = null;
 let currentPage = '';
 let pageData = {}; // cache per page
@@ -8,6 +23,18 @@ let verifCurrentUsulan = null; // for verifikasi modal
 // Google Drive: menggunakan Service Account (backend)
 window.GDRIVE_FOLDER_ID = "1WYRRcm5oxbCaPx8s9XNUkTUe1b85wuDG";
 
+
+// Format date only: DD MMMM YYYY
+function formatDate(ts) {
+  if (!ts) return '-';
+  const d = new Date(ts);
+  if (isNaN(d)) return ts;
+  const bulan = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  return `${String(d.getDate()).padStart(2,'0')} ${bulan[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+// Format datetime: DD MMMM YYYY, HH:mm  
+function formatDateTime(ts) { return formatTS(ts); }
 // ============== AUTH ==============
 async function doLogin() {
   const email = document.getElementById('authEmail').value.trim();
@@ -104,7 +131,7 @@ function buildSidebar() {
         { id: 'laporan', icon: 'bar_chart', label: 'Laporan' }
       ]}
     ],
-    'Kapus': [
+    'Kepala Puskesmas': [
       { label: 'Menu', items: [
         { id: 'dashboard', icon: 'dashboard', label: 'Dashboard' },
         { id: 'verifikasi', icon: 'verified', label: 'Verifikasi' },
@@ -305,7 +332,7 @@ function renderKapusDashboard(el, d) {
       <div class="card-body" style="padding:0" id="pendingTable"></div>
     </div>`;
 
-  API.getUsulan({ kode_pkm: currentUser.kodePKM, status: 'Menunggu Kapus' }).then(rows => {
+  API.getUsulan({ kode_pkm: currentUser.kodePKM, status: 'Menunggu Kepala Puskesmas' }).then(rows => {
     document.getElementById('pendingTable').innerHTML = renderUsulanTable(rows, 'kapus');
   }).catch(() => {});
 }
@@ -319,13 +346,13 @@ function renderProgramDashboard(el, d) {
     </div>
     <div class="card">
       <div class="card-header-bar">
-        <span class="card-title"><span class="material-icons">pending_actions</span>Usulan Menunggu Verifikasi Program</span>
+        <span class="card-title"><span class="material-icons">pending_actions</span>Usulan Menunggu Verifikasi Pengelola Program</span>
         <button class="btn btn-secondary btn-sm" onclick="loadPage('verifikasi')"><span class="material-icons">arrow_forward</span>Lihat Semua</button>
       </div>
       <div class="card-body" style="padding:0" id="pendingTable"></div>
     </div>`;
 
-  API.getUsulan({ status: 'Menunggu Program' }).then(rows => {
+  API.getUsulan({ status: 'Menunggu Pengelola Program' }).then(rows => {
     document.getElementById('pendingTable').innerHTML = renderUsulanTable(rows, 'program');
   }).catch(() => {});
 }
@@ -391,8 +418,8 @@ function renderUsulanTable(rows, role) {
     }
     // Tombol verifikasi hanya muncul kalau status SESUAI tahapan role
     const canVerif =
-      (role === 'kapus'   && u.statusGlobal === 'Menunggu Kapus') ||
-      (role === 'program' && (u.statusGlobal === 'Menunggu Program' || u.statusGlobal === 'Ditolak')) ||
+      (role === 'kapus'   && u.statusGlobal === 'Menunggu Kepala Puskesmas') ||
+      (role === 'program' && (u.statusGlobal === 'Menunggu Pengelola Program' || u.statusGlobal === 'Ditolak')) ||
       (role === 'admin'   && u.statusGlobal === 'Menunggu Admin');
 
     // Untuk Pengelola Program: cek apakah user ini sudah approve
@@ -666,7 +693,7 @@ async function openIndikatorModal(idUsulan) {
       // Ubah label tombol untuk ajukan ulang
       submitBtn.innerHTML = isDitolak
         ? '<span class="material-icons">refresh</span> Ajukan Ulang'
-        : '<span class="material-icons">send</span> Submit ke Kapus';
+        : '<span class="material-icons">send</span> Submit ke Kepala Puskesmas';
     }
     // Tampilkan banner status (bukan Draft dan bukan Ditolak = read-only)
     const _ln = document.getElementById('indModalLockNotif');
@@ -702,7 +729,7 @@ async function openIndikatorModal(idUsulan) {
       return `<tr id="indRow-${ind.no}">
         <td><span style="font-family:'JetBrains Mono';font-weight:700">${ind.no}</span></td>
         <td style="max-width:220px;font-size:12.5px">${ind.nama}</td>
-        <td style="text-align:center"><input type="hidden" id="bobot-${ind.no}" value="${ind.bobot}">${ind.bobot}</td>
+        <input type="hidden" id="bobot-${ind.no}" value="${ind.bobot}">
         <td>${isLocked ? `<span>${ind.target}</span>` : `<input type="number" id="t-${ind.no}" value="${ind.target}" min="0" step="0.01"
             style="width:72px;border:1.5px solid var(--border);border-radius:6px;padding:3px 6px;font-size:13px"
             onchange="saveIndikator(${ind.no})" oninput="previewSPM(${ind.no})">`}</td>
@@ -1063,7 +1090,7 @@ async function doSubmitUsulan(forceSubmit) {
       // Tanya user apakah tetap mau submit tanpa bukti
       showConfirm({
         title: 'Data Dukung Belum Lengkap',
-        message: `${raw.missingCount} indikator (no. ${nos}) belum ada file bukti. Tetap submit ke Kapus?`,
+        message: `${raw.missingCount} indikator (no. ${nos}) belum ada file bukti. Tetap submit ke Kepala Puskesmas?`,
         type: 'warning',
         onConfirm: () => doSubmitUsulan(true) // forceSubmit = true
       });
@@ -1081,7 +1108,7 @@ async function doSubmitUsulan(forceSubmit) {
     // Tampilkan notifikasi sukses di dalam modal
     const lockNotif = document.getElementById('indModalLockNotif');
     if (lockNotif) {
-      lockNotif.innerHTML = `<span class="material-icons" style="color:#0d9488;font-size:18px">check_circle</span><span style="font-weight:600;color:#0d9488">${successMsg} Status: Menunggu Verifikasi Kapus.</span>`;
+      lockNotif.innerHTML = `<span class="material-icons" style="color:#0d9488;font-size:18px">check_circle</span><span style="font-weight:600;color:#0d9488">${successMsg} Status: Menunggu Verifikasi Kepala Puskesmas.</span>`;
       lockNotif.style.cssText = 'display:flex;align-items:center;gap:8px;padding:8px 14px;background:#e6fffa;border-radius:8px;border:1.5px solid #0d9488;flex:1;font-size:13px';
     }
     // Sembunyikan tombol submit
@@ -1192,7 +1219,13 @@ async function viewDetail(idUsulan) {
         <div class="detail-item"><label>Puskesmas</label><span>${detail.namaPKM}</span></div>
         <div class="detail-item"><label>Periode</label><span>${detail.namaBulan} ${detail.tahun}</span></div>
         <div class="detail-item"><label>Status</label><span>${statusBadge(detail.statusGlobal)}</span></div>
-        <div class="detail-item"><label>Dibuat Oleh</label><span>${detail.createdBy}</span></div>
+        <div class="detail-item"><label>Dibuat Oleh</label>
+          <span>
+            <div style="font-weight:600">${detail.namaPembuat || detail.createdBy || '-'}</div>
+            <div style="font-size:12px;color:var(--text-light)">${detail.createdBy || ''}</div>
+            <div style="font-size:11px;color:var(--text-xlight)">${formatTS(detail.createdAt)}</div>
+          </span>
+        </div>
         <div class="detail-item" style="grid-column:span 2">
           <label>Indeks SPM</label>
           <span style="font-family:'JetBrains Mono';font-size:22px;color:var(--primary);font-weight:800">${parseFloat(detail.indeksSPM).toFixed(2)}</span>
@@ -1202,19 +1235,18 @@ async function viewDetail(idUsulan) {
       <div style="font-weight:700;font-size:13.5px;margin-bottom:8px">Detail Indikator</div>
       <div class="table-container">
         <table>
-          <thead><tr><th>No</th><th>Indikator</th><th>Target</th><th>Capaian</th><th>Rasio</th><th>Bobot</th><th>Nilai</th><th>Bukti</th></tr></thead>
+          <thead><tr><th>No</th><th>Indikator</th><th>Target</th><th>Capaian</th><th>Bukti</th></tr></thead>
           <tbody>${inds.map(i => `<tr>
             <td>${i.no}</td><td style="max-width:220px;font-size:12.5px">${i.nama}</td>
             <td>${i.target}</td><td>${i.capaian}</td>
-            <td class="rasio-cell">${(i.realisasiRasio*100).toFixed(2)}</td>
-            <td>${i.bobot}</td><td class="rasio-cell">${parseFloat(i.nilaiTerbobot).toFixed(2)}</td>
+            
             <td>${i.linkFile?`<a href="${i.linkFile}" target="_blank" style="color:var(--primary);display:inline-flex;align-items:center;gap:2px;font-size:12px"><span class="material-icons" style="font-size:13px">open_in_new</span>Lihat</a>`:'-'}</td>
           </tr>`).join('')}</tbody>
         </table>
       </div>
       ${vpHtml}
       <div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
-        ${approvalBox('Kapus', detail.kapusApprovedBy, detail.kapusApprovedAt, detail.statusKapus==='Ditolak' ? detail.kapusCatatan : '')}
+        ${approvalBox('Kepala Puskesmas', detail.kapusApprovedBy, detail.kapusApprovedAt, detail.statusKapus==='Ditolak' ? detail.kapusCatatan : '')}
         ${approvalBox('Program', vp.length && vp.every(v=>v.status==='Selesai') ? 'Semua selesai' : '', '', detail.statusProgram==='Ditolak' ? detail.adminCatatan : '')}
         ${approvalBox('Admin', detail.adminApprovedBy, detail.adminApprovedAt, detail.statusGlobal==='Ditolak' && detail.statusKapus!=='Ditolak' && detail.statusProgram!=='Ditolak' ? detail.adminCatatan : '')}
       </div>
@@ -1260,8 +1292,8 @@ async function downloadLaporanPDF(idUsulan) {
 async function renderVerifikasi() {
   const role = currentUser.role;
   let statusFilter = '';
-  if (role === 'Kapus') statusFilter = 'Menunggu Kapus';
-  else if (role === 'Pengelola Program') statusFilter = 'Menunggu Program';
+  if (role === 'Kapus') statusFilter = 'Menunggu Kepala Puskesmas';
+  else if (role === 'Pengelola Program') statusFilter = 'Menunggu Pengelola Program';
   else if (role === 'Admin') statusFilter = ''; // all
 
   document.getElementById('mainContent').innerHTML = `
@@ -1275,7 +1307,7 @@ async function renderVerifikasi() {
       <div class="tab" onclick="loadVerifTab('Ditolak')">Ditolak</div>
     </div>` : ''}
     ${role === 'Kapus' ? `<div class="tabs" id="verifTabs">
-      <div class="tab active" onclick="loadVerifTab('Menunggu Kapus')">Menunggu Verifikasi</div>
+      <div class="tab active" onclick="loadVerifTab('Menunggu Kepala Puskesmas')">Menunggu Verifikasi</div>
       <div class="tab" onclick="loadVerifTab('semua')">Semua Usulan PKM Ini</div>
     </div>` : ''}
     <div class="card">
@@ -1304,8 +1336,8 @@ async function loadVerifData(status) {
     // kalau 'semua' → tidak set params.status → tampilkan semua
   } else if (role === 'Pengelola Program') {
     // Tampilkan usulan yang masih perlu diverifikasi oleh user ini:
-    // status 'Menunggu Program' atau 'Ditolak' (penolak perlu review ulang setelah operator revisi)
-    params.status_program = 'Menunggu Program,Ditolak';
+    // status 'Menunggu Pengelola Program' atau 'Ditolak' (penolak perlu review ulang setelah operator revisi)
+    params.status_program = 'Menunggu Pengelola Program,Ditolak';
     params.email_program = currentUser.email; // untuk cek sudahVerif & filter per user
   } else if (role === 'Admin' && status !== 'semua') {
     params.status = status;
@@ -1345,13 +1377,12 @@ async function openVerifikasi(idUsulan) {
     document.getElementById('verifIndikatorBody').innerHTML = displayInds.map(i => `<tr>
       <td>${i.no}</td><td style="font-size:13px">${i.nama}</td>
       <td>${i.target}</td><td>${i.capaian}</td>
-      <td class="rasio-cell">${(i.realisasiRasio * 100).toFixed(1)}%</td>
-      <td>${i.bobot}</td><td class="rasio-cell">${parseFloat(i.nilaiTerbobot).toFixed(2)}</td>
+      
     </tr>`).join('');
 
     // Adjust buttons based on status
-    const canApprove = (currentUser.role === 'Kapus' && detail.statusGlobal === 'Menunggu Kapus') ||
-      (currentUser.role === 'Pengelola Program' && detail.statusGlobal === 'Menunggu Program') ||
+    const canApprove = (currentUser.role === 'Kapus' && detail.statusGlobal === 'Menunggu Kepala Puskesmas') ||
+      (currentUser.role === 'Pengelola Program' && detail.statusGlobal === 'Menunggu Pengelola Program') ||
       (currentUser.role === 'Admin' && detail.statusGlobal === 'Menunggu Admin');
 
     document.getElementById('btnApprove').disabled = !canApprove;
@@ -1415,8 +1446,8 @@ async function renderLaporan() {
           <select class="form-control" id="lapStatus" onchange="loadLaporan()">
             <option value="semua">Semua Status</option>
             <option value="Selesai">Selesai</option>
-            <option value="Menunggu Kapus">Menunggu Kapus</option>
-            <option value="Menunggu Program">Menunggu Program</option>
+            <option value="Menunggu Kepala Puskesmas">Menunggu Kepala Puskesmas</option>
+            <option value="Menunggu Pengelola Program">Menunggu Pengelola Program</option>
             <option value="Menunggu Admin">Menunggu Admin</option>
             <option value="Ditolak">Ditolak</option>
           </select>
@@ -1518,7 +1549,7 @@ async function renderUsers() {
           <div class="search-input-wrap"><span class="material-icons search-icon">search</span><input class="search-input" id="searchUser" placeholder="Cari email atau nama..." oninput="filterUsers()"></div>
           <select class="form-control" id="filterRole" onchange="filterUsers()" style="width:160px">
             <option value="">Semua Role</option>
-            <option>Admin</option><option>Operator</option><option>Kapus</option>
+            <option>Admin</option><option>Operator</option><option>Kepala Puskesmas</option>
             <option>Pengelola Program</option><option>Kadis</option>
           </select>
         </div>
@@ -1540,7 +1571,7 @@ async function renderUsers() {
           <div class="form-group"><label>NIP</label><input class="form-control" id="uNIP" placeholder="Nomor Induk Pegawai (opsional)" maxlength="30"></div>
           <div class="form-group"><label>Role *</label>
             <select class="form-control" id="uRole" onchange="checkUserRole()">
-              <option>Admin</option><option>Operator</option><option>Kapus</option>
+              <option>Admin</option><option>Operator</option><option>Kepala Puskesmas</option>
               <option>Pengelola Program</option><option>Kadis</option>
             </select></div>
           <div id="pkmContainer" style="display:none" class="form-group"><label>Puskesmas</label>
@@ -2139,7 +2170,7 @@ function renderIndTable(inds) {
   const tbEl = document.getElementById('totalBobot');
   if (tbEl) tbEl.textContent = totalBobot;
   el.innerHTML = `<div class="table-container"><table>
-    <thead><tr><th>No</th><th>Nama Indikator</th><th>Bobot</th><th>Status</th><th>Aksi</th></tr></thead>
+    <thead><tr><th>No</th><th>Nama Indikator</th><th>Status</th><th>Aksi</th></tr></thead>
     <tbody>${inds.map(i => `<tr>
       <td><span style="font-family:'JetBrains Mono';font-weight:700">${i.no}</span></td>
       <td>${i.nama}</td>
@@ -2386,7 +2417,7 @@ async function renderKelolaUsulan() {
           </select>
           <select class="form-control" id="kuStatus" onchange="loadKelolaUsulan()" style="width:160px">
             <option value="">Semua Status</option>
-            <option>Draft</option><option>Menunggu Kapus</option><option>Menunggu Program</option>
+            <option>Draft</option><option>Menunggu Kepala Puskesmas</option><option>Menunggu Pengelola Program</option>
             <option>Menunggu Admin</option><option>Selesai</option><option>Ditolak</option>
           </select>
         </div>

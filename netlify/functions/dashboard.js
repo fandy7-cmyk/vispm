@@ -14,7 +14,7 @@ exports.handler = async (event) => {
       return await adminStats(pool);
     } else if (role === 'Operator') {
       return await operatorStats(pool, email);
-    } else if (role === 'Kapus') {
+    } else if (role === 'Kapus' || role === 'Kepala Puskesmas') {
       return await kapusStats(pool, kodePKM);
     } else if (role === 'Pengelola Program') {
       return await programStats(pool);
@@ -84,7 +84,7 @@ async function operatorStats(pool, email) {
 async function kapusStats(pool, kodePKM) {
   const result = await pool.query(
     `SELECT
-      COUNT(*) FILTER(WHERE status_global='Menunggu Kapus') as menunggu,
+      COUNT(*) FILTER(WHERE status_global='Menunggu Kepala Puskesmas') as menunggu,
       COUNT(*) FILTER(WHERE status_program='Disetujui') as terverifikasi,
       COUNT(*) as total
      FROM usulan_header WHERE kode_pkm=$1`,
@@ -101,7 +101,7 @@ async function kapusStats(pool, kodePKM) {
 async function programStats(pool) {
   const result = await pool.query(
     `SELECT
-      COUNT(*) FILTER(WHERE status_global='Menunggu Program') as menunggu,
+      COUNT(*) FILTER(WHERE status_global='Menunggu Pengelola Program') as menunggu,
       COUNT(*) FILTER(WHERE status_final='Disetujui') as terverifikasi,
       COUNT(*) as total
      FROM usulan_header`

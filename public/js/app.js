@@ -404,7 +404,7 @@ function renderUsulanTable(rows, role) {
 
     // Tombol download PDF — samping viewBtn, hanya kalau Selesai
     const pdfBtn = u.statusGlobal === 'Selesai'
-      ? `<button class="btn-icon" onclick="downloadLaporanPDF('${u.idUsulan}')" title="Download Laporan PDF" style="background:#e0f2fe;color:#0369a1;border:1.5px solid #0369a1"><span class="material-icons">picture_as_pdf</span></button>`
+      ? `<button class="btn-icon" onclick="downloadLaporanPDF('${u.idUsulan}')" title="Download Laporan PDF" style="background:transparent;border:none;color:#64748b" title="Download Laporan"><span class="material-icons" style="font-size:20px">download</span></button>`
       : '';
 
     if (['kapus', 'program', 'admin'].includes(role)) {
@@ -527,7 +527,7 @@ async function loadMyUsulan() {
           </td>
           <td>
             <button class="btn-icon view" onclick="viewDetail('${u.idUsulan}')"><span class="material-icons">visibility</span></button>
-            ${u.statusGlobal === 'Selesai' ? `<button class="btn-icon" onclick="downloadLaporanPDF('${u.idUsulan}')" title="Download Laporan PDF" style="background:#e0f2fe;color:#0369a1;border:1.5px solid #0369a1"><span class="material-icons">picture_as_pdf</span></button>` : ''}
+            ${u.statusGlobal === 'Selesai' ? `<button class="btn-icon" onclick="downloadLaporanPDF('${u.idUsulan}')" title="Download Laporan PDF" style="background:transparent;border:none;color:#64748b" title="Download Laporan"><span class="material-icons" style="font-size:20px">download</span></button>` : ''}
             ${u.statusGlobal === 'Draft' ? `<button class="btn-icon edit" onclick="openIndikatorModal('${u.idUsulan}')"><span class="material-icons">edit</span></button>` : ''}
             ${u.statusGlobal === 'Draft' ? `<button class="btn-icon del" onclick="deleteUsulan('${u.idUsulan}')"><span class="material-icons">delete</span></button>` : ''}
             ${u.statusGlobal === 'Ditolak' ? `<button class="btn btn-warning btn-sm" onclick="openIndikatorModal('${u.idUsulan}')" style="background:#f59e0b;color:white;border-color:#f59e0b"><span class="material-icons" style="font-size:14px">restart_alt</span> Perbaiki & Ajukan Ulang</button>` : ''}

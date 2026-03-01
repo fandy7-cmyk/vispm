@@ -402,13 +402,13 @@ function renderUsulanTable(rows, role) {
       verifBtn = `<button class="btn-icon" title="Menunggu tahap sebelumnya" style="opacity:0.35;cursor:not-allowed" disabled><span class="material-icons">lock</span></button>`;
     }
 
-    // Tombol download PDF — hanya kalau status Selesai
+    // Tombol download PDF — samping viewBtn, hanya kalau Selesai
     const pdfBtn = u.statusGlobal === 'Selesai'
       ? `<button class="btn-icon" onclick="downloadLaporanPDF('${u.idUsulan}')" title="Download Laporan PDF" style="background:#e0f2fe;color:#0369a1;border:1.5px solid #0369a1"><span class="material-icons">picture_as_pdf</span></button>`
       : '';
 
     if (['kapus', 'program', 'admin'].includes(role)) {
-      return viewBtn + verifBtn + pdfBtn;
+      return viewBtn + pdfBtn + verifBtn;
     }
     return viewBtn;
   };
@@ -527,10 +527,10 @@ async function loadMyUsulan() {
           </td>
           <td>
             <button class="btn-icon view" onclick="viewDetail('${u.idUsulan}')"><span class="material-icons">visibility</span></button>
+            ${u.statusGlobal === 'Selesai' ? `<button class="btn-icon" onclick="downloadLaporanPDF('${u.idUsulan}')" title="Download Laporan PDF" style="background:#e0f2fe;color:#0369a1;border:1.5px solid #0369a1"><span class="material-icons">picture_as_pdf</span></button>` : ''}
             ${u.statusGlobal === 'Draft' ? `<button class="btn-icon edit" onclick="openIndikatorModal('${u.idUsulan}')"><span class="material-icons">edit</span></button>` : ''}
             ${u.statusGlobal === 'Draft' ? `<button class="btn-icon del" onclick="deleteUsulan('${u.idUsulan}')"><span class="material-icons">delete</span></button>` : ''}
             ${u.statusGlobal === 'Ditolak' ? `<button class="btn btn-warning btn-sm" onclick="openIndikatorModal('${u.idUsulan}')" style="background:#f59e0b;color:white;border-color:#f59e0b"><span class="material-icons" style="font-size:14px">restart_alt</span> Perbaiki & Ajukan Ulang</button>` : ''}
-            ${u.statusGlobal === 'Selesai' ? `<button class="btn-icon" onclick="downloadLaporanPDF('${u.idUsulan}')" title="Download Laporan PDF" style="background:#e0f2fe;color:#0369a1;border:1.5px solid #0369a1"><span class="material-icons">picture_as_pdf</span></button>` : ''}
           </td>
         </tr>`).join('')}
         </tbody>
@@ -1036,9 +1036,24 @@ function approvalBox(label, by, at, alasanTolak = '') {
 
 
 // ============== LAPORAN PDF ==============
-function downloadLaporanPDF(idUsulan) {
-  window.open(`/api/laporan-pdf?id=${idUsulan}`, '_blank');
-  toast('Membuka laporan PDF...', 'success');
+async function downloadLaporanPDF(idUsulan) {
+  toast('Menyiapkan laporan PDF...', 'success');
+  try {
+    const res = await fetch(`/api/laporan-pdf?id=${idUsulan}`);
+    if (!res.ok) { toast('Gagal mengunduh laporan', 'error'); return; }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Laporan_SPM_${idUsulan}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast('✅ Laporan PDF berhasil diunduh', 'success');
+  } catch(e) {
+    toast('Gagal mengunduh: ' + e.message, 'error');
+  }
 }
 // ============== VERIFIKASI ==============
 async function renderVerifikasi() {

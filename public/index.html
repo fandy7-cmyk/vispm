@@ -158,8 +158,9 @@ body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); colo
   width: 40px; height: 40px; border-radius: 10px;
   background: linear-gradient(135deg, #0d9488, #06b6d4);
   display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
+  flex-shrink: 0; overflow: hidden;
 }
+.sidebar-logo-icon img { width: 40px; height: 40px; object-fit: cover; border-radius: 10px; }
 .sidebar-logo-icon .material-icons { font-size: 22px; color: white; }
 .sidebar-logo-text { font-size: 15px; font-weight: 800; color: white; line-height: 1.2; }
 .sidebar-logo-sub { font-size: 11px; color: rgba(255,255,255,0.4); font-weight: 400; }
@@ -495,8 +496,10 @@ textarea.form-control { resize: vertical; }
   <div class="sidebar" id="sidebar">
     <div class="sidebar-header">
       <div class="sidebar-logo">
-        <div class="sidebar-logo-icon" style="background:transparent;padding:0;overflow:hidden">
-          <img src="/favicon.png" style="width:40px;height:40px;object-fit:contain;border-radius:8px" onerror="this.outerHTML='<span class=\"material-icons\" style=\"font-size:22px;color:white\">verified</span>'">
+        <div class="sidebar-logo-icon">
+          <img src="/favicon.png" style="width:28px;height:28px;object-fit:contain" 
+               onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+          <span class="material-icons" style="display:none">verified</span>
         </div>
         <div>
           <div class="sidebar-logo-text">VISPM</div>

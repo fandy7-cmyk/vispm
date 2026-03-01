@@ -5,6 +5,7 @@ let pageData = {}; // cache per page
 let verifCurrentUsulan = null; // for verifikasi modal
 
 // ===== GOOGLE DRIVE CONFIG =====
+window.ACCESS_TOKEN = localStorage.getItem("gdrive_token");
 window.GDRIVE_FOLDER_ID = "1WYRRcm5oxbCaPx8s9XNUkTUe1b85wuDG";
 
 // ============== AUTH ==============

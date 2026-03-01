@@ -38,6 +38,8 @@ exports.handler = async (event) => {
       body: `
         <script>
           localStorage.setItem("gdrive_token", "${data.access_token}");
+          localStorage.setItem("gdrive_token_expiry", "${Date.now() + (data.expires_in - 60) * 1000}");
+          ${data.refresh_token ? `localStorage.setItem("gdrive_refresh_token", "${data.refresh_token}");` : ''}
           window.location.href = "/";
         </script>
       `

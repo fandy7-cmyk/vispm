@@ -24,10 +24,6 @@ exports.handler = async (event) => {
     const user = result.rows[0];
 
     // Normalisasi role lama → nama baru
-    const roleMap = { 'Kapus': 'Kepala Puskesmas', 'kapus': 'Kepala Puskesmas' };
-    if (roleMap[user.role]) user.role = roleMap[user.role];
-
-    // Normalisasi role lama → nama baru
     const roleMap = {
       'Kapus': 'Kepala Puskesmas',
       'kapus': 'Kepala Puskesmas',

@@ -395,8 +395,9 @@ function renderUsulanTable(rows, role) {
       (role === 'program' && (u.statusGlobal === 'Menunggu Program' || u.statusGlobal === 'Ditolak')) ||
       (role === 'admin'   && u.statusGlobal === 'Menunggu Admin');
 
-    // Untuk Pengelola Program: cek apakah user ini sudah approve (sudahVerif flag dari server)
-    const sudahVerif = role === 'program' && u.sudahVerif === true;
+    // Untuk Pengelola Program: cek apakah user ini sudah approve
+    // sudahVerif = true hanya kalau status = 'Selesai', bukan 'Ditolak'
+    const sudahVerif = role === 'program' && u.sudahVerif === true && u.myVerifStatus === 'Selesai';
 
     let verifBtn;
     if (sudahVerif) {
@@ -750,18 +751,27 @@ async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, tahun
         reader.readAsDataURL(file);
       });
 
-const res = await fetch("/.netlify/functions/drive-upload", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json"
-  },
-  body: JSON.stringify({
-    accessToken: window.ACCESS_TOKEN,
-    fileName: file.name,
-    fileBase64: base64,
-    folderId: window.GDRIVE_FOLDER_ID
-  })
-});
+      // Cari atau buat subfolder per indikator
+      // Format: "Indikator {no}" di dalam folder utama
+      const targetFolderId = await getOrCreateIndikatorFolder(
+        window.ACCESS_TOKEN,
+        window.GDRIVE_FOLDER_ID,
+        noIndikator,
+        kodePKM,
+        tahun,
+        namaBulan
+      );
+
+      const res = await fetch("/.netlify/functions/drive-upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          accessToken: window.ACCESS_TOKEN,
+          fileName: file.name,
+          fileBase64: base64,
+          folderId: targetFolderId
+        })
+      });
 
       const result = await res.json();
       // ok() wraps data in {success:true, data:{...}}
@@ -808,6 +818,51 @@ const res = await fetch("/.netlify/functions/drive-upload", {
     statusDiv.remove();
   }
 }
+// Cari atau buat subfolder untuk indikator tertentu di Google Drive
+async function getOrCreateIndikatorFolder(accessToken, rootFolderId, noIndikator, kodePKM, tahun, namaBulan) {
+  try {
+    // Level 1: folder periode PKM (misal: PKM11-April-2026)
+    const periodeFolderName = `${kodePKM}-${namaBulan}-${tahun}`;
+    const periodeId = await findOrCreateFolder(accessToken, periodeFolderName, rootFolderId);
+
+    // Level 2: folder per indikator (misal: Indikator-3)
+    const indFolderName = `Indikator-${noIndikator}`;
+    const indId = await findOrCreateFolder(accessToken, indFolderName, periodeId);
+
+    return indId;
+  } catch (e) {
+    console.warn('Gagal buat subfolder, upload ke root folder:', e);
+    return rootFolderId; // fallback ke root kalau gagal
+  }
+}
+
+// Helper: cari folder by name di parent, kalau tidak ada buat baru
+async function findOrCreateFolder(accessToken, folderName, parentId) {
+  // Cari dulu
+  const searchRes = await fetch(
+    `https://www.googleapis.com/drive/v3/files?q=name='${encodeURIComponent(folderName)}' and mimeType='application/vnd.google-apps.folder' and '${parentId}' in parents and trashed=false&fields=files(id,name)`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  const searchData = await searchRes.json();
+  if (searchData.files && searchData.files.length > 0) {
+    return searchData.files[0].id; // folder sudah ada
+  }
+
+  // Buat baru
+  const createRes = await fetch('https://www.googleapis.com/drive/v3/files', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: folderName,
+      mimeType: 'application/vnd.google-apps.folder',
+      parents: [parentId]
+    })
+  });
+  const folder = await createRes.json();
+  if (!folder.id) throw new Error('Gagal membuat folder: ' + folderName);
+  return folder.id;
+}
+
 async function saveIndikator(noIndikator) {
   const target  = parseFloat(document.getElementById(`t-${noIndikator}`)?.value) || 0;
   const capaian = parseFloat(document.getElementById(`c-${noIndikator}`)?.value) || 0;
@@ -992,7 +1047,7 @@ async function viewDetail(idUsulan) {
     </div>` : '';
 
   document.getElementById('detailModalBody').innerHTML = `
-    <div style="padding:24px;min-height:100%">
+    <div style="padding:24px">
       ${rejectionBanner}
       <div style="margin-bottom:16px">${renderStatusBar({...detail, vpProgress: detail.verifikasiProgram ? {total:vp.length,selesai:vp.filter(v=>v.status==='Selesai').length} : null})}</div>
       <div class="detail-grid">
@@ -1110,8 +1165,10 @@ async function loadVerifData(status) {
     if (status && status !== 'semua') params.status = status;
     // kalau 'semua' → tidak set params.status → tampilkan semua
   } else if (role === 'Pengelola Program') {
-    params.status = 'Menunggu Program';
-    params.email_program = currentUser.email; // untuk cek sudahVerif per user
+    // Tampilkan usulan yang masih perlu diverifikasi oleh user ini:
+    // status 'Menunggu Program' atau 'Ditolak' (penolak perlu review ulang setelah operator revisi)
+    params.status_program = 'Menunggu Program,Ditolak';
+    params.email_program = currentUser.email; // untuk cek sudahVerif & filter per user
   } else if (role === 'Admin' && status !== 'semua') {
     params.status = status;
   }

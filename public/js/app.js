@@ -1715,15 +1715,40 @@ function renderUsersTable(users) {
   </table></div>`;
 }
 
+let _resetTargetEmail = '';
 function resetUserPassword(email, nama) {
-  const newPassword = prompt(`Reset password untuk ${nama}\n(${email})\n\nMasukkan password baru (min. 6 karakter):`);
-  if (newPassword === null) return; // user cancel
-  if (!newPassword || newPassword.length < 6) { toast('Password minimal 6 karakter', 'error'); return; }
+  _resetTargetEmail = email;
+  document.getElementById('rpNama').textContent = nama;
+  document.getElementById('rpEmail').textContent = email;
+  document.getElementById('rpNew').value = '';
+  document.getElementById('rpConfirm').value = '';
+  document.getElementById('rpStatus').textContent = '';
+  document.getElementById('rpNew').type = 'password';
+  document.getElementById('rpPwIcon').textContent = 'visibility_off';
+  document.getElementById('resetPasswordModal').style.display = 'flex';
+  setTimeout(() => document.getElementById('rpNew').focus(), 100);
+}
+
+function toggleRpPw() {
+  const inp = document.getElementById('rpNew');
+  const icon = document.getElementById('rpPwIcon');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+  icon.textContent = inp.type === 'password' ? 'visibility_off' : 'visibility';
+}
+
+async function doResetPassword() {
+  const newPassword = document.getElementById('rpNew').value;
+  const confirm = document.getElementById('rpConfirm').value;
+  const statusEl = document.getElementById('rpStatus');
+  if (!newPassword || newPassword.length < 6) { statusEl.textContent = 'Password minimal 6 karakter'; return; }
+  if (newPassword !== confirm) { statusEl.textContent = 'Konfirmasi password tidak cocok'; return; }
   setLoading(true);
-  API.post('auth', { action: 'reset-password', targetEmail: email, newPassword })
-    .then(() => toast(`Password ${nama} berhasil direset!`, 'success'))
-    .catch(e => toast(e.message, 'error'))
-    .finally(() => setLoading(false));
+  try {
+    await API.post('auth', { action: 'reset-password', targetEmail: _resetTargetEmail, newPassword });
+    document.getElementById('resetPasswordModal').style.display = 'none';
+    toast(`Password berhasil direset!`, 'success');
+  } catch(e) { statusEl.textContent = e.message; }
+  finally { setLoading(false); }
 }
 
 function validateEmailInput(input) {

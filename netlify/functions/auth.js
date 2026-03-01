@@ -22,7 +22,7 @@ exports.handler = async (event) => {
         const match = bcrypt ? await bcrypt.compare(oldPassword, hash) : oldPassword === hash;
         if (!match) return err('Password lama tidak sesuai');
       }
-      const newHash = bcrypt ? await bcrypt.hash(newPassword, 10) : newPassword;
+      const newHash = (bcrypt && typeof bcrypt.hash === 'function') ? await bcrypt.hash(newPassword, 10) : newPassword;
       await pool.query('UPDATE users SET password_hash=$1 WHERE LOWER(email)=LOWER($2)', [newHash, email.trim()]);
       return ok({ message: 'Password berhasil diubah' });
     }
@@ -57,13 +57,13 @@ exports.handler = async (event) => {
     // Validasi password
     const hash = user.password_hash;
     if (hash) {
-      // Ada password → wajib cocok
       if (!password) return err('Password diperlukan', 401);
-      const match = bcrypt ? await bcrypt.compare(password, hash) : password === hash;
+      // Coba plain text dulu, lalu bcrypt jika tersedia
+      let match = (password === hash);
+      if (!match && bcrypt && hash.startsWith('$2')) {
+        try { match = await bcrypt.compare(password, hash); } catch(e) { match = false; }
+      }
       if (!match) return err('Email atau password tidak sesuai', 401);
-    } else {
-      // Belum ada password → mode transisi, izinkan login tanpa password
-      // Tapi tandai agar user diminta set password
     }
 
     // Normalisasi role lama → nama baru

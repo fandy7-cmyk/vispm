@@ -276,8 +276,9 @@ textarea.form-control { resize: vertical; }
 .modal-card.xl { width: 900px; }
 /* Fullscreen modal — mengisi area konten (kanan sidebar, bawah topbar) */
 .modal.fullscreen { padding: 0; align-items: stretch; justify-content: flex-end; background: rgba(0,0,0,0.3); }
-.modal.fullscreen .modal-card { width: calc(100% - 260px); max-width: none; height: 100vh; border-radius: 0; margin: 0; display: flex; flex-direction: column; }
-.modal.fullscreen .modal-body { flex: 1; overflow-y: auto; }
+.modal.fullscreen .modal-card { width: calc(100% - 260px); max-width: none; height: 100vh; border-radius: 0; margin: 0; display: flex; flex-direction: column; overflow: hidden; }
+.modal.fullscreen .modal-header { flex-shrink: 0; }
+.modal.fullscreen .modal-body { flex: 1; overflow-y: auto; min-height: 0; padding-bottom: 32px; }
 @media (max-width: 768px) { .modal.fullscreen .modal-card { width: 100%; } }
 .modal-header { padding: 20px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
 .modal-header h3 { font-size: 16px; font-weight: 700; flex: 1; }

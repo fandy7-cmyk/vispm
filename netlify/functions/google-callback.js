@@ -1,24 +1,52 @@
 exports.handler = async (event) => {
-  const code = event.queryStringParameters.code;
+  try {
+    const code = event.queryStringParameters.code;
 
-  const res = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded"
-    },
-    body: new URLSearchParams({
-      code,
-      client_id: process.env.GOOGLE_CLIENT_ID,
-      client_secret: process.env.GOOGLE_CLIENT_SECRET,
-      redirect_uri: process.env.GOOGLE_REDIRECT_URI,
-      grant_type: "authorization_code"
-    })
-  });
+    if (!code) {
+      return {
+        statusCode: 400,
+        body: "Missing authorization code"
+      };
+    }
 
-  const data = await res.json();
+    const res = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      body: new URLSearchParams({
+        code,
+        client_id: process.env.GOOGLE_CLIENT_ID,
+        client_secret: process.env.GOOGLE_CLIENT_SECRET,
+        redirect_uri: process.env.GOOGLE_REDIRECT_URI,
+        grant_type: "authorization_code"
+      })
+    });
 
-  return {
-    statusCode: 200,
-    body: JSON.stringify(data)
-  };
+    const data = await res.json();
+
+    if (!data.access_token) {
+      return {
+        statusCode: 500,
+        body: JSON.stringify(data)
+      };
+    }
+
+    return {
+      statusCode: 200,
+      headers: { "Content-Type": "text/html" },
+      body: `
+        <script>
+          localStorage.setItem("gdrive_token", "${data.access_token}");
+          window.location.href = "/";
+        </script>
+      `
+    };
+
+  } catch (err) {
+    return {
+      statusCode: 500,
+      body: err.message
+    };
+  }
 };

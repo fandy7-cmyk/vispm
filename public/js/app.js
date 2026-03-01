@@ -983,6 +983,7 @@ async function viewDetail(idUsulan) {
     </div>` : '';
 
   document.getElementById('detailModalBody').innerHTML = `
+    <div style="padding:24px;min-height:100%">
       ${rejectionBanner}
       <div style="margin-bottom:16px">${renderStatusBar({...detail, vpProgress: detail.verifikasiProgram ? {total:vp.length,selesai:vp.filter(v=>v.status==='Selesai').length} : null})}</div>
       <div class="detail-grid">
@@ -1014,7 +1015,8 @@ async function viewDetail(idUsulan) {
         ${approvalBox('Kapus', detail.kapusApprovedBy, detail.kapusApprovedAt, detail.statusKapus==='Ditolak' ? detail.kapusCatatan : '')}
         ${approvalBox('Program', vp.length && vp.every(v=>v.status==='Selesai') ? 'Semua selesai' : '', '', detail.statusProgram==='Ditolak' ? detail.adminCatatan : '')}
         ${approvalBox('Admin', detail.adminApprovedBy, detail.adminApprovedAt, detail.statusGlobal==='Ditolak' && detail.statusKapus!=='Ditolak' && detail.statusProgram!=='Ditolak' ? detail.adminCatatan : '')}
-      </div>`;
+      </div>
+    </div>`;
   } catch (e) { toast(e.message, 'error'); }
 }
 

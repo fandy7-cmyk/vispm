@@ -1368,7 +1368,7 @@ async function openVerifikasi(idUsulan) {
   document.getElementById('verifModalId').textContent = idUsulan;
   document.getElementById('verifCatatan').value = '';
   showModal('verifikasiModal');
-  document.getElementById('verifIndikatorBody').innerHTML = `<tr><td colspan="7"><div class="empty-state" style="padding:20px"><p>Memuat...</p></div></td></tr>`;
+  document.getElementById('verifIndikatorBody').innerHTML = `<tr><td colspan="4"><div class="empty-state" style="padding:20px"><p>Memuat...</p></div></td></tr>`;
 
   try {
     const [detail, inds] = await Promise.all([API.getDetailUsulan(idUsulan), API.getIndikatorUsulan(idUsulan)]);
@@ -1378,7 +1378,8 @@ async function openVerifikasi(idUsulan) {
       <div class="detail-item"><label>Periode</label><span>${detail.namaBulan} ${detail.tahun}</span></div>
       <div class="detail-item"><label>Status</label><span>${statusBadge(detail.statusGlobal)}</span></div>
       <div class="detail-item"><label>Dibuat</label><span>${detail.createdBy}</span></div>
-      <div class="detail-item"><label>Indeks Kinerja</label><span style="font-family:'JetBrains Mono'">${parseFloat(detail.indeksKinerja).toFixed(2)}</span></div>
+      <div class="detail-item"><label>Indeks Beban Kerja</label><span style="font-family:'JetBrains Mono'">${parseFloat(detail.indeksBeban||0).toFixed(2)}</span></div>
+      <div class="detail-item"><label>Indeks Kesulitan Wilayah</label><span style="font-family:'JetBrains Mono'">${parseFloat(detail.indeksKesulitan||0).toFixed(2)}</span></div>
       <div class="detail-item"><label>Indeks SPM</label><span style="font-family:'JetBrains Mono';font-size:16px;font-weight:800;color:var(--primary)">${parseFloat(detail.indeksSPM).toFixed(2)}</span></div>`;
 
     // Filter inds for program role

@@ -59,7 +59,22 @@ async function getUsulanList(pool, params) {
   );
   const vpMap = {};
   vpResult.rows.forEach(r => { vpMap[r.id_usulan] = { total: parseInt(r.total), selesai: parseInt(r.selesai) }; });
-  return ok(result.rows.map(r => ({ ...mapHeader(r), vpProgress: vpMap[r.id_usulan] || null })));
+
+  // Cek sudahVerif untuk Pengelola Program yang sedang login
+  let sudahVerifMap = {};
+  if (params.email_program) {
+    const svResult = await pool.query(
+      `SELECT id_usulan, status FROM verifikasi_program WHERE id_usulan=ANY($1) AND LOWER(email_program)=LOWER($2)`,
+      [ids, params.email_program]
+    );
+    svResult.rows.forEach(r => { sudahVerifMap[r.id_usulan] = r.status === 'Selesai'; });
+  }
+
+  return ok(result.rows.map(r => ({
+    ...mapHeader(r),
+    vpProgress: vpMap[r.id_usulan] || null,
+    sudahVerif: sudahVerifMap[r.id_usulan] || false
+  })));
 }
 
 async function getUsulanDetail(pool, idUsulan) {

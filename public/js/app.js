@@ -1310,10 +1310,8 @@ async function downloadLaporanPDF(idUsulan) {
 // ============== VERIFIKASI ==============
 async function renderVerifikasi() {
   const role = currentUser.role;
-  let statusFilter = '';
-  if (role === 'Kepala Puskesmas') statusFilter = 'Menunggu Kepala Puskesmas';
-  else if (role === 'Pengelola Program') statusFilter = 'Menunggu Pengelola Program';
-  else if (role === 'Admin') statusFilter = ''; // all
+  // Default: tampilkan semua agar tombol hijau (sudah verif) bisa terlihat
+  let statusFilter = 'semua';
 
   document.getElementById('mainContent').innerHTML = `
     <div class="page-header">
@@ -1326,8 +1324,8 @@ async function renderVerifikasi() {
       <div class="tab" onclick="loadVerifTab('Ditolak')">Ditolak</div>
     </div>` : ''}
     ${role === 'Kepala Puskesmas' ? `<div class="tabs" id="verifTabs">
-      <div class="tab active" onclick="loadVerifTab('Menunggu Kepala Puskesmas')">Menunggu Verifikasi</div>
-      <div class="tab" onclick="loadVerifTab('semua')">Semua Usulan PKM Ini</div>
+      <div class="tab active" onclick="loadVerifTab('semua')">Semua Usulan</div>
+      <div class="tab" onclick="loadVerifTab('Menunggu Kepala Puskesmas')">Menunggu Verifikasi</div>
     </div>` : ''}
     <div class="card">
       <div class="card-body" style="padding:0" id="verifTable">
@@ -1335,7 +1333,7 @@ async function renderVerifikasi() {
       </div>
     </div>`;
 
-  loadVerifData(statusFilter || 'semua');
+  loadVerifData(statusFilter);
 }
 
 async function loadVerifTab(status) {
@@ -1349,22 +1347,21 @@ async function loadVerifData(status) {
   const role = currentUser.role;
 
   if (role === 'Kepala Puskesmas') {
-    if (!currentUser.kodePKM) { toast('Akun Kapus tidak terhubung ke puskesmas. Hubungi Admin.', 'error'); return; }
-    params.kode_pkm = currentUser.kodePKM; // SELALU filter by PKM
+    if (!currentUser.kodePKM) { toast('Akun Kepala Puskesmas tidak terhubung ke puskesmas. Hubungi Admin.', 'error'); return; }
+    params.kode_pkm = currentUser.kodePKM;
+    params.email_kepala = currentUser.email;
     if (status && status !== 'semua') params.status = status;
-    // kalau 'semua' → tidak set params.status → tampilkan semua
   } else if (role === 'Pengelola Program') {
-    // Tampilkan usulan yang masih perlu diverifikasi oleh user ini:
-    // status 'Menunggu Pengelola Program' atau 'Ditolak' (penolak perlu review ulang setelah operator revisi)
-    params.status_program = 'Menunggu Pengelola Program,Ditolak';
-    params.email_program = currentUser.email; // untuk cek sudahVerif & filter per user
+    // Tampilkan semua yang ditugaskan (sudah/belum verifikasi) agar tombol hijau terlihat
+    params.status_program = 'Menunggu Pengelola Program,Ditolak,Selesai,Menunggu Admin';
+    params.email_program = currentUser.email;
   } else if (role === 'Admin' && status !== 'semua') {
     params.status = status;
   }
 
   try {
     const rows = await API.getUsulan(params);
-    const verifRole = role === 'Kepala Puskesmas' ? 'kapus' : role === 'Pengelola Program' ? 'program' : 'admin';
+    const verifRole = role === 'Kepala Puskesmas' ? 'kepala-puskesmas' : role === 'Pengelola Program' ? 'program' : 'admin';
     document.getElementById('verifTable').innerHTML = renderUsulanTable(rows, verifRole);
   } catch (e) { toast(e.message, 'error'); }
 }

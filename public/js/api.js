@@ -35,7 +35,7 @@ const API = {
   },
 
   // Auth
-  login: (email) => API.post('auth', { email }),
+  login: (email, password) => API.post('auth', { email, password }),
 
   // Dashboard
   dashboard: (params) => API.get('dashboard', params),

@@ -1,68 +1,110 @@
 exports.handler = async (event) => {
   try {
-    const body = JSON.parse(event.body);
+    // ==============================
+    // PARSE REQUEST
+    // ==============================
+    const body = JSON.parse(event.body || "{}");
 
     const accessToken = body.accessToken;
     const fileName = body.fileName;
     const fileBase64 = body.fileBase64;
     const folderId = body.folderId;
 
-    if (!accessToken) {
+    if (!accessToken || !fileName || !fileBase64 || !folderId) {
       return {
         statusCode: 400,
-        body: "Missing access token"
+        body: JSON.stringify({
+          error: "Missing required fields"
+        })
       };
     }
 
-    const base64Data = fileBase64.split(",")[1];
+    // ==============================
+    // FIX BASE64 (REMOVE HEADER)
+    // ==============================
+    const base64Data = fileBase64.includes(",")
+      ? fileBase64.split(",")[1]
+      : fileBase64;
+
     const fileBytes = Buffer.from(base64Data, "base64");
+
+    console.log("Uploading file:", {
+      fileName,
+      folderId,
+      size: fileBytes.length
+    });
+
+    // ==============================
+    // BUILD MULTIPART BODY
+    // ==============================
+    const boundary = "foo_bar_baz";
 
     const metadata = {
       name: fileName,
       parents: [folderId]
     };
 
-    const boundary = "spm_boundary";
-    const bodyData = Buffer.concat([
-      Buffer.from(`--${boundary}\r\n`),
-      Buffer.from(`Content-Type: application/json; charset=UTF-8\r\n\r\n`),
-      Buffer.from(JSON.stringify(metadata)),
-      Buffer.from(`\r\n--${boundary}\r\n`),
-      Buffer.from(`Content-Type: application/octet-stream\r\n\r\n`),
+    const multipartBody =
+      `--${boundary}\r\n` +
+      `Content-Type: application/json; charset=UTF-8\r\n\r\n` +
+      `${JSON.stringify(metadata)}\r\n` +
+      `--${boundary}\r\n` +
+      `Content-Type: application/octet-stream\r\n\r\n`;
+
+    const endBoundary = `\r\n--${boundary}--`;
+
+    const bodyBuffer = Buffer.concat([
+      Buffer.from(multipartBody),
       fileBytes,
-      Buffer.from(`\r\n--${boundary}--`)
+      Buffer.from(endBoundary)
     ]);
 
-    const uploadRes = await fetch(
+    // ==============================
+    // UPLOAD TO GOOGLE DRIVE
+    // ==============================
+    const response = await fetch(
       "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
       {
         method: "POST",
         headers: {
           Authorization: `Bearer ${accessToken}`,
-          "Content-Type": `multipart/related; boundary=${boundary}`
+          "Content-Type": `multipart/related; boundary=${boundary}`,
+          "Content-Length": bodyBuffer.length
         },
-        body: bodyData
+        body: bodyBuffer
       }
     );
 
-    const result = await uploadRes.json();
+    const result = await response.json();
 
-    if (!uploadRes.ok) {
+    console.log("Drive response:", result);
+
+    if (!response.ok) {
       return {
-        statusCode: uploadRes.status,
+        statusCode: response.status,
         body: JSON.stringify(result)
       };
     }
 
+    // ==============================
+    // SUCCESS
+    // ==============================
     return {
       statusCode: 200,
-      body: JSON.stringify(result)
+      body: JSON.stringify({
+        success: true,
+        fileId: result.id,
+        name: result.name
+      })
     };
-
   } catch (err) {
+    console.error("UPLOAD ERROR:", err);
+
     return {
       statusCode: 500,
-      body: err.message
+      body: JSON.stringify({
+        error: err.message
+      })
     };
   }
 };

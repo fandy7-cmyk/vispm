@@ -48,59 +48,95 @@
 body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
 
 /* ===== AUTH SCREEN ===== */
+/* ===== AUTH SCREEN 2-COLUMN ===== */
 #authScreen {
   position: fixed; inset: 0; z-index: 9999;
-  display: flex; align-items: center; justify-content: center;
+  display: flex; align-items: stretch;
+}
+/* Kiri - info panel */
+.auth-left {
+  flex: 1; position: relative;
   background: url('/bg.jpg') center/cover no-repeat;
+  display: flex; flex-direction: column; justify-content: center;
+  padding: 60px 48px; overflow: hidden;
 }
-#authScreen::before {
+.auth-left::before {
   content: ''; position: absolute; inset: 0;
-  background: linear-gradient(135deg, rgba(5,30,22,0.85) 0%, rgba(10,50,38,0.78) 100%);
+  background: linear-gradient(155deg, rgba(5,50,40,0.92) 0%, rgba(13,148,136,0.75) 100%);
 }
-.auth-card {
-  position: relative; z-index: 1;
-  background: rgba(255,255,255,0.97);
-  border-radius: 20px;
-  padding: 40px;
-  width: 100%; max-width: 420px;
-  box-shadow: 0 32px 80px rgba(0,0,0,0.4);
-  text-align: center;
+.auth-left-content { position: relative; z-index: 1; color: white; }
+.auth-left-logo {
+  width: 68px; height: 68px; border-radius: 16px;
+  background: rgba(255,255,255,0.15); backdrop-filter: blur(10px);
+  border: 1.5px solid rgba(255,255,255,0.25);
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 32px; overflow: hidden;
 }
-.auth-logo {
-  width: 76px; height: 76px; border-radius: 18px;
+.auth-left-logo img { width: 44px; height: 44px; object-fit: contain; }
+.auth-left-instansi {
+  font-size: 11px; font-weight: 600; letter-spacing: 1px;
+  text-transform: uppercase; opacity: 0.7; margin-bottom: 12px;
+  line-height: 1.6;
+}
+.auth-left h1 { font-size: 42px; font-weight: 900; margin-bottom: 8px; line-height: 1.1; }
+.auth-left h1 span { color: #5eead4; }
+.auth-left-sub { font-size: 15px; opacity: 0.8; margin-bottom: 40px; line-height: 1.6; max-width: 380px; }
+.auth-left-features { display: flex; flex-direction: column; gap: 14px; }
+.auth-left-feature {
+  display: flex; align-items: center; gap: 12px;
+  background: rgba(255,255,255,0.08); border-radius: 10px;
+  padding: 12px 16px; border: 1px solid rgba(255,255,255,0.12);
+}
+.auth-left-feature .material-icons { font-size: 20px; color: #5eead4; flex-shrink: 0; }
+.auth-left-feature span { font-size: 13px; opacity: 0.85; }
+/* Kanan - form panel */
+.auth-right {
+  width: 440px; flex-shrink: 0;
+  background: white;
+  display: flex; flex-direction: column; justify-content: center;
+  padding: 48px 44px;
+  box-shadow: -20px 0 60px rgba(0,0,0,0.15);
+  overflow-y: auto;
+}
+.auth-right-logo {
+  width: 56px; height: 56px; border-radius: 14px;
   background: linear-gradient(135deg, #0d9488, #06b6d4);
   display: flex; align-items: center; justify-content: center;
-  margin: 0 auto 16px;
-  box-shadow: 0 8px 24px rgba(13,148,136,0.35);
-  overflow: hidden;
+  margin-bottom: 24px; overflow: hidden;
+  box-shadow: 0 6px 20px rgba(13,148,136,0.3);
 }
-.auth-logo img { width: 48px; height: 48px; object-fit: contain; }
-.auth-logo .material-icons { font-size: 34px; color: white; }
-.auth-instansi {
-  font-size: 11px; font-weight: 700; color: var(--primary);
-  text-transform: uppercase; letter-spacing: 0.6px;
-  line-height: 1.5; margin-bottom: 8px;
-}
-.auth-card h2 { font-size: 24px; font-weight: 800; color: var(--text); margin-bottom: 4px; }
-.auth-card > p { font-size: 13px; color: var(--text-light); margin-bottom: 28px; }
+.auth-right-logo img { width: 36px; height: 36px; object-fit: contain; }
+.auth-right h2 { font-size: 26px; font-weight: 800; color: var(--text); margin-bottom: 4px; }
+.auth-right-sub { font-size: 13px; color: var(--text-light); margin-bottom: 32px; }
+.auth-field { margin-bottom: 16px; }
+.auth-field label { display: block; font-size: 12.5px; font-weight: 600; color: var(--text-md); margin-bottom: 6px; }
 .auth-input {
-  width: 100%; padding: 12px 16px; border: 2px solid var(--border);
+  width: 100%; padding: 12px 16px; border: 1.5px solid var(--border);
   border-radius: 10px; font-size: 14px; font-family: inherit;
-  transition: all 0.2s; margin-bottom: 16px;
-  background: var(--border-light); box-sizing: border-box;
+  transition: all 0.2s; background: #f8fafc; box-sizing: border-box; color: var(--text);
 }
-.auth-input:focus { outline: none; border-color: var(--primary); background: white; }
+.auth-input:focus { outline: none; border-color: var(--primary); background: white; box-shadow: 0 0 0 3px rgba(13,148,136,0.1); }
+.auth-pw-wrap { position: relative; }
+.auth-pw-wrap .auth-input { padding-right: 44px; }
+.auth-pw-toggle {
+  position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+  background: none; border: none; cursor: pointer; color: var(--text-light);
+  display: flex; align-items: center; padding: 4px;
+}
 .auth-btn {
   width: 100%; padding: 13px; background: linear-gradient(135deg, #0d9488, #06b6d4);
   border: none; border-radius: 10px; color: white; font-size: 15px;
-  font-weight: 700; font-family: inherit; cursor: pointer;
+  font-weight: 700; font-family: inherit; cursor: pointer; margin-top: 8px;
   transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px;
 }
-.auth-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(13,148,136,0.3); }
+.auth-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(13,148,136,0.35); }
 .auth-btn:disabled { opacity: 0.6; transform: none; cursor: not-allowed; }
-.auth-status { margin-top: 16px; font-size: 13px; color: var(--text-light); min-height: 20px; }
+.auth-status { margin-top: 14px; font-size: 13px; color: var(--text-light); min-height: 18px; text-align: center; }
 .auth-status.error { color: var(--danger); }
-.auth-divider { margin: 20px 0; font-size: 12px; color: var(--text-xlight); }
+@media (max-width: 800px) {
+  .auth-left { display: none; }
+  .auth-right { width: 100%; padding: 40px 28px; box-shadow: none; }
+}
 
 /* ===== LAYOUT ===== */
 #appLayout { display: flex; height: 100vh; overflow: hidden; }
@@ -398,15 +434,51 @@ textarea.form-control { resize: vertical; }
 
 <!-- AUTH SCREEN -->
 <div id="authScreen">
-  <div class="auth-card">
-    <div class="auth-logo">
-      <img src="/favicon.png" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
-      <span class="material-icons" style="display:none">verified</span>
+  <!-- Kiri: Info panel -->
+  <div class="auth-left">
+    <div class="auth-left-content">
+      <div class="auth-left-logo">
+        <img src="/favicon.png" onerror="this.style.display='none'">
+      </div>
+      <div class="auth-left-instansi">Dinas Kesehatan, Pengendalian Penduduk dan Keluarga Berencana<br>Kabupaten Banggai Laut</div>
+      <h1>VIS<span>PM</span></h1>
+      <p class="auth-left-sub">Sistem Verifikasi Indeks Standar Pelayanan Minimal Puskesmas — platform digital untuk memastikan kualitas layanan kesehatan di Kabupaten Banggai Laut.</p>
+      <div class="auth-left-features">
+        <div class="auth-left-feature">
+          <span class="material-icons">verified</span>
+          <span>Verifikasi multi-level: Kepala Puskesmas, Pengelola Program, dan Admin</span>
+        </div>
+        <div class="auth-left-feature">
+          <span class="material-icons">bar_chart</span>
+          <span>Monitoring indeks SPM real-time per puskesmas</span>
+        </div>
+        <div class="auth-left-feature">
+          <span class="material-icons">cloud_upload</span>
+          <span>Upload bukti dokumen terintegrasi dengan Google Drive</span>
+        </div>
+      </div>
     </div>
-    <div class="auth-instansi">Dinas Kesehatan, Pengendalian Penduduk dan Keluarga Berencana<br>Kabupaten Banggai Laut</div>
-    <h2>VISPM</h2>
-    <p>Verifikasi Indeks Standar Pelayanan Minimal</p>
-    <input type="email" id="authEmail" class="auth-input" placeholder="Email akun Anda..." autocomplete="email" onkeydown="if(event.key==='Enter')doLogin()">
+  </div>
+  <!-- Kanan: Form login -->
+  <div class="auth-right">
+    <div class="auth-right-logo">
+      <img src="/favicon.png" onerror="this.outerHTML='<span class=\'material-icons\' style=\'font-size:28px;color:white\'>verified</span>'">
+    </div>
+    <h2>Selamat Datang</h2>
+    <p class="auth-right-sub">Masuk ke sistem VISPM menggunakan akun Anda</p>
+    <div class="auth-field">
+      <label>Email</label>
+      <input type="email" id="authEmail" class="auth-input" placeholder="email@example.com" autocomplete="email" onkeydown="if(event.key==='Enter')document.getElementById('authPassword').focus()">
+    </div>
+    <div class="auth-field">
+      <label>Password</label>
+      <div class="auth-pw-wrap">
+        <input type="password" id="authPassword" class="auth-input" placeholder="Password Anda..." autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+        <button class="auth-pw-toggle" type="button" onclick="toggleAuthPw()" tabindex="-1">
+          <span class="material-icons" id="authPwIcon" style="font-size:20px">visibility_off</span>
+        </button>
+      </div>
+    </div>
     <button class="auth-btn" id="authBtn" onclick="doLogin()">
       <span class="material-icons">login</span>
       Masuk ke Sistem
@@ -442,6 +514,10 @@ textarea.form-control { resize: vertical; }
     </div>
     <div class="sidebar-nav" id="sidebarNav"><!-- dynamic --></div>
     <div class="sidebar-footer">
+      <button class="logout-btn" style="color:rgba(255,255,255,0.6);margin-bottom:4px" onclick="showChangePassword()">
+        <span class="material-icons">lock</span>
+        Ubah Password
+      </button>
       <button class="logout-btn" onclick="doLogout()">
         <span class="material-icons">logout</span>
         Keluar
@@ -461,6 +537,40 @@ textarea.form-control { resize: vertical; }
       </div>
     </div>
     <div class="content" id="mainContent"><!-- dynamic --></div>
+  </div>
+</div>
+
+<!-- CHANGE PASSWORD MODAL -->
+<div class="modal" id="changePasswordModal" style="display:none">
+  <div class="modal-card" style="max-width:400px">
+    <div class="modal-header">
+      <span class="material-icons">lock</span>
+      <h3>Ubah Password</h3>
+      <button class="btn-icon" onclick="closeModal('changePasswordModal')"><span class="material-icons">close</span></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Password Lama</label>
+        <div style="position:relative">
+          <input type="password" id="cpOld" class="form-control" placeholder="Password saat ini">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Password Baru</label>
+        <input type="password" id="cpNew" class="form-control" placeholder="Minimal 6 karakter">
+      </div>
+      <div class="form-group">
+        <label>Konfirmasi Password Baru</label>
+        <input type="password" id="cpConfirm" class="form-control" placeholder="Ulangi password baru">
+      </div>
+      <div id="cpStatus" style="font-size:13px;min-height:18px;color:var(--danger)"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('changePasswordModal')">Batal</button>
+      <button class="btn btn-primary" onclick="doChangePassword()">
+        <span class="material-icons">save</span> Simpan Password
+      </button>
+    </div>
   </div>
 </div>
 

@@ -1,16 +1,47 @@
 const { getPool, ok, err, cors } = require('./db');
 
+let bcrypt;
+try { bcrypt = require('bcryptjs'); } catch(e) { bcrypt = null; }
+
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors();
 
   try {
     const pool = getPool();
-    const { email } = JSON.parse(event.body || '{}');
+    const { email, password, action } = JSON.parse(event.body || '{}');
+
+    // ===== CHANGE PASSWORD =====
+    if (action === 'change-password') {
+      const { oldPassword, newPassword } = JSON.parse(event.body);
+      if (!email || !oldPassword || !newPassword) return err('Data tidak lengkap');
+      if (newPassword.length < 6) return err('Password minimal 6 karakter');
+      const res = await pool.query('SELECT password_hash FROM users WHERE LOWER(email)=LOWER($1)', [email.trim()]);
+      if (!res.rows.length) return err('User tidak ditemukan');
+      const hash = res.rows[0].password_hash;
+      if (hash) {
+        const match = bcrypt ? await bcrypt.compare(oldPassword, hash) : oldPassword === hash;
+        if (!match) return err('Password lama tidak sesuai');
+      }
+      const newHash = bcrypt ? await bcrypt.hash(newPassword, 10) : newPassword;
+      await pool.query('UPDATE users SET password_hash=$1 WHERE LOWER(email)=LOWER($2)', [newHash, email.trim()]);
+      return ok({ message: 'Password berhasil diubah' });
+    }
+
+    // ===== RESET PASSWORD (admin) =====
+    if (action === 'reset-password') {
+      const { targetEmail, newPassword } = JSON.parse(event.body);
+      if (!newPassword) return err('Password baru diperlukan');
+      const newHash = bcrypt ? await bcrypt.hash(newPassword, 10) : newPassword;
+      await pool.query('UPDATE users SET password_hash=$1 WHERE LOWER(email)=LOWER($2)', [newHash, targetEmail.trim()]);
+      return ok({ message: 'Password berhasil direset' });
+    }
+
+    // ===== LOGIN =====
     if (!email) return err('Email diperlukan');
 
     const result = await pool.query(
       `SELECT u.email, u.nama, u.nip, u.role, u.kode_pkm, u.indikator_akses,
-              u.jabatan, u.aktif, p.nama_puskesmas
+              u.jabatan, u.aktif, u.password_hash, p.nama_puskesmas
        FROM users u
        LEFT JOIN master_puskesmas p ON u.kode_pkm = p.kode_pkm
        WHERE LOWER(u.email) = LOWER($1) AND u.aktif = true`,
@@ -22,6 +53,18 @@ exports.handler = async (event) => {
     }
 
     const user = result.rows[0];
+
+    // Validasi password
+    const hash = user.password_hash;
+    if (hash) {
+      // Ada password → wajib cocok
+      if (!password) return err('Password diperlukan', 401);
+      const match = bcrypt ? await bcrypt.compare(password, hash) : password === hash;
+      if (!match) return err('Email atau password tidak sesuai', 401);
+    } else {
+      // Belum ada password → mode transisi, izinkan login tanpa password
+      // Tapi tandai agar user diminta set password
+    }
 
     // Normalisasi role lama → nama baru
     const roleMap = {
@@ -46,7 +89,8 @@ exports.handler = async (event) => {
       namaPKM: user.nama_puskesmas || '',
       jabatan: user.jabatan || '',
       indikatorAkses: indikatorList,
-      indikatorAksesString: user.indikator_akses ? user.indikator_akses.toString() : ''
+      indikatorAksesString: user.indikator_akses ? user.indikator_akses.toString() : '',
+      needsPassword: !hash // flag untuk minta set password
     });
 
   } catch (e) {

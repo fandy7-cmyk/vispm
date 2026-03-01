@@ -821,13 +821,26 @@ async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, tahun
 // Cari atau buat subfolder untuk indikator tertentu di Google Drive
 async function getOrCreateIndikatorFolder(accessToken, rootFolderId, noIndikator, kodePKM, tahun, namaBulan) {
   try {
-    // Level 1: folder periode PKM (misal: PKM11-April-2026)
-    const periodeFolderName = `${kodePKM}-${namaBulan}-${tahun}`;
-    const periodeId = await findOrCreateFolder(accessToken, periodeFolderName, rootFolderId);
+    // Level 1: folder PKM (misal: PKM11)
+    const pkmId = await findOrCreateFolder(accessToken, kodePKM, rootFolderId);
 
-    // Level 2: folder per indikator (misal: Indikator-3)
-    const indFolderName = `Indikator-${noIndikator}`;
-    const indId = await findOrCreateFolder(accessToken, indFolderName, periodeId);
+    // Level 2: folder tahun (misal: 2026)
+    const tahunId = await findOrCreateFolder(accessToken, String(tahun), pkmId);
+
+    // Level 3: folder bulan (misal: 05-Mei)
+    const bulanNum = String(noIndikator); // ambil dari parameter bulan
+    // Kita perlu bulan dari luar — pakai namaBulan yang sudah dikirim
+    // Format bulan: "05-Mei" — ambil nomor bulan dari nama
+    const bulanNamaMap = {'Januari':'01','Februari':'02','Maret':'03','April':'04','Mei':'05','Juni':'06','Juli':'07','Agustus':'08','September':'09','Oktober':'10','November':'11','Desember':'12'};
+    const bulanAngka = bulanNamaMap[namaBulan] || '00';
+    const bulanFolderName = `${bulanAngka}-${namaBulan}`;
+    const bulanId = await findOrCreateFolder(accessToken, bulanFolderName, tahunId);
+
+    // Level 4: folder Indikator (misal: Indikator)
+    const indParentId = await findOrCreateFolder(accessToken, 'Indikator', bulanId);
+
+    // Level 5: nomor indikator (misal: 1, 2, 3...)
+    const indId = await findOrCreateFolder(accessToken, String(noIndikator), indParentId);
 
     return indId;
   } catch (e) {

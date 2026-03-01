@@ -18,7 +18,9 @@ async function doLogin() {
   try {
     const user = await API.login(email);
     currentUser = user;
+    localStorage.setItem('spm_user', JSON.stringify(user));
     startApp();
+    startIdleWatcher();
   } catch (e) {
     setAuthStatus(e.message, 'error');
     btn.disabled = false;
@@ -37,7 +39,7 @@ function doLogout() {
     title: 'Keluar dari Sistem',
     message: 'Yakin ingin keluar dari sistem?',
     type: 'warning',
-    onConfirm: () => { currentUser = null; location.reload(); }
+    onConfirm: () => { currentUser = null; localStorage.removeItem('spm_user'); location.reload(); }
   });
 }
 
@@ -2124,10 +2126,45 @@ document.addEventListener('click', (e) => {
 });
 
 // Enter key on auth
+// ============== IDLE AUTO LOGOUT ==============
+const IDLE_TIMEOUT = 4 * 60 * 1000; // 4 menit
+let _idleTimer = null;
+
+function resetIdleTimer() {
+  clearTimeout(_idleTimer);
+  _idleTimer = setTimeout(() => {
+    if (currentUser) {
+      currentUser = null;
+      localStorage.removeItem('spm_user');
+      toast('Sesi berakhir karena tidak ada aktivitas. Silakan login kembali.', 'warning');
+      setTimeout(() => location.reload(), 2000);
+    }
+  }, IDLE_TIMEOUT);
+}
+
+function startIdleWatcher() {
+  ['mousemove','mousedown','keydown','touchstart','scroll','click'].forEach(evt => {
+    document.addEventListener(evt, resetIdleTimer, { passive: true });
+  });
+  resetIdleTimer();
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('authEmail').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') doLogin();
   });
+
+  // Restore session dari localStorage
+  try {
+    const saved = localStorage.getItem('spm_user');
+    if (saved) {
+      currentUser = JSON.parse(saved);
+      startApp();
+      startIdleWatcher();
+    }
+  } catch(e) {
+    localStorage.removeItem('spm_user');
+  }
 });
 
 // ============ KELOLA SEMUA USULAN (SUPER ADMIN) ============

@@ -48,7 +48,7 @@ async function getUsulanList(pool, params) {
   if (params.awaiting_admin === 'true') where.push(`uh.status_global='Menunggu Admin'`);
 
   // Filter khusus Pengelola Program: tampilkan semua usulan yang masih perlu diverifikasi
-  // Artinya: status_global IN ('Menunggu Program','Ditolak') DAN user ini belum Selesai
+  // Artinya: status_global IN ('Menunggu Pengelola Program','Ditolak') DAN user ini belum Selesai
   if (params.status_program && params.email_program) {
     const statuses = params.status_program.split(',').map(s => `'${s.trim()}'`).join(',');
     where.push(`uh.status_global IN (${statuses})`);
@@ -101,7 +101,7 @@ async function getUsulanList(pool, params) {
 async function getUsulanDetail(pool, idUsulan) {
   if (!idUsulan) return err('ID usulan diperlukan');
   const result = await pool.query(
-    `SELECT uh.*, p.nama_puskesmas, u.nama as nama_pembuat FROM usulan_header uh LEFT JOIN master_puskesmas p ON uh.kode_pkm=p.kode_pkm LEFT JOIN users u ON uh.created_by=u.email WHERE uh.id_usulan=$1`,
+    `SELECT uh.*, p.nama_puskesmas, p.indeks_kesulitan_wilayah, u.nama as nama_pembuat FROM usulan_header uh LEFT JOIN master_puskesmas p ON uh.kode_pkm=p.kode_pkm LEFT JOIN users u ON uh.created_by=u.email WHERE uh.id_usulan=$1`,
     [idUsulan]
   );
   if (result.rows.length === 0) return err('Usulan tidak ditemukan', 404);
@@ -310,7 +310,7 @@ async function submitUsulan(pool, body) {
          WHERE id_usulan=$1 AND status='Ditolak'`,
         [idUsulan]
       );
-      // Reset header ke Menunggu Program, hapus catatan tolak
+      // Reset header ke Menunggu Pengelola Program, hapus catatan tolak
       await pool.query(
         `UPDATE usulan_header SET
           status_program='Menunggu', status_final='Menunggu',
@@ -359,17 +359,17 @@ async function submitUsulan(pool, body) {
   }
 
   // Tentukan status tujuan submit:
-  // - Dari Draft → Menunggu Kapus (normal)
-  // - Dari Ditolak Kapus → Menunggu Kapus (ulang dari awal)
-  // - Dari Ditolak Program → Menunggu Program (Kapus skip, langsung ke program)
-  // - Dari Ditolak Admin → Menunggu Program (ulang dari program)
-  let targetStatus = 'Menunggu Kapus';
+  // - Dari Draft → Menunggu Kepala Puskesmas (normal)
+  // - Dari Ditolak Kapus → Menunggu Kepala Puskesmas (ulang dari awal)
+  // - Dari Ditolak Program → Menunggu Pengelola Program (Kepala Puskesmas skip, langsung ke program)
+  // - Dari Ditolak Admin → Menunggu Pengelola Program (ulang dari program)
+  let targetStatus = 'Menunggu Kepala Puskesmas';
   if (statusSaatIni === 'Ditolak') {
     const tolakInfo = await pool.query('SELECT status_kapus, status_program FROM usulan_header WHERE id_usulan=$1', [idUsulan]);
     const { status_kapus, status_program } = tolakInfo.rows[0];
     if (status_kapus !== 'Ditolak') {
-      // Kapus sudah approve sebelumnya → langsung ke Menunggu Program
-      targetStatus = 'Menunggu Program';
+      // Kepala Puskesmas sudah approve sebelumnya → langsung ke Menunggu Pengelola Program
+      targetStatus = 'Menunggu Pengelola Program';
     }
   }
 
@@ -379,7 +379,7 @@ async function submitUsulan(pool, body) {
   );
   const isResubmit = statusSaatIni === 'Ditolak';
   await logAktivitas(pool, email, 'Operator', isResubmit ? 'Ajukan Ulang' : 'Submit', idUsulan,
-    isResubmit ? `Diajukan ulang — diteruskan ke ${targetStatus}` : 'Disubmit ke Kapus'
+    isResubmit ? `Diajukan ulang — diteruskan ke ${targetStatus}` : 'Disubmit ke Kepala Puskesmas'
   );
   return ok({ message: isResubmit
     ? `Usulan berhasil diajukan ulang! Diteruskan ke ${targetStatus}.`
@@ -392,19 +392,19 @@ async function approveKapus(pool, body) {
   const result = await pool.query(
     `SELECT uh.status_global, uh.kode_pkm, u.kode_pkm as kapus_pkm
      FROM usulan_header uh
-     LEFT JOIN users u ON LOWER(u.email)=LOWER($2) AND u.role='Kapus'
+     LEFT JOIN users u ON LOWER(u.email)=LOWER($2) AND u.role='Kepala Puskesmas'
      WHERE uh.id_usulan=$1`,
     [idUsulan, email]
   );
   if (result.rows.length===0) return err('Usulan tidak ditemukan');
   const row = result.rows[0];
-  if (row.status_global !== 'Menunggu Kapus') return err('Usulan tidak dalam status Menunggu Kapus');
+  if (row.status_global !== 'Menunggu Kepala Puskesmas') return err('Usulan tidak dalam status Menunggu Kepala Puskesmas');
   // Poin 5: Kapus hanya bisa verifikasi PKM-nya sendiri
   if (row.kapus_pkm && row.kode_pkm !== row.kapus_pkm) {
     return err('Anda hanya dapat memverifikasi usulan dari puskesmas Anda sendiri');
   }
   await pool.query(
-    `UPDATE usulan_header SET status_kapus='Selesai',status_global='Menunggu Program',kapus_approved_by=$1,kapus_approved_at=NOW(),kapus_catatan=$2 WHERE id_usulan=$3`,
+    `UPDATE usulan_header SET status_kapus='Selesai',status_global='Menunggu Pengelola Program',kapus_approved_by=$1,kapus_approved_at=NOW(),kapus_catatan=$2 WHERE id_usulan=$3`,
     [email, catatan||'', idUsulan]
   );
   await logAktivitas(pool, email, 'Kapus', 'Approve', idUsulan, catatan||'Disetujui Kapus');
@@ -416,7 +416,7 @@ async function approveProgram(pool, body) {
   const result = await pool.query('SELECT status_global FROM usulan_header WHERE id_usulan=$1', [idUsulan]);
   if (result.rows.length===0) return err('Usulan tidak ditemukan');
   // Izinkan approve kalau status Menunggu Program ATAU Ditolak (ada yang tolak tapi yang lain masih bisa approve)
-  if (!['Menunggu Program','Ditolak'].includes(result.rows[0].status_global)) return err('Usulan tidak dalam tahap verifikasi program');
+  if (!['Menunggu Pengelola Program','Ditolak'].includes(result.rows[0].status_global)) return err('Usulan tidak dalam tahap verifikasi program');
 
   const vpCheck = await pool.query('SELECT id, status FROM verifikasi_program WHERE id_usulan=$1 AND email_program=$2', [idUsulan, email]);
   if (vpCheck.rows.length===0) return err('Anda tidak terdaftar sebagai pengelola program untuk usulan ini');
@@ -484,7 +484,7 @@ async function rejectUsulan(pool, body) {
     );
     const namaPengelola = vpRow.rows[0]?.nama_program || email;
 
-    // Status header tetap 'Menunggu Program' tapi tandai ada yang menolak
+    // Status header tetap 'Menunggu Pengelola Program' tapi tandai ada yang menolak
     // Simpan info siapa yang menolak di admin_catatan sementara
     await pool.query(
       `UPDATE usulan_header SET
@@ -496,8 +496,8 @@ async function rejectUsulan(pool, body) {
       [`Ditolak oleh ${namaPengelola}: ${alasan.trim()}`, idUsulan]
     );
 
-  } else if (role === 'Kapus') {
-    // Kapus tolak → reset semua, operator mulai dari awal
+  } else if (role === 'Kepala Puskesmas') {
+    // Kepala Puskesmas tolak → reset semua, operator mulai dari awal
     await pool.query(
       `UPDATE verifikasi_program SET status='Menunggu', catatan=NULL, verified_at=NULL WHERE id_usulan=$1`,
       [idUsulan]
@@ -564,6 +564,7 @@ function mapHeader(r) {
     periodeKey:r.periode_key, kodePKM:r.kode_pkm, namaPKM:r.nama_puskesmas||r.kode_pkm,
     totalNilai:parseFloat(r.total_nilai)||0, totalBobot:parseFloat(r.total_bobot)||0,
     indeksKinerja:parseFloat(r.indeks_kinerja_spm)||0, indeksBeban:parseFloat(r.indeks_beban_kerja)||0,
+    indeksKesulitan:parseFloat(r.indeks_kesulitan_wilayah)||0,
     indeksSPM:parseFloat(r.indeks_spm)||0,
     statusKapus:r.status_kapus||'Menunggu', statusProgram:r.status_program||'Menunggu',
     statusFinal:r.status_final||'Menunggu', statusGlobal:r.status_global||'Draft',

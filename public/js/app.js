@@ -250,7 +250,7 @@ async function renderDashboard() {
 
   if (role === 'Admin') renderAdminDashboard(content, data);
   else if (role === 'Operator') renderOperatorDashboard(content, data);
-  else if (role === 'Kapus') renderKapusDashboard(content, data);
+  else if (role === 'Kepala Puskesmas') renderKepalasDashboard(content, data);
   else if (role === 'Pengelola Program') renderProgramDashboard(content, data);
   else if (role === 'Kadis') renderKadisDashboard(content, data);
 }
@@ -317,7 +317,7 @@ function renderOperatorDashboard(el, d) {
   }).catch(() => {});
 }
 
-function renderKapusDashboard(el, d) {
+function renderKepalasDashboard(el, d) {
   el.innerHTML = `
     <div class="stats-grid">
       ${statCard('orange','pending','Menunggu Verifikasi', d.menunggu)}
@@ -462,6 +462,11 @@ function renderUsulanTable(rows, role) {
 
 // ============== INPUT USULAN (OPERATOR) ==============
 async function renderInput() {
+  // Guard: hanya Operator yang bisa input usulan
+  if (currentUser && currentUser.role === 'Kepala Puskesmas') {
+    document.getElementById('content').innerHTML = `<div class="empty-state"><span class="material-icons" style="font-size:48px;color:var(--text-xlight)">block</span><p>Kepala Puskesmas tidak memiliki akses untuk input usulan.</p></div>`;
+    return;
+  }
   let pkmList = [], periodeAktif = null, allPeriode = [], periodeOptions = [];
   try {
     [pkmList] = await Promise.all([API.getPKM(true)]);
@@ -1230,6 +1235,14 @@ async function viewDetail(idUsulan) {
           <label>Indeks SPM</label>
           <span style="font-family:'JetBrains Mono';font-size:22px;color:var(--primary);font-weight:800">${parseFloat(detail.indeksSPM).toFixed(2)}</span>
         </div>
+        <div class="detail-item">
+          <label>Indeks Beban Kerja</label>
+          <span style="font-family:'JetBrains Mono';font-weight:700">${parseFloat(detail.indeksBeban||0).toFixed(2)}</span>
+        </div>
+        <div class="detail-item">
+          <label>Indeks Kesulitan Wilayah</label>
+          <span style="font-family:'JetBrains Mono';font-weight:700">${parseFloat(detail.indeksKesulitan||0).toFixed(2)}</span>
+        </div>
       </div>
       ${detail.driveFolderUrl ? `<div style="margin-bottom:12px"><a href="${detail.driveFolderUrl}" target="_blank" class="btn btn-secondary btn-sm"><span class="material-icons" style="font-size:14px">folder_open</span> Lihat Folder Bukti Google Drive</a></div>` : ''}
       <div style="font-weight:700;font-size:13.5px;margin-bottom:8px">Detail Indikator</div>
@@ -1292,7 +1305,7 @@ async function downloadLaporanPDF(idUsulan) {
 async function renderVerifikasi() {
   const role = currentUser.role;
   let statusFilter = '';
-  if (role === 'Kapus') statusFilter = 'Menunggu Kepala Puskesmas';
+  if (role === 'Kepala Puskesmas') statusFilter = 'Menunggu Kepala Puskesmas';
   else if (role === 'Pengelola Program') statusFilter = 'Menunggu Pengelola Program';
   else if (role === 'Admin') statusFilter = ''; // all
 
@@ -1306,7 +1319,7 @@ async function renderVerifikasi() {
       <div class="tab" onclick="loadVerifTab('Selesai')">Selesai</div>
       <div class="tab" onclick="loadVerifTab('Ditolak')">Ditolak</div>
     </div>` : ''}
-    ${role === 'Kapus' ? `<div class="tabs" id="verifTabs">
+    ${role === 'Kepala Puskesmas' ? `<div class="tabs" id="verifTabs">
       <div class="tab active" onclick="loadVerifTab('Menunggu Kepala Puskesmas')">Menunggu Verifikasi</div>
       <div class="tab" onclick="loadVerifTab('semua')">Semua Usulan PKM Ini</div>
     </div>` : ''}
@@ -1329,7 +1342,7 @@ async function loadVerifData(status) {
   const params = {};
   const role = currentUser.role;
 
-  if (role === 'Kapus') {
+  if (role === 'Kepala Puskesmas') {
     if (!currentUser.kodePKM) { toast('Akun Kapus tidak terhubung ke puskesmas. Hubungi Admin.', 'error'); return; }
     params.kode_pkm = currentUser.kodePKM; // SELALU filter by PKM
     if (status && status !== 'semua') params.status = status;
@@ -1345,7 +1358,7 @@ async function loadVerifData(status) {
 
   try {
     const rows = await API.getUsulan(params);
-    const verifRole = role === 'Kapus' ? 'kapus' : role === 'Pengelola Program' ? 'program' : 'admin';
+    const verifRole = role === 'Kepala Puskesmas' ? 'kapus' : role === 'Pengelola Program' ? 'program' : 'admin';
     document.getElementById('verifTable').innerHTML = renderUsulanTable(rows, verifRole);
   } catch (e) { toast(e.message, 'error'); }
 }
@@ -1381,7 +1394,7 @@ async function openVerifikasi(idUsulan) {
     </tr>`).join('');
 
     // Adjust buttons based on status
-    const canApprove = (currentUser.role === 'Kapus' && detail.statusGlobal === 'Menunggu Kepala Puskesmas') ||
+    const canApprove = (currentUser.role === 'Kepala Puskesmas' && detail.statusGlobal === 'Menunggu Kepala Puskesmas') ||
       (currentUser.role === 'Pengelola Program' && detail.statusGlobal === 'Menunggu Pengelola Program') ||
       (currentUser.role === 'Admin' && detail.statusGlobal === 'Menunggu Admin');
 
@@ -1396,7 +1409,7 @@ async function doApprove() {
   setLoading(true);
   try {
     let result;
-    if (role === 'Kapus') result = await API.approveKapus({ idUsulan: verifCurrentUsulan, email: currentUser.email, catatan });
+    if (role === 'Kepala Puskesmas') result = await API.approveKapus({ idUsulan: verifCurrentUsulan, email: currentUser.email, catatan });
     else if (role === 'Pengelola Program') result = await API.approveProgram({ idUsulan: verifCurrentUsulan, email: currentUser.email, catatan });
     else if (role === 'Admin') result = await API.approveAdmin({ idUsulan: verifCurrentUsulan, email: currentUser.email, catatan });
 
@@ -1480,7 +1493,7 @@ async function loadLaporan() {
   if (status !== 'semua') params.status = status;
   if (pkm && pkm !== 'semua') params.kode_pkm = pkm;
   if (currentUser.role === 'Operator') params.email_operator = currentUser.email;
-  if (currentUser.role === 'Kapus') params.kode_pkm = currentUser.kodePKM;
+  if (currentUser.role === 'Kepala Puskesmas') params.kode_pkm = currentUser.kodePKM;
 
   try {
     const result = await API.getLaporan(params);
@@ -1712,7 +1725,7 @@ async function tambahJabatanBaru() {
 
 function checkUserRole() {
   const role = document.getElementById('uRole').value;
-  document.getElementById('pkmContainer').style.display = ['Operator', 'Kapus'].includes(role) ? 'block' : 'none';
+  document.getElementById('pkmContainer').style.display = ['Operator'].includes(role) ? 'block' : 'none';
   const isProgram = role === 'Pengelola Program';
   document.getElementById('jabatanContainer').style.display = isProgram ? 'block' : 'none';
   document.getElementById('indContainer').style.display = isProgram ? 'block' : 'none';

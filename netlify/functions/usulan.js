@@ -46,6 +46,22 @@ async function getUsulanList(pool, params) {
   if (params.bulan && params.bulan !== 'semua') { where.push(`uh.bulan=$${idx++}`); qParams.push(parseInt(params.bulan)); }
   if (params.status && params.status !== 'semua') { where.push(`uh.status_global=$${idx++}`); qParams.push(params.status); }
   if (params.awaiting_admin === 'true') where.push(`uh.status_global='Menunggu Admin'`);
+
+  // Filter khusus Pengelola Program: tampilkan semua usulan yang masih perlu diverifikasi
+  // Artinya: status_global IN ('Menunggu Program','Ditolak') DAN user ini belum Selesai
+  if (params.status_program && params.email_program) {
+    const statuses = params.status_program.split(',').map(s => `'${s.trim()}'`).join(',');
+    where.push(`uh.status_global IN (${statuses})`);
+    // Hanya tampilkan kalau user ini punya record di verifikasi_program dan belum Selesai
+    where.push(`EXISTS (
+      SELECT 1 FROM verifikasi_program vp
+      WHERE vp.id_usulan = uh.id_usulan
+      AND LOWER(vp.email_program) = LOWER($${idx++})
+      AND vp.status != 'Selesai'
+    )`);
+    qParams.push(params.email_program);
+  }
+
   const ws = where.length ? 'WHERE ' + where.join(' AND ') : '';
   const result = await pool.query(
     `SELECT uh.*, p.nama_puskesmas FROM usulan_header uh LEFT JOIN master_puskesmas p ON uh.kode_pkm=p.kode_pkm ${ws} ORDER BY uh.created_at DESC LIMIT 500`,
@@ -60,20 +76,25 @@ async function getUsulanList(pool, params) {
   const vpMap = {};
   vpResult.rows.forEach(r => { vpMap[r.id_usulan] = { total: parseInt(r.total), selesai: parseInt(r.selesai) }; });
 
-  // Cek sudahVerif untuk Pengelola Program yang sedang login
+  // Cek sudahVerif dan myVerifStatus untuk Pengelola Program yang sedang login
   let sudahVerifMap = {};
+  let myVerifStatusMap = {};
   if (params.email_program) {
     const svResult = await pool.query(
       `SELECT id_usulan, status FROM verifikasi_program WHERE id_usulan=ANY($1) AND LOWER(email_program)=LOWER($2)`,
       [ids, params.email_program]
     );
-    svResult.rows.forEach(r => { sudahVerifMap[r.id_usulan] = r.status === 'Selesai'; });
+    svResult.rows.forEach(r => {
+      sudahVerifMap[r.id_usulan] = r.status === 'Selesai';
+      myVerifStatusMap[r.id_usulan] = r.status;
+    });
   }
 
   return ok(result.rows.map(r => ({
     ...mapHeader(r),
     vpProgress: vpMap[r.id_usulan] || null,
-    sudahVerif: sudahVerifMap[r.id_usulan] || false
+    sudahVerif: sudahVerifMap[r.id_usulan] || false,
+    myVerifStatus: myVerifStatusMap[r.id_usulan] || null
   })));
 }
 

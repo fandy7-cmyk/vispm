@@ -1,69 +1,73 @@
+const { GoogleAuth } = require('google-auth-library');
+const { google } = require('googleapis');
+const { Readable } = require('stream');
+
+async function getAuthClient() {
+  const auth = new GoogleAuth({
+    credentials: {
+      client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+      private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+    },
+    scopes: ['https://www.googleapis.com/auth/drive'],
+  });
+  return auth.getClient();
+}
+
 exports.handler = async (event) => {
   const headers = { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers, body: '' };
 
   try {
     const body = JSON.parse(event.body || '{}');
-    const { accessToken, fileName, fileBase64, folderId, folderPath } = body;
+    const { fileName, fileBase64, folderId, folderPath } = body;
 
-    if (!accessToken || !fileName || !fileBase64 || !folderId) {
+    if (!fileName || !fileBase64 || !folderId) {
       return { statusCode: 400, headers, body: JSON.stringify({ success: false, error: 'Missing required fields' }) };
     }
 
-    // ==============================
-    // RESOLVE TARGET FOLDER
-    // Kalau ada folderPath = ['PKM11','2026','05-Mei','Indikator','1']
-    // Buat subfolder secara rekursif dari folderId (root)
-    // ==============================
+    const authClient = await getAuthClient();
+    const drive = google.drive({ version: 'v3', auth: authClient });
+
+    // Resolve subfolder
     let targetFolderId = folderId;
     if (folderPath && Array.isArray(folderPath) && folderPath.length > 0) {
       for (const folderName of folderPath) {
-        targetFolderId = await findOrCreateFolder(accessToken, folderName, targetFolderId);
+        targetFolderId = await findOrCreateFolder(drive, folderName, targetFolderId);
       }
     }
 
-    // ==============================
-    // UPLOAD FILE
-    // ==============================
+    // Upload file
     const base64Data = fileBase64.includes(',') ? fileBase64.split(',')[1] : fileBase64;
-    const fileBytes = Buffer.from(base64Data, 'base64');
+    const fileBuffer = Buffer.from(base64Data, 'base64');
+    const stream = Readable.from(fileBuffer);
 
-    const boundary = 'spm_boundary_xyz';
-    const metadata = { name: fileName, parents: [targetFolderId] };
-    const multipartBody = Buffer.concat([
-      Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n--${boundary}\r\nContent-Type: application/octet-stream\r\n\r\n`),
-      fileBytes,
-      Buffer.from(`\r\n--${boundary}--`)
-    ]);
+    // Detect mime type dari extension
+    const ext = fileName.split('.').pop().toLowerCase();
+    const mimeMap = { pdf: 'application/pdf', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', doc: 'application/msword', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', xls: 'application/vnd.ms-excel', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' };
+    const mimeType = mimeMap[ext] || 'application/octet-stream';
 
-    const uploadRes = await fetch(
-      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': `multipart/related; boundary=${boundary}`,
-          'Content-Length': multipartBody.length
-        },
-        body: multipartBody
-      }
-    );
+    const uploaded = await drive.files.create({
+      requestBody: { name: fileName, parents: [targetFolderId] },
+      media: { mimeType, body: stream },
+      fields: 'id,name,webViewLink'
+    });
 
-    const result = await uploadRes.json();
-    console.log('Drive upload response:', result);
+    const fileId = uploaded.data.id;
+    const fileUrl = `https://drive.google.com/file/d/${fileId}/view`;
 
-    if (!uploadRes.ok) {
-      return { statusCode: uploadRes.status, headers, body: JSON.stringify({ success: false, error: result.error?.message || 'Upload gagal' }) };
-    }
+    // Set permission — anyone with link can view (agar bisa preview di sistem)
+    await drive.permissions.create({
+      fileId,
+      requestBody: { role: 'reader', type: 'anyone' }
+    });
 
-    const fileUrl = `https://drive.google.com/file/d/${result.id}/view`;
     return {
       statusCode: 200,
       headers,
       body: JSON.stringify({
         success: true,
-        data: { fileId: result.id, name: result.name, fileUrl },
-        fileId: result.id,
+        data: { fileId, name: uploaded.data.name, fileUrl },
+        fileId,
         fileUrl
       })
     };
@@ -74,21 +78,17 @@ exports.handler = async (event) => {
   }
 };
 
-// Helper: cari folder by name di parent, kalau tidak ada buat baru
-async function findOrCreateFolder(accessToken, folderName, parentId) {
-  const searchRes = await fetch(
-    `https://www.googleapis.com/drive/v3/files?q=name='${folderName.replace(/'/g, "\\'")}' and mimeType='application/vnd.google-apps.folder' and '${parentId}' in parents and trashed=false&fields=files(id,name)`,
-    { headers: { Authorization: `Bearer ${accessToken}` } }
-  );
-  const searchData = await searchRes.json();
-  if (searchData.files && searchData.files.length > 0) return searchData.files[0].id;
-
-  const createRes = await fetch('https://www.googleapis.com/drive/v3/files', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: folderName, mimeType: 'application/vnd.google-apps.folder', parents: [parentId] })
+async function findOrCreateFolder(drive, folderName, parentId) {
+  const res = await drive.files.list({
+    q: `name='${folderName.replace(/'/g, "\\'")}' and mimeType='application/vnd.google-apps.folder' and '${parentId}' in parents and trashed=false`,
+    fields: 'files(id,name)',
+    spaces: 'drive'
   });
-  const folder = await createRes.json();
-  if (!folder.id) throw new Error(`Gagal membuat folder: ${folderName} (${JSON.stringify(folder)})`);
-  return folder.id;
+  if (res.data.files && res.data.files.length > 0) return res.data.files[0].id;
+
+  const folder = await drive.files.create({
+    requestBody: { name: folderName, mimeType: 'application/vnd.google-apps.folder', parents: [parentId] },
+    fields: 'id'
+  });
+  return folder.data.id;
 }

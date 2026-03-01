@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kebijakan Privasi — VISPM</title>
+<link rel="icon" type="image/png" href="/favicon.png">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --primary: #0d9488;
+    --primary-dark: #0f766e;
+    --dark: #0f172a;
+    --text: #1e293b;
+    --text-light: #64748b;
+    --border: #e2e8f0;
+    --bg: #f8fafc;
+  }
+
+  body {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    color: var(--text);
+    background: white;
+    line-height: 1.7;
+  }
+
+  /* HEADER */
+  header {
+    background: linear-gradient(135deg, #0b2419 0%, #0d3426 60%, #0f3d2c 100%);
+    padding: 48px 24px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  header::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at 50% 0%, rgba(13,148,136,0.25) 0%, transparent 70%);
+  }
+  .header-inner { position: relative; z-index: 1; max-width: 720px; margin: 0 auto; }
+  .logo-badge {
+    display: inline-flex; align-items: center; gap: 10px;
+    background: rgba(13,148,136,0.15); border: 1px solid rgba(13,148,136,0.4);
+    border-radius: 100px; padding: 8px 18px; margin-bottom: 20px;
+  }
+  .logo-dot { width: 8px; height: 8px; border-radius: 50%; background: #0d9488; }
+  .logo-text { font-size: 12px; font-weight: 700; color: #5eead4; letter-spacing: 1.5px; text-transform: uppercase; }
+  header h1 { font-size: clamp(24px, 4vw, 36px); font-weight: 800; color: white; margin-bottom: 12px; }
+  header p { font-size: 15px; color: rgba(255,255,255,0.6); }
+  .update-badge {
+    display: inline-block; margin-top: 16px;
+    background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 6px; padding: 4px 12px; font-size: 12px; color: rgba(255,255,255,0.5);
+  }
+
+  /* NAV */
+  nav {
+    background: white; border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 100;
+    box-shadow: 0 1px 8px rgba(0,0,0,0.06);
+  }
+  .nav-inner {
+    max-width: 960px; margin: 0 auto; padding: 0 24px;
+    display: flex; align-items: center; gap: 4px; overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .nav-inner::-webkit-scrollbar { display: none; }
+  .nav-link {
+    white-space: nowrap; padding: 14px 16px; font-size: 13px; font-weight: 600;
+    color: var(--text-light); text-decoration: none; border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+  }
+  .nav-link:hover { color: var(--primary); border-bottom-color: var(--primary); }
+
+  /* CONTENT */
+  main { max-width: 760px; margin: 0 auto; padding: 56px 24px 80px; }
+
+  .section { margin-bottom: 48px; }
+  .section-number {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 28px; height: 28px; border-radius: 8px;
+    background: linear-gradient(135deg, #0d9488, #06b6d4);
+    color: white; font-size: 12px; font-weight: 800; margin-bottom: 12px;
+  }
+  h2 {
+    font-size: 20px; font-weight: 800; color: var(--dark);
+    margin-bottom: 16px; padding-bottom: 12px;
+    border-bottom: 2px solid var(--border);
+  }
+  p { font-size: 15px; color: #334155; margin-bottom: 14px; }
+  p:last-child { margin-bottom: 0; }
+
+  ul, ol { padding-left: 20px; margin-bottom: 14px; }
+  li { font-size: 15px; color: #334155; margin-bottom: 8px; }
+
+  /* INFO BOX */
+  .info-box {
+    background: #e6fffa; border: 1px solid #99f6e4; border-left: 3px solid #0d9488;
+    border-radius: 8px; padding: 14px 18px; margin-bottom: 16px;
+    font-size: 14px; color: #0f766e;
+  }
+  .info-box strong { color: #065f46; }
+
+  .warning-box {
+    background: #fffbeb; border: 1px solid #fde68a; border-left: 3px solid #f59e0b;
+    border-radius: 8px; padding: 14px 18px; margin-bottom: 16px;
+    font-size: 14px; color: #92400e;
+  }
+
+  /* DATA TABLE */
+  .data-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 14px; }
+  .data-table th {
+    background: var(--dark); color: white; padding: 10px 14px;
+    text-align: left; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .data-table td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .data-table tr:last-child td { border-bottom: none; }
+  .data-table tr:nth-child(even) td { background: var(--bg); }
+  .badge-yes { color: #059669; font-weight: 700; }
+  .badge-no { color: #dc2626; font-weight: 700; }
+
+  /* CONTACT */
+  .contact-card {
+    background: linear-gradient(135deg, #0b2419, #0d3426);
+    border-radius: 16px; padding: 32px; color: white; margin-top: 48px;
+    text-align: center;
+  }
+  .contact-card h3 { font-size: 18px; font-weight: 800; margin-bottom: 8px; }
+  .contact-card p { color: rgba(255,255,255,0.7); font-size: 14px; margin-bottom: 20px; }
+  .contact-card a {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: #0d9488; color: white; padding: 10px 24px;
+    border-radius: 8px; text-decoration: none; font-weight: 700; font-size: 14px;
+    transition: background 0.2s;
+  }
+  .contact-card a:hover { background: #0f766e; }
+
+  /* BACK LINK */
+  .back-link {
+    display: inline-flex; align-items: center; gap: 6px;
+    color: var(--primary); text-decoration: none; font-size: 14px; font-weight: 600;
+    margin-bottom: 40px; padding: 8px 0;
+  }
+  .back-link:hover { color: var(--primary-dark); }
+  .back-link::before { content: '←'; font-size: 16px; }
+
+  /* FOOTER */
+  footer {
+    background: var(--dark); color: rgba(255,255,255,0.4);
+    text-align: center; padding: 24px; font-size: 12px;
+  }
+  footer a { color: #0d9488; text-decoration: none; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="header-inner">
+    <div class="logo-badge">
+      <div class="logo-dot"></div>
+      <span class="logo-text">VISPM · Verifikasi Indeks SPM</span>
+    </div>
+    <h1>Kebijakan Privasi</h1>
+    <p>Transparansi tentang bagaimana kami mengelola data Anda</p>
+    <div class="update-badge">Terakhir diperbarui: 1 Maret 2026</div>
+  </div>
+</header>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-inner">
+    <a href="#informasi" class="nav-link">Informasi yang Dikumpulkan</a>
+    <a href="#penggunaan" class="nav-link">Penggunaan Data</a>
+    <a href="#google-drive" class="nav-link">Google Drive</a>
+    <a href="#keamanan" class="nav-link">Keamanan</a>
+    <a href="#hak-pengguna" class="nav-link">Hak Pengguna</a>
+    <a href="#kontak" class="nav-link">Kontak</a>
+  </div>
+</nav>
+
+<!-- MAIN CONTENT -->
+<main>
+  <a href="/" class="back-link">Kembali ke Aplikasi</a>
+
+  <div class="info-box">
+    <strong>Ringkasan:</strong> VISPM hanya mengumpulkan data yang diperlukan untuk verifikasi Standar Pelayanan Minimal (SPM) Puskesmas. Kami tidak menjual, menyewakan, atau membagikan data Anda kepada pihak ketiga untuk tujuan komersial.
+  </div>
+
+  <!-- SECTION 1 -->
+  <div class="section" id="informasi">
+    <div class="section-number">1</div>
+    <h2>Informasi yang Kami Kumpulkan</h2>
+    <p>Aplikasi VISPM mengumpulkan informasi berikut dalam rangka menjalankan sistem verifikasi SPM Puskesmas:</p>
+
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Jenis Data</th>
+          <th>Contoh</th>
+          <th>Disimpan?</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Identitas Pengguna</strong></td>
+          <td>Nama, alamat email</td>
+          <td class="badge-yes">✓ Ya</td>
+        </tr>
+        <tr>
+          <td><strong>Data SPM</strong></td>
+          <td>Target, capaian, indeks indikator</td>
+          <td class="badge-yes">✓ Ya</td>
+        </tr>
+        <tr>
+          <td><strong>Dokumen Bukti</strong></td>
+          <td>File data dukung indikator</td>
+          <td class="badge-yes">✓ Di Google Drive</td>
+        </tr>
+        <tr>
+          <td><strong>Riwayat Verifikasi</strong></td>
+          <td>Status approval, catatan, timestamp</td>
+          <td class="badge-yes">✓ Ya</td>
+        </tr>
+        <tr>
+          <td><strong>Token OAuth Google</strong></td>
+          <td>Access token Drive</td>
+          <td class="badge-yes">✓ Lokal (browser)</td>
+        </tr>
+        <tr>
+          <td><strong>Data Lokasi</strong></td>
+          <td>GPS, IP address</td>
+          <td class="badge-no">✗ Tidak</td>
+        </tr>
+        <tr>
+          <td><strong>Data Pembayaran</strong></td>
+          <td>Kartu kredit, rekening</td>
+          <td class="badge-no">✗ Tidak</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- SECTION 2 -->
+  <div class="section" id="penggunaan">
+    <div class="section-number">2</div>
+    <h2>Bagaimana Kami Menggunakan Data</h2>
+    <p>Data yang dikumpulkan digunakan semata-mata untuk keperluan:</p>
+    <ul>
+      <li>Menjalankan sistem verifikasi dan pelaporan Indeks SPM Puskesmas</li>
+      <li>Autentikasi pengguna dan kontrol akses berdasarkan peran (Operator, Kapus, Pengelola Program, Admin)</li>
+      <li>Menyimpan riwayat verifikasi dan persetujuan untuk keperluan audit</li>
+      <li>Menghasilkan laporan resmi indeks SPM per periode</li>
+      <li>Mengunggah dan mengelola dokumen data dukung ke Google Drive milik pengguna</li>
+    </ul>
+    <div class="warning-box">
+      <strong>Kami tidak menggunakan data Anda untuk:</strong> iklan, analitik komersial, profiling, atau dibagikan ke pihak ketiga di luar keperluan operasional sistem ini.
+    </div>
+  </div>
+
+  <!-- SECTION 3 -->
+  <div class="section" id="google-drive">
+    <div class="section-number">3</div>
+    <h2>Integrasi Google Drive</h2>
+    <p>VISPM menggunakan Google OAuth 2.0 untuk mengakses Google Drive pengguna dalam rangka menyimpan dokumen data dukung indikator SPM.</p>
+
+    <div class="info-box">
+      <strong>Scope yang digunakan:</strong> <code>https://www.googleapis.com/auth/drive.file</code><br>
+      Akses ini <strong>hanya terbatas pada file yang dibuat oleh aplikasi VISPM</strong>. Kami tidak dapat membaca, mengubah, atau menghapus file lain di Google Drive Anda.
+    </div>
+
+    <p>Rincian penggunaan integrasi Google Drive:</p>
+    <ul>
+      <li>File data dukung diunggah ke folder yang Anda tentukan di Google Drive</li>
+      <li>Struktur folder mengikuti format: <code>Nama-PKM / Tahun / Bulan / Indikator / No</code></li>
+      <li>Token akses disimpan di browser lokal (localStorage) dan tidak dikirim ke server kami</li>
+      <li>Token di-refresh secara otomatis menggunakan refresh token yang tersimpan lokal</li>
+      <li>Anda dapat mencabut akses kapan saja melalui pengaturan akun Google Anda</li>
+    </ul>
+
+    <p>Penggunaan data dari Google API mematuhi <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" style="color:#0d9488">Google API Services User Data Policy</a>, termasuk ketentuan Limited Use.</p>
+  </div>
+
+  <!-- SECTION 4 -->
+  <div class="section" id="keamanan">
+    <div class="section-number">4</div>
+    <h2>Keamanan Data</h2>
+    <p>Kami menerapkan langkah-langkah keamanan berikut untuk melindungi data Anda:</p>
+    <ul>
+      <li><strong>HTTPS:</strong> Seluruh komunikasi antara browser dan server dienkripsi menggunakan TLS</li>
+      <li><strong>Autentikasi berbasis email:</strong> Akses hanya diberikan kepada email yang terdaftar oleh Administrator</li>
+      <li><strong>Kontrol akses peran:</strong> Setiap pengguna hanya dapat mengakses data sesuai perannya</li>
+      <li><strong>Token OAuth lokal:</strong> Token Google Drive tidak disimpan di database kami, hanya di browser pengguna</li>
+      <li><strong>Database terenkripsi:</strong> Data disimpan di Neon PostgreSQL dengan enkripsi at-rest</li>
+    </ul>
+    <div class="warning-box">
+      Meskipun kami menerapkan langkah keamanan terbaik, tidak ada sistem yang 100% aman. Segera laporkan kepada Administrator jika Anda mencurigai adanya akses tidak sah.
+    </div>
+  </div>
+
+  <!-- SECTION 5 -->
+  <div class="section" id="retensi">
+    <div class="section-number">5</div>
+    <h2>Penyimpanan & Retensi Data</h2>
+    <p>Data disimpan selama akun pengguna aktif dalam sistem. Ketentuan retensi:</p>
+    <ul>
+      <li>Data usulan dan verifikasi disimpan permanen untuk keperluan audit dan pelaporan dinas</li>
+      <li>Akun pengguna yang dinonaktifkan tidak dihapus, hanya diblokir aksesnya</li>
+      <li>File data dukung di Google Drive sepenuhnya berada di bawah kendali pemilik akun Google</li>
+      <li>Penghapusan data hanya dapat dilakukan oleh Administrator sistem</li>
+    </ul>
+  </div>
+
+  <!-- SECTION 6 -->
+  <div class="section" id="hak-pengguna">
+    <div class="section-number">6</div>
+    <h2>Hak Pengguna</h2>
+    <p>Sebagai pengguna sistem VISPM, Anda berhak untuk:</p>
+    <ul>
+      <li><strong>Mengakses data:</strong> Melihat semua data yang tersimpan terkait akun Anda</li>
+      <li><strong>Meminta koreksi:</strong> Meminta Administrator memperbaiki data yang tidak akurat</li>
+      <li><strong>Mencabut akses Google:</strong> Kapan saja melalui <a href="https://myaccount.google.com/permissions" target="_blank" style="color:#0d9488">Google Account Permissions</a></li>
+      <li><strong>Pertanyaan privasi:</strong> Mengajukan pertanyaan terkait penggunaan data kepada Administrator</li>
+    </ul>
+  </div>
+
+  <!-- SECTION 7 -->
+  <div class="section" id="perubahan">
+    <div class="section-number">7</div>
+    <h2>Perubahan Kebijakan</h2>
+    <p>Kebijakan privasi ini dapat diperbarui sewaktu-waktu. Perubahan signifikan akan diberitahukan kepada pengguna melalui notifikasi dalam aplikasi. Tanggal pembaruan terakhir selalu tercantum di bagian atas halaman ini.</p>
+    <p>Dengan terus menggunakan aplikasi VISPM setelah perubahan kebijakan, Anda dianggap menyetujui kebijakan yang diperbarui.</p>
+  </div>
+
+  <!-- CONTACT CARD -->
+  <div class="contact-card" id="kontak">
+    <h3>Ada Pertanyaan tentang Privasi?</h3>
+    <p>Hubungi Administrator sistem VISPM di instansi Anda untuk pertanyaan terkait data dan privasi.</p>
+    <a href="/">← Kembali ke Aplikasi</a>
+  </div>
+
+</main>
+
+<!-- FOOTER -->
+<footer>
+  <p>© 2026 VISPM — Sistem Verifikasi Indeks SPM Puskesmas &nbsp;·&nbsp; <a href="/privacy.html">Kebijakan Privasi</a></p>
+</footer>
+
+</body>
+</html>

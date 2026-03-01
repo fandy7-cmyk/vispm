@@ -50,33 +50,44 @@ body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); colo
 /* ===== AUTH SCREEN ===== */
 #authScreen {
   position: fixed; inset: 0; z-index: 9999;
-  background: linear-gradient(135deg, #0f172a 0%, #0d9488 50%, #06b6d4 100%);
   display: flex; align-items: center; justify-content: center;
+  background: url('/bg.jpg') center/cover no-repeat;
+}
+#authScreen::before {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(135deg, rgba(5,30,22,0.85) 0%, rgba(10,50,38,0.78) 100%);
 }
 .auth-card {
-  background: rgba(255,255,255,0.98);
-  border-radius: 24px;
-  padding: 48px 40px;
-  width: 400px; max-width: 90%;
-  box-shadow: 0 32px 64px rgba(0,0,0,0.3);
+  position: relative; z-index: 1;
+  background: rgba(255,255,255,0.97);
+  border-radius: 20px;
+  padding: 40px;
+  width: 100%; max-width: 420px;
+  box-shadow: 0 32px 80px rgba(0,0,0,0.4);
   text-align: center;
-  backdrop-filter: blur(20px);
 }
 .auth-logo {
-  width: 64px; height: 64px; border-radius: 16px;
+  width: 76px; height: 76px; border-radius: 18px;
   background: linear-gradient(135deg, #0d9488, #06b6d4);
   display: flex; align-items: center; justify-content: center;
-  margin: 0 auto 20px;
-  box-shadow: 0 8px 24px rgba(13,148,136,0.3);
+  margin: 0 auto 16px;
+  box-shadow: 0 8px 24px rgba(13,148,136,0.35);
+  overflow: hidden;
 }
-.auth-logo .material-icons { font-size: 32px; color: white; }
-.auth-card h2 { font-size: 22px; font-weight: 800; color: var(--text); margin-bottom: 6px; }
-.auth-card p { font-size: 13px; color: var(--text-light); margin-bottom: 28px; }
+.auth-logo img { width: 48px; height: 48px; object-fit: contain; }
+.auth-logo .material-icons { font-size: 34px; color: white; }
+.auth-instansi {
+  font-size: 11px; font-weight: 700; color: var(--primary);
+  text-transform: uppercase; letter-spacing: 0.6px;
+  line-height: 1.5; margin-bottom: 8px;
+}
+.auth-card h2 { font-size: 24px; font-weight: 800; color: var(--text); margin-bottom: 4px; }
+.auth-card > p { font-size: 13px; color: var(--text-light); margin-bottom: 28px; }
 .auth-input {
   width: 100%; padding: 12px 16px; border: 2px solid var(--border);
   border-radius: 10px; font-size: 14px; font-family: inherit;
   transition: all 0.2s; margin-bottom: 16px;
-  background: var(--border-light);
+  background: var(--border-light); box-sizing: border-box;
 }
 .auth-input:focus { outline: none; border-color: var(--primary); background: white; }
 .auth-btn {
@@ -388,9 +399,13 @@ textarea.form-control { resize: vertical; }
 <!-- AUTH SCREEN -->
 <div id="authScreen">
   <div class="auth-card">
-    <div class="auth-logo"><span class="material-icons">verified</span></div>
-    <h2>Verifikasi Indeks SPM</h2>
-    <p>Sistem Penilaian Standar Pelayanan Minimal Puskesmas</p>
+    <div class="auth-logo">
+      <img src="/favicon.png" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+      <span class="material-icons" style="display:none">verified</span>
+    </div>
+    <div class="auth-instansi">Dinas Kesehatan, Pengendalian Penduduk dan Keluarga Berencana<br>Kabupaten Banggai Laut</div>
+    <h2>VISPM</h2>
+    <p>Verifikasi Indeks Standar Pelayanan Minimal</p>
     <input type="email" id="authEmail" class="auth-input" placeholder="Email akun Anda..." autocomplete="email" onkeydown="if(event.key==='Enter')doLogin()">
     <button class="auth-btn" id="authBtn" onclick="doLogin()">
       <span class="material-icons">login</span>
@@ -408,10 +423,12 @@ textarea.form-control { resize: vertical; }
   <div class="sidebar" id="sidebar">
     <div class="sidebar-header">
       <div class="sidebar-logo">
-        <div class="sidebar-logo-icon"><span class="material-icons">verified</span></div>
+        <div class="sidebar-logo-icon" style="background:transparent;padding:0;overflow:hidden">
+          <img src="/favicon.png" style="width:40px;height:40px;object-fit:contain;border-radius:8px" onerror="this.outerHTML='<span class=\"material-icons\" style=\"font-size:22px;color:white\">verified</span>'">
+        </div>
         <div>
-          <div class="sidebar-logo-text">SPM Puskesmas</div>
-          <div class="sidebar-logo-sub">Verifikasi Indeks</div>
+          <div class="sidebar-logo-text">VISPM</div>
+          <div class="sidebar-logo-sub">Verifikasi Indeks Standar Pelayanan Minimal</div>
         </div>
       </div>
       <div class="sidebar-user">
@@ -504,8 +521,7 @@ textarea.form-control { resize: vertical; }
         <table class="ind-table">
           <thead>
             <tr>
-              <th>No</th><th>Nama Indikator</th><th>Bobot</th>
-              <th>Target (%)</th><th>Capaian</th><th>Bukti</th>
+              <th>No</th><th>Nama Indikator</th><th>Target</th><th>Capaian</th><th>Bukti</th>
             </tr>
           </thead>
           <tbody id="indikatorInputBody"></tbody>
@@ -520,7 +536,7 @@ textarea.form-control { resize: vertical; }
       <div id="indModalLockNotif" style="display:none;align-items:center;gap:8px;padding:8px 14px;background:#e6fffa;border-radius:8px;border:1.5px solid #0d9488;flex:1;min-width:200px;font-size:13px"></div>
       <button class="btn btn-secondary" onclick="closeModal('indikatorModal')">Tutup</button>
       <button class="btn btn-primary" onclick="submitUsulanFromModal()" id="btnSubmitFromModal">
-        <span class="material-icons">send</span> Submit ke Kapus
+        <span class="material-icons">send</span> Submit ke Kepala Puskesmas
       </button>
     </div>
   </div>

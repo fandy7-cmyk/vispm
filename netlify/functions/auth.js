@@ -8,18 +8,21 @@ exports.handler = async (event) => {
 
   try {
     const pool = getPool();
-    const { email, password, action } = JSON.parse(event.body || '{}');
+    const body = JSON.parse(event.body || '{}');
+    const { email, password, action, oldPassword, newPassword, targetEmail } = body;
 
     // ===== CHANGE PASSWORD =====
     if (action === 'change-password') {
-      const { oldPassword, newPassword } = JSON.parse(event.body);
       if (!email || !oldPassword || !newPassword) return err('Data tidak lengkap');
       if (newPassword.length < 6) return err('Password minimal 6 karakter');
       const res = await pool.query('SELECT password_hash FROM users WHERE LOWER(email)=LOWER($1)', [email.trim()]);
       if (!res.rows.length) return err('User tidak ditemukan');
       const hash = res.rows[0].password_hash;
       if (hash) {
-        const match = bcrypt ? await bcrypt.compare(oldPassword, hash) : oldPassword === hash;
+        let match = (oldPassword === hash);
+        if (!match && bcrypt && hash.startsWith('$2')) {
+          try { match = await bcrypt.compare(oldPassword, hash); } catch(e) { match = false; }
+        }
         if (!match) return err('Password lama tidak sesuai');
       }
       const newHash = (bcrypt && typeof bcrypt.hash === 'function') ? await bcrypt.hash(newPassword, 10) : newPassword;
@@ -29,9 +32,8 @@ exports.handler = async (event) => {
 
     // ===== RESET PASSWORD (admin) =====
     if (action === 'reset-password') {
-      const { targetEmail, newPassword } = JSON.parse(event.body);
       if (!newPassword) return err('Password baru diperlukan');
-      const newHash = bcrypt ? await bcrypt.hash(newPassword, 10) : newPassword;
+      const newHash = (bcrypt && typeof bcrypt.hash === 'function') ? await bcrypt.hash(newPassword, 10) : newPassword;
       await pool.query('UPDATE users SET password_hash=$1 WHERE LOWER(email)=LOWER($2)', [newHash, targetEmail.trim()]);
       return ok({ message: 'Password berhasil direset' });
     }

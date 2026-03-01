@@ -4,6 +4,9 @@ let currentPage = '';
 let pageData = {}; // cache per page
 let verifCurrentUsulan = null; // for verifikasi modal
 
+// ===== GOOGLE DRIVE CONFIG =====
+window.GDRIVE_FOLDER_ID = "1WYRRcm5oxbCaPx8s9XNUkTUe1b85wuDG";
+
 // ============== AUTH ==============
 async function doLogin() {
   const email = document.getElementById('authEmail').value.trim();
@@ -746,14 +749,19 @@ async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, tahun
         reader.readAsDataURL(file);
       });
 
-      const res = await fetch('/api/drive-upload', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          kodePKM, tahun, bulan, namaBulan, noIndikator,
-          fileName: file.name, mimeType: file.type || 'application/octet-stream', fileData: base64
-        })
-      });
+const res = await fetch("/.netlify/functions/drive-upload", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify({
+    accessToken: window.ACCESS_TOKEN,
+    fileName: file.name,
+    fileBase64: base64,
+    folderId: window.GDRIVE_FOLDER_ID
+  })
+});
+
       const result = await res.json();
       // ok() wraps data in {success:true, data:{...}}
       if (!res.ok || !result.success) throw new Error(result.data?.error || result.message || result.error || 'Upload gagal');

@@ -392,7 +392,7 @@ async function approveKapus(pool, body) {
   const result = await pool.query(
     `SELECT uh.status_global, uh.kode_pkm, u.kode_pkm as kapus_pkm
      FROM usulan_header uh
-     LEFT JOIN users u ON LOWER(u.email)=LOWER($2) AND u.role='Kepala Puskesmas'
+     LEFT JOIN users u ON LOWER(u.email)=LOWER($2) AND u.role IN ('Kapus','Kepala Puskesmas')
      WHERE uh.id_usulan=$1`,
     [idUsulan, email]
   );
@@ -407,8 +407,8 @@ async function approveKapus(pool, body) {
     `UPDATE usulan_header SET status_kapus='Selesai',status_global='Menunggu Pengelola Program',kapus_approved_by=$1,kapus_approved_at=NOW(),kapus_catatan=$2 WHERE id_usulan=$3`,
     [email, catatan||'', idUsulan]
   );
-  await logAktivitas(pool, email, 'Kapus', 'Approve', idUsulan, catatan||'Disetujui Kapus');
-  return ok({ message: 'Usulan disetujui Kapus' });
+  await logAktivitas(pool, email, 'Kepala Puskesmas', 'Approve', idUsulan, catatan||'Disetujui Kepala Puskesmas');
+  return ok({ message: 'Usulan disetujui Kepala Puskesmas' });
 }
 
 async function approveProgram(pool, body) {

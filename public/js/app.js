@@ -40,14 +40,16 @@ async function doLogin() {
   const email = document.getElementById('authEmail').value.trim();
   if (!email) return setAuthStatus('Masukkan email Anda', 'error');
 
+  const password = document.getElementById('authPassword')?.value || '';
+  if (!password) return setAuthStatus('Masukkan password Anda', 'error');
+
   const btn = document.getElementById('authBtn');
-  const status = document.getElementById('authStatus');
   btn.disabled = true;
   btn.innerHTML = '<span class="material-icons" style="animation:spin 0.8s linear infinite">refresh</span> Memeriksa...';
   setAuthStatus('Memeriksa akses...', '');
 
   try {
-    const user = await API.login(email);
+    const user = await API.login(email, password);
     currentUser = user;
     localStorage.setItem('spm_user', JSON.stringify(user));
     startApp();
@@ -57,6 +59,13 @@ async function doLogin() {
     btn.disabled = false;
     btn.innerHTML = '<span class="material-icons">login</span> Masuk ke Sistem';
   }
+}
+
+function toggleAuthPw() {
+  const inp = document.getElementById('authPassword');
+  const icon = document.getElementById('authPwIcon');
+  if (inp.type === 'password') { inp.type = 'text'; icon.textContent = 'visibility'; }
+  else { inp.type = 'password'; icon.textContent = 'visibility_off'; }
 }
 
 function setAuthStatus(msg, type) {
@@ -333,7 +342,7 @@ function renderKepalasDashboard(el, d) {
     </div>`;
 
   API.getUsulan({ kode_pkm: currentUser.kodePKM, status: 'Menunggu Kepala Puskesmas' }).then(rows => {
-    document.getElementById('pendingTable').innerHTML = renderUsulanTable(rows, 'kapus');
+    document.getElementById('pendingTable').innerHTML = renderUsulanTable(rows, 'kepala-puskesmas');
   }).catch(() => {});
 }
 
@@ -441,7 +450,7 @@ function renderUsulanTable(rows, role) {
       ? `<button class="btn-icon" onclick="downloadLaporanPDF('${u.idUsulan}')" title="Download Laporan PDF" style="background:transparent;border:none;color:#64748b" title="Download Laporan"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10"/><path d="m8 9 4 4 4-4"/><path d="M4 17c0 2.2 1.8 4 4 4h8c2.2 0 4-1.8 4-4"/></svg></button>`
       : '';
 
-    if (['kapus', 'program', 'admin'].includes(role)) {
+    if (['kepala-puskesmas', 'program', 'admin'].includes(role)) {
       return viewBtn + pdfBtn + verifBtn;
     }
     return viewBtn;
@@ -1111,11 +1120,7 @@ async function doSubmitUsulan(forceSubmit) {
     const successMsg = raw.data?.message || raw.message || 'Usulan berhasil disubmit!';
     toast('✅ ' + successMsg, 'success');
     // Tampilkan notifikasi sukses di dalam modal
-    const lockNotif = document.getElementById('indModalLockNotif');
-    if (lockNotif) {
-      lockNotif.innerHTML = `<span class="material-icons" style="color:#0d9488;font-size:18px">check_circle</span><span style="font-weight:600;color:#0d9488">${successMsg} Status: Menunggu Verifikasi Kepala Puskesmas.</span>`;
-      lockNotif.style.cssText = 'display:flex;align-items:center;gap:8px;padding:8px 14px;background:#e6fffa;border-radius:8px;border:1.5px solid #0d9488;flex:1;font-size:13px';
-    }
+    // Notifikasi sukses sudah tampil via toast di atas
     // Sembunyikan tombol submit
     const submitBtn2 = document.getElementById('btnSubmitFromModal');
     if (submitBtn2) submitBtn2.style.display = 'none';
@@ -1415,15 +1420,27 @@ async function doApprove() {
     else if (role === 'Admin') result = await API.approveAdmin({ idUsulan: verifCurrentUsulan, email: currentUser.email, catatan });
 
     toast(result?.message || 'Berhasil disetujui!', 'success');
-    closeModal('verifikasiModal');
-    renderVerifikasi();
 
-    // Admin: offer PDF download after final approve
+    // Tombol Setujui jadi hijau dan disabled sebagai indikator visual
+    const btnApprove = document.getElementById('btnApprove');
+    const btnReject = document.getElementById('btnReject');
+    if (btnApprove) {
+      btnApprove.style.background = '#16a34a';
+      btnApprove.innerHTML = '<span class="material-icons">check_circle</span> Sudah Disetujui';
+      btnApprove.disabled = true;
+    }
+    if (btnReject) btnReject.disabled = true;
+
+    setTimeout(() => {
+      closeModal('verifikasiModal');
+      renderVerifikasi();
+    }, 1000);
+
     if (role === 'Admin') {
       setTimeout(() => {
         showConfirm({ title: 'Laporan Tersedia', message: 'Usulan selesai diverifikasi. Download laporan PDF sekarang?', type: 'warning',
           onConfirm: () => downloadLaporanPDF(verifCurrentUsulan) });
-      }, 800);
+      }, 1200);
     }
   } catch (e) { toast(e.message, 'error'); }
   finally { setLoading(false); }
@@ -1440,6 +1457,34 @@ async function doReject() {
     renderVerifikasi();
   } catch (e) { toast(e.message, 'error'); }
   finally { setLoading(false); }
+}
+
+// ===== UBAH PASSWORD =====
+function showChangePassword() {
+  document.getElementById('cpOld').value = '';
+  document.getElementById('cpNew').value = '';
+  document.getElementById('cpConfirm').value = '';
+  document.getElementById('cpStatus').textContent = '';
+  openModal('changePasswordModal');
+}
+
+async function doChangePassword() {
+  const oldPw = document.getElementById('cpOld').value;
+  const newPw = document.getElementById('cpNew').value;
+  const confirmPw = document.getElementById('cpConfirm').value;
+  const statusEl = document.getElementById('cpStatus');
+
+  if (!newPw || newPw.length < 6) { statusEl.textContent = 'Password baru minimal 6 karakter'; return; }
+  if (newPw !== confirmPw) { statusEl.textContent = 'Konfirmasi password tidak cocok'; return; }
+
+  setLoading(true);
+  try {
+    await API.post('auth', { action: 'change-password', email: currentUser.email, oldPassword: oldPw, newPassword: newPw });
+    toast('Password berhasil diubah!', 'success');
+    closeModal('changePasswordModal');
+  } catch(e) {
+    statusEl.textContent = e.message;
+  } finally { setLoading(false); }
 }
 
 // ============== LAPORAN ==============
@@ -1659,10 +1704,30 @@ function renderUsersTable(users) {
       <td>${u.aktif ? '<span class="badge badge-success">Aktif</span>' : '<span class="badge badge-default">Non-aktif</span>'}</td>
       <td style="display:flex;gap:4px">
         <button class="btn-icon edit" onclick="editUser('${u.email}')"><span class="material-icons">edit</span></button>
+        <button class="btn-icon" title="Reset Password" style="color:#0d9488" onclick="resetUserPassword('${u.email}','${u.nama}')"><span class="material-icons">lock_reset</span></button>
         <button class="btn-icon del" onclick="deleteUser('${u.email}')"><span class="material-icons">delete</span></button>
       </td>
     </tr>`).join('')}</tbody>
   </table></div>`;
+}
+
+function resetUserPassword(email, nama) {
+  showConfirm({
+    title: 'Reset Password',
+    message: `Reset password untuk ${nama} (${email})? Masukkan password baru:`,
+    type: 'warning',
+    inputField: true,
+    inputPlaceholder: 'Password baru (min. 6 karakter)',
+    onConfirm: async (newPassword) => {
+      if (!newPassword || newPassword.length < 6) { toast('Password minimal 6 karakter', 'error'); return; }
+      setLoading(true);
+      try {
+        await API.post('auth', { action: 'reset-password', targetEmail: email, newPassword });
+        toast(`Password ${nama} berhasil direset!`, 'success');
+      } catch(e) { toast(e.message, 'error'); }
+      finally { setLoading(false); }
+    }
+  });
 }
 
 function validateEmailInput(input) {

@@ -23,6 +23,19 @@ exports.handler = async (event) => {
 
     const user = result.rows[0];
 
+    // Normalisasi role lama → nama baru
+    const roleMap = { 'Kapus': 'Kepala Puskesmas', 'kapus': 'Kepala Puskesmas' };
+    if (roleMap[user.role]) user.role = roleMap[user.role];
+
+    // Normalisasi role lama → nama baru
+    const roleMap = {
+      'Kapus': 'Kepala Puskesmas',
+      'kapus': 'Kepala Puskesmas',
+      'Program': 'Pengelola Program',
+      'program': 'Pengelola Program',
+    };
+    if (roleMap[user.role]) user.role = roleMap[user.role];
+
     let indikatorList = [];
     if (user.role === 'Pengelola Program' && user.indikator_akses) {
       indikatorList = parseIndikatorAkses(user.indikator_akses.toString());

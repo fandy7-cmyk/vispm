@@ -2407,6 +2407,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const saved = localStorage.getItem('spm_user');
     if (saved) {
       currentUser = JSON.parse(saved);
+      // Normalisasi role lama → nama baru
+      const roleMap = { 'Kapus': 'Kepala Puskesmas', 'kapus': 'Kepala Puskesmas', 'Program': 'Pengelola Program' };
+      if (roleMap[currentUser.role]) {
+        currentUser.role = roleMap[currentUser.role];
+        localStorage.setItem('spm_user', JSON.stringify(currentUser)); // update localStorage
+      }
       startApp();
       startIdleWatcher();
     }

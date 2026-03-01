@@ -1715,9 +1715,10 @@ async function saveJabatan() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ nama, aktif, id: _editJabatanId })
     });
-    const data = await res.json();
-    if (!data.success) {
-      toast(data.message || 'Gagal menyimpan jabatan', 'error');
+    let data = {};
+    try { data = await res.json(); } catch(_) {}
+    if (!res.ok || !data.success) {
+      toast(data.message || 'Nama jabatan sudah ada atau terjadi kesalahan', 'error');
       return;
     }
     toast(`Jabatan "${nama}" berhasil ${_editJabatanId ? 'diperbarui' : 'ditambahkan'}`, 'success');

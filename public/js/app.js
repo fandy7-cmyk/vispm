@@ -1039,22 +1039,17 @@ function approvalBox(label, by, at, alasanTolak = '') {
 
 // ============== LAPORAN PDF ==============
 async function downloadLaporanPDF(idUsulan) {
-  toast('Menyiapkan laporan PDF...', 'success');
+  toast('Membuka laporan...', 'success');
   try {
     const res = await fetch(`/api/laporan-pdf?id=${idUsulan}`);
-    if (!res.ok) { toast('Gagal mengunduh laporan', 'error'); return; }
-    const blob = await res.blob();
+    if (!res.ok) { toast('Gagal memuat laporan', 'error'); return; }
+    const html = await res.text();
+    const blob = new Blob([html], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `Laporan_SPM_${idUsulan}.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    toast('✅ Laporan PDF berhasil diunduh', 'success');
+    const win = window.open(url, '_blank');
+    if (!win) toast('Aktifkan popup untuk download laporan', 'warning');
   } catch(e) {
-    toast('Gagal mengunduh: ' + e.message, 'error');
+    toast('Gagal: ' + e.message, 'error');
   }
 }
 // ============== VERIFIKASI ==============
@@ -1277,7 +1272,10 @@ async function loadLaporan() {
           <td style="font-size:11.5px;color:var(--text-light)">${formatDateTime(r.createdAt)}</td>
           <td class="rasio-cell" style="font-weight:700;color:var(--primary)">${parseFloat(r.indeksSPM||0).toFixed(2)}</td>
           <td>${statusBadge(r.statusGlobal)}</td>
-          <td><button class="btn-icon view" onclick="viewDetail('${r.idUsulan}')"><span class="material-icons">visibility</span></button></td>
+          <td style="white-space:nowrap">
+            <button class="btn-icon view" onclick="viewDetail('${r.idUsulan}')" title="Detail"><span class="material-icons">visibility</span></button>
+            ${r.statusGlobal === 'Selesai' ? `<button class="btn-icon" onclick="downloadLaporanPDF('${r.idUsulan}')" title="Download Laporan" style="background:transparent;border:none;color:#64748b"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10"/><path d="m8 9 4 4 4-4"/><path d="M4 17c0 2.2 1.8 4 4 4h8c2.2 0 4-1.8 4-4"/></svg></button>` : ''}
+          </td>
         </tr>`).join('')}
         </tbody>
       </table></div>`;

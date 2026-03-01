@@ -426,13 +426,15 @@ function renderUsulanTable(rows, role) {
     }
     // Tombol verifikasi hanya muncul kalau status SESUAI tahapan role
     const canVerif =
-      (role === 'kapus'   && u.statusGlobal === 'Menunggu Kepala Puskesmas') ||
+      (role === 'kepala-puskesmas' && u.statusGlobal === 'Menunggu Kepala Puskesmas') ||
       (role === 'program' && (u.statusGlobal === 'Menunggu Pengelola Program' || u.statusGlobal === 'Ditolak')) ||
       (role === 'admin'   && u.statusGlobal === 'Menunggu Admin');
 
-    // Untuk Pengelola Program: cek apakah user ini sudah approve
-    // sudahVerif = true hanya kalau status = 'Selesai', bukan 'Ditolak'
-    const sudahVerif = role === 'program' && u.sudahVerif === true && u.myVerifStatus === 'Selesai';
+    // Sudah verifikasi: untuk Kepala Puskesmas cek statusKapus, untuk Program cek myVerifStatus, untuk Admin cek Selesai
+    const sudahVerifKepala = role === 'kepala-puskesmas' && u.statusKapus === 'Selesai';
+    const sudahVerifProgram = role === 'program' && u.sudahVerif === true && u.myVerifStatus === 'Selesai';
+    const sudahVerifAdmin = role === 'admin' && u.statusGlobal === 'Selesai';
+    const sudahVerif = sudahVerifKepala || sudahVerifProgram || sudahVerifAdmin;
 
     let verifBtn;
     if (sudahVerif) {
@@ -1264,7 +1266,7 @@ async function viewDetail(idUsulan) {
       ${vpHtml}
       <div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
         ${approvalBox('Kepala Puskesmas', detail.kapusApprovedBy, detail.kapusApprovedAt, detail.statusKapus==='Ditolak' ? detail.kapusCatatan : '')}
-        ${approvalBox('Program', vp.length && vp.every(v=>v.status==='Selesai') ? 'Semua selesai' : '', '', detail.statusProgram==='Ditolak' ? detail.adminCatatan : '')}
+        ${approvalBox('Pengelola Program', vp.length && vp.every(v=>v.status==='Selesai') ? 'Semua selesai' : '', '', detail.statusProgram==='Ditolak' ? detail.adminCatatan : '')}
         ${approvalBox('Admin', detail.adminApprovedBy, detail.adminApprovedAt, detail.statusGlobal==='Ditolak' && detail.statusKapus!=='Ditolak' && detail.statusProgram!=='Ditolak' ? detail.adminCatatan : '')}
       </div>
     </div>`;

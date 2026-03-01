@@ -41,7 +41,6 @@ async function doLogin() {
   if (!email) return setAuthStatus('Masukkan email Anda', 'error');
 
   const password = document.getElementById('authPassword')?.value || '';
-  if (!password) return setAuthStatus('Masukkan password Anda', 'error');
 
   const btn = document.getElementById('authBtn');
   btn.disabled = true;

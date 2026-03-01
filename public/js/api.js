@@ -156,7 +156,7 @@ function toast(msg, type = 'success', title = null) {
 
   const el = document.getElementById('toastNotification');
   if (!el) return;
-  el.className = `toast-notification ${t.cls}`;
+  el.className = `toast ${t.cls}`;
   document.getElementById('toastIcon').textContent = t.icon;
   document.getElementById('toastTitle').textContent = t.title;
   document.getElementById('toastMessage').textContent = msg;

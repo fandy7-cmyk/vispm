@@ -727,9 +727,24 @@ async function openIndikatorModal(idUsulan) {
                 ? `<div style="display:flex;flex-direction:column;align-items:center;gap:2px">${fileLinksHtml}</div>`
                 : '<span style="color:#94a3b8;font-size:12px">-</span>';
             }
+            // File links dengan tombol hapus per file
+            const fileLinksWithDelete = links.map((url, i) =>
+              `<div style="display:flex;align-items:center;gap:4px">
+                <a href="${url}" target="_blank" style="font-size:10.5px;color:#0d9488;display:flex;align-items:center;gap:1px">
+                  <span class="material-icons" style="font-size:11px">open_in_new</span>File ${i+1}
+                </a>
+                <button onclick="hapusBukti('${idUsulan}',${ind.no},${i})" title="Hapus file ini"
+                  style="background:none;border:none;cursor:pointer;padding:0;display:flex;align-items:center;color:#ef4444;line-height:1">
+                  <span class="material-icons" style="font-size:13px">delete</span>
+                </button>
+              </div>`
+            ).join('');
+            const btnStyle = links.length
+              ? 'display:inline-flex;align-items:center;gap:3px;padding:4px 9px;background:#0d9488;color:white;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:600;border:1.5px solid #0d9488;white-space:nowrap'
+              : 'display:inline-flex;align-items:center;gap:3px;padding:4px 9px;background:#ef4444;color:white;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:600;border:1.5px solid #ef4444;white-space:nowrap';
             return `<div id="uploadCell-${ind.no}" style="display:flex;flex-direction:column;align-items:center;gap:3px">
-                ${fileLinksHtml}
-                <label id="uploadLabel-${ind.no}" style="${uploadBtnStyle}">
+                ${fileLinksWithDelete}
+                <label id="uploadLabel-${ind.no}" style="${btnStyle}">
                   <span class="material-icons" style="font-size:13px">${links.length ? 'cloud_done' : 'upload_file'}</span>${links.length ? 'Ganti' : 'Upload'}
                   <input type="file" multiple style="display:none" onchange="uploadBuktiIndikator(event,${ind.no},'${idUsulan}','${detail.kodePKM}',${detail.tahun},${detail.bulan},'${namaBulan}')">
                 </label>
@@ -903,6 +918,67 @@ async function findOrCreateFolder(accessToken, folderName, parentId) {
   const folder = await createRes.json();
   if (!folder.id) throw new Error('Gagal membuat folder: ' + folderName);
   return folder.id;
+}
+
+// Hapus satu file data dukung berdasarkan index
+async function hapusBukti(idUsulan, noIndikator, fileIndex) {
+  showConfirm({
+    title: 'Hapus Data Dukung',
+    message: `Hapus <strong>File ${fileIndex + 1}</strong> dari indikator ${noIndikator}?`,
+    type: 'danger',
+    onConfirm: async () => {
+      try {
+        // Ambil links saat ini
+        const existingDetail = await API.getIndikatorUsulan(idUsulan);
+        const existingInd = (existingDetail || []).find(i => i.no === noIndikator || i.noIndikator === noIndikator);
+        let links = [];
+        if (existingInd?.linkFile) {
+          try { links = JSON.parse(existingInd.linkFile); if (!Array.isArray(links)) links = [existingInd.linkFile]; }
+          catch { links = [existingInd.linkFile]; }
+        }
+        // Hapus index
+        links.splice(fileIndex, 1);
+        const newLinkFile = links.length ? JSON.stringify(links) : '';
+        const tVal = parseFloat(document.getElementById(`t-${noIndikator}`)?.value) || 0;
+        const cVal = parseFloat(document.getElementById(`c-${noIndikator}`)?.value) || 0;
+        await API.updateIndikatorUsulan({ idUsulan, noIndikator, target: tVal, capaian: cVal, linkFile: newLinkFile });
+
+        toast('File berhasil dihapus', 'success');
+
+        // Refresh cell
+        const cell = document.getElementById(`uploadCell-${noIndikator}`);
+        if (cell) {
+          const fileLinksWithDelete = links.map((url, i) =>
+            `<div style="display:flex;align-items:center;gap:4px">
+              <a href="${url}" target="_blank" style="font-size:10.5px;color:#0d9488;display:flex;align-items:center;gap:1px">
+                <span class="material-icons" style="font-size:11px">open_in_new</span>File ${i+1}
+              </a>
+              <button onclick="hapusBukti('${idUsulan}',${noIndikator},${i})" title="Hapus file ini"
+                style="background:none;border:none;cursor:pointer;padding:0;display:flex;align-items:center;color:#ef4444;line-height:1">
+                <span class="material-icons" style="font-size:13px">delete</span>
+              </button>
+            </div>`
+          ).join('');
+          const label = document.getElementById(`uploadLabel-${noIndikator}`);
+          // Hapus semua link lama
+          cell.querySelectorAll('a, button:not(label button)').forEach(el => el.closest('div[style*="flex;align-items:center;gap:4px"]')?.remove());
+          cell.querySelectorAll('div[style*="gap:4px"]').forEach(el => el.remove());
+          cell.insertAdjacentHTML('afterbegin', fileLinksWithDelete);
+          // Update tombol style
+          if (label) {
+            if (links.length === 0) {
+              label.style.background = '#ef4444';
+              label.style.borderColor = '#ef4444';
+              label.querySelector('.material-icons').textContent = 'upload_file';
+              if (label.childNodes[1]) label.childNodes[1].textContent = 'Upload';
+            }
+          }
+        }
+      } catch(e) {
+        toast('Gagal hapus: ' + e.message, 'error');
+      }
+    }
+  });
 }
 
 async function saveIndikator(noIndikator) {

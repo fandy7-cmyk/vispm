@@ -244,7 +244,8 @@ function setActiveNav(page) {
 const PAGE_TITLES = {
   dashboard: 'Dashboard', verifikasi: 'Verifikasi', laporan: 'Laporan',
   users: 'Kelola User', jabatan: 'Kelola Jabatan', pkm: 'Kelola Puskesmas',
-  indikator: 'Kelola Indikator', periode: 'Periode Input', input: 'Input Usulan'
+  indikator: 'Kelola Indikator', periode: 'Periode Input', input: 'Input Usulan',
+  'kelola-usulan': 'Kelola Usulan'
 };
 
 function loadPage(page) {
@@ -1166,14 +1167,10 @@ async function saveIndikator(noIndikator) {
 }
 
 async function submitUsulanFromModal() {
-  // Cek status usulan untuk teks konfirmasi yang tepat
-  const isDitolak = document.getElementById('btnSubmitFromModal')?.innerHTML?.includes('Ajukan Ulang');
   showConfirm({
-    title: isDitolak ? 'Ajukan Ulang' : 'Submit Usulan',
-    message: isDitolak
-      ? 'Ajukan ulang usulan ini setelah diperbaiki?'
-      : 'Submit usulan ke Kepala Puskesmas untuk diverifikasi?',
-    type: 'warning', icon: isDitolak ? 'refresh' : 'send',
+    title: 'Submit Usulan',
+    message: 'Submit usulan ke Kepala Puskesmas untuk diverifikasi?',
+    type: 'warning', icon: 'send',
     onConfirm: async () => {
       await doSubmitUsulan(false);
     }
@@ -1193,7 +1190,6 @@ async function doSubmitUsulan(forceSubmit) {
     // needConfirm: format khusus (bukan lewat ok()), cek duluan
     if (raw.needConfirm) {
       const nos = (raw.missingNos || []).join(', ');
-      const isDitolakCtx = document.getElementById('btnSubmitFromModal')?.innerHTML?.includes('Ajukan Ulang');
       (raw.missingNos || []).forEach(no => {
         const label = document.getElementById(`uploadLabel-${no}`);
         if (label) {
@@ -1204,7 +1200,7 @@ async function doSubmitUsulan(forceSubmit) {
       });
       showConfirm({
         title: 'Data Dukung Belum Lengkap',
-        message: `${raw.missingCount} indikator (no. ${nos}) belum ada file bukti. Tetap ${isDitolakCtx ? 'ajukan ulang' : 'submit ke Kepala Puskesmas'}?`,
+        message: `${raw.missingCount} indikator (no. ${nos}) belum ada file bukti. Tetap submit ke Kepala Puskesmas?`,
         type: 'warning',
         onConfirm: () => doSubmitUsulan(true)
       });
@@ -1348,6 +1344,10 @@ async function viewDetail(idUsulan) {
             <div style="font-size:11px;color:var(--text-xlight)">${formatTS(detail.createdAt)}</div>
           </span>
         </div>
+        <div class="detail-item" style="grid-column:span 2">
+          <label>Indeks SPM</label>
+          <span style="font-family:'JetBrains Mono';font-size:22px;color:var(--primary);font-weight:800">${parseFloat(detail.indeksSPM).toFixed(2)}</span>
+        </div>
         <div class="detail-item">
           <label>Indeks Beban Kerja</label>
           <span style="font-family:'JetBrains Mono';font-weight:700">${parseFloat(detail.indeksBeban||0).toFixed(2)}</span>
@@ -1355,10 +1355,6 @@ async function viewDetail(idUsulan) {
         <div class="detail-item">
           <label>Indeks Kesulitan Wilayah</label>
           <span style="font-family:'JetBrains Mono';font-weight:700">${parseFloat(detail.indeksKesulitan||0).toFixed(2)}</span>
-        </div>
-        <div class="detail-item" style="grid-column:span 2">
-          <label>Indeks SPM</label>
-          <span style="font-family:'JetBrains Mono';font-size:22px;color:var(--primary);font-weight:800">${parseFloat(detail.indeksSPM).toFixed(2)}</span>
         </div>
       </div>
       ${detail.driveFolderUrl ? `<div style="margin-bottom:12px"><a href="${detail.driveFolderUrl}" target="_blank" class="btn btn-secondary btn-sm"><span class="material-icons" style="font-size:14px">folder_open</span> Lihat Folder Bukti Google Drive</a></div>` : ''}
@@ -1377,10 +1373,7 @@ async function viewDetail(idUsulan) {
       ${vpHtml}
       <div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
         ${approvalBox('Kepala Puskesmas', detail.kapusApprovedBy, detail.kapusApprovedAt, detail.statusKapus==='Ditolak' ? detail.kapusCatatan : '')}
-        ${approvalBox('Pengelola Program',
-            detail.statusProgram==='Selesai' ? (vp.length ? `${vp.filter(v=>v.status==='Selesai').length}/${vp.length} disetujui` : 'Selesai') : '',
-            vp.filter(v=>v.status==='Selesai').slice(-1)[0]?.verified_at || '',
-            detail.statusProgram==='Ditolak' ? detail.adminCatatan : '')}
+        ${approvalBox('Pengelola Program', vp.length && vp.every(v=>v.status==='Selesai') ? 'Semua selesai' : '', '', detail.statusProgram==='Ditolak' ? detail.adminCatatan : '')}
         ${approvalBox('Admin', detail.adminApprovedBy, detail.adminApprovedAt, detail.statusGlobal==='Ditolak' && detail.statusKapus!=='Ditolak' && detail.statusProgram!=='Ditolak' ? detail.adminCatatan : '')}
       </div>
     </div>`;
@@ -1408,11 +1401,15 @@ function approvalBox(label, by, at, alasanTolak = '') {
 
 // ============== LAPORAN PDF ==============
 async function downloadLaporanPDF(idUsulan) {
-  toast('Menyiapkan laporan...', 'success');
+  toast('Membuka laporan...', 'success');
   try {
-    const url = `/api/laporan-pdf?id=${idUsulan}&print=1`;
+    const res = await fetch(`/api/laporan-pdf?id=${idUsulan}`);
+    if (!res.ok) { toast('Gagal memuat laporan', 'error'); return; }
+    const html = await res.text();
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
     const win = window.open(url, '_blank');
-    if (!win) toast('Aktifkan popup untuk membuka laporan', 'warning');
+    if (!win) toast('Aktifkan popup untuk download laporan', 'warning');
   } catch(e) {
     toast('Gagal: ' + e.message, 'error');
   }
@@ -1490,13 +1487,7 @@ async function openVerifikasi(idUsulan) {
       <div class="detail-item"><label>Puskesmas</label><span>${detail.namaPKM}</span></div>
       <div class="detail-item"><label>Periode</label><span>${detail.namaBulan} ${detail.tahun}</span></div>
       <div class="detail-item"><label>Status</label><span>${statusBadge(detail.statusGlobal)}</span></div>
-      <div class="detail-item"><label>Operator</label>
-        <span>
-          <div style="font-weight:700;font-size:13px">${detail.namaPembuat || '-'}</div>
-          <div style="font-size:11px;color:var(--text-light)">${detail.createdBy || ''}</div>
-          <div style="font-size:11px;color:var(--text-xlight);margin-top:1px">${formatTS(detail.createdAt)}</div>
-        </span>
-      </div>
+      <div class="detail-item"><label>Dibuat</label><span>${detail.createdBy}</span></div>
       <div class="detail-item"><label>Indeks Beban Kerja</label><span style="font-family:'JetBrains Mono'">${parseFloat(detail.indeksBeban||0).toFixed(2)}</span></div>
       <div class="detail-item"><label>Indeks Kesulitan Wilayah</label><span style="font-family:'JetBrains Mono'">${parseFloat(detail.indeksKesulitan||0).toFixed(2)}</span></div>
       <div class="detail-item"><label>Indeks SPM</label><span style="font-family:'JetBrains Mono';font-size:16px;font-weight:800;color:var(--primary)">${parseFloat(detail.indeksSPM).toFixed(2)}</span></div>`;

@@ -464,7 +464,7 @@ function renderUsulanTable(rows, role) {
       <td>${u.namaPKM || u.kodePKM}</td>
       <td>${u.namaBulan || ''} ${u.tahun}</td>
       <td>${statusBadge(u.statusGlobal)}</td>
-      <td style="font-size:12px;color:var(--text-light)">${formatDate(u.createdAt)}</td>
+      <td style="font-size:12px;color:var(--text-light)">${formatDateTime(u.createdAt)}</td>
       <td>${actionBtn(u)}</td>
     </tr>`).join('')}</tbody>
   </table></div>`;
@@ -2607,7 +2607,7 @@ async function loadKelolaUsulan() {
         <td style="font-size:12px">${u.createdBy || '-'}</td>
         <td>${u.namaBulan || ''} ${u.tahun}</td>
         <td>${statusBadge(u.statusGlobal)}</td>
-        <td style="font-size:12px;color:var(--text-light)">${formatDate(u.createdAt)}</td>
+        <td style="font-size:12px;color:var(--text-light)">${formatDateTime(u.createdAt)}</td>
         <td style="display:flex;gap:4px">
           <button class="btn-icon view" onclick="viewDetail('${u.idUsulan}')" title="Detail"><span class="material-icons">visibility</span></button>
           <button class="btn-icon edit" onclick="adminEditUsulan('${u.idUsulan}')" title="Edit"><span class="material-icons">edit</span></button>

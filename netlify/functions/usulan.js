@@ -105,7 +105,7 @@ async function getUsulanDetail(pool, idUsulan) {
   );
   if (result.rows.length === 0) return err('Usulan tidak ditemukan', 404);
   const vpResult = await pool.query(
-    `SELECT email_program, nama_program, indikator_akses, status, catatan, verified_at FROM verifikasi_program WHERE id_usulan=$1 ORDER BY created_at`,
+    `SELECT email_program, nama_program, nip_program, jabatan_program, indikator_akses, status, catatan, verified_at FROM verifikasi_program WHERE id_usulan=$1 ORDER BY created_at`,
     [idUsulan]
   );
   const detail = mapHeader(result.rows[0]);
@@ -132,7 +132,7 @@ async function getIndikatorUsulan(pool, idUsulan) {
 async function getProgramVerifStatus(pool, idUsulan) {
   if (!idUsulan) return err('ID usulan diperlukan');
   const result = await pool.query(
-    `SELECT email_program, nama_program, indikator_akses, status, catatan, verified_at FROM verifikasi_program WHERE id_usulan=$1 ORDER BY created_at`,
+    `SELECT email_program, nama_program, nip_program, jabatan_program, indikator_akses, status, catatan, verified_at FROM verifikasi_program WHERE id_usulan=$1 ORDER BY created_at`,
     [idUsulan]
   );
   return ok(result.rows);
@@ -175,10 +175,13 @@ async function buatUsulan(pool, body) {
   const indeksBeban = pkmResult.rows.length > 0 ? parseFloat(pkmResult.rows[0].indeks_beban_kerja)||0 : 0;
   const indResult = await pool.query('SELECT no_indikator, bobot FROM master_indikator WHERE aktif=true ORDER BY no_indikator');
   const totalBobot = indResult.rows.reduce((s,r) => s+(parseInt(r.bobot)||0), 0);
-  const ppResult = await pool.query(`SELECT email, nama, indikator_akses FROM users WHERE role='Pengelola Program' AND aktif=true`);
+  const ppResult = await pool.query(`SELECT email, nama, nip, jabatan, indikator_akses FROM users WHERE role='Pengelola Program' AND aktif=true`);
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    // Auto-migrate kolom nip_program dan jabatan_program
+    await client.query(`ALTER TABLE verifikasi_program ADD COLUMN IF NOT EXISTS nip_program VARCHAR(50)`).catch(()=>{});
+    await client.query(`ALTER TABLE verifikasi_program ADD COLUMN IF NOT EXISTS jabatan_program TEXT`).catch(()=>{});
     await client.query(
       `INSERT INTO usulan_header (id_usulan,tahun,bulan,periode_key,kode_pkm,total_nilai,total_bobot,indeks_kinerja_spm,indeks_beban_kerja,indeks_spm,status_kapus,status_program,status_final,status_global,is_locked,created_by,created_at)
        VALUES ($1,$2,$3,$4,$5,0,$6,0,$7,0,'Menunggu','Menunggu','Menunggu','Draft',false,$8,NOW())`,
@@ -188,7 +191,10 @@ async function buatUsulan(pool, body) {
       await client.query(`INSERT INTO usulan_indikator (id_usulan,no_indikator,target,capaian,realisasi_rasio,bobot,nilai_terbobot,status) VALUES ($1,$2,0,0,0,$3,0,'Draft')`, [idUsulan,ind.no_indikator,parseInt(ind.bobot)||0]);
     }
     for (const pp of ppResult.rows) {
-      await client.query(`INSERT INTO verifikasi_program (id_usulan,email_program,nama_program,indikator_akses,status,created_at) VALUES ($1,$2,$3,$4,'Menunggu',NOW())`, [idUsulan,pp.email,pp.nama,pp.indikator_akses||'']);
+      await client.query(
+        `INSERT INTO verifikasi_program (id_usulan,email_program,nama_program,nip_program,jabatan_program,indikator_akses,status,created_at) VALUES ($1,$2,$3,$4,$5,$6,'Menunggu',NOW())`,
+        [idUsulan, pp.email, pp.nama, pp.nip||null, pp.jabatan||null, pp.indikator_akses||'']
+      );
     }
     await client.query('COMMIT');
     return ok({ idUsulan, message: 'Usulan berhasil dibuat' });
@@ -344,7 +350,7 @@ async function submitUsulan(pool, body) {
          WHERE id_usulan=$1`, [idUsulan]
       );
     } else {
-      // Admin menolak → kembali ke Admin
+      // Admin menolak → kembali ke Admin, status Kapus & Program TETAP (tidak direset)
       targetStatus = 'Menunggu Admin';
       await pool.query(
         `UPDATE usulan_header SET
@@ -356,8 +362,13 @@ async function submitUsulan(pool, body) {
     }
   }
 
+  // PENTING: jangan timpa status_program di sini kecuali memang perlu
+  // Kalau Admin ditolak, status_kapus dan status_program harus tetap
+  const updateStatusProgram = wasKapusDitolak || wasProgramDitolak;
   await pool.query(
-    `UPDATE usulan_header SET status_global=$1, status_program='Menunggu', is_locked=true WHERE id_usulan=$2`,
+    `UPDATE usulan_header SET status_global=$1, is_locked=true
+     ${updateStatusProgram ? ", status_program='Menunggu'" : ''}
+     WHERE id_usulan=$2`,
     [targetStatus, idUsulan]
   );
 

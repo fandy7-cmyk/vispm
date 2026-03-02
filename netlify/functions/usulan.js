@@ -281,12 +281,17 @@ async function submitUsulan(pool, body) {
   // Izinkan submit dari Draft ATAU Ditolak (ajukan ulang setelah diperbaiki)
   if (statusSaatIni !== 'Draft' && statusSaatIni !== 'Ditolak') return err('Usulan tidak dapat disubmit pada status ini');
 
-  // Kalau resubmit dari Ditolak: reset sesuai level penolakan
+  // Kalau resubmit dari Ditolak: simpan info penolakan DULU sebelum di-reset
+  let wasKapusDitolak = false;
+  let wasProgramDitolak = false;
+
   if (statusSaatIni === 'Ditolak') {
     const tolakInfo = await pool.query('SELECT status_kapus, status_program FROM usulan_header WHERE id_usulan=$1', [idUsulan]);
     const { status_kapus, status_program } = tolakInfo.rows[0];
+    wasKapusDitolak = status_kapus === 'Ditolak';
+    wasProgramDitolak = status_program === 'Ditolak';
 
-    if (status_kapus === 'Ditolak') {
+    if (wasKapusDitolak) {
       // Ditolak Kapus → reset semua dari awal
       await pool.query(
         `UPDATE usulan_header SET
@@ -301,7 +306,7 @@ async function submitUsulan(pool, body) {
         `UPDATE verifikasi_program SET status='Menunggu', catatan=NULL, verified_at=NULL WHERE id_usulan=$1`,
         [idUsulan]
       );
-    } else if (status_program === 'Ditolak') {
+    } else if (wasProgramDitolak) {
       // Ditolak Pengelola Program → Kapus sudah approve (tidak perlu ulang)
       // Hanya reset yang berstatus 'Ditolak', yang sudah 'Selesai' TETAP Selesai
       await pool.query(
@@ -357,19 +362,14 @@ async function submitUsulan(pool, body) {
     };
   }
 
-  // Tentukan status tujuan submit:
-  // - Dari Draft → Menunggu Kepala Puskesmas (normal)
-  // - Dari Ditolak Kapus → Menunggu Kepala Puskesmas (ulang dari awal)
-  // - Dari Ditolak Program → Menunggu Pengelola Program (Kepala Puskesmas skip, langsung ke program)
-  // - Dari Ditolak Admin → Menunggu Pengelola Program (ulang dari program)
+  // Tentukan status tujuan submit berdasarkan flag yang sudah disimpan sebelum reset
+  // - Draft / Ditolak Kapus → Menunggu Kepala Puskesmas (mulai dari awal)
+  // - Ditolak Program → Menunggu Pengelola Program (Kapus skip, langsung ke program)
+  // - Ditolak Admin → Menunggu Pengelola Program (ulang dari program)
   let targetStatus = 'Menunggu Kepala Puskesmas';
-  if (statusSaatIni === 'Ditolak') {
-    const tolakInfo = await pool.query('SELECT status_kapus, status_program FROM usulan_header WHERE id_usulan=$1', [idUsulan]);
-    const { status_kapus, status_program } = tolakInfo.rows[0];
-    if (status_kapus !== 'Ditolak') {
-      // Kepala Puskesmas sudah approve sebelumnya → langsung ke Menunggu Pengelola Program
-      targetStatus = 'Menunggu Pengelola Program';
-    }
+  if (statusSaatIni === 'Ditolak' && !wasKapusDitolak) {
+    // Kapus sudah approve sebelumnya → langsung ke Pengelola Program
+    targetStatus = 'Menunggu Pengelola Program';
   }
 
   await pool.query(

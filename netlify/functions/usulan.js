@@ -99,9 +99,6 @@ async function getUsulanList(pool, params) {
 
 async function getUsulanDetail(pool, idUsulan) {
   if (!idUsulan) return err('ID usulan diperlukan');
-  // Auto-migrate kolom baru kalau belum ada
-  await pool.query(`ALTER TABLE verifikasi_program ADD COLUMN IF NOT EXISTS nip_program VARCHAR(50)`).catch(()=>{});
-  await pool.query(`ALTER TABLE verifikasi_program ADD COLUMN IF NOT EXISTS jabatan_program TEXT`).catch(()=>{});
   const result = await pool.query(
     `SELECT uh.*, p.nama_puskesmas, p.indeks_kesulitan_wilayah, u.nama as nama_pembuat FROM usulan_header uh LEFT JOIN master_puskesmas p ON uh.kode_pkm=p.kode_pkm LEFT JOIN users u ON uh.created_by=u.email WHERE uh.id_usulan=$1`,
     [idUsulan]
@@ -134,8 +131,6 @@ async function getIndikatorUsulan(pool, idUsulan) {
 
 async function getProgramVerifStatus(pool, idUsulan) {
   if (!idUsulan) return err('ID usulan diperlukan');
-  await pool.query(`ALTER TABLE verifikasi_program ADD COLUMN IF NOT EXISTS nip_program VARCHAR(50)`).catch(()=>{});
-  await pool.query(`ALTER TABLE verifikasi_program ADD COLUMN IF NOT EXISTS jabatan_program TEXT`).catch(()=>{});
   const result = await pool.query(
     `SELECT email_program, nama_program, nip_program, jabatan_program, indikator_akses, status, catatan, verified_at FROM verifikasi_program WHERE id_usulan=$1 ORDER BY created_at`,
     [idUsulan]
@@ -355,7 +350,7 @@ async function submitUsulan(pool, body) {
          WHERE id_usulan=$1`, [idUsulan]
       );
     } else {
-      // Admin menolak → kembali ke Admin, status Kapus & Program TETAP (tidak direset)
+      // Admin menolak → kembali ke Admin
       targetStatus = 'Menunggu Admin';
       await pool.query(
         `UPDATE usulan_header SET
@@ -367,15 +362,21 @@ async function submitUsulan(pool, body) {
     }
   }
 
-  // PENTING: jangan timpa status_program di sini kecuali memang perlu
-  // Kalau Admin ditolak, status_kapus dan status_program harus tetap
-  const updateStatusProgram = wasKapusDitolak || wasProgramDitolak;
-  await pool.query(
-    `UPDATE usulan_header SET status_global=$1, is_locked=true
-     ${updateStatusProgram ? ", status_program='Menunggu'" : ''}
-     WHERE id_usulan=$2`,
-    [targetStatus, idUsulan]
-  );
+  // Kalau Admin yang menolak → status_kapus dan status_program TIDAK direset (tetap Selesai)
+  // Kalau Kapus/Program yang menolak → status_program di-reset sesuai branch di atas
+  if (!wasKapusDitolak && !wasProgramDitolak && statusSaatIni === 'Ditolak') {
+    // Admin ditolak: hanya update status_global, jangan sentuh status_kapus/program
+    await pool.query(
+      `UPDATE usulan_header SET status_global=$1, is_locked=true WHERE id_usulan=$2`,
+      [targetStatus, idUsulan]
+    );
+  } else {
+    // Draft / Kapus ditolak / Program ditolak: reset status_program juga
+    await pool.query(
+      `UPDATE usulan_header SET status_global=$1, status_program='Menunggu', is_locked=true WHERE id_usulan=$2`,
+      [targetStatus, idUsulan]
+    );
+  }
 
   const isResubmit = statusSaatIni === 'Ditolak';
   await logAktivitas(pool, email, 'Operator', isResubmit ? 'Ajukan Ulang' : 'Submit', idUsulan,

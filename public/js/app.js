@@ -563,7 +563,13 @@ function updateBulanOptions() {
 async function loadMyUsulan() {
   try {
     const rows = await API.getUsulan({ email_operator: currentUser.email });
-    document.getElementById('myUsulanTable').innerHTML = rows.length ? `
+    const tbl = document.getElementById('myUsulanTable');
+    if (!tbl) {
+      // User mungkin sedang di dashboard, refresh dashboard saja
+      if (currentUser.role === 'Operator') renderDashboard();
+      return;
+    }
+    tbl.innerHTML = rows.length ? `
       <div class="table-container"><table>
         <thead><tr><th>ID Usulan</th><th>Puskesmas</th><th>Periode</th><th>Progress Verifikasi</th><th>Aksi</th></tr></thead>
         <tbody>${rows.map(u => `<tr>
@@ -1132,7 +1138,8 @@ async function doSubmitUsulan(forceSubmit) {
       rowBtn.style.color = '#065f46';
       rowBtn.style.border = '1.5px solid #0d9488';
       rowBtn.title = 'Sudah diajukan';
-      rowBtn.querySelector('.material-icons').textContent = 'check_circle';
+      const ic = rowBtn.querySelector('.material-icons');
+      if (ic) ic.textContent = 'check_circle';
     }
 
     loadMyUsulan();

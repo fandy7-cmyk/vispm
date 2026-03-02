@@ -176,7 +176,7 @@ function showModal(id) {
 
 function closeModal(id) {
   const m = document.getElementById(id);
-  if (m) m.style.display = 'none';
+  if (m) { m.classList.remove('show'); m.style.display = ''; }
 }
 
 function showConfirm({ title, message, onConfirm, type = 'danger' }) {

@@ -373,7 +373,7 @@ async function submitUsulan(pool, body) {
   }
 
   await pool.query(
-    `UPDATE usulan_header SET status_global=$1, is_locked=true WHERE id_usulan=$2`,
+    `UPDATE usulan_header SET status_global=$1, status_program='Menunggu', is_locked=true WHERE id_usulan=$2`,
     [targetStatus, idUsulan]
   );
   const isResubmit = statusSaatIni === 'Ditolak';
@@ -414,39 +414,45 @@ async function approveProgram(pool, body) {
   const { idUsulan, email, catatan } = body;
   const result = await pool.query('SELECT status_global FROM usulan_header WHERE id_usulan=$1', [idUsulan]);
   if (result.rows.length===0) return err('Usulan tidak ditemukan');
-  // Izinkan approve kalau status Menunggu Program ATAU Ditolak (ada yang tolak tapi yang lain masih bisa approve)
   if (!['Menunggu Pengelola Program','Ditolak'].includes(result.rows[0].status_global)) return err('Usulan tidak dalam tahap verifikasi program');
 
-  const vpCheck = await pool.query('SELECT id, status FROM verifikasi_program WHERE id_usulan=$1 AND email_program=$2', [idUsulan, email]);
+  const vpCheck = await pool.query('SELECT id, status FROM verifikasi_program WHERE id_usulan=$1 AND LOWER(email_program)=LOWER($2)', [idUsulan, email]);
   if (vpCheck.rows.length===0) return err('Anda tidak terdaftar sebagai pengelola program untuk usulan ini');
   if (vpCheck.rows[0].status==='Selesai') return err('Anda sudah memverifikasi usulan ini');
+  if (vpCheck.rows[0].status==='Ditolak') return err('Anda sudah menolak usulan ini');
 
   await pool.query(
-    `UPDATE verifikasi_program SET status='Selesai', catatan=$1, verified_at=NOW() WHERE id_usulan=$2 AND email_program=$3`,
+    `UPDATE verifikasi_program SET status='Selesai', catatan=$1, verified_at=NOW() WHERE id_usulan=$2 AND LOWER(email_program)=LOWER($3)`,
     [catatan||'', idUsulan, email]
   );
   await logAktivitas(pool, email, 'Pengelola Program', 'Approve', idUsulan, catatan||'Disetujui');
 
+  // Cek status semua pengelola program
   const allVP = await pool.query('SELECT status FROM verifikasi_program WHERE id_usulan=$1', [idUsulan]);
-  const allDone = allVP.rows.every(r => r.status === 'Selesai');
-  const stillRejected = allVP.rows.filter(r => r.status === 'Ditolak').length;
   const stillWaiting = allVP.rows.filter(r => r.status === 'Menunggu').length;
+  const rejectedCount = allVP.rows.filter(r => r.status === 'Ditolak').length;
+  const allDone = allVP.rows.every(r => r.status !== 'Menunggu'); // tidak ada yang masih menunggu
 
-  if (allDone) {
+  if (allDone && rejectedCount === 0) {
     // Semua approve → lanjut ke Admin
     await pool.query(
       `UPDATE usulan_header SET status_program='Selesai', status_global='Menunggu Admin' WHERE id_usulan=$1`,
       [idUsulan]
     );
-    return ok({ message: 'Semua pengelola program selesai — usulan diteruskan ke Admin.', allDone: true });
+    return ok({ message: 'Semua pengelola program menyetujui — usulan diteruskan ke Admin.', allDone: true });
   }
 
-  // Ada yang masih menolak atau menunggu
-  const remaining = stillWaiting + stillRejected;
-  const msg = stillRejected > 0
-    ? `Verifikasi Anda disimpan. Masih ada ${stillRejected} penolakan yang belum diselesaikan operator.`
-    : `Verifikasi Anda disimpan. Masih menunggu ${remaining} pengelola program lain.`;
-  return ok({ message: msg, allDone: false });
+  if (allDone && rejectedCount > 0) {
+    // Semua sudah verifikasi tapi ada yang menolak → otomatis Ditolak, operator bisa revisi
+    await pool.query(
+      `UPDATE usulan_header SET status_global='Ditolak', status_program='Ditolak', is_locked=false WHERE id_usulan=$1`,
+      [idUsulan]
+    );
+    return ok({ message: 'Verifikasi Anda disimpan.', allDone: false, autoDitolak: true });
+  }
+
+  // Masih ada yang belum verifikasi
+  return ok({ message: 'Verifikasi Anda disimpan.', allDone: false });
 }
 
 async function approveAdmin(pool, body) {
@@ -468,8 +474,13 @@ async function rejectUsulan(pool, body) {
   if (!alasan || !alasan.trim()) return err('Alasan penolakan wajib diisi');
 
   if (role === 'Pengelola Program') {
-    // Skema: hanya ubah status si penolak → 'Ditolak'
-    // Yang lain TIDAK direset — tetap bisa approve / sudah approve
+    // Cek duplikasi
+    const vpCheck = await pool.query('SELECT status FROM verifikasi_program WHERE id_usulan=$1 AND LOWER(email_program)=LOWER($2)', [idUsulan, email]);
+    if (vpCheck.rows.length === 0) return err('Anda tidak terdaftar sebagai pengelola program untuk usulan ini');
+    if (vpCheck.rows[0].status === 'Selesai') return err('Anda sudah menyetujui usulan ini');
+    if (vpCheck.rows[0].status === 'Ditolak') return err('Anda sudah menolak usulan ini');
+
+    // Simpan penolakan
     await pool.query(
       `UPDATE verifikasi_program SET status='Ditolak', catatan=$1, verified_at=NOW()
        WHERE id_usulan=$2 AND LOWER(email_program)=LOWER($3)`,
@@ -483,33 +494,24 @@ async function rejectUsulan(pool, body) {
     );
     const namaPengelola = vpRow.rows[0]?.nama_program || email;
 
-    // Cek apakah masih ada yang belum verifikasi (status='Menunggu')
-    const stillPending = await pool.query(
-      `SELECT COUNT(*) as cnt FROM verifikasi_program WHERE id_usulan=$1 AND status='Menunggu'`,
-      [idUsulan]
-    );
-    const adaYangBelum = parseInt(stillPending.rows[0].cnt) > 0;
+    // Cek apakah semua pengelola sudah verifikasi (tidak ada yang Menunggu)
+    const allVP = await pool.query('SELECT status FROM verifikasi_program WHERE id_usulan=$1', [idUsulan]);
+    const stillWaiting = allVP.rows.filter(r => r.status === 'Menunggu').length;
 
-    if (adaYangBelum) {
-      // Masih ada pengelola lain yang belum verifikasi → status_global TETAP Menunggu Pengelola Program
-      // Hanya catat siapa yang menolak di admin_catatan
+    if (stillWaiting === 0) {
+      // Semua sudah verifikasi → otomatis Ditolak, operator bisa revisi
       await pool.query(
         `UPDATE usulan_header SET
+          status_global='Ditolak', is_locked=false,
           status_program='Ditolak',
           admin_catatan=$1
          WHERE id_usulan=$2`,
         [`Ditolak oleh ${namaPengelola}: ${alasan.trim()}`, idUsulan]
       );
     } else {
-      // Semua pengelola sudah verifikasi (sebagian approve, penolak ini yang terakhir)
-      // → ubah ke Ditolak agar operator bisa ajukan ulang
+      // Masih ada yang belum verifikasi → status_global TETAP Menunggu Pengelola Program
       await pool.query(
-        `UPDATE usulan_header SET
-          status_global='Ditolak',
-          is_locked=false,
-          status_program='Ditolak',
-          admin_catatan=$1
-         WHERE id_usulan=$2`,
+        `UPDATE usulan_header SET status_program='Ditolak', admin_catatan=$1 WHERE id_usulan=$2`,
         [`Ditolak oleh ${namaPengelola}: ${alasan.trim()}`, idUsulan]
       );
     }

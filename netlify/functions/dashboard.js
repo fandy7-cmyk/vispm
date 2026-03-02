@@ -67,7 +67,8 @@ async function operatorStats(pool, email) {
 
   // Periode aktif
   const periodeResult = await pool.query(
-    `SELECT tahun, bulan, nama_bulan FROM periode_input
+    `SELECT tahun, bulan, nama_bulan, tanggal_mulai, tanggal_selesai, jam_mulai, jam_selesai, notif_operator
+     FROM periode_input
      WHERE status='Aktif' AND tanggal_mulai <= CURRENT_DATE AND tanggal_selesai >= CURRENT_DATE
      LIMIT 1`
   );

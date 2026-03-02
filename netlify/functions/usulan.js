@@ -344,15 +344,11 @@ async function submitUsulan(pool, body) {
          WHERE id_usulan=$1`, [idUsulan]
       );
     } else {
-      // Admin menolak → reset program dan admin
-      targetStatus = 'Menunggu Pengelola Program';
-      await pool.query(
-        `UPDATE verifikasi_program SET status='Menunggu', catatan=NULL, verified_at=NULL WHERE id_usulan=$1`,
-        [idUsulan]
-      );
+      // Admin menolak → kembali ke Admin
+      targetStatus = 'Menunggu Admin';
       await pool.query(
         `UPDATE usulan_header SET
-          status_program='Menunggu', status_final='Menunggu',
+          status_final='Menunggu',
           admin_approved_by=NULL, admin_approved_at=NULL, admin_catatan=NULL,
           final_approved_by=NULL, final_approved_at=NULL
          WHERE id_usulan=$1`, [idUsulan]

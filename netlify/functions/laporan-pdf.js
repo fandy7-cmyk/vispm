@@ -1,5 +1,33 @@
 const { getPool, cors } = require('./db');
 
+// SVG badge "APPROVED" seperti stempel
+function approvedBadgeSVG() {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 100 100">
+    <defs>
+      <path id="circle" d="M 50,50 m -37,0 a 37,37 0 1,1 74,0 a 37,37 0 1,1 -74,0"/>
+    </defs>
+    <!-- Outer badge shape (gear-like) -->
+    <g transform="translate(50,50)">
+      ${Array.from({length:16},(_,i)=>{
+        const a = (i/16)*Math.PI*2;
+        const a2 = ((i+0.5)/16)*Math.PI*2;
+        const r1=46, r2=42;
+        const x1=Math.cos(a)*r1, y1=Math.sin(a)*r1;
+        const x2=Math.cos(a2)*r2, y2=Math.sin(a2)*r2;
+        return `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="#2d7a47" stroke-width="5"/>`;
+      }).join('')}
+      <circle r="44" fill="#2d9e55" />
+      <circle r="38" fill="none" stroke="white" stroke-width="1.5" stroke-dasharray="3 2"/>
+      <!-- Checkmark -->
+      <polyline points="-15,2 -5,14 18,-12" fill="none" stroke="white" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+    <!-- Text APPROVED curved -->
+    <text font-size="8.5" font-family="Arial" font-weight="bold" fill="white" letter-spacing="2.5">
+      <textPath href="#circle" startOffset="10%">APPROVED • APPROVED •</textPath>
+    </text>
+  </svg>`;
+}
+
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors();
 
@@ -9,12 +37,17 @@ exports.handler = async (event) => {
 
   const pool = getPool();
   try {
-    // Auto-migrate: pastikan kolom catatan ada sebelum query
+    // Auto-migrate
     await pool.query(`ALTER TABLE master_indikator ADD COLUMN IF NOT EXISTS catatan TEXT`).catch(()=>{});
+    await pool.query(`ALTER TABLE verifikasi_program ADD COLUMN IF NOT EXISTS nip_program VARCHAR(50)`).catch(()=>{});
+    await pool.query(`ALTER TABLE verifikasi_program ADD COLUMN IF NOT EXISTS jabatan_program TEXT`).catch(()=>{});
 
     const hdrResult = await pool.query(
-      `SELECT uh.*, p.nama_puskesmas FROM usulan_header uh
+      `SELECT uh.*, p.nama_puskesmas,
+              ku.nama as kapus_nama, ku.nip as kapus_nip, ku.jabatan as kapus_jabatan
+       FROM usulan_header uh
        LEFT JOIN master_puskesmas p ON uh.kode_pkm = p.kode_pkm
+       LEFT JOIN users ku ON LOWER(ku.email) = LOWER(uh.kapus_approved_by)
        WHERE uh.id_usulan = $1`, [idUsulan]
     );
     if (hdrResult.rows.length === 0) return { statusCode: 404, body: 'Tidak ditemukan' };
@@ -35,7 +68,6 @@ exports.handler = async (event) => {
     const bulan = bulanNama[h.bulan] || h.bulan;
     const now = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
 
-    // Format datetime untuk tanda tangan
     function fmtDT(ts) {
       if (!ts) return '-';
       const d = new Date(ts);
@@ -44,93 +76,88 @@ exports.handler = async (event) => {
       return `${tgl}, ${jam} WITA`;
     }
 
-    // Build verifikasi map per indikator (program verifier)
-    const vpByInd = {};
-    for (const v of vpResult.rows) {
-      const inds = (v.indikator_akses || '').split(',').map(s => s.trim()).filter(Boolean);
-      if (inds.length === 0) {
-        // akses semua indikator
-        for (const ind of indResult.rows) {
-          const key = String(ind.no_indikator);
-          if (!vpByInd[key]) vpByInd[key] = [];
-          vpByInd[key].push(v);
-        }
-      } else {
-        for (const i of inds) {
-          if (!vpByInd[i]) vpByInd[i] = [];
-          vpByInd[i].push(v);
-        }
-      }
+    // Map: indikator → penanggungjawab (hanya yang punya akses indikator tsb)
+    // indikator_akses kosong = akses semua
+    function getVerifiersForInd(noInd) {
+      return vpResult.rows.filter(v => {
+        const inds = (v.indikator_akses || '').split(',').map(s => s.trim()).filter(Boolean);
+        if (inds.length === 0) return true; // akses semua
+        return inds.includes(String(noInd));
+      });
     }
 
-    // Satu halaman per indikator
+    function signBlock(v) {
+      const approved = v.status === 'Selesai';
+      const jabatan = v.jabatan_program || 'Pengelola Program';
+      const nama = v.nama_program || v.email_program;
+      const nip = v.nip_program || '';
+      return `
+        <div style="text-align:center;min-width:200px">
+          <div style="font-size:10px;color:#334155;margin-bottom:10px;font-weight:600">${jabatan}</div>
+          ${approved
+            ? `<div style="display:inline-block;margin-bottom:6px">${approvedBadgeSVG()}</div>
+               <div style="font-size:9px;color:#2d7a47;font-weight:700;margin-bottom:2px">✓ Disetujui: ${fmtDT(v.verified_at)}</div>`
+            : `<div style="width:80px;height:80px;border:2px dashed #cbd5e1;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:#94a3b8;font-size:10px;margin-bottom:6px">Belum</div>
+               <div style="font-size:9px;color:#94a3b8;margin-bottom:2px">Menunggu persetujuan</div>`}
+          <div style="margin-top:4px;border-top:1px solid #334155;padding-top:4px;display:inline-block;min-width:160px">
+            <div style="font-size:10.5px;font-weight:700">${nama}</div>
+            ${nip ? `<div style="font-size:9.5px">Nip. ${nip}</div>` : ''}
+          </div>
+        </div>`;
+    }
+
+    function kapusSignBlock() {
+      const approved = !!h.kapus_approved_by;
+      const jabatan = h.kapus_jabatan || `Kepala UPTD Puskesmas ${h.nama_puskesmas||h.kode_pkm}`;
+      const nama = h.kapus_nama || h.kapus_approved_by || '-';
+      const nip = h.kapus_nip || '';
+      return `
+        <div style="text-align:center;min-width:200px">
+          <div style="font-size:10px;color:#334155;margin-bottom:10px;font-weight:600">Kepala UPTD Puskesmas ${h.nama_puskesmas||h.kode_pkm}</div>
+          ${approved
+            ? `<div style="display:inline-block;margin-bottom:6px">${approvedBadgeSVG()}</div>
+               <div style="font-size:9px;color:#2d7a47;font-weight:700;margin-bottom:2px">✓ Disetujui: ${fmtDT(h.kapus_approved_at)}</div>`
+            : `<div style="width:80px;height:80px;border:2px dashed #cbd5e1;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:#94a3b8;font-size:10px;margin-bottom:6px">Belum</div>
+               <div style="font-size:9px;color:#94a3b8;margin-bottom:2px">Menunggu persetujuan</div>`}
+          <div style="margin-top:4px;border-top:1px solid #334155;padding-top:4px;display:inline-block;min-width:160px">
+            <div style="font-size:10.5px;font-weight:700">${nama}</div>
+            ${nip ? `<div style="font-size:9.5px">Nip. ${nip}</div>` : ''}
+          </div>
+        </div>`;
+    }
+
     const pagesHtml = indResult.rows.map((ind) => {
       const rasio = parseFloat(ind.realisasi_rasio) || 0;
       const capaianPct = (rasio * 100).toFixed(0);
       const target = parseFloat(ind.target) || 0;
       const capaian = parseFloat(ind.capaian) || 0;
-      const verifiers = vpByInd[String(ind.no_indikator)] || [];
       const catatan = ind.catatan_indikator || '';
 
-      // Tanda tangan pengelola program
-      const pgmSigns = verifiers.map(v => {
-        const approved = v.status === 'Selesai';
-        return `
-          <div style="text-align:center;min-width:180px">
-            <div style="font-size:10px;color:#64748b;margin-bottom:8px">${v.nama_program_jabatan || 'Pengelola Program'}</div>
-            ${approved ? `
-              <div style="border:2px solid #0d9488;border-radius:10px;padding:10px 14px;background:#f0fdf9;display:inline-block">
-                <div style="font-size:22px;margin-bottom:2px">✅</div>
-                <div style="font-size:9px;color:#0d9488;font-weight:700">DISETUJUI</div>
-                <div style="font-size:8.5px;color:#475569;margin-top:2px">${fmtDT(v.verified_at)}</div>
-              </div>
-            ` : `
-              <div style="border:2px solid #e2e8f0;border-radius:10px;padding:10px 14px;background:#f8fafc;display:inline-block">
-                <div style="font-size:22px;margin-bottom:2px">⏳</div>
-                <div style="font-size:9px;color:#94a3b8;font-weight:700">MENUNGGU</div>
-              </div>
-            `}
-            <div style="margin-top:8px;font-size:10px;font-weight:700;color:#1e293b">${v.nama_program || v.email_program}</div>
-          </div>`;
-      }).join('');
+      // Hanya penanggungjawab indikator ini
+      const verifiers = getVerifiersForInd(ind.no_indikator);
 
-      // Tanda tangan kepala puskesmas
-      const kapusSign = `
-        <div style="text-align:center;min-width:180px">
-          <div style="font-size:10px;color:#64748b;margin-bottom:8px">Kepala UPTD Puskesmas ${h.nama_puskesmas || h.kode_pkm}</div>
-          ${h.kapus_approved_by ? `
-            <div style="border:2px solid #0d9488;border-radius:10px;padding:10px 14px;background:#f0fdf9;display:inline-block">
-              <div style="font-size:22px;margin-bottom:2px">✅</div>
-              <div style="font-size:9px;color:#0d9488;font-weight:700">DISETUJUI</div>
-              <div style="font-size:8.5px;color:#475569;margin-top:2px">${fmtDT(h.kapus_approved_at)}</div>
-            </div>
-          ` : `
-            <div style="border:2px solid #e2e8f0;border-radius:10px;padding:10px 14px;background:#f8fafc;display:inline-block">
-              <div style="font-size:22px;margin-bottom:2px">⏳</div>
-              <div style="font-size:9px;color:#94a3b8;font-weight:700">MENUNGGU</div>
-            </div>
-          `}
-          <div style="margin-top:8px;font-size:10px;font-weight:700;color:#1e293b">${h.kapus_approved_by || '-'}</div>
-        </div>`;
+      const pgmSigns = verifiers.length
+        ? verifiers.map(v => signBlock(v)).join('')
+        : `<div style="text-align:center;min-width:180px;color:#94a3b8;font-size:11px">Tidak ada pengelola program</div>`;
 
       return `
       <div class="page-break">
         <!-- KOP SURAT -->
-        <table style="width:100%;border-bottom:3px solid #1e293b;padding-bottom:10px;margin-bottom:12px">
-          <tr>
-            <td style="width:70px;text-align:center">
-              <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/1e/Seal_of_Banggai_Laut_Regency.svg/200px-Seal_of_Banggai_Laut_Regency.svg.png"
-                   style="width:60px;height:60px;object-fit:contain"
-                   onerror="this.style.display='none'">
-            </td>
-            <td style="text-align:center">
-              <div style="font-size:12px;font-weight:700;text-transform:uppercase">Pemerintah Kabupaten Banggai Laut</div>
-              <div style="font-size:11px;font-weight:700;text-transform:uppercase">Dinas Kesehatan, Pengendalian Penduduk dan Keluarga Berencana</div>
-              <div style="font-size:10px">Jl. KM 7 Adean 94895 &nbsp;•&nbsp; Sulawesi Tengah</div>
-              <div style="font-size:10px">email: dinkeskb.balutsulteng@gmail.com</div>
-            </td>
-          </tr>
-        </table>
+        <div style="display:flex;align-items:center;gap:14px;padding-bottom:10px;margin-bottom:14px;border-bottom:4px solid #1e293b">
+          <!-- Logo -->
+          <div style="flex-shrink:0">
+            <img src="https://vispm.netlify.app/logobalut.png"
+                 style="width:72px;height:72px;object-fit:contain"
+                 onerror="this.style.display='none'">
+          </div>
+          <!-- Teks kop -->
+          <div style="flex:1;text-align:center;line-height:1.5">
+            <div style="font-size:12px;font-weight:400;text-transform:uppercase;letter-spacing:0.3px">Pemerintah Kabupaten Banggai Laut</div>
+            <div style="font-size:15px;font-weight:900;text-transform:uppercase;letter-spacing:0.2px;line-height:1.3">Dinas Kesehatan, Pengendalian Penduduk<br>dan Keluarga Berencana</div>
+            <div style="font-size:10px;font-weight:400;margin-top:2px">Jl. KM 7, Adean, Banggai Tengah, Banggai Laut, Sulawesi Tengah 94895</div>
+            <div style="font-size:10px;font-weight:400">Pos-el <span style="color:#1a56db;text-decoration:underline">dinkeskb.balutsulteng@gmail.com</span></div>
+          </div>
+        </div>
 
         <!-- JUDUL -->
         <div style="text-align:center;margin-bottom:16px">
@@ -138,7 +165,7 @@ exports.handler = async (event) => {
           <div style="font-size:12px;font-weight:700;text-transform:uppercase">Bidang Kesehatan Tahun ${h.tahun}</div>
         </div>
 
-        <!-- INFO DASAR -->
+        <!-- INFO -->
         <table style="width:100%;margin-bottom:14px">
           <tr><td style="width:90px;font-size:11px;padding:2px 0">Indikator</td><td style="font-size:11px;padding:2px 0">: <strong>${ind.nama_indikator || '-'}</strong></td></tr>
           <tr><td style="font-size:11px;padding:2px 0">Puskesmas</td><td style="font-size:11px;padding:2px 0">: ${h.nama_puskesmas || h.kode_pkm}</td></tr>
@@ -146,7 +173,7 @@ exports.handler = async (event) => {
         </table>
 
         <!-- TABEL DATA -->
-        <table style="width:100%;border-collapse:collapse;margin-bottom:${catatan ? '10px' : '16px'}">
+        <table style="width:100%;border-collapse:collapse;margin-bottom:${catatan ? '10px' : '20px'}">
           <thead>
             <tr style="background:#1e293b;color:white">
               <th style="padding:7px 10px;font-size:10px;border:1px solid #334155;text-align:center">Jumlah Sasaran<br>(Satu Tahun)</th>
@@ -160,35 +187,21 @@ exports.handler = async (event) => {
               <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:center;font-size:12px">${target}</td>
               <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:center;font-size:12px">${capaian}</td>
               <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:center;font-size:12px">${capaian}</td>
-              <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:center;font-size:13px;font-weight:700;color:${rasio>=1?'#0d9488':rasio>=0.75?'#d97706':'#dc2626'}">${capaianPct}%</td>
+              <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:center;font-size:14px;font-weight:700;color:${rasio>=1?'#0d9488':rasio>=0.75?'#d97706':'#dc2626'}">${capaianPct}%</td>
             </tr>
           </tbody>
         </table>
 
-        <!-- CATATAN -->
-        ${catatan ? `
-        <div style="margin-bottom:16px;font-size:10px;color:#334155">
-          <strong>Catatan :</strong> ${catatan}
-        </div>` : ''}
+        ${catatan ? `<div style="margin-bottom:20px;font-size:10px;color:#334155"><strong>Catatan :</strong> ${catatan}</div>` : ''}
 
         <!-- TANDA TANGAN -->
-        <div style="margin-top:24px">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px">
-            <!-- Pengelola Program (kiri) -->
-            <div style="display:flex;gap:24px;flex-wrap:wrap">
-              ${pgmSigns || `<div style="text-align:center;min-width:180px">
-                <div style="font-size:10px;color:#64748b;margin-bottom:8px">Pengelola Program</div>
-                <div style="border:2px solid #e2e8f0;border-radius:10px;padding:10px 14px;background:#f8fafc;display:inline-block">
-                  <div style="font-size:22px">⏳</div>
-                  <div style="font-size:9px;color:#94a3b8;font-weight:700">MENUNGGU</div>
-                </div>
-              </div>`}
-            </div>
-            <!-- Kepala Puskesmas (kanan) -->
-            <div style="text-align:right">
-              <div style="font-size:10px;color:#64748b;margin-bottom:4px">Adean, ${now}</div>
-              ${kapusSign}
-            </div>
+        <div style="margin-top:28px;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:20px">
+          <div style="display:flex;gap:32px;flex-wrap:wrap">
+            ${pgmSigns}
+          </div>
+          <div>
+            <div style="font-size:10px;color:#334155;margin-bottom:6px;text-align:right">Adean, ${now}</div>
+            ${kapusSignBlock()}
           </div>
         </div>
       </div>`;
@@ -209,24 +222,14 @@ exports.handler = async (event) => {
     .page-break { page-break-after: always; }
     .page-break:last-child { page-break-after: avoid; }
   }
-  .page-break { padding: 0 0 20px 0; }
-  .btn-bar {
-    position: fixed; top: 12px; right: 12px; display: flex; gap: 8px; z-index: 999;
-  }
-  .btn-bar button {
-    background: #0d9488; color: white; border: none; border-radius: 8px;
-    padding: 8px 16px; font-size: 13px; font-weight: 700; cursor: pointer;
-    display: flex; align-items: center; gap: 6px;
-  }
-  .btn-bar button.outline { background: white; color: #0d9488; border: 2px solid #0d9488; }
+  .page-break { padding-bottom: 20px; }
+  .btn-bar { position:fixed; top:12px; right:12px; z-index:999; }
+  .btn-bar button { background:#0d9488; color:white; border:none; border-radius:8px; padding:9px 18px; font-size:13px; font-weight:700; cursor:pointer; }
 </style>
 </head>
 <body>
-<div class="btn-bar no-print">
-  <button onclick="window.print()">⬇ Simpan / Cetak PDF</button>
-</div>
+<div class="btn-bar no-print"><button onclick="window.print()">⬇ Cetak / Simpan PDF</button></div>
 ${pagesHtml}
-<script>window.onload = function(){ /* window.print(); */ }</script>
 </body>
 </html>`;
 

@@ -7,40 +7,39 @@ exports.handler = async (event) => {
   const method = event.httpMethod;
 
   try {
+    // Auto-migrate: tambah kolom catatan kalau belum ada
+    await pool.query(`ALTER TABLE master_indikator ADD COLUMN IF NOT EXISTS catatan TEXT`).catch(()=>{});
+
     if (method === 'GET') {
       const result = await pool.query(
-        'SELECT no_indikator, nama_indikator, bobot, aktif FROM master_indikator ORDER BY no_indikator'
+        'SELECT no_indikator, nama_indikator, bobot, aktif, catatan FROM master_indikator ORDER BY no_indikator'
       );
       return ok(result.rows.map(r => ({
-        no: r.no_indikator,
-        nama: r.nama_indikator,
-        bobot: r.bobot,
-        aktif: r.aktif
+        no: r.no_indikator, nama: r.nama_indikator,
+        bobot: r.bobot, aktif: r.aktif, catatan: r.catatan || ''
       })));
     }
 
     const body = JSON.parse(event.body || '{}');
 
     if (method === 'POST') {
-      const { no, nama, bobot, aktif } = body;
+      const { no, nama, bobot, aktif, catatan } = body;
       if (!no || !nama) return err('Nomor dan nama indikator diperlukan');
-
-      const exists = await pool.query('SELECT no_indikator FROM master_indikator WHERE no_indikator = $1', [no]);
+      const exists = await pool.query('SELECT no_indikator FROM master_indikator WHERE no_indikator=$1', [no]);
       if (exists.rows.length > 0) return err('Nomor indikator sudah ada');
-
       await pool.query(
-        'INSERT INTO master_indikator (no_indikator, nama_indikator, bobot, aktif) VALUES ($1, $2, $3, $4)',
-        [parseInt(no), nama, parseInt(bobot) || 0, aktif !== false]
+        'INSERT INTO master_indikator (no_indikator, nama_indikator, bobot, aktif, catatan) VALUES ($1,$2,$3,$4,$5)',
+        [parseInt(no), nama, parseInt(bobot)||0, aktif !== false, catatan||null]
       );
       return ok({ message: 'Indikator berhasil ditambahkan' });
     }
 
     if (method === 'PUT') {
-      const { no, nama, bobot, aktif } = body;
+      const { no, nama, bobot, aktif, catatan } = body;
       if (!no) return err('Nomor indikator diperlukan');
       await pool.query(
-        'UPDATE master_indikator SET nama_indikator=$1, bobot=$2, aktif=$3 WHERE no_indikator=$4',
-        [nama, parseInt(bobot) || 0, aktif !== false, parseInt(no)]
+        'UPDATE master_indikator SET nama_indikator=$1, bobot=$2, aktif=$3, catatan=$4 WHERE no_indikator=$5',
+        [nama, parseInt(bobot)||0, aktif !== false, catatan||null, parseInt(no)]
       );
       return ok({ message: 'Indikator berhasil diupdate' });
     }
@@ -54,7 +53,6 @@ exports.handler = async (event) => {
 
     return err('Method tidak diizinkan', 405);
   } catch (e) {
-    console.error('Indikator error:', e);
     return err('Error: ' + e.message, 500);
   }
 };

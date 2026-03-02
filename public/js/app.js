@@ -1526,12 +1526,11 @@ function showChangePassword() {
   document.getElementById('cpNew').value = '';
   document.getElementById('cpConfirm').value = '';
   document.getElementById('cpStatus').textContent = '';
-  const modal = document.getElementById('changePasswordModal');
-  modal.style.display = 'flex';
+  showModal('changePasswordModal');
 }
 
 function closeChangePasswordModal() {
-  document.getElementById('changePasswordModal').style.display = 'none';
+  closeModal('changePasswordModal');
 }
 
 async function doChangePassword() {
@@ -1787,7 +1786,7 @@ function resetUserPassword(email, nama) {
   document.getElementById('rpStatus').textContent = '';
   document.getElementById('rpNew').type = 'password';
   document.getElementById('rpPwIcon').textContent = 'visibility_off';
-  document.getElementById('resetPasswordModal').style.display = 'flex';
+  showModal('resetPasswordModal');
   setTimeout(() => document.getElementById('rpNew').focus(), 100);
 }
 
@@ -1807,7 +1806,7 @@ async function doResetPassword() {
   setLoading(true);
   try {
     await API.post('auth', { action: 'reset-password', targetEmail: _resetTargetEmail, newPassword });
-    document.getElementById('resetPasswordModal').style.display = 'none';
+    closeModal('resetPasswordModal');
     toast(`Password berhasil direset!`, 'success');
   } catch(e) { statusEl.textContent = e.message; }
   finally { setLoading(false); }

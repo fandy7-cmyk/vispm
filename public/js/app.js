@@ -94,7 +94,6 @@ function startApp() {
     roleText = `${currentUser.role}`;
   }
   document.getElementById('sidebarRole').textContent = roleText;
-  // Tampilkan nama puskesmas di bawah role kalau ada
   const sidebarPKMEl = document.getElementById('sidebarPKM');
   if (sidebarPKMEl) {
     if (currentUser.namaPKM) {
@@ -109,6 +108,67 @@ function startApp() {
 
   buildSidebar();
   loadPage('dashboard');
+
+  // Popup notifikasi periode untuk Operator saat login
+  if (currentUser.role === 'Operator') {
+    setTimeout(() => showPeriodeLoginPopup(), 800);
+  }
+}
+
+async function showPeriodeLoginPopup() {
+  try {
+    const periodeList = await API.get('periode');
+    const aktif = (periodeList || []).find(p => p.isAktifToday);
+    if (!aktif) return;
+
+    // Buat popup element
+    const popup = document.createElement('div');
+    popup.id = 'periodePopup';
+    popup.style.cssText = `
+      position:fixed;top:0;left:0;right:0;bottom:0;
+      background:rgba(0,0,0,0.5);z-index:9998;
+      display:flex;align-items:center;justify-content:center;
+      backdrop-filter:blur(3px);animation:fadeIn 0.3s ease
+    `;
+    popup.innerHTML = `
+      <div style="background:white;border-radius:16px;width:440px;max-width:calc(100vw - 32px);overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,0.3);animation:authIn 0.3s ease">
+        <div style="background:linear-gradient(135deg,#0d9488,#06b6d4);padding:20px 24px;color:white">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+            <span class="material-icons" style="font-size:24px">notifications_active</span>
+            <span style="font-size:13px;font-weight:600;opacity:0.85;text-transform:uppercase;letter-spacing:0.5px">Informasi Periode Input</span>
+          </div>
+          <div style="font-size:20px;font-weight:800">${aktif.namaBulan} ${aktif.tahun}</div>
+        </div>
+        <div style="padding:20px 24px">
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#f0fdf9;border-radius:8px;border:1px solid #0d9488">
+              <span class="material-icons" style="color:#0d9488;font-size:20px">login</span>
+              <div>
+                <div style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase">Dibuka</div>
+                <div style="font-size:14px;font-weight:700;color:#0f172a">${formatDate(aktif.tanggalMulai)} pukul ${aktif.jamMulai||'08:00'} WITA</div>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#fef2f2;border-radius:8px;border:1px solid #fca5a5">
+              <span class="material-icons" style="color:#ef4444;font-size:20px">logout</span>
+              <div>
+                <div style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase">Ditutup</div>
+                <div style="font-size:14px;font-weight:700;color:#0f172a">${formatDate(aktif.tanggalSelesai)} pukul ${aktif.jamSelesai||'17:00'} WITA</div>
+              </div>
+            </div>
+            ${aktif.notifOperator ? `
+            <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 14px;background:#fffbeb;border-radius:8px;border:1px solid #fcd34d">
+              <span style="font-size:18px;flex-shrink:0;margin-top:1px">📢</span>
+              <div style="font-size:13px;color:#0f172a;line-height:1.5">${aktif.notifOperator}</div>
+            </div>` : ''}
+          </div>
+          <button onclick="document.getElementById('periodePopup').remove()" style="width:100%;margin-top:16px;height:44px;background:linear-gradient(135deg,#0d9488,#06b6d4);border:none;border-radius:10px;color:white;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">
+            <span style="display:flex;align-items:center;justify-content:center;gap:6px"><span class="material-icons" style="font-size:18px">check</span>Mengerti, Tutup</span>
+          </button>
+        </div>
+      </div>`;
+    popup.addEventListener('click', e => { if (e.target === popup) popup.remove(); });
+    document.body.appendChild(popup);
+  } catch(e) { /* silent fail */ }
 }
 
 function buildSidebar() {
@@ -524,9 +584,16 @@ async function renderInput() {
     ? tahunAktif.map(y => `<option value="${y}" ${y == defaultTahun ? 'selected' : ''}>${y}</option>`).join('')
     : `<option value="${defaultTahun}">${defaultTahun}</option>`;
 
-  // Info banner periode
+  // Info banner periode - dengan notifikasi dan jam
   const periodeBanner = periodeAktif
-    ? `<div class="info-card info"><span class="material-icons">event</span><div class="info-card-text"><strong>Periode Aktif Hari Ini:</strong> ${periodeAktif.namaBulan} ${periodeAktif.tahun} — s/d ${formatDate(periodeAktif.tanggalSelesai)}</div></div>`
+    ? `<div style="background:linear-gradient(135deg,#0d9488,#06b6d4);border-radius:12px;padding:16px 20px;color:white;margin-bottom:16px;display:flex;align-items:flex-start;gap:14px">
+        <span class="material-icons" style="font-size:28px;opacity:0.9;flex-shrink:0;margin-top:2px">event_available</span>
+        <div style="flex:1">
+          <div style="font-weight:800;font-size:16px;margin-bottom:2px">Periode Input Aktif: ${periodeAktif.namaBulan} ${periodeAktif.tahun}</div>
+          <div style="font-size:13px;opacity:0.9">Dibuka: ${formatDate(periodeAktif.tanggalMulai)} pukul ${periodeAktif.jamMulai||'08:00'} — Ditutup: ${formatDate(periodeAktif.tanggalSelesai)} pukul ${periodeAktif.jamSelesai||'17:00'} WITA</div>
+          ${periodeAktif.notifOperator ? `<div style="margin-top:8px;padding:8px 12px;background:rgba(255,255,255,0.15);border-radius:8px;font-size:13px;border-left:3px solid rgba(255,255,255,0.6)">📢 ${periodeAktif.notifOperator}</div>` : ''}
+        </div>
+      </div>`
     : periodeOptions.length
       ? `<div class="info-card warning"><span class="material-icons">schedule</span><div class="info-card-text">Ada periode aktif tapi di luar rentang tanggal hari ini. Pilih periode sesuai yang diizinkan Admin.</div></div>`
       : `<div class="info-card warning"><span class="material-icons">warning</span><div class="info-card-text">Tidak ada periode input aktif saat ini. Hubungi Admin.</div></div>`;

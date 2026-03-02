@@ -2400,6 +2400,9 @@ async function renderIndikator() {
           <div class="form-group"><label>No Indikator *</label><input class="form-control" id="iNo" type="number" min="1" placeholder="1, 2, 3..."></div>
           <div class="form-group"><label>Nama Indikator *</label><input class="form-control" id="iNama" placeholder="Nama lengkap indikator"></div>
           <div class="form-group"><label>Bobot</label><input class="form-control" id="iBobot" type="number" min="0" max="100" placeholder="0-100"></div>
+          <div class="form-group"><label>Catatan <span style="font-size:11px;color:var(--text-light)">(tampil di laporan per indikator)</span></label>
+            <textarea class="form-control" id="iCatatan" rows="3" placeholder="Contoh: Standar Pelayanan Ibu Bersalin merujuk pada Permenkes Nomor 6 Tahun 2024..."></textarea>
+          </div>
           <div class="form-group"><label>Status</label><select class="form-control" id="iAktif"><option value="true">Aktif</option><option value="false">Non-aktif</option></select></div>
         </div>
         <div class="modal-footer">
@@ -2447,10 +2450,17 @@ function openIndModal(editNo = null) {
   document.getElementById('iNo').readOnly = !!editNo;
   document.getElementById('iNama').value = '';
   document.getElementById('iBobot').value = '';
+  document.getElementById('iCatatan').value = '';
   document.getElementById('iAktif').value = 'true';
   if (editNo) {
     const i = allIndikator.find(x => x.no == editNo);
-    if (i) { document.getElementById('iNo').value = i.no; document.getElementById('iNama').value = i.nama; document.getElementById('iBobot').value = i.bobot; document.getElementById('iAktif').value = i.aktif ? 'true' : 'false'; }
+    if (i) {
+      document.getElementById('iNo').value = i.no;
+      document.getElementById('iNama').value = i.nama;
+      document.getElementById('iBobot').value = i.bobot;
+      document.getElementById('iCatatan').value = i.catatan || '';
+      document.getElementById('iAktif').value = i.aktif ? 'true' : 'false';
+    }
     document.getElementById('indModal').dataset.editNo = editNo;
   } else { delete document.getElementById('indModal').dataset.editNo; }
   showModal('indModal');
@@ -2462,13 +2472,14 @@ async function saveInd() {
   const no = document.getElementById('iNo').value;
   const nama = document.getElementById('iNama').value.trim();
   const bobot = document.getElementById('iBobot').value;
+  const catatan = document.getElementById('iCatatan').value.trim();
   const aktif = document.getElementById('iAktif').value === 'true';
   if (!no || !nama) return toast('Nomor dan nama harus diisi', 'error');
   const editNo = document.getElementById('indModal').dataset.editNo;
   setLoading(true);
   try {
-    if (editNo) await API.updateIndikator({ no, nama, bobot, aktif });
-    else await API.saveIndikator({ no, nama, bobot, aktif });
+    if (editNo) await API.updateIndikator({ no, nama, bobot, aktif, catatan });
+    else await API.saveIndikator({ no, nama, bobot, aktif, catatan });
     toast(`Indikator berhasil ${editNo ? 'diupdate' : 'ditambahkan'}`);
     closeModal('indModal');
     allIndikator = await API.getIndikator();

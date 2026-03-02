@@ -19,8 +19,24 @@ exports.handler = async (event) => {
       query += ' ORDER BY tahun, bulan';
       const result = await pool.query(query, qParams);
 
-      // Check aktif today
       const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      // Auto-update expired periods to Tidak Aktif
+      for (const r of result.rows) {
+        if (r.status === 'Aktif') {
+          const selesai = new Date(r.tanggal_selesai);
+          selesai.setHours(23, 59, 59, 999);
+          if (today > selesai) {
+            await pool.query(
+              `UPDATE periode_input SET status='Tidak Aktif' WHERE id=$1`,
+              [r.id]
+            );
+            r.status = 'Tidak Aktif';
+          }
+        }
+      }
+
       return ok(result.rows.map(r => {
         const mulai = new Date(r.tanggal_mulai);
         const selesai = new Date(r.tanggal_selesai);

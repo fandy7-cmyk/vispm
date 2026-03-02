@@ -298,14 +298,35 @@ function renderAdminDashboard(el, d) {
 }
 
 function renderOperatorDashboard(el, d) {
+  const p = d.periodeAktif;
+
+  // Banner periode + notifikasi
+  let periodeBanner = '';
+  if (p) {
+    const jamMulai = p.jam_mulai || '08:00';
+    const jamSelesai = p.jam_selesai || '17:00';
+    const tglSelesai = formatDate(p.tanggal_selesai);
+    periodeBanner = `
+      <div style="background:linear-gradient(135deg,#0d9488,#06b6d4);border-radius:12px;padding:16px 20px;color:white;margin-bottom:16px;display:flex;align-items:flex-start;gap:14px">
+        <span class="material-icons" style="font-size:28px;opacity:0.9;flex-shrink:0;margin-top:2px">event_available</span>
+        <div style="flex:1">
+          <div style="font-weight:800;font-size:16px;margin-bottom:2px">Periode Input Aktif: ${p.nama_bulan} ${p.tahun}</div>
+          <div style="font-size:13px;opacity:0.9">Dibuka: ${formatDate(p.tanggal_mulai)} pukul ${jamMulai} — Ditutup: ${tglSelesai} pukul ${jamSelesai} WITA</div>
+          ${p.notif_operator ? `<div style="margin-top:8px;padding:8px 12px;background:rgba(255,255,255,0.15);border-radius:8px;font-size:13px;border-left:3px solid rgba(255,255,255,0.6)">📢 ${p.notif_operator}</div>` : ''}
+        </div>
+      </div>`;
+  } else {
+    periodeBanner = `<div class="info-card warning"><span class="material-icons">warning</span><div class="info-card-text">Tidak ada periode input yang aktif saat ini. Hubungi Admin.</div></div>`;
+  }
+
   el.innerHTML = `
     <div class="stats-grid">
       ${statCard('blue','assignment','Total Usulan Saya', d.totalUsulan)}
       ${statCard('green','check_circle','Selesai/Disetujui', d.disetujui)}
       ${statCard('orange','pending','Dalam Proses', d.menunggu)}
-      ${statCard('cyan','event_available','Periode Aktif', d.periodeAktif ? `${d.periodeAktif.nama_bulan} ${d.periodeAktif.tahun}` : '-')}
+      ${statCard('cyan','event_available','Periode Aktif', p ? `${p.nama_bulan} ${p.tahun}` : '-')}
     </div>
-    ${d.periodeAktif ? `<div class="info-card info"><span class="material-icons">event</span><div class="info-card-text"><strong>Periode Input Aktif:</strong> ${d.periodeAktif.nama_bulan} ${d.periodeAktif.tahun} (s/d ${formatDate(d.periodeAktif.tanggal_selesai)})</div></div>` : '<div class="info-card warning"><span class="material-icons">warning</span><div class="info-card-text">Tidak ada periode input yang aktif saat ini. Hubungi Admin.</div></div>'}
+    ${periodeBanner}
     <div class="card">
       <div class="card-header-bar">
         <span class="card-title"><span class="material-icons">quickreply</span>Aksi Cepat</span>
@@ -2432,7 +2453,14 @@ async function renderPeriode() {
           </div>
           <div class="form-row">
             <div class="form-group"><label>Tanggal Mulai</label><input type="date" class="form-control" id="pMulai"></div>
+            <div class="form-group"><label>Jam Mulai</label><input type="time" class="form-control" id="pJamMulai" value="08:00"></div>
+          </div>
+          <div class="form-row">
             <div class="form-group"><label>Tanggal Selesai</label><input type="date" class="form-control" id="pSelesai"></div>
+            <div class="form-group"><label>Jam Selesai</label><input type="time" class="form-control" id="pJamSelesai" value="17:00"></div>
+          </div>
+          <div class="form-group"><label>Notifikasi untuk Operator</label>
+            <textarea class="form-control" id="pNotif" rows="2" placeholder="Contoh: Input data SPM bulan Maret dibuka hingga 28 Maret 2026 pukul 17.00 WITA"></textarea>
           </div>
           <div class="form-group"><label>Status</label>
             <select class="form-control" id="pStatus">
@@ -2474,9 +2502,10 @@ async function loadPeriodeGrid() {
           <span style="font-weight:700;font-size:15px">${p.namaBulan} ${p.tahun}</span>
           ${badgeHtml}
         </div>
-        <div style="font-size:12px;color:var(--text-light)">
-          <div>Mulai: ${formatDate(p.tanggalMulai)}</div>
-          <div>Selesai: ${formatDate(p.tanggalSelesai)}</div>
+        <div style="font-size:12px;color:var(--text-light);display:flex;flex-direction:column;gap:3px">
+          <div>Mulai: ${formatDate(p.tanggalMulai)}${p.jamMulai ? ` pukul ${p.jamMulai}` : ''}</div>
+          <div>Selesai: ${formatDate(p.tanggalSelesai)}${p.jamSelesai ? ` pukul ${p.jamSelesai}` : ''}</div>
+          ${p.notifOperator ? `<div style="margin-top:6px;padding:5px 8px;background:rgba(13,148,136,0.08);border-radius:6px;color:var(--text-md);font-size:11px;border-left:3px solid var(--primary)"><span style="font-weight:600">Notif:</span> ${p.notifOperator}</div>` : ''}
         </div>
       </div>`;
     }).join('');
@@ -2501,6 +2530,9 @@ async function editPeriode(tahun, bulan) {
     document.getElementById('pBulan').value = p.bulan;
     document.getElementById('pMulai').value = p.tanggalMulai ? p.tanggalMulai.toString().substr(0, 10) : '';
     document.getElementById('pSelesai').value = p.tanggalSelesai ? p.tanggalSelesai.toString().substr(0, 10) : '';
+    document.getElementById('pJamMulai').value = p.jamMulai || '08:00';
+    document.getElementById('pJamSelesai').value = p.jamSelesai || '17:00';
+    document.getElementById('pNotif').value = p.notifOperator || '';
     document.getElementById('pStatus').value = p.status;
     showModal('periodeModal');
   } catch (e) { openPeriodeModal(); }
@@ -2511,11 +2543,14 @@ async function savePeriode() {
   const bulan = parseInt(document.getElementById('pBulan').value);
   const tanggalMulai = document.getElementById('pMulai').value;
   const tanggalSelesai = document.getElementById('pSelesai').value;
+  const jamMulai = document.getElementById('pJamMulai').value || '08:00';
+  const jamSelesai = document.getElementById('pJamSelesai').value || '17:00';
+  const notifOperator = document.getElementById('pNotif').value.trim();
   const status = document.getElementById('pStatus').value;
   if (!tanggalMulai || !tanggalSelesai) return toast('Tanggal mulai dan selesai harus diisi', 'error');
   setLoading(true);
   try {
-    await API.savePeriode({ tahun, bulan, namaBulan: BULAN_NAMA[bulan], tanggalMulai, tanggalSelesai, status });
+    await API.savePeriode({ tahun, bulan, namaBulan: BULAN_NAMA[bulan], tanggalMulai, tanggalSelesai, jamMulai, jamSelesai, notifOperator, status });
     toast('Periode berhasil disimpan');
     closeModal('periodeModal');
     loadPeriodeGrid();

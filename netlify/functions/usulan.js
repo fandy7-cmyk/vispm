@@ -99,6 +99,9 @@ async function getUsulanList(pool, params) {
 
 async function getUsulanDetail(pool, idUsulan) {
   if (!idUsulan) return err('ID usulan diperlukan');
+  // Auto-migrate kolom baru kalau belum ada
+  await pool.query(`ALTER TABLE verifikasi_program ADD COLUMN IF NOT EXISTS nip_program VARCHAR(50)`).catch(()=>{});
+  await pool.query(`ALTER TABLE verifikasi_program ADD COLUMN IF NOT EXISTS jabatan_program TEXT`).catch(()=>{});
   const result = await pool.query(
     `SELECT uh.*, p.nama_puskesmas, p.indeks_kesulitan_wilayah, u.nama as nama_pembuat FROM usulan_header uh LEFT JOIN master_puskesmas p ON uh.kode_pkm=p.kode_pkm LEFT JOIN users u ON uh.created_by=u.email WHERE uh.id_usulan=$1`,
     [idUsulan]
@@ -131,6 +134,8 @@ async function getIndikatorUsulan(pool, idUsulan) {
 
 async function getProgramVerifStatus(pool, idUsulan) {
   if (!idUsulan) return err('ID usulan diperlukan');
+  await pool.query(`ALTER TABLE verifikasi_program ADD COLUMN IF NOT EXISTS nip_program VARCHAR(50)`).catch(()=>{});
+  await pool.query(`ALTER TABLE verifikasi_program ADD COLUMN IF NOT EXISTS jabatan_program TEXT`).catch(()=>{});
   const result = await pool.query(
     `SELECT email_program, nama_program, nip_program, jabatan_program, indikator_akses, status, catatan, verified_at FROM verifikasi_program WHERE id_usulan=$1 ORDER BY created_at`,
     [idUsulan]

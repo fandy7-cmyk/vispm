@@ -9,6 +9,9 @@ exports.handler = async (event) => {
 
   const pool = getPool();
   try {
+    // Auto-migrate: pastikan kolom catatan ada sebelum query
+    await pool.query(`ALTER TABLE master_indikator ADD COLUMN IF NOT EXISTS catatan TEXT`).catch(()=>{});
+
     const hdrResult = await pool.query(
       `SELECT uh.*, p.nama_puskesmas FROM usulan_header uh
        LEFT JOIN master_puskesmas p ON uh.kode_pkm = p.kode_pkm

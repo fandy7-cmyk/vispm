@@ -18,7 +18,8 @@ exports.handler = async (event) => {
     const h = hdrResult.rows[0];
 
     const indResult = await pool.query(
-      `SELECT ui.*, mi.nama_indikator FROM usulan_indikator ui
+      `SELECT ui.*, mi.nama_indikator, mi.catatan as catatan_indikator
+       FROM usulan_indikator ui
        LEFT JOIN master_indikator mi ON ui.no_indikator = mi.no_indikator
        WHERE ui.id_usulan = $1 ORDER BY ui.no_indikator`, [idUsulan]
     );
@@ -29,150 +30,206 @@ exports.handler = async (event) => {
 
     const bulanNama = ['','Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
     const bulan = bulanNama[h.bulan] || h.bulan;
-    const indeksSPM = parseFloat(h.indeks_spm) || 0;
     const now = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
-    const spmColor = indeksSPM >= 1 ? '#0d9488' : indeksSPM >= 0.75 ? '#f59e0b' : '#ef4444';
-    const spmLabel = indeksSPM >= 1 ? 'MEMENUHI TARGET' : indeksSPM >= 0.75 ? 'MENDEKATI TARGET' : 'DI BAWAH TARGET';
 
-    const indHtml = indResult.rows.map((ind, i) => {
+    // Format datetime untuk tanda tangan
+    function fmtDT(ts) {
+      if (!ts) return '-';
+      const d = new Date(ts);
+      const tgl = d.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+      const jam = d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+      return `${tgl}, ${jam} WITA`;
+    }
+
+    // Build verifikasi map per indikator (program verifier)
+    const vpByInd = {};
+    for (const v of vpResult.rows) {
+      const inds = (v.indikator_akses || '').split(',').map(s => s.trim()).filter(Boolean);
+      if (inds.length === 0) {
+        // akses semua indikator
+        for (const ind of indResult.rows) {
+          const key = String(ind.no_indikator);
+          if (!vpByInd[key]) vpByInd[key] = [];
+          vpByInd[key].push(v);
+        }
+      } else {
+        for (const i of inds) {
+          if (!vpByInd[i]) vpByInd[i] = [];
+          vpByInd[i].push(v);
+        }
+      }
+    }
+
+    // Satu halaman per indikator
+    const pagesHtml = indResult.rows.map((ind) => {
       const rasio = parseFloat(ind.realisasi_rasio) || 0;
-      const nilai = parseFloat(ind.nilai_terbobot) || 0;
-      const barColor = rasio >= 1 ? '#0d9488' : rasio >= 0.75 ? '#f59e0b' : '#ef4444';
-      return `<tr style="background:${i%2===0?'#f8fafc':'white'}">
-        <td style="padding:7px 8px;text-align:center;font-weight:700;color:#64748b">${ind.no_indikator}</td>
-        <td style="padding:7px 8px;font-size:11px">${ind.nama_indikator||''}</td>
-        <td style="padding:7px 8px;text-align:center">${parseFloat(ind.target)||0}</td>
-        <td style="padding:7px 8px;text-align:center">${parseFloat(ind.capaian)||0}</td>
-        <td style="padding:7px 8px;text-align:center;font-weight:700;color:${barColor}">${(rasio*100).toFixed(1)}%</td>
-        <td style="padding:7px 8px;text-align:center">${ind.bobot}</td>
-        <td style="padding:7px 8px;text-align:center;font-weight:700;color:#0d9488">${nilai.toFixed(2)}</td>
-        <td style="padding:7px 8px;text-align:center;font-size:10px">${ind.link_file?'✓ Ada':'-'}</td>
-      </tr>`;
-    }).join('');
+      const capaianPct = (rasio * 100).toFixed(0);
+      const target = parseFloat(ind.target) || 0;
+      const capaian = parseFloat(ind.capaian) || 0;
+      const verifiers = vpByInd[String(ind.no_indikator)] || [];
+      const catatan = ind.catatan_indikator || '';
 
-    const vpHtml = vpResult.rows.map(v => {
-      const c = v.status==='Selesai'?'#0d9488':v.status==='Ditolak'?'#ef4444':'#94a3b8';
-      return `<tr>
-        <td style="padding:6px 8px;font-weight:700;color:${c}">${v.status}</td>
-        <td style="padding:6px 8px">${v.nama_program||v.email_program}</td>
-        <td style="padding:6px 8px;font-size:10px;color:#64748b">${v.indikator_akses||'Semua'}</td>
-        <td style="padding:6px 8px;font-size:10px;color:#64748b">${v.verified_at?new Date(v.verified_at).toLocaleDateString('id-ID'):'-'}</td>
-        <td style="padding:6px 8px;font-size:10px;font-style:italic;color:#64748b">${v.catatan||''}</td>
-      </tr>`;
-    }).join('');
+      // Tanda tangan pengelola program
+      const pgmSigns = verifiers.map(v => {
+        const approved = v.status === 'Selesai';
+        return `
+          <div style="text-align:center;min-width:180px">
+            <div style="font-size:10px;color:#64748b;margin-bottom:8px">${v.nama_program_jabatan || 'Pengelola Program'}</div>
+            ${approved ? `
+              <div style="border:2px solid #0d9488;border-radius:10px;padding:10px 14px;background:#f0fdf9;display:inline-block">
+                <div style="font-size:22px;margin-bottom:2px">✅</div>
+                <div style="font-size:9px;color:#0d9488;font-weight:700">DISETUJUI</div>
+                <div style="font-size:8.5px;color:#475569;margin-top:2px">${fmtDT(v.verified_at)}</div>
+              </div>
+            ` : `
+              <div style="border:2px solid #e2e8f0;border-radius:10px;padding:10px 14px;background:#f8fafc;display:inline-block">
+                <div style="font-size:22px;margin-bottom:2px">⏳</div>
+                <div style="font-size:9px;color:#94a3b8;font-weight:700">MENUNGGU</div>
+              </div>
+            `}
+            <div style="margin-top:8px;font-size:10px;font-weight:700;color:#1e293b">${v.nama_program || v.email_program}</div>
+          </div>`;
+      }).join('');
 
-    const totalBobot = indResult.rows.reduce((s,r)=>s+(parseInt(r.bobot)||0),0);
-    const totalNilai = indResult.rows.reduce((s,r)=>s+(parseFloat(r.nilai_terbobot)||0),0);
+      // Tanda tangan kepala puskesmas
+      const kapusSign = `
+        <div style="text-align:center;min-width:180px">
+          <div style="font-size:10px;color:#64748b;margin-bottom:8px">Kepala UPTD Puskesmas ${h.nama_puskesmas || h.kode_pkm}</div>
+          ${h.kapus_approved_by ? `
+            <div style="border:2px solid #0d9488;border-radius:10px;padding:10px 14px;background:#f0fdf9;display:inline-block">
+              <div style="font-size:22px;margin-bottom:2px">✅</div>
+              <div style="font-size:9px;color:#0d9488;font-weight:700">DISETUJUI</div>
+              <div style="font-size:8.5px;color:#475569;margin-top:2px">${fmtDT(h.kapus_approved_at)}</div>
+            </div>
+          ` : `
+            <div style="border:2px solid #e2e8f0;border-radius:10px;padding:10px 14px;background:#f8fafc;display:inline-block">
+              <div style="font-size:22px;margin-bottom:2px">⏳</div>
+              <div style="font-size:9px;color:#94a3b8;font-weight:700">MENUNGGU</div>
+            </div>
+          `}
+          <div style="margin-top:8px;font-size:10px;font-weight:700;color:#1e293b">${h.kapus_approved_by || '-'}</div>
+        </div>`;
+
+      return `
+      <div class="page-break">
+        <!-- KOP SURAT -->
+        <table style="width:100%;border-bottom:3px solid #1e293b;padding-bottom:10px;margin-bottom:12px">
+          <tr>
+            <td style="width:70px;text-align:center">
+              <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/1e/Seal_of_Banggai_Laut_Regency.svg/200px-Seal_of_Banggai_Laut_Regency.svg.png"
+                   style="width:60px;height:60px;object-fit:contain"
+                   onerror="this.style.display='none'">
+            </td>
+            <td style="text-align:center">
+              <div style="font-size:12px;font-weight:700;text-transform:uppercase">Pemerintah Kabupaten Banggai Laut</div>
+              <div style="font-size:11px;font-weight:700;text-transform:uppercase">Dinas Kesehatan, Pengendalian Penduduk dan Keluarga Berencana</div>
+              <div style="font-size:10px">Jl. KM 7 Adean 94895 &nbsp;•&nbsp; Sulawesi Tengah</div>
+              <div style="font-size:10px">email: dinkeskb.balutsulteng@gmail.com</div>
+            </td>
+          </tr>
+        </table>
+
+        <!-- JUDUL -->
+        <div style="text-align:center;margin-bottom:16px">
+          <div style="font-size:12px;font-weight:700;text-transform:uppercase">Lembar Hasil Verifikasi Laporan Standar Pelayanan Minimal (SPM)</div>
+          <div style="font-size:12px;font-weight:700;text-transform:uppercase">Bidang Kesehatan Tahun ${h.tahun}</div>
+        </div>
+
+        <!-- INFO DASAR -->
+        <table style="width:100%;margin-bottom:14px">
+          <tr><td style="width:90px;font-size:11px;padding:2px 0">Indikator</td><td style="font-size:11px;padding:2px 0">: <strong>${ind.nama_indikator || '-'}</strong></td></tr>
+          <tr><td style="font-size:11px;padding:2px 0">Puskesmas</td><td style="font-size:11px;padding:2px 0">: ${h.nama_puskesmas || h.kode_pkm}</td></tr>
+          <tr><td style="font-size:11px;padding:2px 0">Bulan</td><td style="font-size:11px;padding:2px 0">: ${bulan}</td></tr>
+        </table>
+
+        <!-- TABEL DATA -->
+        <table style="width:100%;border-collapse:collapse;margin-bottom:${catatan ? '10px' : '16px'}">
+          <thead>
+            <tr style="background:#1e293b;color:white">
+              <th style="padding:7px 10px;font-size:10px;border:1px solid #334155;text-align:center">Jumlah Sasaran<br>(Satu Tahun)</th>
+              <th style="padding:7px 10px;font-size:10px;border:1px solid #334155;text-align:center">Jumlah Bulan Ini</th>
+              <th style="padding:7px 10px;font-size:10px;border:1px solid #334155;text-align:center">Dilayani Sesuai Standar</th>
+              <th style="padding:7px 10px;font-size:10px;border:1px solid #334155;text-align:center">Capaian (%)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:center;font-size:12px">${target}</td>
+              <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:center;font-size:12px">${capaian}</td>
+              <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:center;font-size:12px">${capaian}</td>
+              <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:center;font-size:13px;font-weight:700;color:${rasio>=1?'#0d9488':rasio>=0.75?'#d97706':'#dc2626'}">${capaianPct}%</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <!-- CATATAN -->
+        ${catatan ? `
+        <div style="margin-bottom:16px;font-size:10px;color:#334155">
+          <strong>Catatan :</strong> ${catatan}
+        </div>` : ''}
+
+        <!-- TANDA TANGAN -->
+        <div style="margin-top:24px">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px">
+            <!-- Pengelola Program (kiri) -->
+            <div style="display:flex;gap:24px;flex-wrap:wrap">
+              ${pgmSigns || `<div style="text-align:center;min-width:180px">
+                <div style="font-size:10px;color:#64748b;margin-bottom:8px">Pengelola Program</div>
+                <div style="border:2px solid #e2e8f0;border-radius:10px;padding:10px 14px;background:#f8fafc;display:inline-block">
+                  <div style="font-size:22px">⏳</div>
+                  <div style="font-size:9px;color:#94a3b8;font-weight:700">MENUNGGU</div>
+                </div>
+              </div>`}
+            </div>
+            <!-- Kepala Puskesmas (kanan) -->
+            <div style="text-align:right">
+              <div style="font-size:10px;color:#64748b;margin-bottom:4px">Adean, ${now}</div>
+              ${kapusSign}
+            </div>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
 
     const html = `<!DOCTYPE html>
 <html lang="id">
 <head>
 <meta charset="UTF-8">
-<title>Laporan SPM - ${idUsulan}</title>
+<title>Laporan SPM Per Indikator - ${idUsulan}</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
   body { font-family: Arial, sans-serif; color: #1e293b; background: white; font-size: 12px; }
-  @page { size: A4; margin: 15mm 12mm; }
+  @page { size: A4 portrait; margin: 15mm 18mm 15mm 18mm; }
   @media print {
     .no-print { display: none !important; }
     body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    table { page-break-inside: auto; }
-    tr { page-break-inside: avoid; }
+    .page-break { page-break-after: always; }
+    .page-break:last-child { page-break-after: avoid; }
   }
-  table { width: 100%; border-collapse: collapse; }
-  th { background: #0d9488; color: white; padding: 8px; text-align: center; font-size: 11px; }
-  .btn-print {
-    position: fixed; top: 16px; right: 16px;
+  .page-break { padding: 0 0 20px 0; }
+  .btn-bar {
+    position: fixed; top: 12px; right: 12px; display: flex; gap: 8px; z-index: 999;
+  }
+  .btn-bar button {
     background: #0d9488; color: white; border: none; border-radius: 8px;
-    padding: 10px 20px; font-size: 13px; font-weight: 700; cursor: pointer;
-    display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(13,148,136,0.4);
-    z-index: 999;
+    padding: 8px 16px; font-size: 13px; font-weight: 700; cursor: pointer;
+    display: flex; align-items: center; gap: 6px;
   }
-  .btn-print:hover { background: #0f766e; }
+  .btn-bar button.outline { background: white; color: #0d9488; border: 2px solid #0d9488; }
 </style>
 </head>
 <body>
-<button class="btn-print no-print" onclick="window.print()">⬇ Simpan PDF</button>
-
-<!-- HEADER -->
-<div style="background:#0f172a;color:white;padding:20px 24px;margin-bottom:16px;border-radius:0 0 12px 12px">
-  <div style="font-size:10px;opacity:0.6;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px">Laporan Verifikasi Indeks SPM Puskesmas</div>
-  <div style="font-size:18px;font-weight:700;margin-bottom:2px">${h.nama_puskesmas||h.kode_pkm}</div>
-  <div style="font-size:12px;opacity:0.8;display:flex;gap:24px;margin-top:4px">
-    <span>Periode: <strong>${bulan} ${h.tahun}</strong></span>
-    <span>ID: <strong>${idUsulan}</strong></span>
-    <span>Dicetak: <strong>${now}</strong></span>
-  </div>
+<div class="btn-bar no-print">
+  <button onclick="window.print()">⬇ Simpan / Cetak PDF</button>
 </div>
-
-<!-- SKOR SPM -->
-<div style="display:flex;gap:12px;margin-bottom:16px;align-items:stretch">
-  <div style="background:white;border:2px solid ${spmColor};border-radius:12px;padding:16px 24px;text-align:center;min-width:180px">
-    <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">Indeks SPM</div>
-    <div style="font-size:36px;font-weight:800;color:${spmColor};font-family:monospace">${indeksSPM.toFixed(4)}</div>
-    <div style="margin-top:8px;padding:3px 12px;background:${spmColor};color:white;border-radius:20px;font-size:10px;font-weight:700;display:inline-block">${spmLabel}</div>
-  </div>
-  <div style="flex:1;background:#f8fafc;border-radius:12px;padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:10px">
-    <div><div style="font-size:10px;color:#94a3b8">Puskesmas</div><div style="font-weight:700">${h.nama_puskesmas||'-'}</div><div style="font-size:10px;color:#64748b">${h.kode_pkm}</div></div>
-    <div><div style="font-size:10px;color:#94a3b8">Operator</div><div style="font-weight:700">${h.created_by||'-'}</div></div>
-    <div><div style="font-size:10px;color:#94a3b8">Disetujui Kapus</div><div style="font-weight:700;color:${h.kapus_approved_by?'#0d9488':'#94a3b8'}">${h.kapus_approved_by||'Belum'}</div></div>
-    <div><div style="font-size:10px;color:#94a3b8">Disetujui Admin</div><div style="font-weight:700;color:${h.admin_approved_by?'#0d9488':'#94a3b8'}">${h.admin_approved_by||'Belum'}</div></div>
-  </div>
-</div>
-
-<!-- TABEL INDIKATOR -->
-<div style="margin-bottom:16px">
-  <div style="font-size:12px;font-weight:700;margin-bottom:8px;color:#0f172a">◆ Detail 12 Indikator SPM</div>
-  <table>
-    <thead>
-      <tr>
-        <th style="width:32px">No</th>
-        <th style="text-align:left">Nama Indikator</th>
-        <th>Target</th>
-        <th>Capaian</th>
-        <th>Rasio</th>
-        <th>Bobot</th>
-        <th>Nilai</th>
-        <th>Bukti</th>
-      </tr>
-    </thead>
-    <tbody>${indHtml}</tbody>
-    <tfoot>
-      <tr style="background:#0f172a;color:white;font-weight:700">
-        <td colspan="5" style="padding:8px">TOTAL</td>
-        <td style="padding:8px;text-align:center">${totalBobot}</td>
-        <td style="padding:8px;text-align:center;color:#5eead4">${totalNilai.toFixed(2)}</td>
-        <td></td>
-      </tr>
-    </tfoot>
-  </table>
-</div>
-
-<!-- VERIFIKASI PROGRAM -->
-${vpResult.rows.length ? `<div style="margin-bottom:16px">
-  <div style="font-size:12px;font-weight:700;margin-bottom:8px;color:#0f172a">◆ Verifikasi Pengelola Program</div>
-  <table>
-    <thead><tr><th>Status</th><th style="text-align:left">Nama</th><th style="text-align:left">Indikator</th><th>Tanggal</th><th style="text-align:left">Catatan</th></tr></thead>
-    <tbody>${vpHtml}</tbody>
-  </table>
-</div>` : ''}
-
-<!-- FOOTER -->
-<div style="margin-top:16px;padding-top:10px;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8">
-  <span>SPM Puskesmas — Sistem Penilaian Mutu</span>
-  <span>${idUsulan} | ${now}</span>
-</div>
-
-<script>window.onload = function(){ window.print(); }</script>
+${pagesHtml}
+<script>window.onload = function(){ /* window.print(); */ }</script>
 </body>
 </html>`;
 
     return {
       statusCode: 200,
-      headers: {
-        'Content-Type': 'text/html; charset=utf-8',
-        'Access-Control-Allow-Origin': '*',
-      },
+      headers: { 'Content-Type': 'text/html; charset=utf-8', 'Access-Control-Allow-Origin': '*' },
       body: html
     };
   } catch (e) {

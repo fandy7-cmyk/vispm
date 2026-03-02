@@ -580,6 +580,7 @@ async function loadMyUsulan() {
             ${u.statusGlobal === 'Draft' ? `<button class="btn-icon edit" onclick="openIndikatorModal('${u.idUsulan}')"><span class="material-icons">edit</span></button>` : ''}
             ${u.statusGlobal === 'Draft' ? `<button class="btn-icon del" onclick="deleteUsulan('${u.idUsulan}')"><span class="material-icons">delete</span></button>` : ''}
             ${u.statusGlobal === 'Ditolak' ? `<button class="btn btn-warning btn-sm" onclick="openIndikatorModal('${u.idUsulan}')" style="background:#f59e0b;color:white;border-color:#f59e0b"><span class="material-icons" style="font-size:14px">restart_alt</span> Perbaiki & Ajukan Ulang</button>` : ''}
+            ${(u.statusGlobal || '').startsWith('Menunggu') ? `<button class="btn-icon" title="Sedang diproses" style="background:#d1fae5;color:#065f46;border:1.5px solid #0d9488;cursor:default" disabled><span class="material-icons">check_circle</span></button>` : ''}
           </td>
         </tr>`).join('')}
         </tbody>
@@ -1090,10 +1091,9 @@ async function doSubmitUsulan(forceSubmit) {
     });
     const raw = await res.json();
 
-    // needConfirm datang sebagai statusCode 200 tapi success:false
+    // needConfirm: format khusus (bukan lewat ok()), cek duluan
     if (raw.needConfirm) {
       const nos = (raw.missingNos || []).join(', ');
-      // Highlight tombol upload yang kurang
       (raw.missingNos || []).forEach(no => {
         const label = document.getElementById(`uploadLabel-${no}`);
         if (label) {
@@ -1102,29 +1102,39 @@ async function doSubmitUsulan(forceSubmit) {
           setTimeout(() => { label.style.boxShadow = ''; label.style.transform = ''; }, 3000);
         }
       });
-      // Tanya user apakah tetap mau submit tanpa bukti
       showConfirm({
         title: 'Data Dukung Belum Lengkap',
         message: `${raw.missingCount} indikator (no. ${nos}) belum ada file bukti. Tetap submit ke Kepala Puskesmas?`,
         type: 'warning',
-        onConfirm: () => doSubmitUsulan(true) // forceSubmit = true
+        onConfirm: () => doSubmitUsulan(true)
       });
       return;
     }
 
-    // Error dari backend (statusCode 4xx/5xx) atau success:false
-    if (!res.ok || !raw.success) {
-      toast(raw.message || raw.error || 'Submit gagal', 'error');
+    // ok() wraps dalam { success: true, data: {...} }
+    // err() wraps dalam { success: false, message: '...' }
+    if (!res.ok || raw.success === false) {
+      toast(raw.message || raw.data?.message || 'Submit gagal', 'error');
       return;
     }
 
-    const successMsg = raw.data?.message || raw.message || 'Usulan berhasil disubmit!';
+    const successMsg = raw.data?.message || 'Usulan berhasil disubmit!';
     toast('✅ ' + successMsg, 'success');
-    // Tampilkan notifikasi sukses di dalam modal
-    // Notifikasi sukses sudah tampil via toast di atas
-    // Sembunyikan tombol submit
-    const submitBtn2 = document.getElementById('btnSubmitFromModal');
-    if (submitBtn2) submitBtn2.style.display = 'none';
+
+    // Sembunyikan tombol submit di modal
+    const submitBtn = document.getElementById('btnSubmitFromModal');
+    if (submitBtn) submitBtn.style.display = 'none';
+
+    // Update icon tombol di tabel jadi hijau
+    const rowBtn = document.querySelector(`button[onclick="openIndikatorModal('${currentIndikatorUsulan}')"]`);
+    if (rowBtn) {
+      rowBtn.style.background = '#d1fae5';
+      rowBtn.style.color = '#065f46';
+      rowBtn.style.border = '1.5px solid #0d9488';
+      rowBtn.title = 'Sudah diajukan';
+      rowBtn.querySelector('.material-icons').textContent = 'check_circle';
+    }
+
     loadMyUsulan();
   } catch (e) {
     toast(e.message, 'error');

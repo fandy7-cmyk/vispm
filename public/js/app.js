@@ -483,8 +483,9 @@ async function renderInput() {
     try {
       const periodeRes = await API.get('periode');
       allPeriode = Array.isArray(periodeRes) ? periodeRes : [];
-      // Periode "Aktif" status (bukan cek hari ini) - semua yg berstatus Aktif bisa dipilih
-      periodeOptions = allPeriode.filter(p => p.status === 'Aktif');
+      // Operator hanya bisa pilih periode yang benar-benar aktif hari ini atau masih dalam rentang
+      // isAktifToday = status Aktif DAN dalam rentang tanggal
+      periodeOptions = allPeriode.filter(p => p.isAktifToday);
       periodeAktif = allPeriode.find(p => p.isAktifToday);
     } catch(e2) { /* periode API mungkin gagal, tetap lanjut */ }
   } catch (e) { toast(e.message, 'error'); }
@@ -2460,12 +2461,18 @@ async function loadPeriodeGrid() {
     }
     grid.innerHTML = rows.map(p => {
       const isActive = p.isAktifToday;
-      const borderColor = isActive ? 'var(--success)' : p.status === 'Aktif' ? 'var(--primary)' : 'var(--border)';
-      const bg = isActive ? 'var(--success-light)' : 'var(--surface)';
-      return `<div style="border:2px solid ${borderColor};border-radius:12px;padding:16px;background:${bg};cursor:pointer" onclick="editPeriode(${p.tahun},${p.bulan})">
+      const isTidakAktif = p.status === 'Tidak Aktif';
+      const borderColor = isActive ? 'var(--success)' : isTidakAktif ? '#e2e8f0' : 'var(--primary)';
+      const bg = isActive ? 'var(--success-light)' : isTidakAktif ? '#f8fafc' : 'var(--surface)';
+      const badgeHtml = isActive
+        ? '<span class="badge badge-success">Aktif Hari Ini</span>'
+        : isTidakAktif
+          ? '<span class="badge badge-default" style="color:#94a3b8">Tidak Aktif</span>'
+          : '<span class="badge badge-info">Aktif</span>';
+      return `<div style="border:2px solid ${borderColor};border-radius:12px;padding:16px;background:${bg};cursor:pointer;opacity:${isTidakAktif?'0.65':'1'}" onclick="editPeriode(${p.tahun},${p.bulan})">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
           <span style="font-weight:700;font-size:15px">${p.namaBulan} ${p.tahun}</span>
-          ${isActive ? '<span class="badge badge-success">Aktif Hari Ini</span>' : `<span class="badge ${p.status==='Aktif'?'badge-info':'badge-default'}">${p.status}</span>`}
+          ${badgeHtml}
         </div>
         <div style="font-size:12px;color:var(--text-light)">
           <div>Mulai: ${formatDate(p.tanggalMulai)}</div>

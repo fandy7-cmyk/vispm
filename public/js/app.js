@@ -2430,7 +2430,7 @@ function renderIndTable(inds) {
   const tbEl = document.getElementById('totalBobot');
   if (tbEl) tbEl.textContent = totalBobot;
   el.innerHTML = `<div class="table-container"><table>
-    <thead><tr><th>No</th><th>Nama Indikator</th><th>Status</th><th>Aksi</th></tr></thead>
+    <thead><tr><th>No</th><th>Nama Indikator</th><th>Bobot</th><th>Status</th><th>Aksi</th></tr></thead>
     <tbody>${inds.map(i => `<tr>
       <td><span style="font-family:'JetBrains Mono';font-weight:700">${i.no}</span></td>
       <td>${i.nama}</td>

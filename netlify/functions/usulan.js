@@ -275,56 +275,77 @@ async function hitungSPM(pool, idUsulan) {
 async function submitUsulan(pool, body) {
   const { idUsulan, email, forceSubmit } = body;
 
-  const result = await pool.query('SELECT status_global FROM usulan_header WHERE id_usulan=$1', [idUsulan]);
+  const result = await pool.query(
+    'SELECT status_global, status_kapus, status_program FROM usulan_header WHERE id_usulan=$1',
+    [idUsulan]
+  );
   if (result.rows.length === 0) return err('Usulan tidak ditemukan');
-  const statusSaatIni = result.rows[0].status_global;
-  // Izinkan submit dari Draft ATAU Ditolak (ajukan ulang setelah diperbaiki)
-  if (statusSaatIni !== 'Draft' && statusSaatIni !== 'Ditolak') return err('Usulan tidak dapat disubmit pada status ini');
+  const { status_global: statusSaatIni, status_kapus, status_program } = result.rows[0];
 
-  // Kalau resubmit dari Ditolak: simpan info penolakan DULU sebelum di-reset
-  let wasKapusDitolak = false;
-  let wasProgramDitolak = false;
+  if (statusSaatIni !== 'Draft' && statusSaatIni !== 'Ditolak')
+    return err('Usulan tidak dapat disubmit pada status ini');
+
+  // Cek indikator yang belum ada bukti DULU sebelum reset apapun
+  const indResult = await pool.query(
+    'SELECT no_indikator, link_file FROM usulan_indikator WHERE id_usulan=$1', [idUsulan]
+  );
+  const missing = indResult.rows.filter(r => !r.link_file || r.link_file.trim() === '');
+  if (missing.length > 0 && !forceSubmit) {
+    return {
+      statusCode: 200,
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+      body: JSON.stringify({
+        success: false, needConfirm: true,
+        missingCount: missing.length,
+        missingNos: missing.map(r => r.no_indikator),
+        message: `${missing.length} indikator belum ada file bukti. Tetap submit?`
+      })
+    };
+  }
+
+  // Tentukan target dan lakukan reset berdasarkan kondisi penolakan
+  // Sesuai flowchart:
+  // - Draft / Ditolak Kapus → kembali ke Kepala Puskesmas
+  // - Ditolak Program → skip Kapus, langsung ke Pengelola Program
+  // - Ditolak Admin → kembali ke Pengelola Program
+  const wasKapusDitolak = status_kapus === 'Ditolak';
+  const wasProgramDitolak = status_program === 'Ditolak';
+
+  let targetStatus = 'Menunggu Kepala Puskesmas';
 
   if (statusSaatIni === 'Ditolak') {
-    const tolakInfo = await pool.query('SELECT status_kapus, status_program FROM usulan_header WHERE id_usulan=$1', [idUsulan]);
-    const { status_kapus, status_program } = tolakInfo.rows[0];
-    wasKapusDitolak = status_kapus === 'Ditolak';
-    wasProgramDitolak = status_program === 'Ditolak';
-
     if (wasKapusDitolak) {
-      // Ditolak Kapus → reset semua dari awal
+      // Kepala Puskesmas menolak → reset semua, mulai dari awal
+      targetStatus = 'Menunggu Kepala Puskesmas';
       await pool.query(
         `UPDATE usulan_header SET
           status_kapus='Menunggu', status_program='Menunggu', status_final='Menunggu',
           kapus_approved_by=NULL, kapus_approved_at=NULL, kapus_catatan=NULL,
           admin_approved_by=NULL, admin_approved_at=NULL, admin_catatan=NULL,
           final_approved_by=NULL, final_approved_at=NULL
-         WHERE id_usulan=$1`,
-        [idUsulan]
+         WHERE id_usulan=$1`, [idUsulan]
       );
       await pool.query(
         `UPDATE verifikasi_program SET status='Menunggu', catatan=NULL, verified_at=NULL WHERE id_usulan=$1`,
         [idUsulan]
       );
     } else if (wasProgramDitolak) {
-      // Ditolak Pengelola Program → Kapus sudah approve (tidak perlu ulang)
-      // Hanya reset yang berstatus 'Ditolak', yang sudah 'Selesai' TETAP Selesai
+      // Pengelola Program menolak → Kapus sudah approve, hanya reset yang Ditolak
+      targetStatus = 'Menunggu Pengelola Program';
       await pool.query(
         `UPDATE verifikasi_program SET status='Menunggu', catatan=NULL, verified_at=NULL
-         WHERE id_usulan=$1 AND status='Ditolak'`,
-        [idUsulan]
+         WHERE id_usulan=$1 AND status='Ditolak'`, [idUsulan]
       );
-      // Reset header ke Menunggu Pengelola Program, hapus catatan tolak
       await pool.query(
         `UPDATE usulan_header SET
           status_program='Menunggu', status_final='Menunggu',
           admin_approved_by=NULL, admin_approved_at=NULL, admin_catatan=NULL,
           final_approved_by=NULL, final_approved_at=NULL
-         WHERE id_usulan=$1`,
-        [idUsulan]
+         WHERE id_usulan=$1`, [idUsulan]
       );
     } else {
-      // Ditolak Admin → Kapus sudah approve, reset program dan admin saja
+      // Admin menolak → reset program dan admin
+      targetStatus = 'Menunggu Pengelola Program';
       await pool.query(
         `UPDATE verifikasi_program SET status='Menunggu', catatan=NULL, verified_at=NULL WHERE id_usulan=$1`,
         [idUsulan]
@@ -334,51 +355,19 @@ async function submitUsulan(pool, body) {
           status_program='Menunggu', status_final='Menunggu',
           admin_approved_by=NULL, admin_approved_at=NULL, admin_catatan=NULL,
           final_approved_by=NULL, final_approved_at=NULL
-         WHERE id_usulan=$1`,
-        [idUsulan]
+         WHERE id_usulan=$1`, [idUsulan]
       );
     }
-  }
-
-  // Cek indikator yang belum ada bukti
-  const indResult = await pool.query(
-    'SELECT no_indikator, link_file FROM usulan_indikator WHERE id_usulan=$1',
-    [idUsulan]
-  );
-  const missing = indResult.rows.filter(r => !r.link_file || r.link_file.trim() === '');
-
-  // Kalau ada yang kurang DAN belum force → kembalikan warning untuk konfirmasi user
-  if (missing.length > 0 && !forceSubmit) {
-    return {
-      statusCode: 200,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-      body: JSON.stringify({
-        success: false,
-        needConfirm: true,
-        missingCount: missing.length,
-        missingNos: missing.map(r => r.no_indikator),
-        message: `${missing.length} indikator belum ada file bukti (no. ${missing.map(r=>r.no_indikator).join(', ')}). Tetap submit?`
-      })
-    };
-  }
-
-  // Tentukan status tujuan submit berdasarkan flag yang sudah disimpan sebelum reset
-  // - Draft / Ditolak Kapus → Menunggu Kepala Puskesmas (mulai dari awal)
-  // - Ditolak Program → Menunggu Pengelola Program (Kapus skip, langsung ke program)
-  // - Ditolak Admin → Menunggu Pengelola Program (ulang dari program)
-  let targetStatus = 'Menunggu Kepala Puskesmas';
-  if (statusSaatIni === 'Ditolak' && !wasKapusDitolak) {
-    // Kapus sudah approve sebelumnya → langsung ke Pengelola Program
-    targetStatus = 'Menunggu Pengelola Program';
   }
 
   await pool.query(
     `UPDATE usulan_header SET status_global=$1, status_program='Menunggu', is_locked=true WHERE id_usulan=$2`,
     [targetStatus, idUsulan]
   );
+
   const isResubmit = statusSaatIni === 'Ditolak';
   await logAktivitas(pool, email, 'Operator', isResubmit ? 'Ajukan Ulang' : 'Submit', idUsulan,
-    isResubmit ? `Diajukan ulang — diteruskan ke ${targetStatus}` : 'Disubmit ke Kepala Puskesmas'
+    isResubmit ? `Diajukan ulang → ${targetStatus}` : 'Disubmit ke Kepala Puskesmas'
   );
   return ok({ message: isResubmit
     ? `Usulan berhasil diajukan ulang! Diteruskan ke ${targetStatus}.`

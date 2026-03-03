@@ -1111,11 +1111,14 @@ function _renderBuktiModal() {
   const svgOpen = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>`;
   const svgTrashM = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></svg>`;
 
-  const embedUrl = isOffice
-    ? `https://docs.google.com/gview?url=${encodeURIComponent(f.url)}&embedded=true`
-    : f.url;
+  const embedUrl = isPDF ? f.url : null;
 
   const navBtn = (dir, fn) => `<button onclick="${fn}" style="position:absolute;top:50%;${dir}:14px;transform:translateY(-50%);background:rgba(255,255,255,0.12);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,0.18);color:white;border-radius:50%;width:42px;height:42px;cursor:pointer;font-size:22px;display:flex;align-items:center;justify-content:center;line-height:1" onmouseover="this.style.background='rgba(255,255,255,0.25)'" onmouseout="this.style.background='rgba(255,255,255,0.12)'">${dir==='left'?'&#8249;':'&#8250;'}</button>`;
+
+  // Icon per file type
+  const fileIcons = { pdf:'&#128196;', doc:'&#128196;', docx:'&#128196;', xls:'&#128202;', xlsx:'&#128202;', ppt:'&#128190;', pptx:'&#128190;' };
+  const fileIcon = fileIcons[ext] || '&#128196;';
+  const fileName = f.name || (f.url.split('/').pop().split('?')[0]) || 'File';
 
   modal.innerHTML = `
     <div style="background:#1e293b;border-radius:14px;width:92%;max-width:920px;height:88vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,0.5)">
@@ -1125,7 +1128,7 @@ function _renderBuktiModal() {
           ${total > 1 ? `<span style="background:#334155;color:#94a3b8;font-size:11px;padding:2px 8px;border-radius:20px;font-weight:600">${idx+1} / ${total}</span>` : ''}
         </div>
         <div style="display:flex;gap:6px;align-items:center">
-          <a href="${f.url}" target="_blank" style="background:#0d9488;color:white;padding:5px 12px;border-radius:7px;font-size:12px;font-weight:600;text-decoration:none;display:flex;align-items:center;gap:5px">${svgOpen} Buka</a>
+          <a href="${f.url}" download="${fileName}" target="_blank" style="background:#0d9488;color:white;padding:5px 12px;border-radius:7px;font-size:12px;font-weight:600;text-decoration:none;display:flex;align-items:center;gap:5px">${svgOpen} Buka</a>
           <button onclick="hapusBukti('${idUsulan}',${noIndikator},${idx})" style="background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.3);padding:5px 12px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px">${svgTrashM} Hapus</button>
           <button onclick="document.getElementById('previewBuktiModal').style.display='none'" style="background:rgba(255,255,255,0.08);border:none;cursor:pointer;color:white;border-radius:7px;width:32px;height:32px;font-size:20px;display:flex;align-items:center;justify-content:center">&#215;</button>
         </div>
@@ -1133,12 +1136,13 @@ function _renderBuktiModal() {
       <div style="flex:1;overflow:hidden;display:flex;align-items:center;justify-content:center;background:#0f172a;position:relative">
         ${isImage
           ? `<img src="${f.url}" style="max-width:100%;max-height:100%;object-fit:contain;padding:16px">`
-          : (isPDF || isOffice)
+          : isPDF
           ? `<iframe src="${embedUrl}" style="width:100%;height:100%;border:none"></iframe>`
           : `<div style="text-align:center;color:white;padding:40px">
-              <div style="font-size:56px;margin-bottom:16px">&#128196;</div>
-              <div style="font-size:14px;color:#94a3b8;margin-bottom:20px">${f.name || 'File'}</div>
-              <a href="${f.url}" target="_blank" style="background:#0d9488;color:white;padding:10px 24px;border-radius:8px;text-decoration:none;font-weight:600">&#8595; Download</a>
+              <div style="font-size:64px;margin-bottom:16px">${fileIcon}</div>
+              <div style="font-size:14px;color:#e2e8f0;font-weight:500;margin-bottom:6px;max-width:400px;word-break:break-all">${fileName}</div>
+              <div style="font-size:12px;color:#64748b;margin-bottom:24px;text-transform:uppercase;letter-spacing:1px">${ext} file</div>
+              <a href="${f.url}" download="${fileName}" target="_blank" style="background:#0d9488;color:white;padding:10px 28px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;display:inline-flex;align-items:center;gap:8px">&#8595; Download ${fileName}</a>
             </div>`
         }
         ${total > 1 ? navBtn('left','_buktiNav(-1)') : ''}

@@ -185,6 +185,7 @@ function buildSidebar() {
         { id: 'users', icon: 'group', label: 'Kelola User' },
         { id: 'jabatan', icon: 'badge', label: 'Kelola Jabatan' },
         { id: 'pkm', icon: 'local_hospital', label: 'Kelola Puskesmas' },
+        { id: 'target-tahunan', icon: 'track_changes', label: 'Target Tahunan' },
         { id: 'indikator', icon: 'monitor_heart', label: 'Kelola Indikator' },
         { id: 'periode', icon: 'event_available', label: 'Periode Input' }
       ]},
@@ -245,7 +246,7 @@ const PAGE_TITLES = {
   dashboard: 'Dashboard', verifikasi: 'Verifikasi', laporan: 'Laporan',
   users: 'Kelola User', jabatan: 'Kelola Jabatan', pkm: 'Kelola Puskesmas',
   indikator: 'Kelola Indikator', periode: 'Periode Input', input: 'Input Usulan',
-  'kelola-usulan': 'Kelola Usulan'
+  'kelola-usulan': 'Kelola Usulan', 'target-tahunan': 'Target Tahunan'
 };
 
 function loadPage(page) {
@@ -264,6 +265,7 @@ function loadPage(page) {
     jabatan: renderJabatan,
     users: renderUsers,
     pkm: renderPKM,
+    'target-tahunan': renderTargetTahunan,
     indikator: renderIndikator,
     periode: renderPeriode,
     input: renderInput
@@ -2371,6 +2373,121 @@ async function deletePKM(kode) {
       } catch (e) { toast(e.message, 'error'); }
     }
   });
+}
+
+// ============== ADMIN - TARGET TAHUNAN ==============
+let _ttPKM = [], _ttIndikator = [], _ttCurrentKode = null, _ttCurrentTahun = null;
+
+async function renderTargetTahunan() {
+  const tahunOpts = Array.from({length:5},(_,i)=>2024+i).map(y=>`<option value="${y}" ${y===CURRENT_YEAR?'selected':''}>${y}</option>`).join('');
+  document.getElementById('mainContent').innerHTML = `
+    <div class="page-header">
+      <h1><span class="material-icons">track_changes</span>Target Tahunan per Puskesmas</h1>
+    </div>
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-body" style="padding:12px 16px">
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:8px">
+            <label style="font-size:13px;font-weight:600;color:var(--text-main)">Tahun</label>
+            <select class="form-control" id="ttTahun" onchange="loadTargetTahunan()" style="width:100px">${tahunOpts}</select>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;flex:1">
+            <label style="font-size:13px;font-weight:600;color:var(--text-main)">Puskesmas</label>
+            <select class="form-control" id="ttPKM" onchange="loadTargetTahunan()" style="min-width:200px">
+              <option value="">-- Pilih Puskesmas --</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="ttContent">
+      <div class="empty-state" style="padding:48px">
+        <span class="material-icons" style="font-size:48px;color:#cbd5e1">track_changes</span>
+        <p style="color:var(--text-light)">Pilih tahun dan puskesmas untuk mengelola target tahunan</p>
+      </div>
+    </div>`;
+
+  try {
+    _ttPKM = await API.getPKM();
+    const sel = document.getElementById('ttPKM');
+    _ttPKM.filter(p=>p.aktif).forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.kode; opt.textContent = p.nama;
+      sel.appendChild(opt);
+    });
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function loadTargetTahunan() {
+  const kode = document.getElementById('ttPKM')?.value;
+  const tahun = document.getElementById('ttTahun')?.value;
+  if (!kode || !tahun) return;
+  _ttCurrentKode = kode; _ttCurrentTahun = tahun;
+
+  const el = document.getElementById('ttContent');
+  el.innerHTML = `<div class="empty-state" style="padding:32px"><p>Memuat...</p></div>`;
+  try {
+    const res = await fetch(`/api/target-tahunan?kode_pkm=${kode}&tahun=${tahun}`);
+    const data = await res.json();
+    if (!data.success) throw new Error(data.message);
+    _ttIndikator = data.data;
+
+    const namaPKM = _ttPKM.find(p=>p.kode===kode)?.nama || kode;
+    const hasData = _ttIndikator.some(i=>i.sasaran>0);
+
+    el.innerHTML = `
+      <div class="card">
+        <div class="card-body" style="padding:12px 16px;display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-weight:700;font-size:14px">${namaPKM}</div>
+            <div style="font-size:12px;color:var(--text-light)">Target Sasaran Tahun ${tahun}</div>
+          </div>
+          <div style="display:flex;gap:8px">
+            ${hasData ? `<span style="font-size:12px;color:#0d9488;background:#f0fdf9;padding:4px 10px;border-radius:6px;border:1px solid #0d9488">✓ Data tersimpan</span>` : `<span style="font-size:12px;color:#f59e0b;background:#fffbeb;padding:4px 10px;border-radius:6px;border:1px solid #fcd34d">⚠ Belum ada data</span>`}
+            <button class="btn btn-primary" onclick="saveTargetTahunan()"><span class="material-icons">save</span>Simpan Semua</button>
+          </div>
+        </div>
+        <div class="table-container">
+          <table>
+            <thead><tr><th style="width:40px">No</th><th>Nama Indikator</th><th style="width:160px;text-align:center">Jumlah Sasaran (Satu Tahun)</th></tr></thead>
+            <tbody>
+              ${_ttIndikator.map(ind => `<tr>
+                <td><span style="font-family:'JetBrains Mono';font-weight:700">${ind.noIndikator}</span></td>
+                <td style="font-size:13px">${ind.namaIndikator}</td>
+                <td style="text-align:center">
+                  <input type="number" min="0"
+                    class="form-control" id="tt-${ind.noIndikator}"
+                    value="${ind.sasaran || ''}"
+                    placeholder="0"
+                    style="width:120px;text-align:center;margin:0 auto;font-family:'JetBrains Mono'">
+                </td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function saveTargetTahunan() {
+  if (!_ttCurrentKode || !_ttCurrentTahun || !_ttIndikator.length) return;
+  const targets = _ttIndikator.map(ind => ({
+    noIndikator: ind.noIndikator,
+    sasaran: parseInt(document.getElementById(`tt-${ind.noIndikator}`)?.value) || 0
+  }));
+  setLoading(true);
+  try {
+    const res = await fetch('/api/target-tahunan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kodePKM: _ttCurrentKode, tahun: parseInt(_ttCurrentTahun), targets })
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.message);
+    toast(`Target tahun ${_ttCurrentTahun} berhasil disimpan ✓`, 'success');
+    await loadTargetTahunan();
+  } catch(e) { toast(e.message, 'error'); }
+  finally { setLoading(false); }
 }
 
 // ============== ADMIN - INDIKATOR ==============

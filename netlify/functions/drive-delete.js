@@ -2,7 +2,16 @@ const crypto = require('crypto');
 
 async function getAccessToken() {
   const clientEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-  const privateKey = Buffer.from(process.env.GOOGLE_PRIVATE_KEY_BASE || '', 'base64').toString('utf8');
+  const privateKeyRaw = process.env.GOOGLE_PRIVATE_KEY_BASE || '';
+  let privateKey = Buffer.from(privateKeyRaw, 'base64').toString('utf8');
+  privateKey = privateKey.replace(/\\n/g, '\n');
+  if (!privateKey.includes('\n')) {
+    privateKey = privateKey
+      .replace('-----BEGIN PRIVATE KEY-----', '-----BEGIN PRIVATE KEY-----\n')
+      .replace('-----END PRIVATE KEY-----', '\n-----END PRIVATE KEY-----')
+      .replace('-----BEGIN RSA PRIVATE KEY-----', '-----BEGIN RSA PRIVATE KEY-----\n')
+      .replace('-----END RSA PRIVATE KEY-----', '\n-----END RSA PRIVATE KEY-----');
+  }
   const now = Math.floor(Date.now() / 1000);
   const headerB64 = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64').replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
   const payloadB64 = Buffer.from(JSON.stringify({ iss: clientEmail, scope: 'https://www.googleapis.com/auth/drive', aud: 'https://oauth2.googleapis.com/token', exp: now+3600, iat: now })).toString('base64').replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');

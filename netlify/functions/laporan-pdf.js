@@ -41,6 +41,16 @@ exports.handler = async (event) => {
     await pool.query(`ALTER TABLE master_indikator ADD COLUMN IF NOT EXISTS catatan TEXT`).catch(()=>{});
     await pool.query(`ALTER TABLE verifikasi_program ADD COLUMN IF NOT EXISTS nip_program VARCHAR(50)`).catch(()=>{});
     await pool.query(`ALTER TABLE verifikasi_program ADD COLUMN IF NOT EXISTS jabatan_program TEXT`).catch(()=>{});
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS target_tahunan (
+        id SERIAL PRIMARY KEY,
+        kode_pkm VARCHAR(20) NOT NULL,
+        no_indikator INT NOT NULL,
+        tahun INT NOT NULL,
+        sasaran INT NOT NULL DEFAULT 0,
+        UNIQUE(kode_pkm, no_indikator, tahun)
+      )
+    `).catch(()=>{});
 
     const hdrResult = await pool.query(
       `SELECT uh.*, p.nama_puskesmas,
@@ -54,10 +64,13 @@ exports.handler = async (event) => {
     const h = hdrResult.rows[0];
 
     const indResult = await pool.query(
-      `SELECT ui.*, mi.nama_indikator, mi.catatan as catatan_indikator
+      `SELECT ui.*, mi.nama_indikator, mi.catatan as catatan_indikator,
+              COALESCE(tt.sasaran, 0) as sasaran_tahunan
        FROM usulan_indikator ui
        LEFT JOIN master_indikator mi ON ui.no_indikator = mi.no_indikator
-       WHERE ui.id_usulan = $1 ORDER BY ui.no_indikator`, [idUsulan]
+       LEFT JOIN target_tahunan tt ON tt.kode_pkm = $2 AND tt.no_indikator = ui.no_indikator AND tt.tahun = $3
+       WHERE ui.id_usulan = $1 ORDER BY ui.no_indikator`,
+      [idUsulan, h.kode_pkm, h.tahun]
     );
 
     const vpResult = await pool.query(
@@ -129,7 +142,7 @@ exports.handler = async (event) => {
     const pagesHtml = indResult.rows.map((ind) => {
       const rasio = parseFloat(ind.realisasi_rasio) || 0;
       const capaianPct = (rasio * 100).toFixed(0);
-      const target = parseFloat(ind.target) || 0;
+      const sasaranTahunan = parseInt(ind.sasaran_tahunan) || 0;
       const capaian = parseFloat(ind.capaian) || 0;
       const catatan = ind.catatan_indikator || '';
 
@@ -184,7 +197,7 @@ exports.handler = async (event) => {
           </thead>
           <tbody>
             <tr>
-              <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:center;font-size:12px">${target}</td>
+              <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:center;font-size:12px">${sasaranTahunan > 0 ? sasaranTahunan : '<span style="color:#94a3b8;font-style:italic">-</span>'}</td>
               <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:center;font-size:12px">${capaian}</td>
               <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:center;font-size:12px">${capaian}</td>
               <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:center;font-size:14px;font-weight:700;color:${rasio>=1?'#0d9488':rasio>=0.75?'#d97706':'#dc2626'}">${capaianPct}%</td>

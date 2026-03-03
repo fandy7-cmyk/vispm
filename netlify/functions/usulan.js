@@ -21,6 +21,7 @@ exports.handler = async (event) => {
     if (method === 'POST' && path === 'reject') return await rejectUsulan(pool, body);
     if (method === 'PUT' && path === 'drive-folder') return await saveDriveFolder(pool, body);
     if (method === 'POST' && path === 'admin-reset') return await adminResetUsulan(pool, body);
+    if (method === 'POST' && path === 'restore-verif') return await restoreVerifStatus(pool, body);
     if (method === 'DELETE') {
       const { idUsulan } = body; // body sudah di-parse di atas
       if (!idUsulan) return err('idUsulan diperlukan');
@@ -622,4 +623,42 @@ async function adminResetUsulan(pool, body) {
   );
   await logAktivitas(pool, email, 'Admin', 'Reset', idUsulan, 'Direset oleh Admin');
   return ok({ message: 'Usulan berhasil direset ke Draft' });
+}
+
+// Restore verifikasi yang terhapus akibat bug resubmit
+// Hanya bisa dipakai Admin. Set status_kapus=Selesai dan semua verif_program=Selesai
+async function restoreVerifStatus(pool, body) {
+  const { idUsulan, emailAdmin, kapusBy, kapusAt } = body;
+  if (!idUsulan) return err('idUsulan diperlukan');
+
+  // Cek hanya admin
+  const adminCheck = await pool.query(`SELECT role FROM users WHERE LOWER(email)=LOWER($1)`, [emailAdmin]);
+  if (!adminCheck.rows.length || adminCheck.rows[0].role !== 'Admin') return err('Hanya Admin yang bisa restore');
+
+  const hdr = await pool.query(`SELECT status_global, status_kapus, status_program FROM usulan_header WHERE id_usulan=$1`, [idUsulan]);
+  if (!hdr.rows.length) return err('Usulan tidak ditemukan');
+
+  // Restore status_kapus = Selesai
+  await pool.query(
+    `UPDATE usulan_header SET
+      status_kapus = 'Selesai',
+      status_program = 'Selesai',
+      kapus_approved_by = COALESCE(kapus_approved_by, $2),
+      kapus_approved_at = COALESCE(kapus_approved_at, $3)
+     WHERE id_usulan = $1`,
+    [idUsulan, kapusBy || 'restored', kapusAt || new Date().toISOString()]
+  );
+
+  // Restore semua verifikasi_program yang Menunggu → Selesai
+  await pool.query(
+    `UPDATE verifikasi_program SET
+      status = 'Selesai',
+      verified_at = COALESCE(verified_at, NOW()),
+      catatan = COALESCE(catatan, 'Dipulihkan oleh Admin')
+     WHERE id_usulan = $1 AND status = 'Menunggu'`,
+    [idUsulan]
+  );
+
+  await logAktivitas(pool, emailAdmin, 'Admin', 'Restore Verif', idUsulan, 'Status verifikasi dipulihkan');
+  return ok({ message: 'Status verifikasi berhasil dipulihkan' });
 }

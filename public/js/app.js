@@ -21,7 +21,7 @@ let verifCurrentUsulan = null; // for verifikasi modal
 
 // ===== GOOGLE DRIVE CONFIG =====
 // Google Drive: menggunakan Service Account (backend)
-window.GDRIVE_FOLDER_ID = "1WYRRcm5oxbCaPx8s9XNUkTUe1b85wuDG";
+window.GDRIVE_FOLDER_ID = "1HywRrWup2JgX3Zig2FND8K5Zc6HWtu-A";
 
 
 // Format date only: DD MMMM YYYY

@@ -28,7 +28,7 @@ exports.handler = async (event) => {
     if (!tokenData.access_token) return { statusCode: 200, headers, body: JSON.stringify({ step: 4, error: 'Token gagal', detail: tokenData }) };
 
     const token = tokenData.access_token;
-    const ROOT  = '1WYRRcm5oxbCaPx8s9XNUkTUe1b85wuDG';
+    const ROOT  = '1HywRrWup2JgX3Zig2FND8K5Zc6HWtu-A';
     const boundary = 'SPMboundary1234567890';
     const metaJson = JSON.stringify({ name: 'test-debug.txt', parents: [ROOT] });
     const fileBytes = Buffer.from('SPM test file - ' + new Date().toISOString());

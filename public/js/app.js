@@ -893,30 +893,34 @@ async function openIndikatorModal(idUsulan) {
               ? 'display:inline-flex;align-items:center;padding:4px 12px;background:#16a34a;color:white;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:600;border:1.5px solid #16a34a;white-space:nowrap'
               : 'display:inline-flex;align-items:center;padding:4px 12px;background:#ef4444;color:white;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:600;border:1.5px solid #ef4444;white-space:nowrap';
 
-            // Carousel jika > 1 file
-            const carouselHtml = normLinks.length > 1
-              ? `<div id="carousel-${ind.no}" style="display:flex;align-items:center;gap:4px;max-width:160px">
-                  <button onclick="carouselPrev(${ind.no})" style="background:none;border:none;cursor:pointer;font-size:14px;padding:0;line-height:1">◀</button>
-                  <div id="carouselSlide-${ind.no}" style="flex:1;text-align:center">
-                    <span onclick="previewBukti('${normLinks[0].url}','${normLinks[0].id||''}')" style="font-size:10.5px;color:#0d9488;cursor:pointer;text-decoration:underline">👁️ File 1</span>
-                    <button onclick="hapusBukti('${idUsulan}',${ind.no},0)" style="background:none;border:none;cursor:pointer;padding:0;font-size:13px">🗑️</button>
+            // Carousel jika > 1 file, single jika 1 file
+            const fileControlHtml = normLinks.length > 1
+              ? `<div style="display:flex;align-items:center;gap:2px">
+                  <button onclick="carouselPrev(${ind.no})" style="background:none;border:none;cursor:pointer;font-size:13px;padding:0;line-height:1">◀</button>
+                  <div id="carouselSlide-${ind.no}" style="display:flex;align-items:center;gap:2px">
+                    <span onclick="previewBukti('${normLinks[0].url}')" style="font-size:11px;cursor:pointer">👁️</span>
+                    <button onclick="hapusBukti('${idUsulan}',${ind.no},0)" style="background:none;border:none;cursor:pointer;padding:0;font-size:12px">🗑️</button>
                   </div>
-                  <button onclick="carouselNext(${ind.no},${normLinks.length})" style="background:none;border:none;cursor:pointer;font-size:14px;padding:0;line-height:1">▶</button>
-                  <span id="carouselIdx-${ind.no}" style="font-size:10px;color:#94a3b8">1/${normLinks.length}</span>
+                  <button onclick="carouselNext(${ind.no},${normLinks.length})" style="background:none;border:none;cursor:pointer;font-size:13px;padding:0;line-height:1">▶</button>
+                  <span id="carouselIdx-${ind.no}" style="font-size:9px;color:#94a3b8">1/${normLinks.length}</span>
                 </div>`
-              : fileLinksWithDelete;
+              : normLinks.length === 1
+              ? `<div style="display:flex;align-items:center;gap:2px">
+                  <span onclick="previewBukti('${normLinks[0].url}')" style="font-size:11px;cursor:pointer" title="Preview">👁️</span>
+                  <button onclick="hapusBukti('${idUsulan}',${ind.no},0)" style="background:none;border:none;cursor:pointer;padding:0;font-size:12px" title="Hapus">🗑️</button>
+                </div>`
+              : '';
 
-            // Simpan data carousel di window
             if (normLinks.length > 1) {
               window[`_carouselData_${ind.no}`] = { links: normLinks, idx: 0, idUsulan };
             }
 
-            return `<div id="uploadCell-${ind.no}" style="display:flex;flex-direction:column;align-items:center;gap:3px">
-                ${carouselHtml}
+            return `<div id="uploadCell-${ind.no}" style="display:flex;align-items:center;gap:6px;justify-content:center">
                 <label id="uploadLabel-${ind.no}" style="${btnStyle}">
                   ${hasFiles ? 'Uploaded' : 'Upload'}
                   <input type="file" multiple style="display:none" onchange="uploadBuktiIndikator(event,${ind.no},'${idUsulan}','${detail.kodePKM}',${detail.tahun},${detail.bulan},'${namaBulan}')">
                 </label>
+                <div id="fileControls-${ind.no}">${fileControlHtml}</div>
               </div>`;
           })()}
         </td>
@@ -950,29 +954,24 @@ async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, tahun
         reader.readAsDataURL(file);
       });
 
-      // Kirim folderPath ke backend — backend yang buat subfolder
-      const bulanNamaMap = {'Januari':'01','Februari':'02','Maret':'03','April':'04','Mei':'05','Juni':'06','Juli':'07','Agustus':'08','September':'09','Oktober':'10','November':'11','Desember':'12'};
-      const bulanAngka = bulanNamaMap[namaBulan] || String(bulan).padStart(2,'0');
-      const folderPath = [kodePKM, String(tahun), `${bulanAngka}-${namaBulan}`, 'Indikator', String(noIndikator)];
-
-      const res = await fetch("/.netlify/functions/drive-upload", {
+      const res = await fetch("/.netlify/functions/upload", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           fileName: file.name,
           fileBase64: base64,
-          folderId: window.GDRIVE_FOLDER_ID,
-          folderPath
+          kodePKM,
+          tahun,
+          bulan,
+          noIndikator
         })
       });
 
       const result = await res.json();
-      // ok() wraps data in {success:true, data:{...}}
-      if (!res.ok || !result.success) throw new Error(result.data?.error || result.message || result.error || 'Upload gagal');
-      const fileUrl = result.data?.fileUrl || result.fileUrl;
-      const fileId = result.data?.fileId || result.fileId;
+      if (!res.ok || !result.success) throw new Error(result.error || 'Upload gagal');
+      const fileUrl = result.fileUrl;
       if (!fileUrl) throw new Error('URL file tidak ditemukan dalam response');
-      uploadedLinks.push({ id: fileId, url: fileUrl, name: file.name });
+      uploadedLinks.push({ id: result.publicId, url: fileUrl, name: file.name });
     } catch (e) {
       toast(`Gagal upload ${file.name}: ${e.message}`, 'error');
     }
@@ -1003,32 +1002,30 @@ async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, tahun
 
     statusDiv.remove();
 
-    // Hapus file list lama
-    cell.querySelectorAll('[data-filelist]').forEach(el => el.remove());
-
-    // Render carousel atau single file
-    if (allLinks.length > 1) {
-      window[`_carouselData_${noIndikator}`] = { links: allLinks, idx: 0, idUsulan };
-      const f0 = allLinks[0];
-      cell.insertAdjacentHTML('afterbegin',
-        `<div data-filelist style="display:flex;align-items:center;gap:4px">
-          <button onclick="carouselPrev(${noIndikator})" style="background:none;border:none;cursor:pointer;font-size:14px;padding:0">◀</button>
+    // Update fileControls div (sejajar kanan tombol Upload)
+    const controls = document.getElementById(`fileControls-${noIndikator}`);
+    if (controls) {
+      if (allLinks.length > 1) {
+        window[`_carouselData_${noIndikator}`] = { links: allLinks, idx: 0, idUsulan };
+        const f0 = allLinks[0];
+        controls.innerHTML = `<div style="display:flex;align-items:center;gap:2px">
+          <button onclick="carouselPrev(${noIndikator})" style="background:none;border:none;cursor:pointer;font-size:13px;padding:0">◀</button>
           <div id="carouselSlide-${noIndikator}" style="display:flex;align-items:center;gap:2px">
-            <span onclick="previewBukti('${f0.url||f0}','${f0.id||''}')" style="font-size:10.5px;color:#0d9488;cursor:pointer;text-decoration:underline">👁️ File 1</span>
-            <button onclick="hapusBukti('${idUsulan}',${noIndikator},0)" style="background:none;border:none;cursor:pointer;padding:0;font-size:13px">🗑️</button>
+            <span onclick="previewBukti('${f0.url||f0}')" style="font-size:11px;cursor:pointer">👁️</span>
+            <button onclick="hapusBukti('${idUsulan}',${noIndikator},0)" style="background:none;border:none;cursor:pointer;padding:0;font-size:12px">🗑️</button>
           </div>
-          <button onclick="carouselNext(${noIndikator},${allLinks.length})" style="background:none;border:none;cursor:pointer;font-size:14px;padding:0">▶</button>
-          <span id="carouselIdx-${noIndikator}" style="font-size:10px;color:#94a3b8">1/${allLinks.length}</span>
-        </div>`
-      );
-    } else if (allLinks.length === 1) {
-      const f = allLinks[0];
-      cell.insertAdjacentHTML('afterbegin',
-        `<div data-filelist style="display:flex;align-items:center;gap:4px">
-          <span onclick="previewBukti('${f.url||f}','${f.id||''}')" style="font-size:10.5px;color:#0d9488;cursor:pointer;text-decoration:underline">👁️ File 1</span>
-          <button onclick="hapusBukti('${idUsulan}',${noIndikator},0)" style="background:none;border:none;cursor:pointer;padding:0;font-size:13px">🗑️</button>
-        </div>`
-      );
+          <button onclick="carouselNext(${noIndikator},${allLinks.length})" style="background:none;border:none;cursor:pointer;font-size:13px;padding:0">▶</button>
+          <span id="carouselIdx-${noIndikator}" style="font-size:9px;color:#94a3b8">1/${allLinks.length}</span>
+        </div>`;
+      } else if (allLinks.length === 1) {
+        const f = allLinks[0];
+        controls.innerHTML = `<div style="display:flex;align-items:center;gap:2px">
+          <span onclick="previewBukti('${f.url||f}')" style="font-size:11px;cursor:pointer" title="Preview">👁️</span>
+          <button onclick="hapusBukti('${idUsulan}',${noIndikator},0)" style="background:none;border:none;cursor:pointer;padding:0;font-size:12px" title="Hapus">🗑️</button>
+        </div>`;
+      } else {
+        controls.innerHTML = '';
+      }
     }
 
     // Tombol hijau tanpa icon

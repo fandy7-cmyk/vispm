@@ -893,13 +893,13 @@ async function openIndikatorModal(idUsulan) {
               ? 'display:inline-flex;align-items:center;padding:4px 12px;background:#16a34a;color:white;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:600;border:1.5px solid #16a34a;white-space:nowrap'
               : 'display:inline-flex;align-items:center;padding:4px 12px;background:#ef4444;color:white;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:600;border:1.5px solid #ef4444;white-space:nowrap';
 
+            if (normLinks.length > 0) window[`_buktiLinks_${ind.no}`] = { links: normLinks, idUsulan };
             const fileControlHtml = normLinks.length > 0
               ? `<div style="display:flex;align-items:center;gap:1px">
                   <button onclick="openBuktiModal(${ind.no},0)" title="Preview" style="background:none;border:none;cursor:pointer;padding:3px 4px;border-radius:5px;display:flex;align-items:center;color:#0d9488" onmouseover="this.style.background='rgba(13,148,136,0.08)'" onmouseout="this.style.background='none'">${SVG_EYE}</button>
                   <button onclick="hapusBukti('${idUsulan}',${ind.no},${normLinks.length-1})" title="Hapus" style="background:none;border:none;cursor:pointer;padding:3px 4px;border-radius:5px;display:flex;align-items:center;color:#ef4444" onmouseover="this.style.background='rgba(239,68,68,0.08)'" onmouseout="this.style.background='none'">${SVG_TRASH}</button>
                 </div>`
               : '';
-
             return `<div id="uploadCell-${ind.no}" style="display:flex;align-items:center;gap:6px;justify-content:center">
                 <label id="uploadLabel-${ind.no}" style="${btnStyle}">
                   ${hasFiles ? 'Uploaded' : 'Upload'}
@@ -916,6 +916,10 @@ async function openIndikatorModal(idUsulan) {
   }
 }
 
+
+// ============== ICON CONSTANTS ==============
+const SVG_EYE = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>';
+const SVG_TRASH = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></svg>';
 
 // ============== UPLOAD BUKTI INDIKATOR ==============
 async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, tahun, bulan, namaBulan) {
@@ -993,8 +997,8 @@ async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, tahun
     if (controls) {
       if (allLinks.length > 0) {
         controls.innerHTML = '<div style="display:flex;align-items:center;gap:1px">'
-          + '<button onclick="openBuktiModal(' + noIndikator + ',0)" title="Preview" style="background:none;border:none;cursor:pointer;padding:3px 4px;border-radius:5px;display:flex;align-items:center;color:#0d9488" onmouseover="this.style.background=\'rgba(13,148,136,0.08)\'" onmouseout="this.style.background=\'none\'">' + SVG_EYE + '</button>'
-          + '<button onclick="hapusBukti(\'' + idUsulan + '\',' + noIndikator + ',' + (allLinks.length - 1) + ')" title="Hapus" style="background:none;border:none;cursor:pointer;padding:3px 4px;border-radius:5px;display:flex;align-items:center;color:#ef4444" onmouseover="this.style.background=\'rgba(239,68,68,0.08)\'" onmouseout="this.style.background=\'none\'">' + SVG_TRASH + '</button>'
+          + '<button onclick="openBuktiModal(' + noIndikator + ',0)" title="Preview" style="background:none;border:none;cursor:pointer;padding:3px 4px;border-radius:5px;display:flex;align-items:center;color:#0d9488">' + SVG_EYE + '</button>'
+          + '<button onclick="hapusBukti(\'' + idUsulan + '\',' + noIndikator + ',' + (allLinks.length-1) + ')" title="Hapus" style="background:none;border:none;cursor:pointer;padding:3px 4px;border-radius:5px;display:flex;align-items:center;color:#ef4444">' + SVG_TRASH + '</button>'
           + '</div>';
       } else {
         controls.innerHTML = '';
@@ -1105,7 +1109,7 @@ function _renderBuktiModal() {
   }
 
   const svgOpen = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>`;
-  const svgTrash = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></svg>`;
+  const svgTrashM = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></svg>`;
 
   const embedUrl = isOffice
     ? `https://docs.google.com/gview?url=${encodeURIComponent(f.url)}&embedded=true`
@@ -1118,11 +1122,11 @@ function _renderBuktiModal() {
       <div style="padding:12px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;border-bottom:1px solid rgba(255,255,255,0.08)">
         <div style="display:flex;align-items:center;gap:10px">
           <span style="color:#94a3b8;font-size:12px;font-weight:500">Data Dukung</span>
-          ${total > 1 ? `<span style="background:#334155;color:#94a3b8;font-size:11px;padding:2px 8px;border-radius:20px;font-weight:600">${idx+1} / ${total}</span>` : ""}
+          ${total > 1 ? `<span style="background:#334155;color:#94a3b8;font-size:11px;padding:2px 8px;border-radius:20px;font-weight:600">${idx+1} / ${total}</span>` : ''}
         </div>
         <div style="display:flex;gap:6px;align-items:center">
           <a href="${f.url}" target="_blank" style="background:#0d9488;color:white;padding:5px 12px;border-radius:7px;font-size:12px;font-weight:600;text-decoration:none;display:flex;align-items:center;gap:5px">${svgOpen} Buka</a>
-          <button onclick="hapusBukti('${idUsulan}',${noIndikator},${idx})" style="background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.3);padding:5px 12px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px">${svgTrash} Hapus</button>
+          <button onclick="hapusBukti('${idUsulan}',${noIndikator},${idx})" style="background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.3);padding:5px 12px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px">${svgTrashM} Hapus</button>
           <button onclick="document.getElementById('previewBuktiModal').style.display='none'" style="background:rgba(255,255,255,0.08);border:none;cursor:pointer;color:white;border-radius:7px;width:32px;height:32px;font-size:20px;display:flex;align-items:center;justify-content:center">&#215;</button>
         </div>
       </div>
@@ -1133,7 +1137,7 @@ function _renderBuktiModal() {
           ? `<iframe src="${embedUrl}" style="width:100%;height:100%;border:none"></iframe>`
           : `<div style="text-align:center;color:white;padding:40px">
               <div style="font-size:56px;margin-bottom:16px">&#128196;</div>
-              <div style="font-size:14px;color:#94a3b8;margin-bottom:20px">${f.name || "File"}</div>
+              <div style="font-size:14px;color:#94a3b8;margin-bottom:20px">${f.name || 'File'}</div>
               <a href="${f.url}" target="_blank" style="background:#0d9488;color:white;padding:10px 24px;border-radius:8px;text-decoration:none;font-weight:600">&#8595; Download</a>
             </div>`
         }
@@ -1143,7 +1147,7 @@ function _renderBuktiModal() {
       ${total > 1 ? `
       <div style="display:flex;justify-content:center;gap:5px;padding:10px;flex-shrink:0;border-top:1px solid rgba(255,255,255,0.06)">
         ${links.map((_,i)=>`<button onclick="_buktiGoto(${i})" style="width:${i===idx?'20px':'7px'};height:7px;border-radius:10px;border:none;cursor:pointer;background:${i===idx?'#0d9488':'rgba(255,255,255,0.2)'};transition:all 0.2s;padding:0"></button>`).join('')}
-      </div>` : ""}
+      </div>` : ''}
     </div>`;
   modal.style.display = 'flex';
 }
@@ -1158,12 +1162,6 @@ function _buktiGoto(idx) {
   window._modalBukti.idx = idx;
   _renderBuktiModal();
 }
-
-function _buktiGoto(idx) {
-  window._modalBukti.idx = idx;
-  _renderBuktiModal();
-}
-
 
 async function saveIndikator(noIndikator) {
   const target  = parseFloat(document.getElementById(`t-${noIndikator}`)?.value) || 0;

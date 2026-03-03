@@ -1356,7 +1356,7 @@ async function viewDetail(idUsulan) {
         </div>
         <div class="detail-item" style="grid-column:span 2">
           <label>Indeks SPM</label>
-          <span style="font-family:'JetBrains Mono';font-size:22px;color:var(--primary);font-weight:800">${parseFloat(detail.indeksSPM).toFixed(2)}</span>
+          <span style="font-family:'JetBrains Mono';font-size:16px;color:var(--primary);font-weight:800">${parseFloat(detail.indeksSPM).toFixed(2)}</span>
         </div>
       </div>
       ${detail.driveFolderUrl ? `<div style="margin-bottom:12px"><a href="${detail.driveFolderUrl}" target="_blank" class="btn btn-secondary btn-sm"><span class="material-icons" style="font-size:14px">folder_open</span> Lihat Folder Bukti Google Drive</a></div>` : ''}

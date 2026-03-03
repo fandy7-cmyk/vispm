@@ -1489,7 +1489,13 @@ async function openVerifikasi(idUsulan) {
       <div class="detail-item"><label>Puskesmas</label><span>${detail.namaPKM}</span></div>
       <div class="detail-item"><label>Periode</label><span>${detail.namaBulan} ${detail.tahun}</span></div>
       <div class="detail-item"><label>Status</label><span>${statusBadge(detail.statusGlobal)}</span></div>
-      <div class="detail-item"><label>Dibuat</label><span>${detail.createdBy}</span></div>
+      <div class="detail-item"><label>Dibuat Oleh</label>
+        <span>
+          <div style="font-weight:600">${detail.namaPembuat || detail.createdBy || '-'}</div>
+          <div style="font-size:12px;color:var(--text-light)">${detail.createdBy || ''}</div>
+          <div style="font-size:11px;color:var(--text-xlight)">${formatTS(detail.createdAt)}</div>
+        </span>
+      </div>
       <div class="detail-item"><label>Indeks Beban Kerja</label><span style="font-family:'JetBrains Mono'">${parseFloat(detail.indeksBeban||0).toFixed(2)}</span></div>
       <div class="detail-item"><label>Indeks Kesulitan Wilayah</label><span style="font-family:'JetBrains Mono'">${parseFloat(detail.indeksKesulitan||0).toFixed(2)}</span></div>
       <div class="detail-item"><label>Indeks SPM</label><span style="font-family:'JetBrains Mono';font-size:16px;font-weight:800;color:var(--primary)">${parseFloat(detail.indeksSPM).toFixed(2)}</span></div>`;

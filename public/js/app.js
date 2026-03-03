@@ -21,7 +21,7 @@ let verifCurrentUsulan = null; // for verifikasi modal
 
 // ===== GOOGLE DRIVE CONFIG =====
 // Google Drive: menggunakan Service Account (backend)
-// Upload bukti menggunakan Cloudinary
+window.GDRIVE_FOLDER_ID = "1HywRrWup2JgX3Zig2FND8K5Zc6HWtu-A";
 
 
 // Format date only: DD MMMM YYYY
@@ -754,7 +754,29 @@ async function deleteUsulan(idUsulan) {
 let currentIndikatorUsulan = null;
 let indikatorData = [];
 
-// Folder management menggunakan Cloudinary
+// Buka/buat folder Google Drive otomatis
+async function openGDriveFolder(kodePKM, tahun, bulan, namaBulan, idUsulan) {
+  const btn = document.getElementById('btnOpenDrive');
+  if (btn) { btn.innerHTML = '<span class="material-icons" style="font-size:15px;animation:spin 0.8s linear infinite">refresh</span> Membuat folder...'; btn.disabled = true; }
+  try {
+    const result = await API.get('drive', { kodePKM, tahun, bulan, namaBulan });
+    // Save folder URL to DB
+    if (idUsulan) {
+      await fetch(`/api/usulan?action=drive-folder`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idUsulan, driveFolderId: result.folderId, driveFolderUrl: result.folderUrl })
+      });
+    }
+    window.open(result.folderUrl, '_blank');
+    if (btn) { btn.innerHTML = '<span class="material-icons" style="font-size:15px">folder_open</span> Buka Folder Drive'; btn.disabled = false; }
+    // Update link info
+    const linkEl = document.getElementById('driveFolderLink');
+    if (linkEl) { linkEl.href = result.folderUrl; linkEl.style.display = 'inline-flex'; }
+  } catch (e) {
+    toast('Gagal membuka Google Drive: ' + e.message, 'error');
+    if (btn) { btn.innerHTML = '<span class="material-icons" style="font-size:15px">open_in_new</span> Buka Google Drive'; btn.disabled = false; }
+  }
+}
 
 async function openIndikatorModal(idUsulan) {
   currentIndikatorUsulan = idUsulan;
@@ -858,21 +880,41 @@ async function openIndikatorModal(idUsulan) {
               `<div style="display:flex;align-items:center;gap:4px">
                 <span onclick="previewBukti('${f.url}','${f.id||''}')" title="Preview file"
                   style="font-size:10.5px;color:#0d9488;display:flex;align-items:center;gap:1px;cursor:pointer;text-decoration:underline">
-                  <span class="material-icons" style="font-size:11px">visibility</span>File ${i+1}
+                  👁️ File ${i+1}
                 </span>
                 <button onclick="hapusBukti('${idUsulan}',${ind.no},${i})" title="Hapus file ini"
-                  style="background:none;border:none;cursor:pointer;padding:0;display:flex;align-items:center;color:#ef4444;line-height:1">
-                  <span class="material-icons" style="font-size:13px">delete</span>
+                  style="background:none;border:none;cursor:pointer;padding:0;font-size:13px;line-height:1">
+                  🗑️
                 </button>
               </div>`
             ).join('');
-            const btnStyle = normLinks.length
-              ? 'display:inline-flex;align-items:center;gap:3px;padding:4px 9px;background:#0d9488;color:white;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:600;border:1.5px solid #0d9488;white-space:nowrap'
-              : 'display:inline-flex;align-items:center;gap:3px;padding:4px 9px;background:#ef4444;color:white;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:600;border:1.5px solid #ef4444;white-space:nowrap';
+            const hasFiles = normLinks.length > 0;
+            const btnStyle = hasFiles
+              ? 'display:inline-flex;align-items:center;padding:4px 12px;background:#16a34a;color:white;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:600;border:1.5px solid #16a34a;white-space:nowrap'
+              : 'display:inline-flex;align-items:center;padding:4px 12px;background:#ef4444;color:white;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:600;border:1.5px solid #ef4444;white-space:nowrap';
+
+            // Carousel jika > 1 file
+            const carouselHtml = normLinks.length > 1
+              ? `<div id="carousel-${ind.no}" style="display:flex;align-items:center;gap:4px;max-width:160px">
+                  <button onclick="carouselPrev(${ind.no})" style="background:none;border:none;cursor:pointer;font-size:14px;padding:0;line-height:1">◀</button>
+                  <div id="carouselSlide-${ind.no}" style="flex:1;text-align:center">
+                    <span onclick="previewBukti('${normLinks[0].url}','${normLinks[0].id||''}')" style="font-size:10.5px;color:#0d9488;cursor:pointer;text-decoration:underline">👁️ File 1</span>
+                    <button onclick="hapusBukti('${idUsulan}',${ind.no},0)" style="background:none;border:none;cursor:pointer;padding:0;font-size:13px">🗑️</button>
+                  </div>
+                  <button onclick="carouselNext(${ind.no},${normLinks.length})" style="background:none;border:none;cursor:pointer;font-size:14px;padding:0;line-height:1">▶</button>
+                  <span id="carouselIdx-${ind.no}" style="font-size:10px;color:#94a3b8">1/${normLinks.length}</span>
+                </div>`
+              : fileLinksWithDelete;
+
+            // Simpan data carousel di window
+            if (normLinks.length > 1) {
+              window[`_carouselData_${ind.no}`] = { links: normLinks, idx: 0, idUsulan };
+            }
+
             return `<div id="uploadCell-${ind.no}" style="display:flex;flex-direction:column;align-items:center;gap:3px">
-                ${fileLinksWithDelete}
+                ${carouselHtml}
                 <label id="uploadLabel-${ind.no}" style="${btnStyle}">
-                  <span class="material-icons" style="font-size:13px">${normLinks.length ? 'cloud_done' : 'upload_file'}</span>${normLinks.length ? 'Ganti' : 'Upload'}
+                  ${hasFiles ? 'Uploaded' : 'Upload'}
                   <input type="file" multiple style="display:none" onchange="uploadBuktiIndikator(event,${ind.no},'${idUsulan}','${detail.kodePKM}',${detail.tahun},${detail.bulan},'${namaBulan}')">
                 </label>
               </div>`;
@@ -908,24 +950,29 @@ async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, tahun
         reader.readAsDataURL(file);
       });
 
-      const res = await fetch("/.netlify/functions/upload", {
+      // Kirim folderPath ke backend — backend yang buat subfolder
+      const bulanNamaMap = {'Januari':'01','Februari':'02','Maret':'03','April':'04','Mei':'05','Juni':'06','Juli':'07','Agustus':'08','September':'09','Oktober':'10','November':'11','Desember':'12'};
+      const bulanAngka = bulanNamaMap[namaBulan] || String(bulan).padStart(2,'0');
+      const folderPath = [kodePKM, String(tahun), `${bulanAngka}-${namaBulan}`, 'Indikator', String(noIndikator)];
+
+      const res = await fetch("/.netlify/functions/drive-upload", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           fileName: file.name,
           fileBase64: base64,
-          kodePKM,
-          tahun,
-          bulan,
-          noIndikator
+          folderId: window.GDRIVE_FOLDER_ID,
+          folderPath
         })
       });
 
       const result = await res.json();
-      if (!res.ok || !result.success) throw new Error(result.error || 'Upload gagal');
-      const fileUrl = result.fileUrl;
+      // ok() wraps data in {success:true, data:{...}}
+      if (!res.ok || !result.success) throw new Error(result.data?.error || result.message || result.error || 'Upload gagal');
+      const fileUrl = result.data?.fileUrl || result.fileUrl;
+      const fileId = result.data?.fileId || result.fileId;
       if (!fileUrl) throw new Error('URL file tidak ditemukan dalam response');
-      uploadedLinks.push({ id: result.publicId, url: fileUrl, name: file.name });
+      uploadedLinks.push({ id: fileId, url: fileUrl, name: file.name });
     } catch (e) {
       toast(`Gagal upload ${file.name}: ${e.message}`, 'error');
     }
@@ -956,27 +1003,42 @@ async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, tahun
 
     statusDiv.remove();
 
-    // Update tampilan — tampilkan semua link dengan delete btn
-    const allLinksHtml = allLinks.map((f, i) =>
-      `<div style="display:flex;align-items:center;gap:4px">
-        <span onclick="previewBukti('${f.url||f}','${f.id||''}')" title="Preview file" style="font-size:10.5px;color:#0d9488;display:flex;align-items:center;gap:1px;cursor:pointer">
-          <span class="material-icons" style="font-size:11px">visibility</span>File ${i+1}
-        </span>
-        <button onclick="hapusBukti('${idUsulan}',${noIndikator},${i})" title="Hapus file ini"
-          style="background:none;border:none;cursor:pointer;padding:0;display:flex;align-items:center;color:#ef4444;line-height:1">
-          <span class="material-icons" style="font-size:13px">delete</span>
-        </button>
-      </div>`
-    ).join('');
-    cell.querySelectorAll('div[style*="gap:4px"]').forEach(el => el.remove());
-    cell.insertAdjacentHTML('afterbegin', allLinksHtml);
+    // Hapus file list lama
+    cell.querySelectorAll('[data-filelist]').forEach(el => el.remove());
 
-    // Ubah tombol upload → hijau
+    // Render carousel atau single file
+    if (allLinks.length > 1) {
+      window[`_carouselData_${noIndikator}`] = { links: allLinks, idx: 0, idUsulan };
+      const f0 = allLinks[0];
+      cell.insertAdjacentHTML('afterbegin',
+        `<div data-filelist style="display:flex;align-items:center;gap:4px">
+          <button onclick="carouselPrev(${noIndikator})" style="background:none;border:none;cursor:pointer;font-size:14px;padding:0">◀</button>
+          <div id="carouselSlide-${noIndikator}" style="display:flex;align-items:center;gap:2px">
+            <span onclick="previewBukti('${f0.url||f0}','${f0.id||''}')" style="font-size:10.5px;color:#0d9488;cursor:pointer;text-decoration:underline">👁️ File 1</span>
+            <button onclick="hapusBukti('${idUsulan}',${noIndikator},0)" style="background:none;border:none;cursor:pointer;padding:0;font-size:13px">🗑️</button>
+          </div>
+          <button onclick="carouselNext(${noIndikator},${allLinks.length})" style="background:none;border:none;cursor:pointer;font-size:14px;padding:0">▶</button>
+          <span id="carouselIdx-${noIndikator}" style="font-size:10px;color:#94a3b8">1/${allLinks.length}</span>
+        </div>`
+      );
+    } else if (allLinks.length === 1) {
+      const f = allLinks[0];
+      cell.insertAdjacentHTML('afterbegin',
+        `<div data-filelist style="display:flex;align-items:center;gap:4px">
+          <span onclick="previewBukti('${f.url||f}','${f.id||''}')" style="font-size:10.5px;color:#0d9488;cursor:pointer;text-decoration:underline">👁️ File 1</span>
+          <button onclick="hapusBukti('${idUsulan}',${noIndikator},0)" style="background:none;border:none;cursor:pointer;padding:0;font-size:13px">🗑️</button>
+        </div>`
+      );
+    }
+
+    // Tombol hijau tanpa icon
     const label = document.getElementById(`uploadLabel-${noIndikator}`);
     if (label) {
-      label.style.cssText = 'display:inline-flex;align-items:center;gap:3px;padding:4px 9px;background:#0d9488;color:white;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:600;border:1.5px solid #0d9488;white-space:nowrap';
-      label.querySelector('.material-icons').textContent = 'cloud_done';
-      if (label.childNodes[1]) label.childNodes[1].textContent = 'Ganti';
+      label.style.cssText = 'display:inline-flex;align-items:center;padding:4px 12px;background:#16a34a;color:white;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:600;border:1.5px solid #16a34a;white-space:nowrap';
+      label.querySelectorAll('.material-icons').forEach(el => el.remove());
+      const textNode = [...label.childNodes].find(n => n.nodeType === 3);
+      if (textNode) textNode.textContent = 'Uploaded';
+      else label.insertBefore(document.createTextNode('Uploaded'), label.querySelector('input'));
     }
 
     // Refresh SPM
@@ -997,11 +1059,10 @@ async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, tahun
 async function hapusBukti(idUsulan, noIndikator, fileIndex) {
   showConfirm({
     title: 'Hapus Data Dukung',
-    message: `Hapus <strong>File ${fileIndex + 1}</strong> dari indikator ${noIndikator}?<br><small style="color:#94a3b8">File juga akan dihapus dari Google Drive.</small>`,
+    message: `Hapus <strong>File ${fileIndex + 1}</strong> dari indikator ${noIndikator}?`,
     type: 'danger',
     onConfirm: async () => {
       try {
-        // Ambil links saat ini
         const existingDetail = await API.getIndikatorUsulan(idUsulan);
         const existingInd = (existingDetail || []).find(i => i.no === noIndikator || i.noIndikator === noIndikator);
         let links = [];
@@ -1014,51 +1075,48 @@ async function hapusBukti(idUsulan, noIndikator, fileIndex) {
           } catch { links = [{ id: null, url: existingInd.linkFile, name: 'File' }]; }
         }
 
-        const fileToDelete = links[fileIndex];
-
-        // Hard delete dari Google Drive kalau ada fileId
-        if (fileToDelete?.id) {
-          try {
-            await fetch('/.netlify/functions/drive-delete', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ fileId: fileToDelete.id })
-            });
-          } catch(e) { console.warn('Drive delete warning:', e); }
-        }
-
-        // Hapus dari array dan simpan ke DB
         links.splice(fileIndex, 1);
         const newLinkFile = links.length ? JSON.stringify(links) : '';
         const tVal = parseFloat(document.getElementById(`t-${noIndikator}`)?.value) || 0;
         const cVal = parseFloat(document.getElementById(`c-${noIndikator}`)?.value) || 0;
         await API.updateIndikatorUsulan({ idUsulan, noIndikator, target: tVal, capaian: cVal, linkFile: newLinkFile });
 
-        toast('File berhasil dihapus dari sistem dan Google Drive', 'success');
+        toast('File berhasil dihapus', 'success');
 
         // Refresh cell UI
         const cell = document.getElementById(`uploadCell-${noIndikator}`);
         if (cell) {
-          const newHtml = links.map((f, i) =>
-            `<div style="display:flex;align-items:center;gap:4px">
-              <span onclick="previewBukti('${f.url}','${f.id||''}')" title="Preview file"
-                style="font-size:10.5px;color:#0d9488;display:flex;align-items:center;gap:1px;cursor:pointer;text-decoration:underline">
-                <span class="material-icons" style="font-size:11px">visibility</span>File ${i+1}
-              </span>
-              <button onclick="hapusBukti('${idUsulan}',${noIndikator},${i})" title="Hapus file ini"
-                style="background:none;border:none;cursor:pointer;padding:0;display:flex;align-items:center;color:#ef4444;line-height:1">
-                <span class="material-icons" style="font-size:13px">delete</span>
-              </button>
-            </div>`
-          ).join('');
-          cell.querySelectorAll('div[style*="gap:4px"]').forEach(el => el.remove());
-          cell.insertAdjacentHTML('afterbegin', newHtml);
+          cell.querySelectorAll('[data-filelist]').forEach(el => el.remove());
+          if (links.length > 1) {
+            window[`_carouselData_${noIndikator}`] = { links, idx: 0, idUsulan };
+            const f0 = links[0];
+            cell.insertAdjacentHTML('afterbegin',
+              `<div data-filelist style="display:flex;align-items:center;gap:4px">
+                <button onclick="carouselPrev(${noIndikator})" style="background:none;border:none;cursor:pointer;font-size:14px;padding:0">◀</button>
+                <div id="carouselSlide-${noIndikator}" style="display:flex;align-items:center;gap:2px">
+                  <span onclick="previewBukti('${f0.url||f0}')" style="font-size:10.5px;color:#0d9488;cursor:pointer;text-decoration:underline">👁️ File 1</span>
+                  <button onclick="hapusBukti('${idUsulan}',${noIndikator},0)" style="background:none;border:none;cursor:pointer;padding:0;font-size:13px">🗑️</button>
+                </div>
+                <button onclick="carouselNext(${noIndikator},${links.length})" style="background:none;border:none;cursor:pointer;font-size:14px;padding:0">▶</button>
+                <span id="carouselIdx-${noIndikator}" style="font-size:10px;color:#94a3b8">1/${links.length}</span>
+              </div>`
+            );
+          } else if (links.length === 1) {
+            const f = links[0];
+            cell.insertAdjacentHTML('afterbegin',
+              `<div data-filelist style="display:flex;align-items:center;gap:4px">
+                <span onclick="previewBukti('${f.url||f}')" style="font-size:10.5px;color:#0d9488;cursor:pointer;text-decoration:underline">👁️ File 1</span>
+                <button onclick="hapusBukti('${idUsulan}',${noIndikator},0)" style="background:none;border:none;cursor:pointer;padding:0;font-size:13px">🗑️</button>
+              </div>`
+            );
+          }
           const label = document.getElementById(`uploadLabel-${noIndikator}`);
-          if (label && links.length === 0) {
-            label.style.background = '#ef4444';
-            label.style.borderColor = '#ef4444';
-            label.querySelector('.material-icons').textContent = 'upload_file';
-            if (label.childNodes[1]) label.childNodes[1].textContent = 'Upload';
+          if (label) {
+            if (links.length === 0) {
+              label.style.cssText = 'display:inline-flex;align-items:center;padding:4px 12px;background:#ef4444;color:white;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:600;border:1.5px solid #ef4444;white-space:nowrap';
+              const textNode = [...label.childNodes].find(n => n.nodeType === 3);
+              if (textNode) textNode.textContent = 'Upload';
+            }
           }
         }
       } catch(e) {
@@ -1068,18 +1126,38 @@ async function hapusBukti(idUsulan, noIndikator, fileIndex) {
   });
 }
 
-// Preview file di dalam modal (iframe Google Drive embed)
-function previewBukti(fileUrl, fileId) {
-  // Extract file ID dari URL kalau tidak dikirim langsung
-  if (!fileId && fileUrl) {
-    const match = fileUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
-    if (match) fileId = match[1];
-  }
-  const embedUrl = fileId
-    ? `https://drive.google.com/file/d/${fileId}/preview`
-    : fileUrl;
+function carouselPrev(noIndikator) {
+  const data = window[`_carouselData_${noIndikator}`];
+  if (!data) return;
+  data.idx = (data.idx - 1 + data.links.length) % data.links.length;
+  _renderCarouselSlide(noIndikator, data);
+}
 
-  // Buat/update preview modal
+function carouselNext(noIndikator, total) {
+  const data = window[`_carouselData_${noIndikator}`];
+  if (!data) return;
+  data.idx = (data.idx + 1) % data.links.length;
+  _renderCarouselSlide(noIndikator, data);
+}
+
+function _renderCarouselSlide(noIndikator, data) {
+  const { links, idx, idUsulan } = data;
+  const f = links[idx];
+  const slide = document.getElementById(`carouselSlide-${noIndikator}`);
+  const idxEl = document.getElementById(`carouselIdx-${noIndikator}`);
+  if (slide) slide.innerHTML = `
+    <span onclick="previewBukti('${f.url||f}')" style="font-size:10.5px;color:#0d9488;cursor:pointer;text-decoration:underline">👁️ File ${idx+1}</span>
+    <button onclick="hapusBukti('${idUsulan}',${noIndikator},${idx})" style="background:none;border:none;cursor:pointer;padding:0;font-size:13px">🗑️</button>`;
+  if (idxEl) idxEl.textContent = `${idx+1}/${links.length}`;
+}
+
+// Preview file di dalam modal (iframe Google Drive embed)
+function previewBukti(fileUrl) {
+  if (!fileUrl) return;
+  const ext = fileUrl.split('?')[0].split('.').pop().toLowerCase();
+  const isImage = ['jpg','jpeg','png','gif','webp'].includes(ext);
+  const isPDF = ext === 'pdf';
+
   let modal = document.getElementById('previewBuktiModal');
   if (!modal) {
     modal = document.createElement('div');
@@ -1088,14 +1166,11 @@ function previewBukti(fileUrl, fileId) {
     modal.innerHTML = `
       <div style="background:white;border-radius:12px;width:90%;max-width:900px;height:85vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.4)">
         <div style="padding:14px 18px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
-          <div style="display:flex;align-items:center;gap:8px">
-            <span class="material-icons" style="color:#0d9488">description</span>
-            <span style="font-weight:700;font-size:14px">Preview Data Dukung</span>
-          </div>
+          <span style="font-weight:700;font-size:14px">Preview Data Dukung</span>
           <div style="display:flex;gap:8px;align-items:center">
-            <a id="previewOpenLink" href="${fileUrl}" target="_blank"
+            <a id="previewOpenLink" href="" target="_blank"
               style="font-size:12px;color:#0d9488;display:flex;align-items:center;gap:3px;text-decoration:none">
-              <span class="material-icons" style="font-size:14px">open_in_new</span>Buka di Drive
+              <span class="material-icons" style="font-size:14px">open_in_new</span>Buka
             </a>
             <button onclick="document.getElementById('previewBuktiModal').style.display='none'"
               style="background:none;border:none;cursor:pointer;padding:4px;border-radius:6px;display:flex;align-items:center;color:#64748b">
@@ -1103,15 +1178,27 @@ function previewBukti(fileUrl, fileId) {
             </button>
           </div>
         </div>
-        <iframe id="previewBuktiFrame" src="" style="flex:1;border:none;width:100%" allow="autoplay"></iframe>
+        <div id="previewBuktiContent" style="flex:1;overflow:auto;display:flex;align-items:center;justify-content:center;background:#f8fafc"></div>
       </div>`;
     document.body.appendChild(modal);
-    // Tutup kalau klik backdrop
     modal.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = 'none'; });
   }
 
-  document.getElementById('previewBuktiFrame').src = embedUrl;
   document.getElementById('previewOpenLink').href = fileUrl;
+  const content = document.getElementById('previewBuktiContent');
+
+  if (isImage) {
+    content.innerHTML = `<img src="${fileUrl}" style="max-width:100%;max-height:100%;object-fit:contain;padding:12px">`;
+  } else if (isPDF) {
+    content.innerHTML = `<iframe src="${fileUrl}" style="width:100%;height:100%;border:none"></iframe>`;
+  } else {
+    content.innerHTML = `<div style="text-align:center;padding:40px">
+      <div style="font-size:48px;margin-bottom:16px">📄</div>
+      <div style="font-size:14px;color:#334155;margin-bottom:16px">File tidak bisa dipreview langsung</div>
+      <a href="${fileUrl}" target="_blank" style="background:#0d9488;color:white;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:600">⬇ Download File</a>
+    </div>`;
+  }
+
   modal.style.display = 'flex';
 }
 

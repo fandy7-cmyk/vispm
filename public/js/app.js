@@ -44,7 +44,7 @@ async function doLogin() {
 
   const btn = document.getElementById('authBtn');
   btn.disabled = true;
-  btn.innerHTML = '<span class="material-icons" style="animation:spin 0.8s linear infinite">refresh</span> Loading...';
+  btn.innerHTML = '<span class="material-icons" style="animation:spin 0.8s linear infinite">refresh</span> Memeriksa...';
   setAuthStatus('Memeriksa akses...', '');
 
   try {
@@ -1403,15 +1403,21 @@ function approvalBox(label, by, at, alasanTolak = '') {
 
 // ============== LAPORAN PDF ==============
 async function downloadLaporanPDF(idUsulan) {
-  toast('Membuka laporan...', 'success');
+  toast('Menyiapkan laporan...', 'success');
   try {
     const res = await fetch(`/api/laporan-pdf?id=${idUsulan}`);
     if (!res.ok) { toast('Gagal memuat laporan', 'error'); return; }
     const html = await res.text();
     const blob = new Blob([html], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
-    const win = window.open(url, '_blank');
-    if (!win) toast('Aktifkan popup untuk download laporan', 'warning');
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Laporan-SPM-${idUsulan}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast('Laporan berhasil diunduh ✓', 'success');
   } catch(e) {
     toast('Gagal: ' + e.message, 'error');
   }
@@ -1588,12 +1594,6 @@ async function doApprove() {
       renderVerifikasi();
     }, 1000);
 
-    if (role === 'Admin') {
-      setTimeout(() => {
-        showConfirm({ title: 'Laporan Tersedia', message: 'Usulan selesai diverifikasi. Download laporan PDF sekarang?', type: 'warning',
-          onConfirm: () => downloadLaporanPDF(verifCurrentUsulan) });
-      }, 1200);
-    }
   } catch (e) { toast(e.message, 'error'); }
   finally { setLoading(false); }
 }

@@ -21,7 +21,7 @@ let verifCurrentUsulan = null; // for verifikasi modal
 
 // ===== GOOGLE DRIVE CONFIG =====
 // Google Drive: menggunakan Service Account (backend)
-window.GDRIVE_FOLDER_ID = "1HywRrWup2JgX3Zig2FND8K5Zc6HWtu-A";
+// Upload bukti menggunakan Cloudinary
 
 
 // Format date only: DD MMMM YYYY
@@ -754,29 +754,7 @@ async function deleteUsulan(idUsulan) {
 let currentIndikatorUsulan = null;
 let indikatorData = [];
 
-// Buka/buat folder Google Drive otomatis
-async function openGDriveFolder(kodePKM, tahun, bulan, namaBulan, idUsulan) {
-  const btn = document.getElementById('btnOpenDrive');
-  if (btn) { btn.innerHTML = '<span class="material-icons" style="font-size:15px;animation:spin 0.8s linear infinite">refresh</span> Membuat folder...'; btn.disabled = true; }
-  try {
-    const result = await API.get('drive', { kodePKM, tahun, bulan, namaBulan });
-    // Save folder URL to DB
-    if (idUsulan) {
-      await fetch(`/api/usulan?action=drive-folder`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idUsulan, driveFolderId: result.folderId, driveFolderUrl: result.folderUrl })
-      });
-    }
-    window.open(result.folderUrl, '_blank');
-    if (btn) { btn.innerHTML = '<span class="material-icons" style="font-size:15px">folder_open</span> Buka Folder Drive'; btn.disabled = false; }
-    // Update link info
-    const linkEl = document.getElementById('driveFolderLink');
-    if (linkEl) { linkEl.href = result.folderUrl; linkEl.style.display = 'inline-flex'; }
-  } catch (e) {
-    toast('Gagal membuka Google Drive: ' + e.message, 'error');
-    if (btn) { btn.innerHTML = '<span class="material-icons" style="font-size:15px">open_in_new</span> Buka Google Drive'; btn.disabled = false; }
-  }
-}
+// Folder management menggunakan Cloudinary
 
 async function openIndikatorModal(idUsulan) {
   currentIndikatorUsulan = idUsulan;
@@ -930,29 +908,24 @@ async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, tahun
         reader.readAsDataURL(file);
       });
 
-      // Kirim folderPath ke backend — backend yang buat subfolder
-      const bulanNamaMap = {'Januari':'01','Februari':'02','Maret':'03','April':'04','Mei':'05','Juni':'06','Juli':'07','Agustus':'08','September':'09','Oktober':'10','November':'11','Desember':'12'};
-      const bulanAngka = bulanNamaMap[namaBulan] || String(bulan).padStart(2,'0');
-      const folderPath = [kodePKM, String(tahun), `${bulanAngka}-${namaBulan}`, 'Indikator', String(noIndikator)];
-
-      const res = await fetch("/.netlify/functions/drive-upload", {
+      const res = await fetch("/.netlify/functions/upload", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           fileName: file.name,
           fileBase64: base64,
-          folderId: window.GDRIVE_FOLDER_ID,
-          folderPath
+          kodePKM,
+          tahun,
+          bulan,
+          noIndikator
         })
       });
 
       const result = await res.json();
-      // ok() wraps data in {success:true, data:{...}}
-      if (!res.ok || !result.success) throw new Error(result.data?.error || result.message || result.error || 'Upload gagal');
-      const fileUrl = result.data?.fileUrl || result.fileUrl;
-      const fileId = result.data?.fileId || result.fileId;
+      if (!res.ok || !result.success) throw new Error(result.error || 'Upload gagal');
+      const fileUrl = result.fileUrl;
       if (!fileUrl) throw new Error('URL file tidak ditemukan dalam response');
-      uploadedLinks.push({ id: fileId, url: fileUrl, name: file.name });
+      uploadedLinks.push({ id: result.publicId, url: fileUrl, name: file.name });
     } catch (e) {
       toast(`Gagal upload ${file.name}: ${e.message}`, 'error');
     }

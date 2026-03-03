@@ -2749,6 +2749,9 @@ async function loadKelolaUsulan() {
           <button class="btn-icon view" onclick="viewDetail('${u.idUsulan}')" title="Detail"><span class="material-icons">visibility</span></button>
           <button class="btn-icon edit" onclick="adminEditUsulan('${u.idUsulan}')" title="Edit"><span class="material-icons">edit</span></button>
           <button class="btn-icon del" onclick="adminDeleteUsulan('${u.idUsulan}')" title="Hapus"><span class="material-icons">delete</span></button>
+          ${u.statusGlobal === 'Menunggu Admin' && u.statusKapus !== 'Selesai'
+            ? `<button class="btn-icon" onclick="restoreVerifAdmin('${u.idUsulan}')" title="Pulihkan verifikasi Kapus & Program" style="color:#f59e0b;background:#fffbeb;border:1px solid #fcd34d"><span class="material-icons">restore</span></button>`
+            : ''}
         </td>
       </tr>`).join('')}
       </tbody>
@@ -2793,6 +2796,30 @@ async function adminDeleteUsulan(idUsulan) {
         const data = await res.json();
         if (!res.ok && !data.success) throw new Error(data.message || data.error || 'Gagal hapus');
         toast(`Usulan ${idUsulan} berhasil dihapus`);
+        loadKelolaUsulan();
+      } catch(e) { toast(e.message, 'error'); }
+      finally { setLoading(false); }
+    }
+  });
+}
+
+async function restoreVerifAdmin(idUsulan) {
+  showConfirm({
+    title: 'Pulihkan Status Verifikasi',
+    type: 'warning',
+    icon: 'restore',
+    message: `Status verifikasi Kepala Puskesmas dan Pengelola Program untuk usulan ${idUsulan} akan dipulihkan ke "Selesai".\n\nGunakan ini hanya jika data verifikasi hilang akibat bug ajukan ulang.`,
+    onConfirm: async () => {
+      setLoading(true);
+      try {
+        const res = await fetch('/api/usulan?action=restore-verif', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ idUsulan, emailAdmin: currentUser.email })
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message || 'Gagal memulihkan');
+        toast('Status verifikasi berhasil dipulihkan ✓', 'success');
         loadKelolaUsulan();
       } catch(e) { toast(e.message, 'error'); }
       finally { setLoading(false); }

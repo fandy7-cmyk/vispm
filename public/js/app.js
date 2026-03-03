@@ -876,45 +876,21 @@ async function openIndikatorModal(idUsulan) {
             }
             // Normalisasi links ke format {id, url}
             const normLinks = links.map(f => typeof f === 'string' ? { id: null, url: f, name: 'File' } : f);
-            const fileLinksWithDelete = normLinks.map((f, i) =>
-              `<div style="display:flex;align-items:center;gap:4px">
-                <span onclick="previewBukti('${f.url}','${f.id||''}')" title="Preview file"
-                  style="font-size:10.5px;color:#0d9488;display:flex;align-items:center;gap:1px;cursor:pointer;text-decoration:underline">
-                  👁️ File ${i+1}
-                </span>
-                <button onclick="hapusBukti('${idUsulan}',${ind.no},${i})" title="Hapus file ini"
-                  style="background:none;border:none;cursor:pointer;padding:0;font-size:13px;line-height:1">
-                  🗑️
-                </button>
-              </div>`
-            ).join('');
+            const SVG_EYE = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>`;
+            const SVG_TRASH = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></svg>`;
             const hasFiles = normLinks.length > 0;
             const btnStyle = hasFiles
               ? 'display:inline-flex;align-items:center;padding:4px 12px;background:#16a34a;color:white;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:600;border:1.5px solid #16a34a;white-space:nowrap'
               : 'display:inline-flex;align-items:center;padding:4px 12px;background:#ef4444;color:white;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:600;border:1.5px solid #ef4444;white-space:nowrap';
 
-            // Carousel jika > 1 file, single jika 1 file
-            const fileControlHtml = normLinks.length > 1
-              ? `<div style="display:flex;align-items:center;gap:2px">
-                  <button onclick="carouselPrev(${ind.no})" style="background:none;border:none;cursor:pointer;font-size:13px;padding:0;line-height:1">◀</button>
-                  <div id="carouselSlide-${ind.no}" style="display:flex;align-items:center;gap:2px">
-                    <span onclick="previewBukti('${normLinks[0].url}')" style="font-size:11px;cursor:pointer">👁️</span>
-                    <button onclick="hapusBukti('${idUsulan}',${ind.no},0)" style="background:none;border:none;cursor:pointer;padding:0;font-size:12px">🗑️</button>
-                  </div>
-                  <button onclick="carouselNext(${ind.no},${normLinks.length})" style="background:none;border:none;cursor:pointer;font-size:13px;padding:0;line-height:1">▶</button>
-                  <span id="carouselIdx-${ind.no}" style="font-size:9px;color:#94a3b8">1/${normLinks.length}</span>
-                </div>`
-              : normLinks.length === 1
-              ? `<div style="display:flex;align-items:center;gap:2px">
-                  <span onclick="previewBukti('${normLinks[0].url}')" style="font-size:11px;cursor:pointer" title="Preview">👁️</span>
-                  <button onclick="hapusBukti('${idUsulan}',${ind.no},0)" style="background:none;border:none;cursor:pointer;padding:0;font-size:12px" title="Hapus">🗑️</button>
+            if (normLinks.length > 0) window[`_buktiLinks_${ind.no}`] = { links: normLinks, idUsulan };
+            const fileControlHtml = normLinks.length > 0
+              ? `<div style="display:flex;align-items:center;gap:1px">
+                  <button onclick="openBuktiModal(${ind.no},0)" title="Preview" style="background:none;border:none;cursor:pointer;padding:3px 4px;border-radius:5px;display:flex;align-items:center;color:#0d9488" onmouseover="this.style.background='rgba(13,148,136,0.08)'" onmouseout="this.style.background='none'">${SVG_EYE}</button>
+                  <button onclick="hapusBukti('${idUsulan}',${ind.no},${normLinks.length-1})" title="Hapus" style="background:none;border:none;cursor:pointer;padding:3px 4px;border-radius:5px;display:flex;align-items:center;color:#ef4444" onmouseover="this.style.background='rgba(239,68,68,0.08)'" onmouseout="this.style.background='none'">${SVG_TRASH}</button>
+                  ${normLinks.length > 1 ? `<span style="font-size:9px;background:#e2e8f0;color:#64748b;border-radius:10px;padding:1px 5px;font-weight:700">${normLinks.length}</span>` : ''}
                 </div>`
               : '';
-
-            if (normLinks.length > 1) {
-              window[`_carouselData_${ind.no}`] = { links: normLinks, idx: 0, idUsulan };
-            }
-
             return `<div id="uploadCell-${ind.no}" style="display:flex;align-items:center;gap:6px;justify-content:center">
                 <label id="uploadLabel-${ind.no}" style="${btnStyle}">
                   ${hasFiles ? 'Uploaded' : 'Upload'}
@@ -1002,26 +978,15 @@ async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, tahun
 
     statusDiv.remove();
 
-    // Update fileControls div (sejajar kanan tombol Upload)
+    // Update _buktiLinks + fileControls
+    window[`_buktiLinks_${noIndikator}`] = { links: allLinks, idUsulan };
     const controls = document.getElementById(`fileControls-${noIndikator}`);
     if (controls) {
-      if (allLinks.length > 1) {
-        window[`_carouselData_${noIndikator}`] = { links: allLinks, idx: 0, idUsulan };
-        const f0 = allLinks[0];
-        controls.innerHTML = `<div style="display:flex;align-items:center;gap:2px">
-          <button onclick="carouselPrev(${noIndikator})" style="background:none;border:none;cursor:pointer;font-size:13px;padding:0">◀</button>
-          <div id="carouselSlide-${noIndikator}" style="display:flex;align-items:center;gap:2px">
-            <span onclick="previewBukti('${f0.url||f0}')" style="font-size:11px;cursor:pointer">👁️</span>
-            <button onclick="hapusBukti('${idUsulan}',${noIndikator},0)" style="background:none;border:none;cursor:pointer;padding:0;font-size:12px">🗑️</button>
-          </div>
-          <button onclick="carouselNext(${noIndikator},${allLinks.length})" style="background:none;border:none;cursor:pointer;font-size:13px;padding:0">▶</button>
-          <span id="carouselIdx-${noIndikator}" style="font-size:9px;color:#94a3b8">1/${allLinks.length}</span>
-        </div>`;
-      } else if (allLinks.length === 1) {
-        const f = allLinks[0];
-        controls.innerHTML = `<div style="display:flex;align-items:center;gap:2px">
-          <span onclick="previewBukti('${f.url||f}')" style="font-size:11px;cursor:pointer" title="Preview">👁️</span>
-          <button onclick="hapusBukti('${idUsulan}',${noIndikator},0)" style="background:none;border:none;cursor:pointer;padding:0;font-size:12px" title="Hapus">🗑️</button>
+      if (allLinks.length > 0) {
+        controls.innerHTML = `<div style="display:flex;align-items:center;gap:1px">
+          <button onclick="openBuktiModal(${noIndikator},0)" title="Preview" style="background:none;border:none;cursor:pointer;padding:3px 4px;border-radius:5px;display:flex;align-items:center;color:#0d9488" onmouseover="this.style.background='rgba(13,148,136,0.08)'" onmouseout="this.style.background='none'">${SVG_EYE}</button>
+          <button onclick="hapusBukti('${idUsulan}',${noIndikator},${allLinks.length-1})" title="Hapus" style="background:none;border:none;cursor:pointer;padding:3px 4px;border-radius:5px;display:flex;align-items:center;color:#ef4444" onmouseover="this.style.background='rgba(239,68,68,0.08)'" onmouseout="this.style.background='none'">${SVG_TRASH}</button>
+          ${allLinks.length > 1 ? `<span style="font-size:9px;background:#e2e8f0;color:#64748b;border-radius:10px;padding:1px 5px;font-weight:700">${allLinks.length}</span>` : ''}
         </div>`;
       } else {
         controls.innerHTML = '';
@@ -1080,42 +1045,24 @@ async function hapusBukti(idUsulan, noIndikator, fileIndex) {
 
         toast('File berhasil dihapus', 'success');
 
-        // Refresh cell UI
-        const cell = document.getElementById(`uploadCell-${noIndikator}`);
-        if (cell) {
-          cell.querySelectorAll('[data-filelist]').forEach(el => el.remove());
-          if (links.length > 1) {
-            window[`_carouselData_${noIndikator}`] = { links, idx: 0, idUsulan };
-            const f0 = links[0];
-            cell.insertAdjacentHTML('afterbegin',
-              `<div data-filelist style="display:flex;align-items:center;gap:4px">
-                <button onclick="carouselPrev(${noIndikator})" style="background:none;border:none;cursor:pointer;font-size:14px;padding:0">◀</button>
-                <div id="carouselSlide-${noIndikator}" style="display:flex;align-items:center;gap:2px">
-                  <span onclick="previewBukti('${f0.url||f0}')" style="font-size:10.5px;color:#0d9488;cursor:pointer;text-decoration:underline">👁️ File 1</span>
-                  <button onclick="hapusBukti('${idUsulan}',${noIndikator},0)" style="background:none;border:none;cursor:pointer;padding:0;font-size:13px">🗑️</button>
-                </div>
-                <button onclick="carouselNext(${noIndikator},${links.length})" style="background:none;border:none;cursor:pointer;font-size:14px;padding:0">▶</button>
-                <span id="carouselIdx-${noIndikator}" style="font-size:10px;color:#94a3b8">1/${links.length}</span>
-              </div>`
-            );
-          } else if (links.length === 1) {
-            const f = links[0];
-            cell.insertAdjacentHTML('afterbegin',
-              `<div data-filelist style="display:flex;align-items:center;gap:4px">
-                <span onclick="previewBukti('${f.url||f}')" style="font-size:10.5px;color:#0d9488;cursor:pointer;text-decoration:underline">👁️ File 1</span>
-                <button onclick="hapusBukti('${idUsulan}',${noIndikator},0)" style="background:none;border:none;cursor:pointer;padding:0;font-size:13px">🗑️</button>
-              </div>`
-            );
-          }
-          const label = document.getElementById(`uploadLabel-${noIndikator}`);
-          if (label) {
-            if (links.length === 0) {
-              label.style.cssText = 'display:inline-flex;align-items:center;padding:4px 12px;background:#ef4444;color:white;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:600;border:1.5px solid #ef4444;white-space:nowrap';
-              const textNode = [...label.childNodes].find(n => n.nodeType === 3);
-              if (textNode) textNode.textContent = 'Upload';
-            }
-          }
-        }
+         // Refresh _buktiLinks + fileControls
+         window[`_buktiLinks_${noIndikator}`] = { links, idUsulan };
+         const ctrl = document.getElementById(`fileControls-${noIndikator}`);
+         if (ctrl) {
+           if (links.length > 0) {
+             ctrl.innerHTML = '<div style="display:flex;align-items:center;gap:1px">'
+               + '<button onclick="openBuktiModal('+noIndikator+',0)" title="Preview" style="background:none;border:none;cursor:pointer;padding:3px 4px;border-radius:5px;display:flex;align-items:center;color:#0d9488" onmouseover="this.style.background=\' rgba(13,148,136,0.08)\'" onmouseout="this.style.background=\'none\'">' + SVG_EYE + '</button>'
+               + '<button onclick="hapusBukti(\''+idUsulan+'\','+noIndikator+','+(links.length-1)+')" title="Hapus" style="background:none;border:none;cursor:pointer;padding:3px 4px;border-radius:5px;display:flex;align-items:center;color:#ef4444" onmouseover="this.style.background=\'rgba(239,68,68,0.08)\'" onmouseout="this.style.background=\'none\'">' + SVG_TRASH + '</button>'
+               + (links.length>1 ? '<span style="font-size:9px;background:#e2e8f0;color:#64748b;border-radius:10px;padding:1px 5px;font-weight:700">'+links.length+'</span>' : '')
+               + '</div>';
+           } else { ctrl.innerHTML = ''; }
+         }
+         const lbl = document.getElementById(`uploadLabel-${noIndikator}`);
+         if (lbl && links.length === 0) {
+           lbl.style.cssText = 'display:inline-flex;align-items:center;padding:4px 12px;background:#ef4444;color:white;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:600;border:1.5px solid #ef4444;white-space:nowrap';
+           const tn = [...lbl.childNodes].find(n => n.nodeType === 3);
+           if (tn) tn.textContent = 'Upload';
+         }
       } catch(e) {
         toast('Gagal hapus: ' + e.message, 'error');
       }
@@ -1123,80 +1070,78 @@ async function hapusBukti(idUsulan, noIndikator, fileIndex) {
   });
 }
 
-function carouselPrev(noIndikator) {
-  const data = window[`_carouselData_${noIndikator}`];
-  if (!data) return;
-  data.idx = (data.idx - 1 + data.links.length) % data.links.length;
-  _renderCarouselSlide(noIndikator, data);
+function openBuktiModal(noIndikator, startIdx) {
+  const data = window[`_buktiLinks_${noIndikator}`];
+  if (!data || !data.links.length) return;
+  window._modalBukti = { links: data.links, idUsulan: data.idUsulan, idx: startIdx || 0, noIndikator };
+  _renderBuktiModal();
 }
 
-function carouselNext(noIndikator, total) {
-  const data = window[`_carouselData_${noIndikator}`];
-  if (!data) return;
-  data.idx = (data.idx + 1) % data.links.length;
-  _renderCarouselSlide(noIndikator, data);
-}
-
-function _renderCarouselSlide(noIndikator, data) {
-  const { links, idx, idUsulan } = data;
+function _renderBuktiModal() {
+  const { links, idx, idUsulan, noIndikator } = window._modalBukti;
   const f = links[idx];
-  const slide = document.getElementById(`carouselSlide-${noIndikator}`);
-  const idxEl = document.getElementById(`carouselIdx-${noIndikator}`);
-  if (slide) slide.innerHTML = `
-    <span onclick="previewBukti('${f.url||f}')" style="font-size:10.5px;color:#0d9488;cursor:pointer;text-decoration:underline">👁️ File ${idx+1}</span>
-    <button onclick="hapusBukti('${idUsulan}',${noIndikator},${idx})" style="background:none;border:none;cursor:pointer;padding:0;font-size:13px">🗑️</button>`;
-  if (idxEl) idxEl.textContent = `${idx+1}/${links.length}`;
-}
-
-// Preview file di dalam modal (iframe Google Drive embed)
-function previewBukti(fileUrl) {
-  if (!fileUrl) return;
-  const ext = fileUrl.split('?')[0].split('.').pop().toLowerCase();
+  const ext = (f.url || '').split('?')[0].split('.').pop().toLowerCase();
   const isImage = ['jpg','jpeg','png','gif','webp'].includes(ext);
-  const isPDF = ext === 'pdf';
+  const total = links.length;
 
   let modal = document.getElementById('previewBuktiModal');
   if (!modal) {
     modal = document.createElement('div');
     modal.id = 'previewBuktiModal';
-    modal.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:3000;justify-content:center;align-items:center;padding:24px';
-    modal.innerHTML = `
-      <div style="background:white;border-radius:12px;width:90%;max-width:900px;height:85vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.4)">
-        <div style="padding:14px 18px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
-          <span style="font-weight:700;font-size:14px">Preview Data Dukung</span>
-          <div style="display:flex;gap:8px;align-items:center">
-            <a id="previewOpenLink" href="" target="_blank"
-              style="font-size:12px;color:#0d9488;display:flex;align-items:center;gap:3px;text-decoration:none">
-              <span class="material-icons" style="font-size:14px">open_in_new</span>Buka
-            </a>
-            <button onclick="document.getElementById('previewBuktiModal').style.display='none'"
-              style="background:none;border:none;cursor:pointer;padding:4px;border-radius:6px;display:flex;align-items:center;color:#64748b">
-              <span class="material-icons">close</span>
-            </button>
-          </div>
-        </div>
-        <div id="previewBuktiContent" style="flex:1;overflow:auto;display:flex;align-items:center;justify-content:center;background:#f8fafc"></div>
-      </div>`;
+    modal.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:3000;justify-content:center;align-items:center;padding:20px';
     document.body.appendChild(modal);
-    modal.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = 'none'; });
+    modal.addEventListener('click', e => { if (e.target === modal) modal.style.display = 'none'; });
   }
 
-  document.getElementById('previewOpenLink').href = fileUrl;
-  const content = document.getElementById('previewBuktiContent');
+  const navBtn = (dir, fn) => `<button onclick="${fn}" style="position:absolute;top:50%;${dir}:14px;transform:translateY(-50%);background:rgba(255,255,255,0.12);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,0.18);color:white;border-radius:50%;width:42px;height:42px;cursor:pointer;font-size:20px;display:flex;align-items:center;justify-content:center" onmouseover="this.style.background='rgba(255,255,255,0.25)'" onmouseout="this.style.background='rgba(255,255,255,0.12)'">${dir === 'left' ? '‹' : '›'}</button>`;
 
-  if (isImage) {
-    content.innerHTML = `<img src="${fileUrl}" style="max-width:100%;max-height:100%;object-fit:contain;padding:12px">`;
-  } else if (isPDF) {
-    content.innerHTML = `<iframe src="${fileUrl}" style="width:100%;height:100%;border:none"></iframe>`;
-  } else {
-    content.innerHTML = `<div style="text-align:center;padding:40px">
-      <div style="font-size:48px;margin-bottom:16px">📄</div>
-      <div style="font-size:14px;color:#334155;margin-bottom:16px">File tidak bisa dipreview langsung</div>
-      <a href="${fileUrl}" target="_blank" style="background:#0d9488;color:white;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:600">⬇ Download File</a>
+  const svgOpen = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>`;
+  const svgTrash = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></svg>`;
+
+  modal.innerHTML = `
+    <div style="background:#1e293b;border-radius:14px;width:92%;max-width:920px;height:88vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,0.5)">
+      <div style="padding:12px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;border-bottom:1px solid rgba(255,255,255,0.08)">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="color:#94a3b8;font-size:12px;font-weight:500">Data Dukung</span>
+          ${total > 1 ? `<span style="background:#334155;color:#94a3b8;font-size:11px;padding:2px 8px;border-radius:20px;font-weight:600">${idx+1} / ${total}</span>` : ''}
+        </div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <a href="${f.url}" target="_blank" style="background:#0d9488;color:white;padding:5px 12px;border-radius:7px;font-size:12px;font-weight:600;text-decoration:none;display:flex;align-items:center;gap:5px">${svgOpen} Buka</a>
+          <button onclick="hapusBukti('${idUsulan}',${noIndikator},${idx})" style="background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.3);padding:5px 12px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px">${svgTrash} Hapus</button>
+          <button onclick="document.getElementById('previewBuktiModal').style.display='none'" style="background:rgba(255,255,255,0.08);border:none;cursor:pointer;color:white;border-radius:7px;width:32px;height:32px;font-size:20px;display:flex;align-items:center;justify-content:center;line-height:1">×</button>
+        </div>
+      </div>
+      <div style="flex:1;overflow:hidden;display:flex;align-items:center;justify-content:center;background:#0f172a;position:relative">
+        ${isImage
+          ? `<img src="${f.url}" style="max-width:100%;max-height:100%;object-fit:contain;padding:16px">`
+          : ext === 'pdf'
+          ? `<iframe src="${f.url}" style="width:100%;height:100%;border:none"></iframe>`
+          : `<div style="text-align:center;color:white;padding:40px">
+              <div style="font-size:56px;margin-bottom:16px">📄</div>
+              <div style="font-size:14px;color:#94a3b8;margin-bottom:20px">${f.name || 'File'}</div>
+              <a href="${f.url}" target="_blank" style="background:#0d9488;color:white;padding:10px 24px;border-radius:8px;text-decoration:none;font-weight:600">⬇ Download</a>
+            </div>`
+        }
+        ${total > 1 ? navBtn('left', '_buktiNav(-1)') : ''}
+        ${total > 1 ? navBtn('right', '_buktiNav(1)') : ''}
+      </div>
+      ${total > 1 ? `
+      <div style="display:flex;justify-content:center;gap:5px;padding:10px;flex-shrink:0;border-top:1px solid rgba(255,255,255,0.06)">
+        ${links.map((_,i) => `<button onclick="_buktiGoto(${i})" style="width:${i===idx?'20px':'7px'};height:7px;border-radius:10px;border:none;cursor:pointer;background:${i===idx?'#0d9488':'rgba(255,255,255,0.2)'};transition:all 0.2s;padding:0"></button>`).join('')}
+      </div>` : ''}
     </div>`;
-  }
-
   modal.style.display = 'flex';
+}
+
+function _buktiNav(dir) {
+  const d = window._modalBukti;
+  d.idx = (d.idx + dir + d.links.length) % d.links.length;
+  _renderBuktiModal();
+}
+
+function _buktiGoto(idx) {
+  window._modalBukti.idx = idx;
+  _renderBuktiModal();
 }
 
 async function saveIndikator(noIndikator) {

@@ -58,19 +58,19 @@ async function getAccessToken() {
 async function findOrCreateFolder(token, folderName, parentId) {
   const q = `name='${folderName.replace(/'/g, "\\'")}' and mimeType='application/vnd.google-apps.folder' and '${parentId}' in parents and trashed=false`;
   const searchRes = await fetch(
-    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)`,
+    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)&supportsAllDrives=true&includeItemsFromAllDrives=true`,
     { headers: { Authorization: `Bearer ${token}` } }
   );
   const searchData = await searchRes.json();
   if (searchData.files && searchData.files.length > 0) return searchData.files[0].id;
 
-  const createRes = await fetch('https://www.googleapis.com/drive/v3/files', {
+  const createRes = await fetch('https://www.googleapis.com/drive/v3/files?supportsAllDrives=true', {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ name: folderName, mimeType: 'application/vnd.google-apps.folder', parents: [parentId] })
   });
   const folder = await createRes.json();
-  if (!folder.id) throw new Error('Gagal buat folder: ' + folderName);
+  if (!folder.id) throw new Error('Gagal buat folder: ' + folderName + ' → ' + JSON.stringify(folder));
   return folder.id;
 }
 
@@ -109,7 +109,7 @@ exports.handler = async (event) => {
     ]);
 
     const uploadRes = await fetch(
-      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name',
+      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name&supportsAllDrives=true',
       {
         method: 'POST',
         headers: {

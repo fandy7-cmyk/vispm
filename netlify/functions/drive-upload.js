@@ -2,7 +2,20 @@ const crypto = require('crypto');
 
 async function getAccessToken() {
   const clientEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-  const privateKey = Buffer.from(process.env.GOOGLE_PRIVATE_KEY_BASE || '', 'base64').toString('utf8');
+  const privateKeyRaw = process.env.GOOGLE_PRIVATE_KEY_BASE;
+  if (!clientEmail || !privateKeyRaw) throw new Error('GOOGLE_SERVICE_ACCOUNT_EMAIL atau GOOGLE_PRIVATE_KEY_BASE belum dikonfigurasi');
+  // Decode base64, lalu fix newlines jika hilang saat encode
+  let privateKey = Buffer.from(privateKeyRaw, 'base64').toString('utf8');
+  // Kalau private key tidak punya newline (sering terjadi saat paste), tambahkan manual
+  if (!privateKey.includes('\n')) {
+    privateKey = privateKey
+      .replace('-----BEGIN RSA PRIVATE KEY-----', '-----BEGIN RSA PRIVATE KEY-----\n')
+      .replace('-----END RSA PRIVATE KEY-----', '\n-----END RSA PRIVATE KEY-----')
+      .replace('-----BEGIN PRIVATE KEY-----', '-----BEGIN PRIVATE KEY-----\n')
+      .replace('-----END PRIVATE KEY-----', '\n-----END PRIVATE KEY-----');
+  }
+  // Ganti literal \n (string) dengan newline asli
+  privateKey = privateKey.replace(/\\n/g, '\n');
 
   const now = Math.floor(Date.now() / 1000);
 

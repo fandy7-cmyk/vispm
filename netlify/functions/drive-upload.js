@@ -1,33 +1,45 @@
-const { createSign } = require('crypto');
+const crypto = require('crypto');
 
-function makeJWT(clientEmail, privateKey) {
+async function getAccessToken() {
+  const clientEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+  const privateKey = Buffer.from(process.env.GOOGLE_PRIVATE_KEY_BASE || '', 'base64').toString('utf8');
+
   const now = Math.floor(Date.now() / 1000);
-  const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url');
-  const payload = Buffer.from(JSON.stringify({
+
+  // Build JWT header + payload
+  const headerB64 = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64')
+    .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+  const payloadB64 = Buffer.from(JSON.stringify({
     iss: clientEmail,
     scope: 'https://www.googleapis.com/auth/drive',
     aud: 'https://oauth2.googleapis.com/token',
     exp: now + 3600,
     iat: now
-  })).toString('base64url');
-  const sign = createSign('RSA-SHA256');
-  sign.update(`${header}.${payload}`);
-  const signature = sign.sign(privateKey, 'base64url');
-  return `${header}.${payload}.${signature}`;
-}
+  })).toString('base64')
+    .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
 
-async function getAccessToken() {
-  const clientEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-  const privateKey = Buffer.from(process.env.GOOGLE_PRIVATE_KEY_BASE64 || '', 'base64').toString('utf8');
-  const jwt = makeJWT(clientEmail, privateKey);
-  const res = await fetch('https://oauth2.googleapis.com/token', {
+  const sigInput = `${headerB64}.${payloadB64}`;
+
+  // Sign with RS256
+  const sign = crypto.createSign('SHA256');
+  sign.update(sigInput);
+  sign.end();
+  const sigB64 = sign.sign(privateKey, 'base64')
+    .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+
+  const jwt = `${sigInput}.${sigB64}`;
+
+  const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: jwt })
+    body: new URLSearchParams({
+      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+      assertion: jwt
+    })
   });
-  const data = await res.json();
-  if (!data.access_token) throw new Error('Token error: ' + JSON.stringify(data));
-  return data.access_token;
+  const tokenData = await tokenRes.json();
+  if (!tokenData.access_token) throw new Error('Token error: ' + JSON.stringify(tokenData));
+  return tokenData.access_token;
 }
 
 async function findOrCreateFolder(token, folderName, parentId) {
@@ -87,7 +99,11 @@ exports.handler = async (event) => {
       'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name',
       {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': `multipart/related; boundary=${boundary}`, 'Content-Length': String(multipart.length) },
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': `multipart/related; boundary=${boundary}`,
+          'Content-Length': String(multipart.length)
+        },
         body: multipart
       }
     );
@@ -97,6 +113,7 @@ exports.handler = async (event) => {
       return { statusCode: 500, headers, body: JSON.stringify({ success: false, error: result.error?.message || 'Upload gagal' }) };
     }
 
+    // Set anyone can view
     await fetch(`https://www.googleapis.com/drive/v3/files/${result.id}/permissions`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },

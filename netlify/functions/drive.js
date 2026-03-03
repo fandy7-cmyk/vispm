@@ -5,8 +5,17 @@ function getCredentials() {
   const clientEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
   const privateKeyRaw = process.env.GOOGLE_PRIVATE_KEY_BASE;
   if (!clientEmail || !privateKeyRaw) throw new Error('GOOGLE_SERVICE_ACCOUNT_EMAIL atau GOOGLE_PRIVATE_KEY_BASE belum dikonfigurasi');
-  // Decode base64 → PEM
-  const privateKey = Buffer.from(privateKeyRaw, 'base64').toString('utf8');
+  let privateKey = Buffer.from(privateKeyRaw, 'base64').toString('utf8');
+  // Fix literal \n (string) → newline asli
+  privateKey = privateKey.replace(/\\n/g, '\n');
+  // Kalau masih tidak ada newline, tambahkan manual di header/footer
+  if (!privateKey.includes('\n')) {
+    privateKey = privateKey
+      .replace('-----BEGIN PRIVATE KEY-----', '-----BEGIN PRIVATE KEY-----\n')
+      .replace('-----END PRIVATE KEY-----', '\n-----END PRIVATE KEY-----')
+      .replace('-----BEGIN RSA PRIVATE KEY-----', '-----BEGIN RSA PRIVATE KEY-----\n')
+      .replace('-----END RSA PRIVATE KEY-----', '\n-----END RSA PRIVATE KEY-----');
+  }
   return { clientEmail, privateKey };
 }
 

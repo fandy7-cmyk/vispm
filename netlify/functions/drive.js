@@ -73,7 +73,7 @@ exports.handler = async (event) => {
   if (!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL) return err('Google Service Account belum dikonfigurasi');
 
   try {
-    const ROOT_FOLDER_ID = '1WYRRcm5oxbCaPx8s9XNUkTUe1b85wuDG';
+    const ROOT_FOLDER_ID = '1HywRrWup2JgX3Zig2FND8K5Zc6HWtu-A';
     const token = await getAccessToken();
     const pkmFolderId   = await findOrCreateFolder(token, kodePKM, ROOT_FOLDER_ID);
     const tahunFolderId = await findOrCreateFolder(token, tahun.toString(), pkmFolderId);

@@ -1119,6 +1119,17 @@ function _renderBuktiModal() {
   const isPDF = ext === 'pdf';
   const total = links.length;
 
+  // Untuk PDF lama yang tersimpan sebagai raw/upload — Cloudinary raw = 401 tanpa auth
+  // Konversi ke image/upload agar bisa diakses publik
+  function fixPdfUrl(url) {
+    if (!url) return url;
+    if (url.includes('/raw/upload/')) {
+      return url.replace('/raw/upload/', '/image/upload/');
+    }
+    return url;
+  }
+  const fileUrl = isPDF ? fixPdfUrl(f.url) : f.url;
+
   // URL download via proxy — bypass CORS + paksa download dengan nama yang benar
   const downloadUrl = `/.netlify/functions/download?url=${encodeURIComponent(f.url)}&name=${encodeURIComponent(fileName)}`;
 
@@ -1157,9 +1168,9 @@ function _renderBuktiModal() {
       </div>
       <div style="flex:1;overflow:hidden;display:flex;align-items:center;justify-content:center;background:#0f172a;position:relative">
         ${isImage
-          ? `<img src="${f.url}" style="max-width:100%;max-height:100%;object-fit:contain;padding:16px">`
+          ? `<img src="${fileUrl}" style="max-width:100%;max-height:100%;object-fit:contain;padding:16px">`
           : isPDF
-          ? `<iframe src="${f.url}" style="width:100%;height:100%;border:none"></iframe>`
+          ? `<iframe src="${fileUrl}" style="width:100%;height:100%;border:none"></iframe>`
           : `<div style="text-align:center;color:white;padding:40px">
               <div style="font-size:64px;margin-bottom:16px">${fileIcon}</div>
               <div style="font-size:11px;color:#64748b;margin-bottom:28px;text-transform:uppercase;letter-spacing:1px">${ext ? ext.toUpperCase() + ' &bull; ' : ''}Tidak dapat dipreview di browser</div>
@@ -1199,29 +1210,27 @@ async function downloadBukti(idx) {
   const dotIdx = fileName.lastIndexOf('.');
   const ext = dotIdx > -1 ? fileName.substring(dotIdx + 1).toLowerCase() : '';
 
-  // Bangun daftar URL yang akan dicoba (dari yang paling mungkin benar)
-  const urlsToTry = [f.url];
-  const urlBase = f.url.split('?')[0];
-  const urlHasExt = urlBase.split('/').pop().includes('.');
-  if (!urlHasExt && ext) {
-    // File lama: Cloudinary raw/upload URL tanpa ekstensi — coba append
-    urlsToTry.push(f.url + '.' + ext);
-  }
-  // Untuk PDF lama yang mungkin di-upload sebagai image resource type
-  if (ext === 'pdf' && f.url.includes('/raw/upload/')) {
-    urlsToTry.push(f.url.replace('/raw/upload/', '/image/upload/'));
-    urlsToTry.push(f.url.replace('/raw/upload/', '/image/upload/') + '.pdf');
+  // Untuk PDF: konversi raw/upload → image/upload (raw = 401 di Cloudinary)
+  function resolveUrl(url) {
+    if (ext === 'pdf' && url && url.includes('/raw/upload/')) {
+      return url.replace('/raw/upload/', '/image/upload/');
+    }
+    return url;
   }
 
-  let fetchUrl = f.url;
+  // Bangun daftar URL yang akan dicoba
+  const baseUrl = resolveUrl(f.url);
+  const urlsToTry = [baseUrl];
+  const urlHasExt = baseUrl.split('/').pop().split('?')[0].includes('.');
+  if (!urlHasExt && ext) urlsToTry.push(baseUrl + '.' + ext);
+
+  let fetchUrl = baseUrl;
   try {
-    // Cari URL yang valid
     for (const u of urlsToTry) {
       const res = await fetch(u, { method: 'HEAD' });
       if (res.ok) { fetchUrl = u; break; }
     }
 
-    // Fetch sebagai blob
     const blobRes = await fetch(fetchUrl);
     if (!blobRes.ok) throw new Error('Fetch gagal');
     const blob = await blobRes.blob();
@@ -1234,7 +1243,6 @@ async function downloadBukti(idx) {
     document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
   } catch (e) {
-    // Fallback: buka tab baru
     window.open(fetchUrl, '_blank');
   }
 }

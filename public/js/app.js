@@ -1118,22 +1118,24 @@ function _renderBuktiModal() {
   const isImage = ['jpg','jpeg','png','gif','webp'].includes(ext);
   const isPDF = ext === 'pdf';
   const isOffice = ['doc','docx','xls','xlsx','ppt','pptx'].includes(ext);
-  const isRaw = f.url && f.url.includes('/raw/upload/');  // raw = perlu auth
   const total = links.length;
 
-  // URL proxy backend (untuk raw files yang butuh auth)
+  // File lama (raw/upload) mungkin 401 karena belum punya access_mode=public
+  // File baru (raw/upload + access_mode=public) bisa diakses langsung
+  // Cek: kalau URL mengandung /raw/upload/ coba proxy dulu sebagai fallback
+  const isRaw = f.url && f.url.includes('/raw/upload/'); // untuk referensi download fallback
+
+  // Proxy backend untuk download (handle auth file lama)
   const proxyBase = `https://vispm.netlify.app/.netlify/functions/sign-url`;
-  const previewProxyUrl = `${proxyBase}?url=${encodeURIComponent(f.url)}&name=${encodeURIComponent(fileName)}&mode=preview`;
+  const proxyDownload = `${proxyBase}?url=${encodeURIComponent(f.url)}&name=${encodeURIComponent(fileName)}&mode=download`;
 
-  // PDF: iframe langsung (publik) atau via proxy (raw)
-  const pdfIframeUrl = isRaw ? previewProxyUrl : f.url;
-
-  // Office preview via Google Docs Viewer:
-  // - File publik (image/upload): GDV akses URL Cloudinary langsung
-  // - File raw: GDV tidak bisa akses Netlify function → tampilkan download card saja
-  const officePublicUrl = !isRaw ? f.url : null;
-  const gdvUrl = officePublicUrl
-    ? `https://docs.google.com/viewer?embedded=true&url=${encodeURIComponent(officePublicUrl)}`
+  // Preview URL:
+  // - Gambar: f.url langsung
+  // - PDF: f.url langsung (raw+public bisa di-iframe; jika gagal, browser tampilkan error)
+  // - Office: Google Docs Viewer dengan f.url langsung (raw+public bisa diakses GDV)
+  //   File lama (raw tanpa access_mode=public) → GDV mungkin gagal, tampilkan download saja
+  const gdvUrl = isOffice
+    ? `https://docs.google.com/viewer?embedded=true&url=${encodeURIComponent(f.url)}`
     : null;
 
   let modal = document.getElementById('previewBuktiModal');
@@ -1171,7 +1173,7 @@ function _renderBuktiModal() {
         ${isImage
           ? `<img src="${f.url}" style="max-width:100%;max-height:100%;object-fit:contain;padding:16px">`
           : isPDF
-          ? `<iframe src="${pdfIframeUrl}" style="width:100%;height:100%;border:none"></iframe>`
+          ? `<iframe src="${f.url}" style="width:100%;height:100%;border:none"></iframe>`
           : (isOffice && gdvUrl)
           ? `<iframe src="${gdvUrl}" style="width:100%;height:100%;border:none"></iframe>`
           : `<div style="text-align:center;color:white;padding:40px">
@@ -1209,46 +1211,39 @@ async function downloadBukti(idx) {
   if (!f) return;
 
   let fileName = (f.name && f.name !== 'File' && f.name.trim()) ? f.name.trim() : 'file';
-  const dotIdx = fileName.lastIndexOf('.');
-  const ext = dotIdx > -1 ? fileName.substring(dotIdx + 1).toLowerCase() : '';
-  if (ext && !fileName.toLowerCase().endsWith('.' + ext)) fileName += '.' + ext;
+  const dotIdx2 = fileName.lastIndexOf('.');
+  const ext2 = dotIdx2 > -1 ? fileName.substring(dotIdx2 + 1).toLowerCase() : '';
+  if (ext2 && !fileName.toLowerCase().endsWith('.' + ext2)) fileName += '.' + ext2;
 
-  const isRaw = f.url && f.url.includes('/raw/upload/');
-
-  if (isRaw) {
-    // File raw (PDF lama, docx, xlsx) — proxy via backend dengan Cloudinary Basic Auth
-    const proxyUrl = `/.netlify/functions/sign-url?url=${encodeURIComponent(f.url)}&name=${encodeURIComponent(fileName)}&mode=download`;
-    try {
-      toast('Mengunduh file...', 'info');
-      const res = await fetch(proxyUrl);
-      if (!res.ok) throw new Error('Proxy error ' + res.status);
-      const blob = await res.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = blobUrl; a.download = fileName;
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
-    } catch (e) {
-      toast('Download gagal, membuka di tab baru...', 'error');
-      window.open(f.url, '_blank');
-    }
-    return;
-  }
-
-  // File publik (image/upload) — fetch langsung
-  try {
-    const urlHasExt = f.url.split('/').pop().split('?')[0].includes('.');
-    const fetchUrl = (!urlHasExt && ext) ? f.url + '.' + ext : f.url;
-    const res = await fetch(fetchUrl);
-    if (!res.ok) throw new Error('Fetch gagal');
+  async function tryDownload(url) {
+    const res = await fetch(url);
+    if (!res.ok) throw Object.assign(new Error('HTTP ' + res.status), { status: res.status });
     const blob = await res.blob();
     const blobUrl = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = blobUrl; a.download = fileName;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+  }
+
+  // Coba URL langsung dulu (works untuk file baru raw+public dan semua image/upload)
+  // Kalau 401/403, fallback ke proxy backend yang pakai Cloudinary Basic Auth
+  try {
+    const urlHasExt = f.url.split('/').pop().split('?')[0].includes('.');
+    const directUrl = (!urlHasExt && ext2) ? f.url + '.' + ext2 : f.url;
+    await tryDownload(directUrl);
   } catch (e) {
-    window.open(f.url, '_blank');
+    if (e.status === 401 || e.status === 403 || e.status === 404) {
+      try {
+        const proxyUrl = `https://vispm.netlify.app/.netlify/functions/sign-url?url=${encodeURIComponent(f.url)}&name=${encodeURIComponent(fileName)}&mode=download`;
+        await tryDownload(proxyUrl);
+      } catch (e2) {
+        toast('Gagal download: ' + e2.message, 'error');
+        window.open(f.url, '_blank');
+      }
+    } else {
+      window.open(f.url, '_blank');
+    }
   }
 }
 

@@ -421,8 +421,18 @@ async function approveProgram(pool, body) {
 
   const vpCheck = await pool.query('SELECT id, status FROM verifikasi_program WHERE id_usulan=$1 AND LOWER(email_program)=LOWER($2)', [idUsulan, email]);
   if (vpCheck.rows.length===0) return err('Anda tidak terdaftar sebagai pengelola program untuk usulan ini');
-  if (vpCheck.rows[0].status==='Selesai') return err('Anda sudah memverifikasi usulan ini');
-  if (vpCheck.rows[0].status==='Ditolak') return err('Anda sudah menolak usulan ini');
+  // Izinkan re-verifikasi: jika sudah Selesai/Ditolak tapi status_global masih Menunggu Pengelola Program
+  // (artinya ada pengelola lain yang belum verifikasi, atau usulan di-reset)
+  const currentVpStatus = vpCheck.rows[0].status;
+  // Block hanya jika sudah Selesai DAN status global sudah melewati tahap program
+  const headerCheck = await pool.query('SELECT status_global FROM usulan_header WHERE id_usulan=$1', [idUsulan]);
+  const statusGlobal = headerCheck.rows[0]?.status_global;
+  if (currentVpStatus === 'Selesai' && statusGlobal !== 'Menunggu Pengelola Program') {
+    return err('Anda sudah memverifikasi usulan ini');
+  }
+  if (currentVpStatus === 'Ditolak' && statusGlobal !== 'Menunggu Pengelola Program') {
+    return err('Anda sudah menolak usulan ini');
+  }
 
   await pool.query(
     `UPDATE verifikasi_program SET status='Selesai', catatan=$1, verified_at=NOW() WHERE id_usulan=$2 AND LOWER(email_program)=LOWER($3)`,
@@ -480,8 +490,11 @@ async function rejectUsulan(pool, body) {
     // Cek duplikasi
     const vpCheck = await pool.query('SELECT status FROM verifikasi_program WHERE id_usulan=$1 AND LOWER(email_program)=LOWER($2)', [idUsulan, email]);
     if (vpCheck.rows.length === 0) return err('Anda tidak terdaftar sebagai pengelola program untuk usulan ini');
-    if (vpCheck.rows[0].status === 'Selesai') return err('Anda sudah menyetujui usulan ini');
-    if (vpCheck.rows[0].status === 'Ditolak') return err('Anda sudah menolak usulan ini');
+    // Izinkan re-verifikasi selama status global masih Menunggu Pengelola Program
+    const hdrChk = await pool.query('SELECT status_global FROM usulan_header WHERE id_usulan=$1', [idUsulan]);
+    const sgChk = hdrChk.rows[0]?.status_global;
+    if (vpCheck.rows[0].status === 'Selesai' && sgChk !== 'Menunggu Pengelola Program') return err('Anda sudah menyetujui usulan ini');
+    if (vpCheck.rows[0].status === 'Ditolak' && sgChk !== 'Menunggu Pengelola Program') return err('Anda sudah menolak usulan ini');
 
     // Simpan penolakan
     await pool.query(

@@ -183,6 +183,7 @@ function buildSidebar() {
       ]},
       { label: 'Kelola Master', items: [
         { id: 'master-data', icon: 'tune', label: 'Master Data' },
+        { id: 'target-tahunan', icon: 'track_changes', label: 'Target Tahunan' },
         { id: 'periode', icon: 'event_available', label: 'Periode Input' }
       ]},
       { label: 'Manajemen', items: [

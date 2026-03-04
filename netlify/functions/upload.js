@@ -1,10 +1,31 @@
-const cloudinary = require('cloudinary').v2;
+const https = require('https');
+const crypto = require('crypto');
 
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
+function cloudinaryRequest(path, data) {
+  return new Promise((resolve, reject) => {
+    const body = Buffer.from(data);
+    const options = {
+      hostname: 'api.cloudinary.com',
+      path,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Length': body.length,
+      },
+    };
+    const req = https.request(options, (res) => {
+      let raw = '';
+      res.on('data', c => raw += c);
+      res.on('end', () => {
+        try { resolve({ status: res.statusCode, body: JSON.parse(raw) }); }
+        catch(e) { resolve({ status: res.statusCode, body: raw }); }
+      });
+    });
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
+}
 
 exports.handler = async (event) => {
   const headers = {
@@ -22,65 +43,53 @@ exports.handler = async (event) => {
       return { statusCode: 400, headers, body: JSON.stringify({ success: false, error: 'fileName dan fileBase64 diperlukan' }) };
     }
 
-    // Pisahkan ekstensi dari nama file
+    const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+    const apiKey = process.env.CLOUDINARY_API_KEY;
+    const apiSecret = process.env.CLOUDINARY_API_SECRET;
+
     const dotIdx = fileName.lastIndexOf('.');
     const baseName = dotIdx > -1 ? fileName.substring(0, dotIdx) : fileName;
     const ext = dotIdx > -1 ? fileName.substring(dotIdx + 1).toLowerCase() : '';
 
-    // Buat public_id yang include ekstensi sebagai bagian nama (bukan sebagai ekstensi Cloudinary)
-    // Format: VISPM/PKM11/2026/05/4/PKM11_2026_5_ind4_timestamp_namafile
-    const timestamp = Date.now();
-    const safeBase = baseName.replace(/[^a-zA-Z0-9_\-\.]/g, '_').substring(0, 40);
-    const folder = `VISPM/${kodePKM || 'PKM'}/${tahun || ''}/${bulan || ''}/${noIndikator || ''}`;
-    // public_id menyimpan nama file dengan ekstensi agar bisa diketahui tipe filenya
-    const publicId = `${kodePKM || 'PKM'}_${tahun || ''}_${bulan || ''}_ind${noIndikator || ''}_${timestamp}_${safeBase}.${ext}`;
+    const imageExts = ['jpg','jpeg','png','gif','webp','bmp','svg'];
+    const resourceType = imageExts.includes(ext) ? 'image' : 'raw';
 
-    // Deteksi resource_type
-    const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'];
-    const videoExts = ['mp4', 'mov', 'avi', 'mkv'];
-    let resourceType = 'raw'; // default untuk doc, docx, xlsx, pdf, dll
-    if (imageExts.includes(ext)) resourceType = 'image';
-    else if (videoExts.includes(ext)) resourceType = 'video';
+    const timestamp = Math.floor(Date.now() / 1000);
+    const folder = 'VISPM/' + (kodePKM||'PKM') + '/' + (tahun||'') + '/' + (bulan||'') + '/' + (noIndikator||'');
+    const safeBase = (baseName + '_' + timestamp).replace(/[^a-zA-Z0-9_\-]/g, '_').substring(0, 60);
+    const publicId = folder + '/' + safeBase;
 
-    const dataUri = `data:application/octet-stream;base64,${fileBase64}`;
+    const signStr = 'public_id=' + publicId + '&timestamp=' + timestamp + apiSecret;
+    const signature = crypto.createHash('sha1').update(signStr).digest('hex');
 
-    const result = await cloudinary.uploader.upload(dataUri, {
-      folder,
+    const dataUri = 'data:application/octet-stream;base64,' + fileBase64;
+    const params = new URLSearchParams({
+      file: dataUri,
       public_id: publicId,
-      resource_type: resourceType,
-      use_filename: false,
-      unique_filename: false,
-      overwrite: false,
+      timestamp: timestamp.toString(),
+      api_key: apiKey,
+      signature,
     });
 
-    // Untuk raw files, Cloudinary URL tidak include ekstensi — kita tambahkan sendiri
-    let fileUrl = result.secure_url;
-    if (resourceType === 'raw' && ext && !fileUrl.endsWith('.' + ext)) {
-      // Cloudinary raw URL format: .../raw/upload/v.../folder/publicId
-      // publicId sudah include .ext jadi URL seharusnya sudah benar
-      // Tapi kalau belum, tambahkan
-      if (!fileUrl.includes('.' + ext)) {
-        fileUrl = fileUrl + '.' + ext;
-      }
+    const result = await cloudinaryRequest('/v1_1/' + cloudName + '/' + resourceType + '/upload', params.toString());
+
+    if (result.status !== 200) {
+      console.error('Cloudinary error:', result.body);
+      throw new Error((result.body && result.body.error && result.body.error.message) || ('Cloudinary error ' + result.status));
+    }
+
+    let fileUrl = result.body.secure_url;
+    if (resourceType === 'raw' && ext && !fileUrl.split('/').pop().includes('.')) {
+      fileUrl = fileUrl + '.' + ext;
     }
 
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({
-        success: true,
-        fileUrl,
-        publicId: result.public_id,
-        originalName: fileName,
-        resourceType,
-      }),
+      body: JSON.stringify({ success: true, fileUrl, publicId: result.body.public_id, originalName: fileName }),
     };
   } catch (e) {
     console.error('Upload error:', e);
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({ success: false, error: e.message }),
-    };
+    return { statusCode: 500, headers, body: JSON.stringify({ success: false, error: e.message }) };
   }
 };

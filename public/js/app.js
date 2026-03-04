@@ -1120,19 +1120,19 @@ function _renderBuktiModal() {
   const isOffice = ['doc','docx','xls','xlsx','ppt','pptx'].includes(ext);
   const total = links.length;
 
-  // File lama (raw/upload) mungkin 401 karena belum punya access_mode=public
-  // File baru (raw/upload + access_mode=public) bisa diakses langsung
-  // Cek: kalau URL mengandung /raw/upload/ coba proxy dulu sebagai fallback
-  const isRaw = f.url && f.url.includes('/raw/upload/'); // untuk referensi download fallback
+  // URL dengan ekstensi untuk viewer (Office Online wajib ada ekstensi di URL)
+  const urlWithExt = (f.url && ext && !f.url.split('/').pop().split('?')[0].includes('.'))
+    ? f.url + '.' + ext
+    : f.url;
 
-  // Proxy backend untuk download (handle auth file lama)
-  const proxyBase = `https://vispm.netlify.app/.netlify/functions/sign-url`;
-  const proxyDownload = `${proxyBase}?url=${encodeURIComponent(f.url)}&name=${encodeURIComponent(fileName)}&mode=download`;
+  // Office Online Viewer — wajib URL publik dengan ekstensi
+  const officeViewerUrl = isOffice
+    ? `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(urlWithExt)}`
+    : null;
 
-  // Office preview via Office Online Viewer (lebih reliable dari Google Docs Viewer)
-  // Office Online bisa akses URL publik Cloudinary langsung
-  const gdvUrl = isOffice
-    ? `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(f.url)}`
+  // PDF: Google Docs Viewer sebagai fallback yang tidak butuh sign-url
+  const pdfViewerUrl = isPDF
+    ? `https://docs.google.com/viewer?embedded=true&url=${encodeURIComponent(urlWithExt)}`
     : null;
 
   let modal = document.getElementById('previewBuktiModal');
@@ -1170,9 +1170,9 @@ function _renderBuktiModal() {
         ${isImage
           ? `<img src="${f.url}" style="max-width:100%;max-height:100%;object-fit:contain;padding:16px">`
           : isPDF
-          ? `<iframe src="https://vispm.netlify.app/.netlify/functions/sign-url?url=${encodeURIComponent(f.url.replace(/\.pdf\.pdf$/, '.pdf'))}&name=${encodeURIComponent(fileName)}&mode=preview" style="width:100%;height:100%;border:none"></iframe>`
-          : (isOffice && gdvUrl)
-          ? `<iframe src="${gdvUrl}" style="width:100%;height:100%;border:none"></iframe>`
+          ? `<iframe src="${pdfViewerUrl}" style="width:100%;height:100%;border:none"></iframe>`
+          : (isOffice && officeViewerUrl)
+          ? `<iframe src="${officeViewerUrl}" style="width:100%;height:100%;border:none"></iframe>`
           : `<div style="text-align:center;color:white;padding:40px">
               <div style="font-size:64px;margin-bottom:16px">${fileIcon}</div>
               <div style="font-size:11px;color:#64748b;margin-bottom:28px;text-transform:uppercase;letter-spacing:1px">${ext ? ext.toUpperCase() + ' &bull; ' : ''}Tidak dapat dipreview di browser</div>
@@ -1212,11 +1212,13 @@ async function downloadBukti(idx) {
   const ext2 = dotIdx2 > -1 ? fileName.substring(dotIdx2 + 1).toLowerCase() : '';
   if (ext2 && !fileName.toLowerCase().endsWith('.' + ext2)) fileName += '.' + ext2;
 
-  // Fix double extension di URL (file lama yang punya .pdf.pdf)
-  const cleanUrl = f.url.replace(/\.pdf\.pdf($|\?)/, '.pdf$1');
+  // URL langsung — raw+public bisa diakses, append ekstensi kalau belum ada
+  let fetchUrl = f.url.replace(/\.pdf\.pdf($|\?)/, '.pdf$1');
+  const urlHasExt = fetchUrl.split('/').pop().split('?')[0].includes('.');
+  if (!urlHasExt && ext2) fetchUrl = fetchUrl + '.' + ext2;
 
-  async function tryDownload(url) {
-    const res = await fetch(url);
+  try {
+    const res = await fetch(fetchUrl);
     if (!res.ok) throw Object.assign(new Error('HTTP ' + res.status), { status: res.status });
     const blob = await res.blob();
     const blobUrl = URL.createObjectURL(blob);
@@ -1224,25 +1226,9 @@ async function downloadBukti(idx) {
     a.href = blobUrl; a.download = fileName;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
-  }
-
-  // Coba langsung dulu; kalau 401/403 fallback ke proxy backend
-  try {
-    const urlHasExt = cleanUrl.split('/').pop().split('?')[0].includes('.');
-    const directUrl = (!urlHasExt && ext2) ? cleanUrl + '.' + ext2 : cleanUrl;
-    await tryDownload(directUrl);
   } catch (e) {
-    if (e.status === 401 || e.status === 403 || e.status === 404) {
-      try {
-        const proxyUrl = `https://vispm.netlify.app/.netlify/functions/sign-url?url=${encodeURIComponent(cleanUrl)}&name=${encodeURIComponent(fileName)}&mode=download`;
-        await tryDownload(proxyUrl);
-      } catch (e2) {
-        toast('Gagal download', 'error');
-        window.open(cleanUrl, '_blank');
-      }
-    } else {
-      window.open(cleanUrl, '_blank');
-    }
+    // Fallback: buka di tab baru
+    window.open(fetchUrl, '_blank');
   }
 }
 

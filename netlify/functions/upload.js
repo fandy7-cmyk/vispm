@@ -57,7 +57,8 @@ exports.handler = async (event) => {
     const timestamp = Math.floor(Date.now() / 1000);
     const folder = 'VISPM/' + (kodePKM||'PKM') + '/' + (tahun||'') + '/' + (bulan||'') + '/' + (noIndikator||'');
     const safeBase = (baseName + '_' + timestamp).replace(/[^a-zA-Z0-9_\-]/g, '_').substring(0, 60);
-    const publicId = folder + '/' + safeBase;
+    // Sertakan ekstensi di public_id agar URL Cloudinary mengandung ekstensi file
+    const publicId = folder + '/' + safeBase + (ext ? '.' + ext : '');
 
     const signStr = 'public_id=' + publicId + '&timestamp=' + timestamp + apiSecret;
     const signature = crypto.createHash('sha1').update(signStr).digest('hex');

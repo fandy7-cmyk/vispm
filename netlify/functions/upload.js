@@ -77,13 +77,15 @@ exports.handler = async (event) => {
       throw new Error((result.body?.error?.message) || `Cloudinary error ${result.status}`);
     }
 
-    // Untuk raw: URL tidak punya ekstensi, append manual
-    let fileUrl = result.body.secure_url;
+    // Cloudinary DAM: secure_url tidak include asset_folder di path
+    // Konstruksi URL manual agar folder path masuk
+    const version = result.body.version ? `v${result.body.version}` : '';
+    const fullPublicId = assetFolder + '/' + result.body.public_id;
+    const storedPublicId = fullPublicId;
+    let fileUrl = `https://res.cloudinary.com/${cloudName}/${resourceType}/upload/${version}/${fullPublicId}`;
     if (resourceType === 'raw' && ext && !fileUrl.split('/').pop().split('?')[0].includes('.')) {
       fileUrl = fileUrl + '.' + ext;
     }
-    // Simpan juga folder path untuk referensi
-    const storedPublicId = assetFolder + '/' + result.body.public_id;
 
     return {
       statusCode: 200,

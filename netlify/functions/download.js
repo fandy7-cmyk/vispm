@@ -1,22 +1,3 @@
-const https = require('https');
-const http = require('http');
-
-function fetchBuffer(url) {
-  return new Promise((resolve, reject) => {
-    const client = url.startsWith('https') ? https : http;
-    client.get(url, (res) => {
-      // Follow redirects
-      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        return fetchBuffer(res.headers.location).then(resolve).catch(reject);
-      }
-      const chunks = [];
-      res.on('data', chunk => chunks.push(chunk));
-      res.on('end', () => resolve({ buffer: Buffer.concat(chunks), headers: res.headers, statusCode: res.statusCode }));
-      res.on('error', reject);
-    }).on('error', reject);
-  });
-}
-
 exports.handler = async (event) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -28,30 +9,28 @@ exports.handler = async (event) => {
 
   const { url, name } = event.queryStringParameters || {};
   if (!url) return { statusCode: 400, headers, body: JSON.stringify({ error: 'URL diperlukan' }) };
+  if (!url.includes('cloudinary.com')) return { statusCode: 403, headers, body: JSON.stringify({ error: 'URL tidak diizinkan' }) };
 
-  if (!url.includes('cloudinary.com')) {
-    return { statusCode: 403, headers, body: JSON.stringify({ error: 'URL tidak diizinkan' }) };
-  }
+  // Cloudinary mendukung fl_attachment untuk force download dengan nama file kustom.
+  // Untuk raw files: insert fl_attachment:nama_file setelah /upload/
+  // Contoh: .../raw/upload/v123/... -> .../raw/upload/fl_attachment:nama/v123/...
+  const fileName = (name || 'file').replace(/[^a-zA-Z0-9._\-\s]/g, '_');
+  const safeNameForUrl = fileName.replace(/\s/g, '_');
 
-  try {
-    const { buffer, statusCode } = await fetchBuffer(url);
-    if (statusCode !== 200) throw new Error('File tidak ditemukan');
+  // Insert fl_attachment transformation ke URL Cloudinary
+  const downloadUrl = url.replace(
+    /\/(image|raw|video)\/upload\//,
+    '/$1/upload/fl_attachment:' + safeNameForUrl + '/'
+  );
 
-    const fileName = name || 'file';
-
-    return {
-      statusCode: 200,
-      headers: {
-        ...headers,
-        'Content-Type': 'application/octet-stream',
-        'Content-Disposition': "attachment; filename*=UTF-8''" + encodeURIComponent(fileName),
-        'Content-Length': buffer.length.toString(),
-      },
-      body: buffer.toString('base64'),
-      isBase64Encoded: true,
-    };
-  } catch (e) {
-    console.error('Download error:', e);
-    return { statusCode: 500, headers, body: JSON.stringify({ error: e.message }) };
-  }
+  // Redirect ke Cloudinary langsung — tidak perlu proxy buffer
+  return {
+    statusCode: 302,
+    headers: {
+      ...headers,
+      'Location': downloadUrl,
+      'Cache-Control': 'no-cache',
+    },
+    body: '',
+  };
 };

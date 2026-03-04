@@ -1128,7 +1128,7 @@ function _renderBuktiModal() {
   if (!modal) {
     modal = document.createElement('div');
     modal.id = 'previewBuktiModal';
-    modal.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:3000;justify-content:center;align-items:center;padding:20px';
+    modal.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:3000;';
     document.body.appendChild(modal);
     modal.addEventListener('click', e => { if (e.target === modal) modal.style.display = 'none'; });
   }
@@ -1142,8 +1142,8 @@ function _renderBuktiModal() {
   // Loading state dulu, lalu fetch blob dan render
   const previewId = 'buktiPreview_' + idx + '_' + Date.now();
   modal.innerHTML = `
-    <div style="background:#1e293b;border-radius:14px;width:92%;max-width:920px;height:88vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,0.5)">
-      <div style="padding:12px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;border-bottom:1px solid rgba(255,255,255,0.08)">
+    <div style="background:#0f172a;width:100%;height:100%;display:flex;flex-direction:column;overflow:hidden;">
+      <div style="padding:10px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;border-bottom:1px solid rgba(255,255,255,0.08);background:#1e293b">
         <div style="display:flex;align-items:center;gap:10px">
           <span style="color:#94a3b8;font-size:12px;font-weight:500">Data Dukung</span>
           ${total > 1 ? `<span style="background:#334155;color:#94a3b8;font-size:11px;padding:2px 8px;border-radius:20px;font-weight:600">${idx+1} / ${total}</span>` : ''}
@@ -1154,18 +1154,20 @@ function _renderBuktiModal() {
           <button onclick="document.getElementById('previewBuktiModal').style.display='none'" style="background:rgba(255,255,255,0.08);border:none;cursor:pointer;color:white;border-radius:7px;width:32px;height:32px;font-size:20px;display:flex;align-items:center;justify-content:center">&#215;</button>
         </div>
       </div>
-      <div id="${previewId}" style="flex:1;overflow:hidden;display:flex;align-items:center;justify-content:center;background:#0f172a;position:relative">
-        ${isImage
-          ? `<img src="${urlWithExt}" style="max-width:100%;max-height:100%;object-fit:contain;padding:16px">`
-          : `<div style="color:#94a3b8;font-size:13px;display:flex;align-items:center;gap:8px">
-              <span class="material-icons" style="animation:spin 1s linear infinite">refresh</span> Memuat...
-            </div>`
-        }
+      <div style="flex:1;overflow:hidden;position:relative;">
+        <div id="${previewId}" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;">
+          ${isImage
+            ? `<img src="${urlWithExt}" style="max-width:100%;max-height:100%;object-fit:contain;padding:16px">`
+            : `<div style="color:#94a3b8;font-size:13px;display:flex;align-items:center;gap:8px">
+                <span class="material-icons" style="animation:spin 1s linear infinite">refresh</span> Memuat...
+              </div>`
+          }
+        </div>
         ${total > 1 ? navBtn('left','_buktiNav(-1)') : ''}
         ${total > 1 ? navBtn('right','_buktiNav(1)') : ''}
       </div>
       ${total > 1 ? `
-      <div style="display:flex;justify-content:center;gap:5px;padding:10px;flex-shrink:0;border-top:1px solid rgba(255,255,255,0.06)">
+      <div style="display:flex;justify-content:center;gap:5px;padding:8px;flex-shrink:0;border-top:1px solid rgba(255,255,255,0.06);background:#1e293b">
         ${links.map((_,i)=>`<button onclick="_buktiGoto(${i})" style="width:${i===idx?'20px':'7px'};height:7px;border-radius:10px;border:none;cursor:pointer;background:${i===idx?'#0d9488':'rgba(255,255,255,0.2)'};transition:all 0.2s;padding:0"></button>`).join('')}
       </div>` : ''}
     </div>`;
@@ -1185,8 +1187,6 @@ function _renderBuktiModal() {
         if (isPDF) {
           el.innerHTML = `<iframe src="${blobUrl}" style="width:100%;height:100%;border:none"></iframe>`;
         } else if (isOffice) {
-          // Office Online Viewer dengan blob URL tidak works — pakai GDV dengan blob URL juga tidak
-          // Solusi: buka di Office Online dengan URL Cloudinary langsung (fallback)
           el.innerHTML = `<iframe src="https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(urlWithExt)}" style="width:100%;height:100%;border:none"></iframe>`;
         } else {
           el.innerHTML = `<div style="text-align:center;color:white;padding:40px">
@@ -1196,8 +1196,9 @@ function _renderBuktiModal() {
           </div>`;
         }
       } catch(e) {
-        if (!el) return;
-        el.innerHTML = `<div style="text-align:center;color:white;padding:40px">
+        const el2 = document.getElementById(previewId);
+        if (!el2) return;
+        el2.innerHTML = `<div style="text-align:center;color:white;padding:40px">
           <div style="font-size:64px;margin-bottom:16px">${fileIcon}</div>
           <div style="font-size:11px;color:#64748b;margin-bottom:28px">${ext.toUpperCase()} &bull; Tidak dapat dipreview</div>
           <button onclick="downloadBukti(${idx})" style="background:#0d9488;color:white;padding:12px 32px;border-radius:8px;border:none;font-weight:600;font-size:14px;cursor:pointer;display:inline-flex;align-items:center;gap:8px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download</button>

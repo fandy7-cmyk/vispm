@@ -182,11 +182,7 @@ function buildSidebar() {
         { id: 'laporan', icon: 'bar_chart', label: 'Laporan' }
       ]},
       { label: 'Kelola Master', items: [
-        { id: 'users', icon: 'group', label: 'Kelola User' },
-        { id: 'jabatan', icon: 'badge', label: 'Kelola Jabatan' },
-        { id: 'pkm', icon: 'local_hospital', label: 'Kelola Puskesmas' },
-        { id: 'target-tahunan', icon: 'track_changes', label: 'Target Tahunan' },
-        { id: 'indikator', icon: 'monitor_heart', label: 'Kelola Indikator' },
+        { id: 'master-data', icon: 'tune', label: 'Master Data' },
         { id: 'periode', icon: 'event_available', label: 'Periode Input' }
       ]},
       { label: 'Manajemen', items: [
@@ -244,7 +240,8 @@ function setActiveNav(page) {
 // ============== ROUTING ==============
 const PAGE_TITLES = {
   dashboard: 'Dashboard', verifikasi: 'Verifikasi', laporan: 'Laporan',
-  users: 'Kelola User', jabatan: 'Kelola Jabatan', pkm: 'Kelola Puskesmas',
+  users: 'Master Data', jabatan: 'Master Data', pkm: 'Master Data',
+  'master-data': 'Master Data',
   indikator: 'Kelola Indikator', periode: 'Periode Input', input: 'Input Usulan',
   'kelola-usulan': 'Kelola Usulan', 'target-tahunan': 'Target Tahunan'
 };
@@ -262,11 +259,12 @@ function loadPage(page) {
     verifikasi: renderVerifikasi,
     laporan: renderLaporan,
     'kelola-usulan': renderKelolaUsulan,
-    jabatan: renderJabatan,
-    users: renderUsers,
-    pkm: renderPKM,
+    jabatan: () => renderMasterData('jabatan'),
+    users: () => renderMasterData('users'),
+    pkm: () => renderMasterData('pkm'),
+    'master-data': () => renderMasterData('users'),
     'target-tahunan': renderTargetTahunan,
-    indikator: renderIndikator,
+    indikator: () => renderMasterData('indikator'),
     periode: renderPeriode,
     input: renderInput
   };
@@ -1389,9 +1387,9 @@ async function viewDetail(idUsulan) {
         <div style="font-weight:700;font-size:13px;margin-bottom:8px;display:flex;align-items:center;gap:6px">
           <span class="material-icons" style="font-size:16px;color:var(--primary)">groups</span>
           Progress Verifikasi Pengelola Program
-          (<span style="color:#0d9488">✅ ${vp.filter(v=>v.status==='Selesai').length} selesai</span>
-          ${vp.filter(v=>v.status==='Ditolak').length ? `· <span style="color:#ef4444">❌ ${vp.filter(v=>v.status==='Ditolak').length} menolak</span>` : ''}
-          · <span style="color:#94a3b8">⏳ ${vp.filter(v=>v.status==='Menunggu').length} menunggu</span> dari ${vp.length})
+          (${vp.filter(v=>v.status==='Selesai').length} selesai
+          ${vp.filter(v=>v.status==='Ditolak').length ? `· <span style="color:#ef4444">${vp.filter(v=>v.status==='Ditolak').length} menolak</span>` : ''}
+          · ${vp.filter(v=>v.status==='Menunggu').length} menunggu dari ${vp.length})
         </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px">
           ${vp.map(v => {
@@ -1646,12 +1644,8 @@ async function openVerifikasi(idUsulan) {
     if (currentUser.role === 'Kepala Puskesmas') {
       sudahVerifUser = detail.statusKapus === 'Selesai' || detail.statusKapus === 'Ditolak';
     } else if (currentUser.role === 'Pengelola Program') {
-      // Cek record verifikasi untuk usulan INI saja (bukan usulan lain)
       const myRecord = (detail.verifikasiProgram || []).find(v => v.email_program?.toLowerCase() === currentUser.email?.toLowerCase());
-      // Hanya block jika status usulan ini memang sudah melewati tahap program
-      // Jika status global masih "Menunggu Pengelola Program", berarti masih bisa verifikasi
-      sudahVerifUser = myRecord && (myRecord.status === 'Selesai' || myRecord.status === 'Ditolak')
-        && detail.statusGlobal !== 'Menunggu Pengelola Program';
+      sudahVerifUser = myRecord && (myRecord.status === 'Selesai' || myRecord.status === 'Ditolak');
     } else if (currentUser.role === 'Admin') {
       sudahVerifUser = detail.statusGlobal === 'Selesai';
     }
@@ -1878,7 +1872,242 @@ function exportLaporan() {
 // ============== ADMIN - USERS ==============
 let allUsers = [], allPKMList = [], allIndList = [];
 
-async function renderUsers() {
+// ─── MASTER DATA (Tab: User | Jabatan | Puskesmas | Indikator) ───────────────
+let _masterTab = 'users';
+async function renderMasterData(tab = 'users') {
+  _masterTab = tab;
+  document.getElementById('mainContent').innerHTML = `
+    <div class="page-header">
+      <h1><span class="material-icons">tune</span>Master Data</h1>
+      <div id="masterDataActionBtn"></div>
+    </div>
+    <!-- TAB BAR -->
+    <div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:20px;overflow-x:auto">
+      ${[
+        { id:'users',     icon:'group',         label:'Kelola User'      },
+        { id:'jabatan',   icon:'badge',          label:'Kelola Jabatan'   },
+        { id:'pkm',       icon:'local_hospital', label:'Kelola Puskesmas' },
+        { id:'indikator', icon:'monitor_heart',  label:'Kelola Indikator' },
+      ].map(t => `
+        <button onclick="switchMasterTab('${t.id}')" id="masterTab-${t.id}"
+          style="display:inline-flex;align-items:center;gap:6px;padding:10px 20px;border:none;background:none;cursor:pointer;font-size:13.5px;font-weight:600;white-space:nowrap;border-bottom:3px solid ${tab===t.id?'var(--primary)':'transparent'};color:${tab===t.id?'var(--primary)':'var(--text-light)'};margin-bottom:-2px;transition:all .15s">
+          <span class="material-icons" style="font-size:17px">${t.icon}</span>${t.label}
+        </button>`).join('')}
+    </div>
+    <!-- TAB CONTENT -->
+    <div id="masterTabContent"></div>
+    <!-- MODALS CONTAINER -->
+    <div id="masterModals"></div>`;
+
+  await _loadMasterTab(tab);
+}
+
+async function switchMasterTab(tab) {
+  _masterTab = tab;
+  // Update tab style
+  ['users','jabatan','pkm','indikator'].forEach(t => {
+    const btn = document.getElementById(`masterTab-${t}`);
+    if (!btn) return;
+    btn.style.borderBottomColor = t === tab ? 'var(--primary)' : 'transparent';
+    btn.style.color = t === tab ? 'var(--primary)' : 'var(--text-light)';
+  });
+  await _loadMasterTab(tab);
+}
+
+async function _loadMasterTab(tab) {
+  const content = document.getElementById('masterTabContent');
+  const modals  = document.getElementById('masterModals');
+  const actionBtn = document.getElementById('masterDataActionBtn');
+  if (!content) return;
+  content.innerHTML = `<div class="empty-state" style="padding:32px"><p>Memuat...</p></div>`;
+
+  if (tab === 'users') {
+    actionBtn.innerHTML = `<button class="btn btn-primary" onclick="openUserModal()"><span class="material-icons">person_add</span>Tambah User</button>`;
+    content.innerHTML = `
+      <div class="card">
+        <div class="card-body" style="padding:12px 16px">
+          <div class="search-row">
+            <div class="search-input-wrap"><span class="material-icons search-icon">search</span><input class="search-input" id="searchUser" placeholder="Cari email atau nama..." oninput="filterUsers()"></div>
+            <select class="form-control" id="filterRole" onchange="filterUsers()" style="width:160px">
+              <option value="">Semua Role</option>
+              <option>Admin</option><option>Operator</option><option>Kepala Puskesmas</option>
+              <option>Pengelola Program</option><option>Kadis</option>
+            </select>
+          </div>
+        </div>
+        <div style="padding:0" id="usersTable"></div>
+      </div>`;
+    modals.innerHTML = `
+      <div class="modal" id="userModal">
+        <div class="modal-card">
+          <div class="modal-header"><span class="material-icons">person_add</span><h3 id="userModalTitle">Tambah User</h3>
+            <button class="btn-icon" onclick="closeModal('userModal')"><span class="material-icons">close</span></button></div>
+          <div class="modal-body">
+            <div class="form-group"><label>Email *</label>
+              <input class="form-control" id="uEmail" type="email" placeholder="user@example.com" oninput="validateEmailInput(this)">
+              <div id="emailValidMsg" style="font-size:11.5px;margin-top:4px;display:none"></div>
+            </div>
+            <div class="form-group"><label>Nama *</label><input class="form-control" id="uNama" placeholder="Nama Lengkap"></div>
+            <div class="form-group"><label>NIP</label><input class="form-control" id="uNIP" placeholder="Nomor Induk Pegawai (opsional)" maxlength="30"></div>
+            <div class="form-group"><label>Role *</label>
+              <select class="form-control" id="uRole" onchange="checkUserRole()">
+                <option>Admin</option><option>Operator</option><option>Kepala Puskesmas</option>
+                <option>Pengelola Program</option><option>Kadis</option>
+              </select></div>
+            <div id="pkmContainer" style="display:none" class="form-group"><label>Puskesmas</label>
+              <select class="form-control" id="uPKM"><option value="">Pilih Puskesmas</option></select></div>
+            <div id="jabatanContainer" style="display:none" class="form-group">
+              <label>Jabatan / Bidang Tanggung Jawab <span style="font-size:11px;color:var(--text-light)">(bisa pilih lebih dari satu)</span></label>
+              <div id="jabatanCheckboxList" style="max-height:180px;overflow-y:auto;border:1.5px solid var(--border);border-radius:8px;padding:8px;background:white;display:grid;grid-template-columns:1fr;gap:4px">
+                <div style="color:var(--text-light);font-size:12px;padding:4px">Memuat daftar jabatan...</div>
+              </div>
+              <div style="margin-top:6px;display:flex;gap:6px;align-items:center">
+                <input class="form-control" id="uJabatanBaru" placeholder="Tambah jabatan baru..." style="flex:1">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="tambahJabatanBaru()">+ Tambah</button>
+              </div>
+            </div>
+            <div id="indContainer" style="display:none" class="form-group">
+              <label>Indikator Akses</label>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                <span style="font-size:12px;color:var(--text-light)">Centang indikator yang dapat diakses</span>
+                <div style="display:flex;gap:8px">
+                  <button type="button" class="btn btn-secondary btn-sm" onclick="checkAllIndikator(true)">Pilih Semua</button>
+                  <button type="button" class="btn btn-secondary btn-sm" onclick="checkAllIndikator(false)">Hapus Semua</button>
+                </div>
+              </div>
+              <div id="indCheckboxList" style="max-height:220px;overflow-y:auto;border:1.5px solid var(--border);border-radius:8px;padding:8px;background:white;display:grid;grid-template-columns:1fr 1fr;gap:4px"></div>
+            </div>
+            <div class="form-group"><label>Status</label>
+              <select class="form-control" id="uAktif"><option value="true">Aktif</option><option value="false">Non-aktif</option></select></div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('userModal')">Batal</button>
+            <button class="btn btn-primary" onclick="saveUser()"><span class="material-icons">save</span>Simpan</button>
+          </div>
+        </div>
+      </div>`;
+    try {
+      [allUsers, allPKMList, allIndList] = await Promise.all([API.getUsers(), API.getPKM(), API.getIndikator()]);
+      renderUsersTable(allUsers);
+      const pkmSel = document.getElementById('uPKM');
+      allPKMList.forEach(p => pkmSel.innerHTML += `<option value="${p.kode}">${p.nama}</option>`);
+    } catch (e) { toast(e.message, 'error'); }
+
+  } else if (tab === 'jabatan') {
+    actionBtn.innerHTML = `<button class="btn btn-primary" onclick="openJabatanModal()"><span class="material-icons">add</span>Tambah Jabatan</button>`;
+    content.innerHTML = `
+      <div class="card">
+        <div class="card-body" style="padding:0" id="jabatanTable">
+          <div class="empty-state" style="padding:32px"><p>Memuat...</p></div>
+        </div>
+      </div>`;
+    modals.innerHTML = `
+      <div class="modal" id="jabatanModal">
+        <div class="modal-card" style="max-width:420px">
+          <div class="modal-header">
+            <span class="material-icons">badge</span>
+            <span id="jabatanModalTitle">Tambah Jabatan</span>
+            <button class="btn-icon" onclick="closeModal('jabatanModal')"><span class="material-icons">close</span></button>
+          </div>
+          <div class="modal-body">
+            <div class="form-group"><label>Nama Jabatan</label>
+              <input class="form-control" id="jNama" placeholder="Contoh: Pengelola Program Gizi Kabupaten"></div>
+            <div class="form-group"><label>Status</label>
+              <select class="form-control" id="jAktif"><option value="true">Aktif</option><option value="false">Non-aktif</option></select></div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('jabatanModal')">Batal</button>
+            <button class="btn btn-primary" onclick="saveJabatan()"><span class="material-icons">save</span>Simpan</button>
+          </div>
+        </div>
+      </div>`;
+    await loadJabatanTable();
+
+  } else if (tab === 'pkm') {
+    actionBtn.innerHTML = `<button class="btn btn-primary" onclick="openPKMModal()"><span class="material-icons">add</span>Tambah Puskesmas</button>`;
+    content.innerHTML = `
+      <div class="card">
+        <div class="card-body" style="padding:12px 16px">
+          <div class="search-row">
+            <div class="search-input-wrap"><span class="material-icons search-icon">search</span><input class="search-input" id="searchPKM" placeholder="Cari kode atau nama..." oninput="filterPKM()"></div>
+            <select class="form-control" id="filterPKMAktif" onchange="filterPKM()" style="width:140px">
+              <option value="">Semua Status</option><option value="aktif">Aktif</option><option value="nonaktif">Non-aktif</option>
+            </select>
+          </div>
+        </div>
+        <div id="pkmTable" style="padding:0"></div>
+      </div>`;
+    modals.innerHTML = `
+      <div class="modal" id="pkmModal">
+        <div class="modal-card">
+          <div class="modal-header"><span class="material-icons">local_hospital</span><h3 id="pkmModalTitle">Tambah Puskesmas</h3>
+            <button class="btn-icon" onclick="closeModal('pkmModal')"><span class="material-icons">close</span></button></div>
+          <div class="modal-body">
+            <div class="form-group"><label>Kode *</label><input class="form-control" id="pKode" placeholder="Maks 10 karakter" maxlength="10"></div>
+            <div class="form-group"><label>Nama Puskesmas *</label><input class="form-control" id="pNama" placeholder="Nama lengkap puskesmas"></div>
+            <div class="form-group"><label>Indeks Beban Kerja</label><input class="form-control" id="pIndeks" type="number" step="0.0001" min="0" placeholder="Contoh: 1.5"></div>
+            <div class="form-group"><label>Indeks Kesulitan Wilayah</label><input class="form-control" id="pIndeksKesulitan" type="number" step="0.0001" min="0" placeholder="Contoh: 1.2"></div>
+            <div class="form-group"><label>Status</label><select class="form-control" id="pAktif"><option value="true">Aktif</option><option value="false">Non-aktif</option></select></div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('pkmModal')">Batal</button>
+            <button class="btn btn-primary" onclick="savePKM()"><span class="material-icons">save</span>Simpan</button>
+          </div>
+        </div>
+      </div>`;
+    try {
+      allPKM = await API.getPKM();
+      renderPKMTable(allPKM);
+    } catch (e) { toast(e.message, 'error'); }
+
+  } else if (tab === 'indikator') {
+    actionBtn.innerHTML = `<button class="btn btn-primary" onclick="openIndModal()"><span class="material-icons">add</span>Tambah Indikator</button>`;
+    content.innerHTML = `
+      <div class="card">
+        <div class="card-body" style="padding:12px 16px;display:flex;justify-content:space-between;align-items:center">
+          <div class="search-row" style="margin:0;flex:1">
+            <div class="search-input-wrap"><span class="material-icons search-icon">search</span><input class="search-input" id="searchInd" placeholder="Cari nomor atau nama..." oninput="filterInd()"></div>
+          </div>
+          <div style="background:var(--info-light);padding:8px 14px;border-radius:8px;font-size:13px;margin-left:12px">
+            Total Bobot Aktif: <strong id="totalBobot">0</strong>
+          </div>
+        </div>
+        <div id="indTable" style="padding:0"></div>
+      </div>`;
+    modals.innerHTML = `
+      <div class="modal" id="indModal">
+        <div class="modal-card">
+          <div class="modal-header"><span class="material-icons">monitor_heart</span><h3 id="indModalTitle">Tambah Indikator</h3>
+            <button class="btn-icon" onclick="closeModal('indModal')"><span class="material-icons">close</span></button></div>
+          <div class="modal-body">
+            <div class="form-group"><label>No Indikator *</label><input class="form-control" id="iNo" type="number" min="1" placeholder="1, 2, 3..."></div>
+            <div class="form-group"><label>Nama Indikator *</label><input class="form-control" id="iNama" placeholder="Nama lengkap indikator"></div>
+            <div class="form-group"><label>Bobot</label><input class="form-control" id="iBobot" type="number" min="0" max="100" placeholder="0-100"></div>
+            <div class="form-group"><label>Catatan <span style="font-size:11px;color:var(--text-light)">(tampil di laporan per indikator)</span></label>
+              <textarea class="form-control" id="iCatatan" rows="3" placeholder="Contoh: Standar Pelayanan Ibu Bersalin merujuk pada Permenkes Nomor 6 Tahun 2024..."></textarea>
+            </div>
+            <div class="form-group"><label>Status</label><select class="form-control" id="iAktif"><option value="true">Aktif</option><option value="false">Non-aktif</option></select></div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('indModal')">Batal</button>
+            <button class="btn btn-primary" onclick="saveInd()"><span class="material-icons">save</span>Simpan</button>
+          </div>
+        </div>
+      </div>`;
+    try {
+      allIndikator = await API.getIndikator();
+      renderIndTable(allIndikator);
+    } catch (e) { toast(e.message, 'error'); }
+  }
+}
+
+async function renderUsers() { await renderMasterData('users'); }
+async function renderJabatan() { await renderMasterData('jabatan'); }
+async function renderPKM() { await renderMasterData('pkm'); }
+async function renderIndikator() { await renderMasterData('indikator'); }
+
+// ─────────────────────────────────────────────────────────────────────────────
+async function _renderUsers_LEGACY() {
   document.getElementById('mainContent').innerHTML = `
     <div class="page-header">
       <h1><span class="material-icons">group</span>Kelola User</h1>
@@ -2231,7 +2460,7 @@ async function deleteUser(email) {
 // ============== KELOLA JABATAN ==============
 let _jabatanAllList = [];
 
-async function renderJabatan() {
+async function _renderJabatan_LEGACY() {
   document.getElementById('mainContent').innerHTML = `
     <div class="page-header">
       <h1><span class="material-icons">badge</span>Kelola Jabatan Pengelola Program</h1>
@@ -2367,7 +2596,7 @@ async function deleteJabatan(id, nama) {
 // ============== ADMIN - PKM ==============
 let allPKM = [];
 
-async function renderPKM() {
+async function _renderPKM_LEGACY() {
   document.getElementById('mainContent').innerHTML = `
     <div class="page-header">
       <h1><span class="material-icons">local_hospital</span>Kelola Puskesmas</h1>
@@ -2611,7 +2840,7 @@ async function saveTargetTahunan() {
 // ============== ADMIN - INDIKATOR ==============
 let allIndikator = [];
 
-async function renderIndikator() {
+async function _renderIndikator_LEGACY() {
   document.getElementById('mainContent').innerHTML = `
     <div class="page-header">
       <h1><span class="material-icons">monitor_heart</span>Kelola Indikator</h1>

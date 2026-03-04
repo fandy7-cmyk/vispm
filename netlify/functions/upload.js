@@ -77,12 +77,19 @@ exports.handler = async (event) => {
       throw new Error((result.body?.error?.message) || `Cloudinary error ${result.status}`);
     }
 
-    // Cloudinary DAM: secure_url tidak include asset_folder di path
-    // Konstruksi URL manual agar folder path masuk
-    const version = result.body.version ? `v${result.body.version}` : '';
-    const fullPublicId = assetFolder + '/' + result.body.public_id;
-    const storedPublicId = fullPublicId;
-    let fileUrl = `https://res.cloudinary.com/${cloudName}/${resourceType}/upload/${version}/${fullPublicId}`;
+    // Gunakan secure_url langsung dari Cloudinary response — ini URL yang pasti benar
+    // Log response untuk debug
+    console.log('[upload] Cloudinary response:', JSON.stringify({
+      secure_url: result.body.secure_url,
+      public_id: result.body.public_id,
+      asset_folder: result.body.asset_folder,
+      version: result.body.version,
+    }));
+
+    let fileUrl = result.body.secure_url;
+    const storedPublicId = assetFolder + '/' + result.body.public_id;
+
+    // Untuk raw: append ekstensi jika belum ada di URL
     if (resourceType === 'raw' && ext && !fileUrl.split('/').pop().split('?')[0].includes('.')) {
       fileUrl = fileUrl + '.' + ext;
     }

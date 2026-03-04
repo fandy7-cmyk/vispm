@@ -1324,7 +1324,7 @@ async function doSubmitUsulan(forceSubmit) {
     }
 
     const successMsg = raw.data?.message || 'Usulan berhasil disubmit!';
-    toast('✅ ' + successMsg, 'success');
+    toast('successMsg, 'success');
 
     // Sembunyikan tombol submit di modal
     const submitBtn = document.getElementById('btnSubmitFromModal');

@@ -1120,20 +1120,9 @@ function _renderBuktiModal() {
   const isOffice = ['doc','docx','xls','xlsx','ppt','pptx'].includes(ext);
   const total = links.length;
 
-  // URL dengan ekstensi untuk viewer (Office Online wajib ada ekstensi di URL)
+  // URL dengan ekstensi (Cloudinary raw tidak auto-append)
   const urlWithExt = (f.url && ext && !f.url.split('/').pop().split('?')[0].includes('.'))
-    ? f.url + '.' + ext
-    : f.url;
-
-  // Office Online Viewer — wajib URL publik dengan ekstensi
-  const officeViewerUrl = isOffice
-    ? `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(urlWithExt)}`
-    : null;
-
-  // PDF: Google Docs Viewer sebagai fallback yang tidak butuh sign-url
-  const pdfViewerUrl = isPDF
-    ? `https://docs.google.com/viewer?embedded=true&url=${encodeURIComponent(urlWithExt)}`
-    : null;
+    ? f.url + '.' + ext : f.url;
 
   let modal = document.getElementById('previewBuktiModal');
   if (!modal) {
@@ -1146,13 +1135,12 @@ function _renderBuktiModal() {
 
   const svgDownload = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
   const svgTrashM = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></svg>`;
-
   const navBtn = (dir, fn) => `<button onclick="${fn}" style="position:absolute;top:50%;${dir}:14px;transform:translateY(-50%);background:rgba(255,255,255,0.12);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,0.18);color:white;border-radius:50%;width:42px;height:42px;cursor:pointer;font-size:22px;display:flex;align-items:center;justify-content:center;line-height:1" onmouseover="this.style.background='rgba(255,255,255,0.25)'" onmouseout="this.style.background='rgba(255,255,255,0.12)'">${dir==='left'?'&#8249;':'&#8250;'}</button>`;
-
-  // Icon per file type
   const fileIcons = { pdf:'&#128196;', doc:'&#128196;', docx:'&#128196;', xls:'&#128202;', xlsx:'&#128202;', ppt:'&#128190;', pptx:'&#128190;' };
   const fileIcon = fileIcons[ext] || '&#128196;';
 
+  // Loading state dulu, lalu fetch blob dan render
+  const previewId = 'buktiPreview_' + idx + '_' + Date.now();
   modal.innerHTML = `
     <div style="background:#1e293b;border-radius:14px;width:92%;max-width:920px;height:88vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,0.5)">
       <div style="padding:12px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;border-bottom:1px solid rgba(255,255,255,0.08)">
@@ -1166,17 +1154,11 @@ function _renderBuktiModal() {
           <button onclick="document.getElementById('previewBuktiModal').style.display='none'" style="background:rgba(255,255,255,0.08);border:none;cursor:pointer;color:white;border-radius:7px;width:32px;height:32px;font-size:20px;display:flex;align-items:center;justify-content:center">&#215;</button>
         </div>
       </div>
-      <div style="flex:1;overflow:hidden;display:flex;align-items:center;justify-content:center;background:#0f172a;position:relative">
+      <div id="${previewId}" style="flex:1;overflow:hidden;display:flex;align-items:center;justify-content:center;background:#0f172a;position:relative">
         ${isImage
-          ? `<img src="${f.url}" style="max-width:100%;max-height:100%;object-fit:contain;padding:16px">`
-          : isPDF
-          ? `<iframe src="${pdfViewerUrl}" style="width:100%;height:100%;border:none"></iframe>`
-          : (isOffice && officeViewerUrl)
-          ? `<iframe src="${officeViewerUrl}" style="width:100%;height:100%;border:none"></iframe>`
-          : `<div style="text-align:center;color:white;padding:40px">
-              <div style="font-size:64px;margin-bottom:16px">${fileIcon}</div>
-              <div style="font-size:11px;color:#64748b;margin-bottom:28px;text-transform:uppercase;letter-spacing:1px">${ext ? ext.toUpperCase() + ' &bull; ' : ''}Tidak dapat dipreview di browser</div>
-              <button onclick="downloadBukti(${idx})" style="background:#0d9488;color:white;padding:12px 32px;border-radius:8px;border:none;font-weight:600;font-size:14px;cursor:pointer;display:inline-flex;align-items:center;gap:8px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download</button>
+          ? `<img src="${urlWithExt}" style="max-width:100%;max-height:100%;object-fit:contain;padding:16px">`
+          : `<div style="color:#94a3b8;font-size:13px;display:flex;align-items:center;gap:8px">
+              <span class="material-icons" style="animation:spin 1s linear infinite">refresh</span> Memuat...
             </div>`
         }
         ${total > 1 ? navBtn('left','_buktiNav(-1)') : ''}
@@ -1188,6 +1170,41 @@ function _renderBuktiModal() {
       </div>` : ''}
     </div>`;
   modal.style.display = 'flex';
+
+  // Untuk non-image: fetch sebagai blob lalu embed
+  if (!isImage) {
+    (async () => {
+      const el = document.getElementById(previewId);
+      if (!el) return;
+      try {
+        const res = await fetch(urlWithExt);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const blob = await res.blob();
+        const blobUrl = URL.createObjectURL(blob);
+
+        if (isPDF) {
+          el.innerHTML = `<iframe src="${blobUrl}" style="width:100%;height:100%;border:none"></iframe>`;
+        } else if (isOffice) {
+          // Office Online Viewer dengan blob URL tidak works — pakai GDV dengan blob URL juga tidak
+          // Solusi: buka di Office Online dengan URL Cloudinary langsung (fallback)
+          el.innerHTML = `<iframe src="https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(urlWithExt)}" style="width:100%;height:100%;border:none"></iframe>`;
+        } else {
+          el.innerHTML = `<div style="text-align:center;color:white;padding:40px">
+            <div style="font-size:64px;margin-bottom:16px">${fileIcon}</div>
+            <div style="font-size:11px;color:#64748b;margin-bottom:28px;text-transform:uppercase">${ext.toUpperCase()} &bull; Tidak dapat dipreview</div>
+            <button onclick="downloadBukti(${idx})" style="background:#0d9488;color:white;padding:12px 32px;border-radius:8px;border:none;font-weight:600;font-size:14px;cursor:pointer">Download</button>
+          </div>`;
+        }
+      } catch(e) {
+        if (!el) return;
+        el.innerHTML = `<div style="text-align:center;color:white;padding:40px">
+          <div style="font-size:64px;margin-bottom:16px">${fileIcon}</div>
+          <div style="font-size:11px;color:#64748b;margin-bottom:28px">${ext.toUpperCase()} &bull; Tidak dapat dipreview</div>
+          <button onclick="downloadBukti(${idx})" style="background:#0d9488;color:white;padding:12px 32px;border-radius:8px;border:none;font-weight:600;font-size:14px;cursor:pointer;display:inline-flex;align-items:center;gap:8px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download</button>
+        </div>`;
+      }
+    })();
+  }
 }
 
 function _buktiNav(dir) {

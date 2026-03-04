@@ -1178,7 +1178,9 @@ function _renderBuktiModal() {
       const el = document.getElementById(previewId);
       if (!el) return;
       try {
-        const res = await fetch(urlWithExt);
+        // Selalu lewat sign-url proxy agar Cloudinary raw files bisa diakses
+        const proxyUrl = `/.netlify/functions/sign-url?url=${encodeURIComponent(urlWithExt)}&name=${encodeURIComponent(fileName)}&mode=preview`;
+        const res = await fetch(proxyUrl);
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const blob = await res.blob();
         const blobUrl = URL.createObjectURL(blob);
@@ -1186,7 +1188,9 @@ function _renderBuktiModal() {
         if (isPDF) {
           el.innerHTML = `<iframe src="${blobUrl}" style="width:100%;height:100%;border:none"></iframe>`;
         } else if (isOffice) {
-          el.innerHTML = `<iframe src="https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(urlWithExt)}" style="width:100%;height:100%;border:none"></iframe>`;
+          // Office viewer butuh URL publik — gunakan netlify function sebagai proxy publik
+          const officeProxyUrl = `${window.location.origin}/.netlify/functions/sign-url?url=${encodeURIComponent(urlWithExt)}&name=${encodeURIComponent(fileName)}&mode=preview`;
+          el.innerHTML = `<iframe src="https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(officeProxyUrl)}" style="width:100%;height:100%;border:none"></iframe>`;
         } else {
           el.innerHTML = `<div style="text-align:center;color:white;padding:40px">
             <div style="font-size:64px;margin-bottom:16px">${fileIcon}</div>
@@ -1229,10 +1233,8 @@ async function downloadBukti(idx) {
   const ext2 = dotIdx2 > -1 ? fileName.substring(dotIdx2 + 1).toLowerCase() : '';
   if (ext2 && !fileName.toLowerCase().endsWith('.' + ext2)) fileName += '.' + ext2;
 
-  // URL langsung — raw+public bisa diakses, append ekstensi kalau belum ada
-  let fetchUrl = f.url.replace(/\.pdf\.pdf($|\?)/, '.pdf$1');
-  const urlHasExt = fetchUrl.split('/').pop().split('?')[0].includes('.');
-  if (!urlHasExt && ext2) fetchUrl = fetchUrl + '.' + ext2;
+  // Lewat sign-url proxy agar Cloudinary raw files bisa diakses
+  let fetchUrl = `/.netlify/functions/sign-url?url=${encodeURIComponent(f.url)}&name=${encodeURIComponent(fileName)}`;
 
   try {
     const res = await fetch(fetchUrl);

@@ -1193,19 +1193,26 @@ async function downloadBukti(idx) {
   const f = d.links[idx];
   if (!f) return;
 
-  // Nama file dari f.name (tersimpan saat upload)
-  const dotIdx = (f.name || '').lastIndexOf('.');
-  const ext = dotIdx > -1 ? f.name.substring(dotIdx + 1).toLowerCase() : '';
-  let fileName = (f.name && f.name !== 'File') ? f.name : 'file' + (ext ? '.' + ext : '');
+  // Nama file dari f.name
+  let fileName = (f.name && f.name !== 'File' && f.name.trim()) ? f.name.trim() : 'file';
+  const dotIdx = fileName.lastIndexOf('.');
+  const ext = dotIdx > -1 ? fileName.substring(dotIdx + 1).toLowerCase() : '';
 
+  // Coba URL asli dulu, kalau 404 coba tambah ekstensi (file lama tanpa ekstensi di URL)
+  let fetchUrl = f.url;
   try {
-    // Fetch file sebagai blob — menghindari masalah CORS pada download attribute
-    const response = await fetch(f.url);
-    if (!response.ok) throw new Error('Gagal mengambil file');
-    const blob = await response.blob();
-    const blobUrl = URL.createObjectURL(blob);
+    let response = await fetch(fetchUrl, { method: 'HEAD' });
+    if (response.status === 404 && ext && !f.url.split('/').pop().split('?')[0].includes('.')) {
+      fetchUrl = f.url + '.' + ext;
+      response = await fetch(fetchUrl, { method: 'HEAD' });
+    }
+    if (!response.ok) throw new Error('404');
 
-    // Trigger download dengan nama file yang benar
+    // Fetch sebagai blob
+    const blobRes = await fetch(fetchUrl);
+    if (!blobRes.ok) throw new Error('Fetch gagal');
+    const blob = await blobRes.blob();
+    const blobUrl = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = blobUrl;
     a.download = fileName;
@@ -1214,8 +1221,8 @@ async function downloadBukti(idx) {
     document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
   } catch (e) {
-    // Fallback: buka di tab baru
-    window.open(f.url, '_blank');
+    // Fallback: buka tab baru
+    window.open(fetchUrl, '_blank');
   }
 }
 

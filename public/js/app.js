@@ -1178,9 +1178,7 @@ function _renderBuktiModal() {
       const el = document.getElementById(previewId);
       if (!el) return;
       try {
-        // Selalu lewat sign-url proxy agar Cloudinary raw files bisa diakses
-        const proxyUrl = `/.netlify/functions/sign-url?url=${encodeURIComponent(urlWithExt)}&name=${encodeURIComponent(fileName)}&mode=preview`;
-        const res = await fetch(proxyUrl);
+        const res = await fetch(urlWithExt);
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const blob = await res.blob();
         const blobUrl = URL.createObjectURL(blob);
@@ -1188,9 +1186,7 @@ function _renderBuktiModal() {
         if (isPDF) {
           el.innerHTML = `<iframe src="${blobUrl}" style="width:100%;height:100%;border:none"></iframe>`;
         } else if (isOffice) {
-          // Office viewer butuh URL publik — gunakan netlify function sebagai proxy publik
-          const officeProxyUrl = `${window.location.origin}/.netlify/functions/sign-url?url=${encodeURIComponent(urlWithExt)}&name=${encodeURIComponent(fileName)}&mode=preview`;
-          el.innerHTML = `<iframe src="https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(officeProxyUrl)}" style="width:100%;height:100%;border:none"></iframe>`;
+          el.innerHTML = `<iframe src="https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(urlWithExt)}" style="width:100%;height:100%;border:none"></iframe>`;
         } else {
           el.innerHTML = `<div style="text-align:center;color:white;padding:40px">
             <div style="font-size:64px;margin-bottom:16px">${fileIcon}</div>
@@ -1233,8 +1229,10 @@ async function downloadBukti(idx) {
   const ext2 = dotIdx2 > -1 ? fileName.substring(dotIdx2 + 1).toLowerCase() : '';
   if (ext2 && !fileName.toLowerCase().endsWith('.' + ext2)) fileName += '.' + ext2;
 
-  // Lewat sign-url proxy agar Cloudinary raw files bisa diakses
-  let fetchUrl = `/.netlify/functions/sign-url?url=${encodeURIComponent(f.url)}&name=${encodeURIComponent(fileName)}`;
+  // URL langsung — raw+public bisa diakses, append ekstensi kalau belum ada
+  let fetchUrl = f.url.replace(/\.pdf\.pdf($|\?)/, '.pdf$1');
+  const urlHasExt = fetchUrl.split('/').pop().split('?')[0].includes('.');
+  if (!urlHasExt && ext2) fetchUrl = fetchUrl + '.' + ext2;
 
   try {
     const res = await fetch(fetchUrl);
@@ -1391,9 +1389,9 @@ async function viewDetail(idUsulan) {
         <div style="font-weight:700;font-size:13px;margin-bottom:8px;display:flex;align-items:center;gap:6px">
           <span class="material-icons" style="font-size:16px;color:var(--primary)">groups</span>
           Progress Verifikasi Pengelola Program
-          (${vp.filter(v=>v.status==='Selesai').length} selesai
-          ${vp.filter(v=>v.status==='Ditolak').length ? `· <span style="color:#ef4444">${vp.filter(v=>v.status==='Ditolak').length} menolak</span>` : ''}
-          · ${vp.filter(v=>v.status==='Menunggu').length} menunggu dari ${vp.length})
+          (<span style="color:#0d9488">✅ ${vp.filter(v=>v.status==='Selesai').length} selesai</span>
+          ${vp.filter(v=>v.status==='Ditolak').length ? `· <span style="color:#ef4444">❌ ${vp.filter(v=>v.status==='Ditolak').length} menolak</span>` : ''}
+          · <span style="color:#94a3b8">⏳ ${vp.filter(v=>v.status==='Menunggu').length} menunggu</span> dari ${vp.length})
         </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px">
           ${vp.map(v => {
@@ -1648,8 +1646,12 @@ async function openVerifikasi(idUsulan) {
     if (currentUser.role === 'Kepala Puskesmas') {
       sudahVerifUser = detail.statusKapus === 'Selesai' || detail.statusKapus === 'Ditolak';
     } else if (currentUser.role === 'Pengelola Program') {
+      // Cek record verifikasi untuk usulan INI saja (bukan usulan lain)
       const myRecord = (detail.verifikasiProgram || []).find(v => v.email_program?.toLowerCase() === currentUser.email?.toLowerCase());
-      sudahVerifUser = myRecord && (myRecord.status === 'Selesai' || myRecord.status === 'Ditolak');
+      // Hanya block jika status usulan ini memang sudah melewati tahap program
+      // Jika status global masih "Menunggu Pengelola Program", berarti masih bisa verifikasi
+      sudahVerifUser = myRecord && (myRecord.status === 'Selesai' || myRecord.status === 'Ditolak')
+        && detail.statusGlobal !== 'Menunggu Pengelola Program';
     } else if (currentUser.role === 'Admin') {
       sudahVerifUser = detail.statusGlobal === 'Selesai';
     }

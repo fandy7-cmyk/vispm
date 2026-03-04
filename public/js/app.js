@@ -45,7 +45,7 @@ async function doLogin() {
   const btn = document.getElementById('authBtn');
   btn.disabled = true;
   btn.innerHTML = '<span class="material-icons" style="animation:spin 0.8s linear infinite">refresh</span> Loading...';
-  setAuthStatus('Memeriksa akses...', '');
+  setAuthStatus('Loading...', '');
 
   try {
     const user = await API.login(email, password);
@@ -1092,13 +1092,11 @@ function _renderBuktiModal() {
   const f = links[idx];
 
   // Nama file asli dari f.name (tersimpan saat upload dengan ekstensi lengkap)
-  // Cloudinary URL untuk raw files tidak mengandung ekstensi, jadi JANGAN ambil dari URL
   let fileName = (f.name && f.name !== 'File' && f.name.trim()) ? f.name.trim() : null;
 
-  // Kalau tidak ada f.name, coba ekstrak dari publicId (format: ..._namafile.ext)
+  // Kalau tidak ada f.name, coba ekstrak dari publicId
   if (!fileName && f.id) {
-    const pidParts = f.id.split('/').pop(); // ambil bagian terakhir publicId
-    // publicId format: PKM11_2026_5_ind4_timestamp_namafile.ext
+    const pidParts = f.id.split('/').pop();
     const match = pidParts.match(/_\d+_(.+)$/);
     if (match) fileName = match[1];
   }
@@ -1106,9 +1104,17 @@ function _renderBuktiModal() {
   // Fallback: nama generik
   if (!fileName) fileName = 'file';
 
-  // Ekstrak ekstensi dari nama file (bukan dari URL Cloudinary!)
-  const dotIdx = fileName.lastIndexOf('.');
-  const ext = dotIdx > -1 ? fileName.substring(dotIdx + 1).toLowerCase() : '';
+  // Ekstrak ekstensi — coba dari fileName dulu, fallback dari URL
+  let dotIdx = fileName.lastIndexOf('.');
+  let ext = dotIdx > -1 ? fileName.substring(dotIdx + 1).toLowerCase() : '';
+  if (!ext) {
+    // Ambil dari URL (berguna untuk file lama yang URL-nya punya ekstensi)
+    const urlClean = (f.url || '').split('?')[0];
+    const urlExt = urlClean.split('.').pop().toLowerCase();
+    if (urlExt && urlExt.length <= 5 && /^[a-z0-9]+$/.test(urlExt)) ext = urlExt;
+  }
+  // Pastikan fileName punya ekstensi
+  if (ext && !fileName.toLowerCase().endsWith('.' + ext)) fileName = fileName + '.' + ext;
 
   const isImage = ['jpg','jpeg','png','gif','webp'].includes(ext);
   const isPDF = ext === 'pdf';
@@ -1145,8 +1151,8 @@ function _renderBuktiModal() {
           ${total > 1 ? `<span style="background:#334155;color:#94a3b8;font-size:11px;padding:2px 8px;border-radius:20px;font-weight:600">${idx+1} / ${total}</span>` : ''}
         </div>
         <div style="display:flex;gap:6px;align-items:center">
-          <button onclick="downloadBukti(${idx})" title="Download ${fileName}" style="background:rgba(13,148,136,0.15);color:#0d9488;border:1px solid rgba(13,148,136,0.3);padding:5px 10px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px">${svgDownload}</button>
-          <button onclick="hapusBukti('${idUsulan}',${noIndikator},${idx})" style="background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.3);padding:5px 12px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px">${svgTrashM} Hapus</button>
+          <button onclick="downloadBukti(${idx})" title="Download" style="background:rgba(13,148,136,0.15);color:#0d9488;border:1px solid rgba(13,148,136,0.3);padding:5px 10px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px">${svgDownload}</button>
+          ${idUsulan ? `<button onclick="hapusBukti('${idUsulan}',${noIndikator},${idx})" style="background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.3);padding:5px 12px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px">${svgTrashM} Hapus</button>` : ''}
           <button onclick="document.getElementById('previewBuktiModal').style.display='none'" style="background:rgba(255,255,255,0.08);border:none;cursor:pointer;color:white;border-radius:7px;width:32px;height:32px;font-size:20px;display:flex;align-items:center;justify-content:center">&#215;</button>
         </div>
       </div>
@@ -1154,12 +1160,11 @@ function _renderBuktiModal() {
         ${isImage
           ? `<img src="${f.url}" style="max-width:100%;max-height:100%;object-fit:contain;padding:16px">`
           : isPDF
-          ? `<iframe src="${embedUrl}" style="width:100%;height:100%;border:none"></iframe>`
+          ? `<iframe src="${f.url}" style="width:100%;height:100%;border:none"></iframe>`
           : `<div style="text-align:center;color:white;padding:40px">
               <div style="font-size:64px;margin-bottom:16px">${fileIcon}</div>
-              <div style="font-size:15px;color:#e2e8f0;font-weight:600;margin-bottom:6px;max-width:440px;word-break:break-word">${fileName}</div>
               <div style="font-size:11px;color:#64748b;margin-bottom:28px;text-transform:uppercase;letter-spacing:1px">${ext ? ext.toUpperCase() + ' &bull; ' : ''}Tidak dapat dipreview di browser</div>
-              <a href="javascript:void(0)" onclick="downloadBukti(${idx})" style="background:#0d9488;color:white;padding:12px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;display:inline-flex;align-items:center;gap:8px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download ${fileName}</a>
+              <button onclick="downloadBukti(${idx})" style="background:#0d9488;color:white;padding:12px 32px;border-radius:8px;border:none;font-weight:600;font-size:14px;cursor:pointer;display:inline-flex;align-items:center;gap:8px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download</button>
             </div>`
         }
         ${total > 1 ? navBtn('left','_buktiNav(-1)') : ''}

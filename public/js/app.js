@@ -109,6 +109,12 @@ function startApp() {
   buildSidebar();
   loadPage('dashboard');
 
+  // Load app settings (tahun range, dll)
+  API.getSettings().then(s => {
+    if (s && s.tahun_akhir) window._maxPeriodeTahun = parseInt(s.tahun_akhir);
+    if (s && s.tahun_awal)  window._minPeriodeTahun = parseInt(s.tahun_awal);
+  }).catch(() => {});
+
   // Popup notifikasi periode untuk Operator saat login
   if (currentUser.role === 'Operator') {
     setTimeout(() => showPeriodeLoginPopup(), 800);
@@ -293,7 +299,7 @@ function closeSidebar() {
 function yearOptions(selected, maxYear) {
   // Gunakan maxYear dari parameter, atau ambil dari state global, minimal CURRENT_YEAR+3
   const max = maxYear || window._maxPeriodeTahun || Math.max(CURRENT_YEAR + 3, 2030);
-  const min = Math.min(2024, CURRENT_YEAR);
+  const min = window._minPeriodeTahun || Math.min(2024, CURRENT_YEAR);
   let html = '';
   for (let y = min; y <= max; y++) {
     html += `<option value="${y}" ${y == selected ? 'selected' : ''}>${y}</option>`;
@@ -1885,10 +1891,11 @@ async function renderMasterData(tab = 'users') {
     <!-- TAB BAR -->
     <div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:20px;overflow-x:auto">
       ${[
-        { id:'users',     icon:'group',         label:'Kelola User'      },
-        { id:'jabatan',   icon:'badge',          label:'Kelola Jabatan'   },
-        { id:'pkm',       icon:'local_hospital', label:'Kelola Puskesmas' },
-        { id:'indikator', icon:'monitor_heart',  label:'Kelola Indikator' },
+        { id:'users',      icon:'group',         label:'Kelola User'      },
+        { id:'jabatan',    icon:'badge',          label:'Kelola Jabatan'   },
+        { id:'pkm',        icon:'local_hospital', label:'Kelola Puskesmas' },
+        { id:'indikator',  icon:'monitor_heart',  label:'Kelola Indikator' },
+        { id:'pengaturan', icon:'settings',       label:'Pengaturan'       },
       ].map(t => `
         <button onclick="switchMasterTab('${t.id}')" id="masterTab-${t.id}"
           style="display:inline-flex;align-items:center;gap:6px;padding:10px 20px;border:none;background:none;cursor:pointer;font-size:13.5px;font-weight:600;white-space:nowrap;border-bottom:3px solid ${tab===t.id?'var(--primary)':'transparent'};color:${tab===t.id?'var(--primary)':'var(--text-light)'};margin-bottom:-2px;transition:all .15s">
@@ -2099,6 +2106,44 @@ async function _loadMasterTab(tab) {
       allIndikator = await API.getIndikator();
       renderIndTable(allIndikator);
     } catch (e) { toast(e.message, 'error'); }
+
+  } else if (tab === 'pengaturan') {
+    actionBtn.innerHTML = '';
+    content.innerHTML = `<div class="empty-state" style="padding:32px"><p>Memuat pengaturan...</p></div>`;
+    modals.innerHTML = '';
+    try {
+      const s = await API.getSettings();
+      const tahunAwal  = s?.tahun_awal  || 2024;
+      const tahunAkhir = s?.tahun_akhir || Math.max(CURRENT_YEAR + 3, 2030);
+      content.innerHTML = `
+        <div class="card" style="max-width:480px">
+          <div class="card-body" style="padding:24px">
+            <div style="font-weight:700;font-size:15px;margin-bottom:4px;display:flex;align-items:center;gap:8px">
+              <span class="material-icons" style="color:var(--primary)">calendar_today</span>
+              Range Tahun
+            </div>
+            <div style="font-size:13px;color:var(--text-light);margin-bottom:20px">
+              Mengatur rentang tahun yang tampil pada semua dropdown tahun di seluruh aplikasi.
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
+              <div class="form-group" style="margin:0">
+                <label>Tahun Awal</label>
+                <input class="form-control" id="setTahunAwal" type="number" min="2020" max="2100" value="${tahunAwal}">
+              </div>
+              <div class="form-group" style="margin:0">
+                <label>Tahun Akhir</label>
+                <input class="form-control" id="setTahunAkhir" type="number" min="2020" max="2100" value="${tahunAkhir}">
+              </div>
+            </div>
+            <div style="background:var(--info-light);border-radius:8px;padding:10px 14px;font-size:12.5px;color:var(--text-light);margin-bottom:20px">
+              💡 Contoh: Tahun Awal <b>2024</b> · Tahun Akhir <b>2030</b> → dropdown akan menampilkan 2024 s/d 2030
+            </div>
+            <button class="btn btn-primary" onclick="savePengaturanTahun()">
+              <span class="material-icons">save</span>Simpan Pengaturan
+            </button>
+          </div>
+        </div>`;
+    } catch(e) { toast('Gagal memuat pengaturan: ' + e.message, 'error'); }
   }
 }
 
@@ -2106,6 +2151,18 @@ async function renderUsers() { await renderMasterData('users'); }
 async function renderJabatan() { await renderMasterData('jabatan'); }
 async function renderPKM() { await renderMasterData('pkm'); }
 async function renderIndikator() { await renderMasterData('indikator'); }
+
+async function savePengaturanTahun() {
+  const awal  = parseInt(document.getElementById('setTahunAwal')?.value);
+  const akhir = parseInt(document.getElementById('setTahunAkhir')?.value);
+  if (!awal || !akhir || awal > akhir) return toast('Range tahun tidak valid', 'warning');
+  try {
+    await API.saveSettings({ tahun_awal: awal, tahun_akhir: akhir });
+    window._minPeriodeTahun = awal;
+    window._maxPeriodeTahun = akhir;
+    toast(`Range tahun berhasil disimpan: ${awal} – ${akhir}`, 'success');
+  } catch(e) { toast('Gagal menyimpan: ' + e.message, 'error'); }
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 async function _renderUsers_LEGACY() {

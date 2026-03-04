@@ -1148,7 +1148,7 @@ function _renderBuktiModal() {
           ${total > 1 ? `<span style="background:#334155;color:#94a3b8;font-size:11px;padding:2px 8px;border-radius:20px;font-weight:600">${idx+1} / ${total}</span>` : ''}
         </div>
         <div style="display:flex;gap:6px;align-items:center">
-          <a href="${downloadUrl}" title="Download ${fileName}" style="background:rgba(13,148,136,0.15);color:#0d9488;border:1px solid rgba(13,148,136,0.3);padding:5px 10px;border-radius:7px;font-size:12px;font-weight:600;text-decoration:none;display:flex;align-items:center;gap:5px">${svgDownload}</a>
+          <button onclick="downloadBukti(${idx})" title="Download ${fileName}" style="background:rgba(13,148,136,0.15);color:#0d9488;border:1px solid rgba(13,148,136,0.3);padding:5px 10px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px">${svgDownload}</button>
           <button onclick="hapusBukti('${idUsulan}',${noIndikator},${idx})" style="background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.3);padding:5px 12px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px">${svgTrashM} Hapus</button>
           <button onclick="document.getElementById('previewBuktiModal').style.display='none'" style="background:rgba(255,255,255,0.08);border:none;cursor:pointer;color:white;border-radius:7px;width:32px;height:32px;font-size:20px;display:flex;align-items:center;justify-content:center">&#215;</button>
         </div>
@@ -1162,7 +1162,7 @@ function _renderBuktiModal() {
               <div style="font-size:64px;margin-bottom:16px">${fileIcon}</div>
               <div style="font-size:15px;color:#e2e8f0;font-weight:600;margin-bottom:6px;max-width:440px;word-break:break-word">${fileName}</div>
               <div style="font-size:11px;color:#64748b;margin-bottom:28px;text-transform:uppercase;letter-spacing:1px">${ext ? ext.toUpperCase() + ' &bull; ' : ''}Tidak dapat dipreview di browser</div>
-              <a href="${downloadUrl}" style="background:#0d9488;color:white;padding:12px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;display:inline-flex;align-items:center;gap:8px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download ${fileName}</a>
+              <a href="javascript:void(0)" onclick="downloadBukti(${idx})" style="background:#0d9488;color:white;padding:12px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;display:inline-flex;align-items:center;gap:8px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download ${fileName}</a>
             </div>`
         }
         ${total > 1 ? navBtn('left','_buktiNav(-1)') : ''}
@@ -1185,6 +1185,38 @@ function _buktiNav(dir) {
 function _buktiGoto(idx) {
   window._modalBukti.idx = idx;
   _renderBuktiModal();
+}
+
+async function downloadBukti(idx) {
+  const d = window._modalBukti;
+  if (!d) return;
+  const f = d.links[idx];
+  if (!f) return;
+
+  // Nama file dari f.name (tersimpan saat upload)
+  const dotIdx = (f.name || '').lastIndexOf('.');
+  const ext = dotIdx > -1 ? f.name.substring(dotIdx + 1).toLowerCase() : '';
+  let fileName = (f.name && f.name !== 'File') ? f.name : 'file' + (ext ? '.' + ext : '');
+
+  try {
+    // Fetch file sebagai blob — menghindari masalah CORS pada download attribute
+    const response = await fetch(f.url);
+    if (!response.ok) throw new Error('Gagal mengambil file');
+    const blob = await response.blob();
+    const blobUrl = URL.createObjectURL(blob);
+
+    // Trigger download dengan nama file yang benar
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+  } catch (e) {
+    // Fallback: buka di tab baru
+    window.open(f.url, '_blank');
+  }
 }
 
 async function saveIndikator(noIndikator) {

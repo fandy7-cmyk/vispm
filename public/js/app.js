@@ -1953,12 +1953,12 @@ async function _loadMasterTab(tab) {
             <h3 id="userModalTitle">Tambah User</h3>
             <button class="btn-icon" onclick="closeModal('userModal')"><span class="material-icons">close</span></button>
           </div>
-          <div class="modal-body" style="padding:32px;background:#f8fafc">
-            <div style="max-width:720px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:20px">
+          <div class="modal-body" style="padding:24px;background:#f8fafc">
+            <div style="height:100%;display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start">
               <!-- Kolom kiri -->
               <div style="display:flex;flex-direction:column;gap:16px">
-                <div class="card" style="padding:20px">
-                  <div style="font-weight:700;font-size:13px;color:var(--primary);margin-bottom:14px;display:flex;align-items:center;gap:6px">
+                <div class="card" style="padding:24px">
+                  <div style="font-weight:700;font-size:13px;color:var(--primary);margin-bottom:16px;display:flex;align-items:center;gap:6px">
                     <span class="material-icons" style="font-size:16px">badge</span>Informasi Akun
                   </div>
                   <div class="form-group"><label>Email *</label>
@@ -1989,12 +1989,12 @@ async function _loadMasterTab(tab) {
               </div>
               <!-- Kolom kanan -->
               <div style="display:flex;flex-direction:column;gap:16px">
-                <div class="card" id="jabatanContainer" style="padding:20px;display:none">
+                <div class="card" id="jabatanContainer" style="padding:24px;display:none">
                   <div style="font-weight:700;font-size:13px;color:var(--primary);margin-bottom:14px;display:flex;align-items:center;gap:6px">
                     <span class="material-icons" style="font-size:16px">work</span>Jabatan / Bidang
                     <span style="font-size:11px;color:var(--text-light);font-weight:400">(bisa pilih lebih dari satu)</span>
                   </div>
-                  <div id="jabatanCheckboxList" style="max-height:220px;overflow-y:auto;border:1.5px solid var(--border);border-radius:8px;padding:8px;background:white;display:grid;grid-template-columns:1fr;gap:4px">
+                  <div id="jabatanCheckboxList" style="max-height:260px;overflow-y:auto;border:1.5px solid var(--border);border-radius:8px;padding:10px;background:white;display:flex;flex-direction:column;gap:6px">
                     <div style="color:var(--text-light);font-size:12px;padding:4px">Memuat daftar jabatan...</div>
                   </div>
                   <div style="margin-top:10px;display:flex;gap:6px;align-items:center">
@@ -2002,15 +2002,17 @@ async function _loadMasterTab(tab) {
                     <button type="button" class="btn btn-secondary btn-sm" onclick="tambahJabatanBaru()">+ Tambah</button>
                   </div>
                 </div>
-                <div class="card" id="indContainer" style="padding:20px;display:none">
-                  <div style="font-weight:700;font-size:13px;color:var(--primary);margin-bottom:10px;display:flex;align-items:center;gap:6px">
-                    <span class="material-icons" style="font-size:16px">monitor_heart</span>Indikator Akses
+                <div class="card" id="indContainer" style="padding:24px;display:none">
+                  <div style="font-weight:700;font-size:13px;color:var(--primary);margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
+                    <div style="display:flex;align-items:center;gap:6px">
+                      <span class="material-icons" style="font-size:16px">monitor_heart</span>Indikator Akses
+                    </div>
+                    <div style="display:flex;gap:8px">
+                      <button type="button" class="btn btn-secondary btn-sm" onclick="checkAllIndikator(true)">Pilih Semua</button>
+                      <button type="button" class="btn btn-secondary btn-sm" onclick="checkAllIndikator(false)">Hapus Semua</button>
+                    </div>
                   </div>
-                  <div style="display:flex;gap:8px;margin-bottom:10px">
-                    <button type="button" class="btn btn-secondary btn-sm" onclick="checkAllIndikator(true)">Pilih Semua</button>
-                    <button type="button" class="btn btn-secondary btn-sm" onclick="checkAllIndikator(false)">Hapus Semua</button>
-                  </div>
-                  <div id="indCheckboxList" style="max-height:260px;overflow-y:auto;border:1.5px solid var(--border);border-radius:8px;padding:8px;background:white;display:grid;grid-template-columns:1fr 1fr;gap:4px"></div>
+                  <div id="indCheckboxList" style="max-height:320px;overflow-y:auto;border:1.5px solid var(--border);border-radius:8px;padding:10px;background:white;display:grid;grid-template-columns:1fr 1fr;gap:6px"></div>
                 </div>
               </div>
             </div>

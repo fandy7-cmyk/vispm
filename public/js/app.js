@@ -3098,12 +3098,15 @@ async function loadPeriodeGrid() {
         : isTidakAktif
           ? '<span class="badge badge-default" style="color:#94a3b8">Tidak Aktif</span>'
           : '<span class="badge badge-info">Aktif</span>';
-      return `<div style="border:2px solid ${borderColor};border-radius:12px;padding:16px;background:${bg};cursor:pointer;opacity:${isTidakAktif?'0.65':'1'}" onclick="editPeriode(${p.tahun},${p.bulan})">
+      return `<div style="border:2px solid ${borderColor};border-radius:12px;padding:16px;background:${bg};opacity:${isTidakAktif?'0.65':'1'}">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-          <span style="font-weight:700;font-size:15px">${p.namaBulan} ${p.tahun}</span>
-          ${badgeHtml}
+          <span style="font-weight:700;font-size:15px;cursor:pointer" onclick="editPeriode(${p.tahun},${p.bulan})">${p.namaBulan} ${p.tahun}</span>
+          <div style="display:flex;align-items:center;gap:6px">
+            ${badgeHtml}
+            <button onclick="hapusPeriode(${p.tahun},${p.bulan},'${p.namaBulan}')" title="Hapus" style="background:none;border:none;cursor:pointer;padding:2px 4px;border-radius:5px;display:flex;align-items:center;color:#ef4444" onmouseover="this.style.background='rgba(239,68,68,0.08)'" onmouseout="this.style.background='none'"><span class="material-icons" style="font-size:16px">delete</span></button>
+          </div>
         </div>
-        <div style="font-size:12px;color:var(--text-light);display:flex;flex-direction:column;gap:3px">
+        <div style="font-size:12px;color:var(--text-light);display:flex;flex-direction:column;gap:3px;cursor:pointer" onclick="editPeriode(${p.tahun},${p.bulan})">
           <div>Mulai: ${formatDate(p.tanggalMulai)}${p.jamMulai ? ` pukul ${p.jamMulai}` : ''}</div>
           <div>Selesai: ${formatDate(p.tanggalSelesai)}${p.jamSelesai ? ` pukul ${p.jamSelesai}` : ''}</div>
           ${p.notifOperator ? `<div style="margin-top:6px;padding:5px 8px;background:rgba(13,148,136,0.08);border-radius:6px;color:var(--text-md);font-size:11px;border-left:3px solid var(--primary)"><span style="font-weight:600">Notif:</span> ${p.notifOperator}</div>` : ''}
@@ -3113,7 +3116,20 @@ async function loadPeriodeGrid() {
   } catch (e) { toast(e.message, 'error'); }
 }
 
-async function openPeriodeModal() {
+async function hapusPeriode(tahun, bulan, namaBulan) {
+  confirmAction(
+    `Hapus periode <b>${namaBulan} ${tahun}</b>?<br><span style="font-size:12px;color:#ef4444">Tindakan ini tidak bisa dibatalkan.</span>`,
+    async () => {
+      setLoading(true);
+      try {
+        await fetch(`/api/periode?tahun=${tahun}&bulan=${bulan}`, { method: 'DELETE' });
+        toast(`Periode ${namaBulan} ${tahun} berhasil dihapus`, 'success');
+        loadPeriodeGrid();
+      } catch (e) { toast(e.message, 'error'); }
+      finally { setLoading(false); }
+    }
+  );
+}
   document.getElementById('pTahun').value = CURRENT_YEAR;
   document.getElementById('pBulan').value = CURRENT_BULAN;
   document.getElementById('pMulai').value = '';

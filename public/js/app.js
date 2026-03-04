@@ -44,8 +44,8 @@ async function doLogin() {
 
   const btn = document.getElementById('authBtn');
   btn.disabled = true;
-  btn.innerHTML = '<span class="material-icons" style="animation:spin 0.8s linear infinite">refresh</span> Memeriksa...';
-  setAuthStatus('Memeriksa akses...', '');
+  btn.innerHTML = '<span class="material-icons" style="animation:spin 0.8s linear infinite">refresh</span> Loading...';
+  setAuthStatus('Loading...', '');
 
   try {
     const user = await API.login(email, password);
@@ -56,7 +56,7 @@ async function doLogin() {
   } catch (e) {
     setAuthStatus(e.message, 'error');
     btn.disabled = false;
-    btn.innerHTML = '<span class="material-icons">login</span> Masuk ke Sistem';
+    btn.innerHTML = '<span class="material-icons">login</span> Login';
   }
 }
 
@@ -858,36 +858,19 @@ async function openIndikatorModal(idUsulan) {
               try { links = JSON.parse(ind.linkFile); if (!Array.isArray(links)) links = [ind.linkFile]; }
               catch { links = [ind.linkFile]; }
             }
-            const fileLinksHtml = links.map((url, i) =>
-              `<a href="${url}" target="_blank" style="font-size:10.5px;color:#0d9488;display:flex;align-items:center;gap:1px">
-                <span class="material-icons" style="font-size:11px">open_in_new</span>File ${i+1}
-              </a>`
-            ).join('');
-            if (isLocked) {
-              if (!links.length) return '<span style="color:#94a3b8;font-size:12px">-</span>';
-              const normL = links.map(f => typeof f === 'string' ? { id: null, url: f } : f);
-              const lockedHtml = normL.map((f, i) =>
-                `<span onclick="previewBukti('${f.url}','${f.id||''}')" title="Preview"
-                  style="font-size:10.5px;color:#0d9488;display:flex;align-items:center;gap:1px;cursor:pointer;text-decoration:underline">
-                  <span class="material-icons" style="font-size:11px">visibility</span>File ${i+1}
-                </span>`
-              ).join('');
-              return `<div style="display:flex;flex-direction:column;align-items:center;gap:2px">${lockedHtml}</div>`;
-            }
-            // Normalisasi links ke format {id, url}
+            // Normalisasi links ke format {id, url, name}
             const normLinks = links.map(f => typeof f === 'string' ? { id: null, url: f, name: 'File' } : f);
-            const fileLinksWithDelete = normLinks.map((f, i) =>
-              `<div style="display:flex;align-items:center;gap:4px">
-                <span onclick="previewBukti('${f.url}','${f.id||''}')" title="Preview file"
-                  style="font-size:10.5px;color:#0d9488;display:flex;align-items:center;gap:1px;cursor:pointer;text-decoration:underline">
-                  👁️ File ${i+1}
-                </span>
-                <button onclick="hapusBukti('${idUsulan}',${ind.no},${i})" title="Hapus file ini"
-                  style="background:none;border:none;cursor:pointer;padding:0;font-size:13px;line-height:1">
-                  🗑️
-                </button>
-              </div>`
-            ).join('');
+
+            if (isLocked) {
+              if (!normLinks.length) return '<span style="color:#94a3b8;font-size:12px">-</span>';
+              // Set _buktiLinks untuk modal preview di locked state juga
+              window[`_buktiLinks_${ind.no}`] = { links: normLinks, idUsulan };
+              return `<div style="display:flex;align-items:center;gap:2px">
+                <input type="hidden" id="indLinks-${ind.no}" value='${JSON.stringify(normLinks).replace(/'/g,"&#39;")}' data-idusulan="${idUsulan}">
+                <button onclick="openBuktiModal(${ind.no},0)" title="Preview" style="background:none;border:none;cursor:pointer;padding:2px 4px;border-radius:5px;display:flex;align-items:center;color:#0d9488"><span class="material-icons" style="font-size:16px">visibility</span></button>
+                ${normLinks.length > 1 ? `<span style="font-size:10px;color:#94a3b8">${normLinks.length}</span>` : ''}
+              </div>`;
+            }
             const hasFiles = normLinks.length > 0;
             const btnStyle = hasFiles
               ? 'display:inline-flex;align-items:center;padding:4px 12px;background:#16a34a;color:white;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:600;border:1.5px solid #16a34a;white-space:nowrap'
@@ -1466,7 +1449,7 @@ async function viewDetail(idUsulan) {
             <td>${i.no}</td><td style="max-width:220px;font-size:12.5px">${i.nama}</td>
             <td>${i.target}</td><td>${i.capaian}</td>
             
-            <td>${i.linkFile?`<a href="${i.linkFile}" target="_blank" style="color:var(--primary);display:inline-flex;align-items:center;gap:2px;font-size:12px"><span class="material-icons" style="font-size:13px">open_in_new</span>Lihat</a>`:'-'}</td>
+            <td>${i.linkFile ? (() => { try { const ls = JSON.parse(i.linkFile); const arr = Array.isArray(ls) ? ls.map(f=>typeof f==='string'?{id:null,url:f,name:'File'}:f) : [{id:null,url:i.linkFile,name:'File'}]; window[`_buktiLinks_${i.no}_detail`]={links:arr,idUsulan:i.idUsulan||''}; return `<button onclick="(function(){window._modalBukti={links:${JSON.stringify(arr).replace(/"/g,'&quot;')},idUsulan:'',idx:0,noIndikator:${i.no}};_renderBuktiModal();})()" style="background:none;border:none;cursor:pointer;color:#0d9488;display:inline-flex;align-items:center;gap:3px;font-size:12px;padding:2px 6px;border-radius:5px" onmouseover="this.style.background='rgba(13,148,136,0.08)'" onmouseout="this.style.background='none'"><span class="material-icons" style="font-size:14px">visibility</span>${arr.length>1?arr.length+' file':''}</button>`; } catch(e){ return `<a href="${i.linkFile}" target="_blank" style="color:#0d9488"><span class="material-icons" style="font-size:13px">visibility</span></a>`; } })() : '-'}</td>
           </tr>`).join('')}</tbody>
         </table>
       </div>

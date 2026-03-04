@@ -1119,19 +1119,16 @@ function _renderBuktiModal() {
   const isPDF = ext === 'pdf';
   const total = links.length;
 
-  // Untuk PDF lama yang tersimpan sebagai raw/upload — Cloudinary raw = 401 tanpa auth
-  // Konversi ke image/upload agar bisa diakses publik
-  function fixPdfUrl(url) {
-    if (!url) return url;
-    if (url.includes('/raw/upload/')) {
-      return url.replace('/raw/upload/', '/image/upload/');
-    }
-    return url;
-  }
-  const fileUrl = isPDF ? fixPdfUrl(f.url) : f.url;
+  // Tentukan URL yang bisa diakses:
+  // - PDF baru (image/upload): langsung pakai f.url
+  // - PDF lama (raw/upload): butuh proxy autentikasi via sign-url
+  const isRawPdf = isPDF && f.url && f.url.includes('/raw/upload/');
+  const fileUrl = isRawPdf
+    ? `/.netlify/functions/sign-url?url=${encodeURIComponent(f.url)}&name=${encodeURIComponent(fileName)}`
+    : f.url;
 
-  // URL download via proxy — bypass CORS + paksa download dengan nama yang benar
-  const downloadUrl = `/.netlify/functions/download?url=${encodeURIComponent(f.url)}&name=${encodeURIComponent(fileName)}`;
+  // Untuk preview PDF di iframe: raw PDF tidak bisa di-embed, tampilkan download card
+  const canPreviewPdf = isPDF && !isRawPdf;
 
   let modal = document.getElementById('previewBuktiModal');
   if (!modal) {
@@ -1169,7 +1166,7 @@ function _renderBuktiModal() {
       <div style="flex:1;overflow:hidden;display:flex;align-items:center;justify-content:center;background:#0f172a;position:relative">
         ${isImage
           ? `<img src="${fileUrl}" style="max-width:100%;max-height:100%;object-fit:contain;padding:16px">`
-          : isPDF
+          : (isPDF && canPreviewPdf)
           ? `<iframe src="${fileUrl}" style="width:100%;height:100%;border:none"></iframe>`
           : `<div style="text-align:center;color:white;padding:40px">
               <div style="font-size:64px;margin-bottom:16px">${fileIcon}</div>
@@ -1205,32 +1202,50 @@ async function downloadBukti(idx) {
   const f = d.links[idx];
   if (!f) return;
 
-  // Nama file dari f.name
   let fileName = (f.name && f.name !== 'File' && f.name.trim()) ? f.name.trim() : 'file';
   const dotIdx = fileName.lastIndexOf('.');
   const ext = dotIdx > -1 ? fileName.substring(dotIdx + 1).toLowerCase() : '';
 
-  // Untuk PDF: konversi raw/upload → image/upload (raw = 401 di Cloudinary)
-  function resolveUrl(url) {
-    if (ext === 'pdf' && url && url.includes('/raw/upload/')) {
-      return url.replace('/raw/upload/', '/image/upload/');
+  // Untuk PDF lama (raw/upload): gunakan sign-url proxy yang pakai Basic Auth
+  // Untuk file lain: coba langsung, fallback append ekstensi
+  const isRawResource = f.url && f.url.includes('/raw/upload/');
+
+  if (isRawResource) {
+    // Proxy via sign-url — backend akan handle autentikasi
+    const proxyUrl = `/.netlify/functions/sign-url?url=${encodeURIComponent(f.url)}&name=${encodeURIComponent(fileName)}`;
+    try {
+      const res = await fetch(proxyUrl);
+      if (!res.ok) throw new Error('Proxy error');
+      // Cek apakah response adalah redirect (signed URL) atau blob
+      const ct = res.headers.get('content-type') || '';
+      if (ct.includes('application/json')) {
+        // Mungkin error
+        const json = await res.json();
+        throw new Error(json.error || 'Download gagal');
+      }
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+    } catch (e) {
+      window.open(f.url, '_blank');
     }
-    return url;
+    return;
   }
 
-  // Bangun daftar URL yang akan dicoba
-  const baseUrl = resolveUrl(f.url);
-  const urlsToTry = [baseUrl];
-  const urlHasExt = baseUrl.split('/').pop().split('?')[0].includes('.');
-  if (!urlHasExt && ext) urlsToTry.push(baseUrl + '.' + ext);
-
-  let fetchUrl = baseUrl;
+  // File publik (image/upload) — fetch langsung sebagai blob
+  let fetchUrl = f.url;
   try {
-    for (const u of urlsToTry) {
-      const res = await fetch(u, { method: 'HEAD' });
-      if (res.ok) { fetchUrl = u; break; }
+    const urlHasExt = f.url.split('/').pop().split('?')[0].includes('.');
+    if (!urlHasExt && ext) {
+      const res = await fetch(f.url + '.' + ext, { method: 'HEAD' });
+      if (res.ok) fetchUrl = f.url + '.' + ext;
     }
-
     const blobRes = await fetch(fetchUrl);
     if (!blobRes.ok) throw new Error('Fetch gagal');
     const blob = await blobRes.blob();

@@ -807,7 +807,7 @@ async function openIndikatorModal(idUsulan) {
       // Ubah label tombol untuk ajukan ulang
       submitBtn.innerHTML = isDitolak
         ? '<span class="material-icons">refresh</span> Ajukan Ulang'
-        : '<span class="material-icons">send</span> Submit ke Kepala Puskesmas';
+        : '<span class="material-icons">send</span> Submit';
     }
     // Tampilkan banner status (bukan Draft dan bukan Ditolak = read-only)
     const _ln = document.getElementById('indModalLockNotif');
@@ -896,7 +896,8 @@ async function openIndikatorModal(idUsulan) {
             if (normLinks.length > 0) window[`_buktiLinks_${ind.no}`] = { links: normLinks, idUsulan };
             const fileControlHtml = normLinks.length > 0
               ? `<div style="display:flex;align-items:center;gap:1px">
-                  <button onclick="openBuktiModal(${ind.no},0)" title="Preview" style="background:none;border:none;cursor:pointer;padding:3px 4px;border-radius:5px;display:flex;align-items:center;color:#0d9488" onmouseover="this.style.background='rgba(13,148,136,0.08)'" onmouseout="this.style.background='none'">${SVG_EYE}</button>
+                  <input type="hidden" id="indLinks-${ind.no}" value='${JSON.stringify(normLinks).replace(/'/g,"&#39;")}' data-idusulan="${idUsulan}">
+                  <button onclick="openBuktiModal(${ind.no},0)" title="Preview" style="background:none;border:none;cursor:pointer;padding:2px 4px;border-radius:5px;display:flex;align-items:center;color:#0d9488" onmouseover="this.style.background='rgba(13,148,136,0.08)'" onmouseout="this.style.background='none'"><span class="material-icons" style="font-size:16px">visibility</span></button>
                   <button onclick="hapusBukti('${idUsulan}',${ind.no},${normLinks.length-1})" title="Hapus" style="background:none;border:none;cursor:pointer;padding:3px 4px;border-radius:5px;display:flex;align-items:center;color:#ef4444" onmouseover="this.style.background='rgba(239,68,68,0.08)'" onmouseout="this.style.background='none'">${SVG_TRASH}</button>
                 </div>`
               : '';
@@ -997,7 +998,7 @@ async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, tahun
     if (controls) {
       if (allLinks.length > 0) {
         controls.innerHTML = '<div style="display:flex;align-items:center;gap:1px">'
-          + '<button onclick="openBuktiModal(' + noIndikator + ',0)" title="Preview" style="background:none;border:none;cursor:pointer;padding:3px 4px;border-radius:5px;display:flex;align-items:center;color:#0d9488">' + SVG_EYE + '</button>'
+          + '<button onclick="openBuktiModal(' + noIndikator + ',0)" title="Preview" style="background:none;border:none;cursor:pointer;padding:2px 4px;border-radius:5px;display:flex;align-items:center;color:#0d9488"><span class="material-icons" style="font-size:16px">visibility</span></button>'
           + '<button onclick="hapusBukti(\'' + idUsulan + '\',' + noIndikator + ',' + (allLinks.length-1) + ')" title="Hapus" style="background:none;border:none;cursor:pointer;padding:3px 4px;border-radius:5px;display:flex;align-items:center;color:#ef4444">' + SVG_TRASH + '</button>'
           + '</div>';
       } else {
@@ -1063,7 +1064,7 @@ async function hapusBukti(idUsulan, noIndikator, fileIndex) {
         if (ctrl) {
           if (links.length > 0) {
             ctrl.innerHTML = '<div style="display:flex;align-items:center;gap:1px">'
-              + '<button onclick="openBuktiModal(' + noIndikator + ',0)" title="Preview" style="background:none;border:none;cursor:pointer;padding:3px 4px;border-radius:5px;display:flex;align-items:center;color:#0d9488">' + SVG_EYE + '</button>'
+              + '<button onclick="openBuktiModal(' + noIndikator + ',0)" title="Preview" style="background:none;border:none;cursor:pointer;padding:2px 4px;border-radius:5px;display:flex;align-items:center;color:#0d9488"><span class="material-icons" style="font-size:16px">visibility</span></button>'
               + '<button onclick="hapusBukti(\'' + idUsulan + '\',' + noIndikator + ',' + (links.length-1) + ')" title="Hapus" style="background:none;border:none;cursor:pointer;padding:3px 4px;border-radius:5px;display:flex;align-items:center;color:#ef4444">' + SVG_TRASH + '</button>'
               + '</div>';
           } else {
@@ -1084,8 +1085,21 @@ async function hapusBukti(idUsulan, noIndikator, fileIndex) {
 }
 
 function openBuktiModal(noIndikator, startIdx) {
-  const data = window[`_buktiLinks_${noIndikator}`];
-  if (!data || !data.links.length) return;
+  let data = window[`_buktiLinks_${noIndikator}`];
+  // Fallback: baca dari hidden input di DOM kalau window data belum ter-set
+  if (!data || !data.links.length) {
+    const hiddenEl = document.getElementById(`indLinks-${noIndikator}`);
+    if (hiddenEl) {
+      try {
+        const parsed = JSON.parse(hiddenEl.value);
+        const idUsulan = hiddenEl.dataset.idusulan;
+        const links = Array.isArray(parsed) ? parsed.map(f => typeof f === 'string' ? { id: null, url: f, name: 'File' } : f) : [];
+        data = { links, idUsulan };
+        window[`_buktiLinks_${noIndikator}`] = data;
+      } catch(e) {}
+    }
+  }
+  if (!data || !data.links.length) { toast('Data dukung tidak ditemukan', 'error'); return; }
   window._modalBukti = { links: data.links, idUsulan: data.idUsulan, idx: startIdx || 0, noIndikator };
   _renderBuktiModal();
 }
@@ -1255,7 +1269,7 @@ async function saveIndikator(noIndikator) {
 async function submitUsulanFromModal() {
   showConfirm({
     title: 'Submit Usulan',
-    message: 'Submit usulan ke Kepala Puskesmas untuk diverifikasi?',
+    message: 'Submit usulan untuk diverifikasi?',
     type: 'warning', icon: 'send',
     onConfirm: async () => {
       await doSubmitUsulan(false);

@@ -84,6 +84,23 @@ exports.handler = async (event) => {
       return ok({ message: 'Periode berhasil disimpan' });
     }
 
+    if (method === 'DELETE') {
+      const { tahun, bulan } = params;
+      if (!tahun || !bulan) return err('Tahun dan bulan diperlukan');
+      // Cek apakah periode sedang aktif hari ini — tidak boleh dihapus
+      const r = await pool.query('SELECT id, status, tanggal_mulai, tanggal_selesai FROM periode_input WHERE tahun=$1 AND bulan=$2', [parseInt(tahun), parseInt(bulan)]);
+      if (!r.rows.length) return err('Periode tidak ditemukan');
+      const p = r.rows[0];
+      const today = new Date(); today.setHours(0,0,0,0);
+      const mulai = new Date(p.tanggal_mulai);
+      const selesai = new Date(p.tanggal_selesai); selesai.setHours(23,59,59,999);
+      if (p.status === 'Aktif' && today >= mulai && today <= selesai) {
+        return err('Tidak dapat menghapus periode yang sedang aktif hari ini');
+      }
+      await pool.query('DELETE FROM periode_input WHERE tahun=$1 AND bulan=$2', [parseInt(tahun), parseInt(bulan)]);
+      return ok({ message: 'Periode berhasil dihapus' });
+    }
+
     return err('Method tidak diizinkan', 405);
   } catch (e) {
     console.error('Periode error:', e);

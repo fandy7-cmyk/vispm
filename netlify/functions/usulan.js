@@ -228,8 +228,8 @@ async function updateIndikator(pool, body) {
   // nilai = bobot * rasio
   const nilaiTerbobot = Math.round(bobot * rasio * 100) / 100;
 
-  // Update — link_file hanya diupdate kalau ada nilainya
-  if (linkFile !== undefined && linkFile !== null && linkFile !== '') {
+  // Update — link_file diupdate kalau linkFile dikirim (termasuk string kosong untuk hapus semua)
+  if (linkFile !== undefined && linkFile !== null) {
     await pool.query(
       'UPDATE usulan_indikator SET target=$1, capaian=$2, realisasi_rasio=$3, nilai_terbobot=$4, catatan=$5, link_file=$6 WHERE id_usulan=$7 AND no_indikator=$8',
       [t, c, rasio, nilaiTerbobot, catatan || '', linkFile, idUsulan, noIndikator]

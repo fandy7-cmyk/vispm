@@ -2784,7 +2784,7 @@ async function deletePKM(kode) {
 let _ttPKM = [], _ttIndikator = [], _ttCurrentKode = null, _ttCurrentTahun = null;
 
 async function renderTargetTahunan() {
-  const tahunOpts = Array.from({length:5},(_,i)=>2024+i).map(y=>`<option value="${y}" ${y===CURRENT_YEAR?'selected':''}>${y}</option>`).join('');
+  const tahunOpts = yearOptions(CURRENT_YEAR);
   document.getElementById('mainContent').innerHTML = `
     <div class="page-header">
       <h1><span class="material-icons">track_changes</span>Target Tahunan per Puskesmas</h1>
@@ -3035,7 +3035,7 @@ async function renderPeriode() {
     <div class="card">
       <div class="card-body" style="padding:12px 16px">
         <select class="form-control" id="filterTahunPeriode" style="width:150px" onchange="loadPeriodeGrid()">
-          ${yearOptions(currentTahun, CURRENT_YEAR + 10)}
+          ${yearOptions(currentTahun, window._maxPeriodeTahun || CURRENT_YEAR + 10)}
         </select>
       </div>
       <div class="card-body">
@@ -3049,7 +3049,7 @@ async function renderPeriode() {
           <button class="btn-icon" onclick="closeModal('periodeModal')"><span class="material-icons">close</span></button></div>
         <div class="modal-body">
           <div class="form-row">
-            <div class="form-group"><label>Tahun</label><select class="form-control" id="pTahun">${yearOptions(currentTahun, CURRENT_YEAR + 10)}</select></div>
+            <div class="form-group"><label>Tahun</label><select class="form-control" id="pTahun">${yearOptions(currentTahun, window._maxPeriodeTahun || CURRENT_YEAR + 10)}</select></div>
             <div class="form-group"><label>Bulan</label><select class="form-control" id="pBulan">${bulanOptions(CURRENT_BULAN)}</select></div>
           </div>
           <div class="form-row">

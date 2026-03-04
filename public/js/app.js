@@ -1108,7 +1108,7 @@ function _renderBuktiModal() {
     modal.addEventListener('click', e => { if (e.target === modal) modal.style.display = 'none'; });
   }
 
-  const svgOpen = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>`;
+  const svgDownload = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
   const svgTrashM = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></svg>`;
 
   const embedUrl = isPDF ? f.url : null;
@@ -1118,7 +1118,11 @@ function _renderBuktiModal() {
   // Icon per file type
   const fileIcons = { pdf:'&#128196;', doc:'&#128196;', docx:'&#128196;', xls:'&#128202;', xlsx:'&#128202;', ppt:'&#128190;', pptx:'&#128190;' };
   const fileIcon = fileIcons[ext] || '&#128196;';
-  const fileName = f.name || (f.url.split('/').pop().split('?')[0]) || 'File';
+  // Get filename with extension - f.name already has it from upload
+  const rawName = f.name || f.url.split('/').pop().split('?')[0] || 'File';
+  // Ensure extension is present
+  const hasExt = rawName.includes('.') && rawName.split('.').pop().length <= 5;
+  const fileName = hasExt ? rawName : (rawName + '.' + ext);
 
   modal.innerHTML = `
     <div style="background:#1e293b;border-radius:14px;width:92%;max-width:920px;height:88vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,0.5)">
@@ -1128,7 +1132,7 @@ function _renderBuktiModal() {
           ${total > 1 ? `<span style="background:#334155;color:#94a3b8;font-size:11px;padding:2px 8px;border-radius:20px;font-weight:600">${idx+1} / ${total}</span>` : ''}
         </div>
         <div style="display:flex;gap:6px;align-items:center">
-          <a href="${f.url}" download="${fileName}" target="_blank" style="background:#0d9488;color:white;padding:5px 12px;border-radius:7px;font-size:12px;font-weight:600;text-decoration:none;display:flex;align-items:center;gap:5px">${svgOpen} Buka</a>
+          <a href="${f.url}" download="${fileName}" title="Download ${fileName}" style="background:rgba(13,148,136,0.15);color:#0d9488;border:1px solid rgba(13,148,136,0.3);padding:5px 10px;border-radius:7px;font-size:12px;font-weight:600;text-decoration:none;display:flex;align-items:center;gap:5px">${svgDownload}</a>
           <button onclick="hapusBukti('${idUsulan}',${noIndikator},${idx})" style="background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.3);padding:5px 12px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px">${svgTrashM} Hapus</button>
           <button onclick="document.getElementById('previewBuktiModal').style.display='none'" style="background:rgba(255,255,255,0.08);border:none;cursor:pointer;color:white;border-radius:7px;width:32px;height:32px;font-size:20px;display:flex;align-items:center;justify-content:center">&#215;</button>
         </div>
@@ -1141,8 +1145,8 @@ function _renderBuktiModal() {
           : `<div style="text-align:center;color:white;padding:40px">
               <div style="font-size:64px;margin-bottom:16px">${fileIcon}</div>
               <div style="font-size:14px;color:#e2e8f0;font-weight:500;margin-bottom:6px;max-width:400px;word-break:break-all">${fileName}</div>
-              <div style="font-size:12px;color:#64748b;margin-bottom:24px;text-transform:uppercase;letter-spacing:1px">${ext} file</div>
-              <a href="${f.url}" download="${fileName}" target="_blank" style="background:#0d9488;color:white;padding:10px 28px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;display:inline-flex;align-items:center;gap:8px">&#8595; Download ${fileName}</a>
+              <div style="font-size:12px;color:#64748b;margin-bottom:24px;text-transform:uppercase;letter-spacing:1px">${ext.toUpperCase()} &bull; Tidak dapat dipreview di browser</div>
+              <a href="${f.url}" download="${fileName}" target="_blank" style="background:#0d9488;color:white;padding:12px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;display:inline-flex;align-items:center;gap:8px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download ${fileName}</a>
             </div>`
         }
         ${total > 1 ? navBtn('left','_buktiNav(-1)') : ''}
@@ -1384,11 +1388,11 @@ async function viewDetail(idUsulan) {
           <span style="font-family:'JetBrains Mono';font-size:16px;color:var(--primary);font-weight:800">${parseFloat(detail.indeksSPM).toFixed(2)}</span>
         </div>
       </div>
-      ${detail.driveFolderUrl ? `<div style="margin-bottom:12px"><a href="${detail.driveFolderUrl}" target="_blank" class="btn btn-secondary btn-sm"><span class="material-icons" style="font-size:14px">folder_open</span> Lihat Folder Bukti Google Drive</a></div>` : ''}
+      ${detail.driveFolderUrl ? `<div style="margin-bottom:12px"><a href="${detail.driveFolderUrl}" target="_blank" class="btn btn-secondary btn-sm"><span class="material-icons" style="font-size:14px">folder_open</span> Lihat Folder Data Dukung Google Drive</a></div>` : ''}
       <div style="font-weight:700;font-size:13.5px;margin-bottom:8px">Detail Indikator</div>
       <div class="table-container">
         <table>
-          <thead><tr><th>No</th><th>Indikator</th><th>Target</th><th>Capaian</th><th>Bukti</th></tr></thead>
+          <thead><tr><th>No</th><th>Indikator</th><th>Target</th><th>Capaian</th><th>Data Dukung</th></tr></thead>
           <tbody>${inds.map(i => `<tr>
             <td>${i.no}</td><td style="max-width:220px;font-size:12.5px">${i.nama}</td>
             <td>${i.target}</td><td>${i.capaian}</td>
@@ -1543,7 +1547,7 @@ async function openVerifikasi(idUsulan) {
         try {
           const links = JSON.parse(i.linkFile);
           if (Array.isArray(links)) {
-            buktiHtml = links.map((f,idx) => `<a href="${f.url||f}" target="_blank" style="display:inline-flex;align-items:center;gap:3px;color:var(--primary);font-size:12px;margin-right:4px"><span class="material-icons" style="font-size:13px">attach_file</span>Bukti ${idx+1}</a>`).join('');
+            buktiHtml = links.map((f,idx) => `<a href="${f.url||f}" target="_blank" style="display:inline-flex;align-items:center;gap:3px;color:var(--primary);font-size:12px;margin-right:4px"><span class="material-icons" style="font-size:13px">attach_file</span>File ${idx+1}</a>`).join('');
           } else {
             buktiHtml = `<a href="${i.linkFile}" target="_blank" style="display:inline-flex;align-items:center;gap:3px;color:var(--primary);font-size:12px"><span class="material-icons" style="font-size:13px">attach_file</span>Lihat</a>`;
           }

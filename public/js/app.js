@@ -1117,18 +1117,21 @@ function _renderBuktiModal() {
 
   const isImage = ['jpg','jpeg','png','gif','webp'].includes(ext);
   const isPDF = ext === 'pdf';
+  const isOffice = ['doc','docx','xls','xlsx','ppt','pptx'].includes(ext);
+  const isRaw = f.url && f.url.includes('/raw/upload/');  // raw = perlu auth
   const total = links.length;
 
-  // Tentukan URL yang bisa diakses:
-  // - PDF baru (image/upload): langsung pakai f.url
-  // - PDF lama (raw/upload): butuh proxy autentikasi via sign-url
-  const isRawPdf = isPDF && f.url && f.url.includes('/raw/upload/');
-  const fileUrl = isRawPdf
-    ? `/.netlify/functions/sign-url?url=${encodeURIComponent(f.url)}&name=${encodeURIComponent(fileName)}`
-    : f.url;
+  // URL untuk preview (inline) dan download
+  const previewProxyUrl = `${location.origin}/.netlify/functions/sign-url?url=${encodeURIComponent(f.url)}&name=${encodeURIComponent(fileName)}&mode=preview`;
+  const downloadProxyUrl = `${location.origin}/.netlify/functions/sign-url?url=${encodeURIComponent(f.url)}&name=${encodeURIComponent(fileName)}&mode=download`;
 
-  // Untuk preview PDF di iframe: raw PDF tidak bisa di-embed, tampilkan download card
-  const canPreviewPdf = isPDF && !isRawPdf;
+  // Tentukan cara preview:
+  // - Gambar: <img> langsung
+  // - PDF publik (image/upload): <iframe> langsung
+  // - PDF lama (raw/upload): <iframe> via proxy
+  // - Office (doc/xlsx/ppt): Google Docs Viewer dengan proxy URL (agar GDV bisa akses)
+  const directUrl = isRaw ? previewProxyUrl : f.url;
+  const gdvUrl = `https://docs.google.com/viewer?embedded=true&url=${encodeURIComponent(previewProxyUrl)}`;
 
   let modal = document.getElementById('previewBuktiModal');
   if (!modal) {
@@ -1141,8 +1144,6 @@ function _renderBuktiModal() {
 
   const svgDownload = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
   const svgTrashM = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></svg>`;
-
-  const embedUrl = isPDF ? f.url : null;
 
   const navBtn = (dir, fn) => `<button onclick="${fn}" style="position:absolute;top:50%;${dir}:14px;transform:translateY(-50%);background:rgba(255,255,255,0.12);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,0.18);color:white;border-radius:50%;width:42px;height:42px;cursor:pointer;font-size:22px;display:flex;align-items:center;justify-content:center;line-height:1" onmouseover="this.style.background='rgba(255,255,255,0.25)'" onmouseout="this.style.background='rgba(255,255,255,0.12)'">${dir==='left'?'&#8249;':'&#8250;'}</button>`;
 
@@ -1165,9 +1166,9 @@ function _renderBuktiModal() {
       </div>
       <div style="flex:1;overflow:hidden;display:flex;align-items:center;justify-content:center;background:#0f172a;position:relative">
         ${isImage
-          ? `<img src="${fileUrl}" style="max-width:100%;max-height:100%;object-fit:contain;padding:16px">`
-          : (isPDF && canPreviewPdf)
-          ? `<iframe src="${fileUrl}" style="width:100%;height:100%;border:none"></iframe>`
+          ? `<img src="${f.url}" style="max-width:100%;max-height:100%;object-fit:contain;padding:16px">`
+          : (isPDF || isOffice)
+          ? `<iframe src="${isOffice ? gdvUrl : directUrl}" style="width:100%;height:100%;border:none" onload="this.style.opacity=1" style="opacity:0;transition:opacity 0.3s"></iframe>`
           : `<div style="text-align:center;color:white;padding:40px">
               <div style="font-size:64px;margin-bottom:16px">${fileIcon}</div>
               <div style="font-size:11px;color:#64748b;margin-bottom:28px;text-transform:uppercase;letter-spacing:1px">${ext ? ext.toUpperCase() + ' &bull; ' : ''}Tidak dapat dipreview di browser</div>
@@ -1205,60 +1206,44 @@ async function downloadBukti(idx) {
   let fileName = (f.name && f.name !== 'File' && f.name.trim()) ? f.name.trim() : 'file';
   const dotIdx = fileName.lastIndexOf('.');
   const ext = dotIdx > -1 ? fileName.substring(dotIdx + 1).toLowerCase() : '';
+  if (ext && !fileName.toLowerCase().endsWith('.' + ext)) fileName += '.' + ext;
 
-  // Untuk PDF lama (raw/upload): gunakan sign-url proxy yang pakai Basic Auth
-  // Untuk file lain: coba langsung, fallback append ekstensi
-  const isRawResource = f.url && f.url.includes('/raw/upload/');
+  const isRaw = f.url && f.url.includes('/raw/upload/');
 
-  if (isRawResource) {
-    // Proxy via sign-url — backend akan handle autentikasi
-    const proxyUrl = `/.netlify/functions/sign-url?url=${encodeURIComponent(f.url)}&name=${encodeURIComponent(fileName)}`;
+  if (isRaw) {
+    // File raw (PDF lama, docx, xlsx) — proxy via backend dengan Cloudinary Basic Auth
+    const proxyUrl = `/.netlify/functions/sign-url?url=${encodeURIComponent(f.url)}&name=${encodeURIComponent(fileName)}&mode=download`;
     try {
+      toast('Mengunduh file...', 'info');
       const res = await fetch(proxyUrl);
-      if (!res.ok) throw new Error('Proxy error');
-      // Cek apakah response adalah redirect (signed URL) atau blob
-      const ct = res.headers.get('content-type') || '';
-      if (ct.includes('application/json')) {
-        // Mungkin error
-        const json = await res.json();
-        throw new Error(json.error || 'Download gagal');
-      }
+      if (!res.ok) throw new Error('Proxy error ' + res.status);
       const blob = await res.blob();
       const blobUrl = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = blobUrl;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      a.href = blobUrl; a.download = fileName;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
       setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
     } catch (e) {
+      toast('Download gagal, membuka di tab baru...', 'error');
       window.open(f.url, '_blank');
     }
     return;
   }
 
-  // File publik (image/upload) — fetch langsung sebagai blob
-  let fetchUrl = f.url;
+  // File publik (image/upload) — fetch langsung
   try {
     const urlHasExt = f.url.split('/').pop().split('?')[0].includes('.');
-    if (!urlHasExt && ext) {
-      const res = await fetch(f.url + '.' + ext, { method: 'HEAD' });
-      if (res.ok) fetchUrl = f.url + '.' + ext;
-    }
-    const blobRes = await fetch(fetchUrl);
-    if (!blobRes.ok) throw new Error('Fetch gagal');
-    const blob = await blobRes.blob();
+    const fetchUrl = (!urlHasExt && ext) ? f.url + '.' + ext : f.url;
+    const res = await fetch(fetchUrl);
+    if (!res.ok) throw new Error('Fetch gagal');
+    const blob = await res.blob();
     const blobUrl = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = blobUrl;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    a.href = blobUrl; a.download = fileName;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
   } catch (e) {
-    window.open(fetchUrl, '_blank');
+    window.open(f.url, '_blank');
   }
 }
 

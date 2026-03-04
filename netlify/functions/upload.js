@@ -1,70 +1,86 @@
-const crypto = require('crypto');
+const cloudinary = require('cloudinary').v2;
 
-const CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME;
-const API_KEY    = process.env.CLOUDINARY_API_KEY;
-const API_SECRET = process.env.CLOUDINARY_API_SECRET;
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 exports.handler = async (event) => {
-  const headers = { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  };
+
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers, body: '' };
   if (event.httpMethod !== 'POST') return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method not allowed' }) };
 
   try {
-    const body = JSON.parse(event.body || '{}');
-    const { fileName, fileBase64, kodePKM, tahun, bulan, noIndikator } = body;
-
+    const { fileName, fileBase64, kodePKM, tahun, bulan, noIndikator } = JSON.parse(event.body || '{}');
     if (!fileName || !fileBase64) {
       return { statusCode: 400, headers, body: JSON.stringify({ success: false, error: 'fileName dan fileBase64 diperlukan' }) };
     }
 
-    // Folder struktur: VISPM/PKM11/2026/05/1
-    const folder = `VISPM/${kodePKM || 'UNKNOWN'}/${tahun || ''}/${String(bulan||'').padStart(2,'0')}/${noIndikator || ''}`;
-    const timestamp = Math.floor(Date.now() / 1000);
-    const publicId = `${kodePKM}_${tahun}_${bulan}_ind${noIndikator}_${timestamp}`;
+    // Pisahkan ekstensi dari nama file
+    const dotIdx = fileName.lastIndexOf('.');
+    const baseName = dotIdx > -1 ? fileName.substring(0, dotIdx) : fileName;
+    const ext = dotIdx > -1 ? fileName.substring(dotIdx + 1).toLowerCase() : '';
 
-    // Signature
-    const toSign = `folder=${folder}&public_id=${publicId}&timestamp=${timestamp}${API_SECRET}`;
-    const signature = crypto.createHash('sha256').update(toSign).digest('hex');
+    // Buat public_id yang include ekstensi sebagai bagian nama (bukan sebagai ekstensi Cloudinary)
+    // Format: VISPM/PKM11/2026/05/4/PKM11_2026_5_ind4_timestamp_namafile
+    const timestamp = Date.now();
+    const safeBase = baseName.replace(/[^a-zA-Z0-9_\-\.]/g, '_').substring(0, 40);
+    const folder = `VISPM/${kodePKM || 'PKM'}/${tahun || ''}/${bulan || ''}/${noIndikator || ''}`;
+    // public_id menyimpan nama file dengan ekstensi agar bisa diketahui tipe filenya
+    const publicId = `${kodePKM || 'PKM'}_${tahun || ''}_${bulan || ''}_ind${noIndikator || ''}_${timestamp}_${safeBase}.${ext}`;
 
-    // Base64 data URI
-    const base64Data = fileBase64.includes(',') ? fileBase64.split(',')[1] : fileBase64;
-    const ext = fileName.split('.').pop().toLowerCase();
-    const mimeMap = {
-      pdf: 'application/pdf', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
-      doc: 'application/msword', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      xls: 'application/vnd.ms-excel', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    };
-    const mimeType = mimeMap[ext] || 'application/octet-stream';
-    const dataUri = `data:${mimeType};base64,${base64Data}`;
+    // Deteksi resource_type
+    const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'];
+    const videoExts = ['mp4', 'mov', 'avi', 'mkv'];
+    let resourceType = 'raw'; // default untuk doc, docx, xlsx, pdf, dll
+    if (imageExts.includes(ext)) resourceType = 'image';
+    else if (videoExts.includes(ext)) resourceType = 'video';
 
-    const isImage = ['jpg','jpeg','png','gif','webp'].includes(ext);
-    const resourceType = isImage ? 'image' : 'raw';
+    const dataUri = `data:application/octet-stream;base64,${fileBase64}`;
 
-    const formData = new URLSearchParams();
-    formData.append('file', dataUri);
-    formData.append('api_key', API_KEY);
-    formData.append('timestamp', String(timestamp));
-    formData.append('signature', signature);
-    formData.append('folder', folder);
-    formData.append('public_id', publicId);
+    const result = await cloudinary.uploader.upload(dataUri, {
+      folder,
+      public_id: publicId,
+      resource_type: resourceType,
+      use_filename: false,
+      unique_filename: false,
+      overwrite: false,
+    });
 
-    const uploadRes = await fetch(
-      `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/${resourceType}/upload`,
-      { method: 'POST', body: formData }
-    );
-
-    const result = await uploadRes.json();
-    if (result.error) {
-      return { statusCode: 500, headers, body: JSON.stringify({ success: false, error: result.error.message }) };
+    // Untuk raw files, Cloudinary URL tidak include ekstensi — kita tambahkan sendiri
+    let fileUrl = result.secure_url;
+    if (resourceType === 'raw' && ext && !fileUrl.endsWith('.' + ext)) {
+      // Cloudinary raw URL format: .../raw/upload/v.../folder/publicId
+      // publicId sudah include .ext jadi URL seharusnya sudah benar
+      // Tapi kalau belum, tambahkan
+      if (!fileUrl.includes('.' + ext)) {
+        fileUrl = fileUrl + '.' + ext;
+      }
     }
 
     return {
-      statusCode: 200, headers,
-      body: JSON.stringify({ success: true, fileUrl: result.secure_url, publicId: result.public_id, fileName })
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({
+        success: true,
+        fileUrl,
+        publicId: result.public_id,
+        originalName: fileName,
+        resourceType,
+      }),
     };
-
-  } catch (err) {
-    console.error('Upload error:', err.message);
-    return { statusCode: 500, headers, body: JSON.stringify({ success: false, error: err.message }) };
+  } catch (e) {
+    console.error('Upload error:', e);
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ success: false, error: e.message }),
+    };
   }
 };

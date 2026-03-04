@@ -1121,17 +1121,20 @@ function _renderBuktiModal() {
   const isRaw = f.url && f.url.includes('/raw/upload/');  // raw = perlu auth
   const total = links.length;
 
-  // URL untuk preview (inline) dan download
-  const previewProxyUrl = `${location.origin}/.netlify/functions/sign-url?url=${encodeURIComponent(f.url)}&name=${encodeURIComponent(fileName)}&mode=preview`;
-  const downloadProxyUrl = `${location.origin}/.netlify/functions/sign-url?url=${encodeURIComponent(f.url)}&name=${encodeURIComponent(fileName)}&mode=download`;
+  // URL proxy backend (untuk raw files yang butuh auth)
+  const proxyBase = `https://vispm.netlify.app/.netlify/functions/sign-url`;
+  const previewProxyUrl = `${proxyBase}?url=${encodeURIComponent(f.url)}&name=${encodeURIComponent(fileName)}&mode=preview`;
 
-  // Tentukan cara preview:
-  // - Gambar: <img> langsung
-  // - PDF publik (image/upload): <iframe> langsung
-  // - PDF lama (raw/upload): <iframe> via proxy
-  // - Office (doc/xlsx/ppt): Google Docs Viewer dengan proxy URL (agar GDV bisa akses)
-  const directUrl = isRaw ? previewProxyUrl : f.url;
-  const gdvUrl = `https://docs.google.com/viewer?embedded=true&url=${encodeURIComponent(previewProxyUrl)}`;
+  // PDF: iframe langsung (publik) atau via proxy (raw)
+  const pdfIframeUrl = isRaw ? previewProxyUrl : f.url;
+
+  // Office preview via Google Docs Viewer:
+  // - File publik (image/upload): GDV akses URL Cloudinary langsung
+  // - File raw: GDV tidak bisa akses Netlify function → tampilkan download card saja
+  const officePublicUrl = !isRaw ? f.url : null;
+  const gdvUrl = officePublicUrl
+    ? `https://docs.google.com/viewer?embedded=true&url=${encodeURIComponent(officePublicUrl)}`
+    : null;
 
   let modal = document.getElementById('previewBuktiModal');
   if (!modal) {
@@ -1167,8 +1170,10 @@ function _renderBuktiModal() {
       <div style="flex:1;overflow:hidden;display:flex;align-items:center;justify-content:center;background:#0f172a;position:relative">
         ${isImage
           ? `<img src="${f.url}" style="max-width:100%;max-height:100%;object-fit:contain;padding:16px">`
-          : (isPDF || isOffice)
-          ? `<iframe src="${isOffice ? gdvUrl : directUrl}" style="width:100%;height:100%;border:none" onload="this.style.opacity=1" style="opacity:0;transition:opacity 0.3s"></iframe>`
+          : isPDF
+          ? `<iframe src="${pdfIframeUrl}" style="width:100%;height:100%;border:none"></iframe>`
+          : (isOffice && gdvUrl)
+          ? `<iframe src="${gdvUrl}" style="width:100%;height:100%;border:none"></iframe>`
           : `<div style="text-align:center;color:white;padding:40px">
               <div style="font-size:64px;margin-bottom:16px">${fileIcon}</div>
               <div style="font-size:11px;color:#64748b;margin-bottom:28px;text-transform:uppercase;letter-spacing:1px">${ext ? ext.toUpperCase() + ' &bull; ' : ''}Tidak dapat dipreview di browser</div>

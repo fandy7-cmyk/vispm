@@ -1170,14 +1170,7 @@ function _renderBuktiModal() {
         ${isImage
           ? `<img src="${f.url}" style="max-width:100%;max-height:100%;object-fit:contain;padding:16px">`
           : isPDF
-          ? `<iframe id="pdfFrame_${idx}" src="${f.url}" style="width:100%;height:100%;border:none"
-               onerror="document.getElementById('pdfFrame_${idx}').style.display='none';document.getElementById('pdfFallback_${idx}').style.display='flex'"
-             ></iframe>
-             <div id="pdfFallback_${idx}" style="display:none;text-align:center;color:white;padding:40px;flex-direction:column;align-items:center">
-               <div style="font-size:64px;margin-bottom:16px">📄</div>
-               <div style="font-size:11px;color:#64748b;margin-bottom:28px">PDF tidak dapat dipreview langsung</div>
-               <button onclick="downloadBukti(${idx})" style="background:#0d9488;color:white;padding:12px 32px;border-radius:8px;border:none;font-weight:600;font-size:14px;cursor:pointer;display:inline-flex;align-items:center;gap:8px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download</button>
-             </div>`
+          ? `<iframe src="https://vispm.netlify.app/.netlify/functions/sign-url?url=${encodeURIComponent(f.url.replace(/\.pdf\.pdf$/, '.pdf'))}&name=${encodeURIComponent(fileName)}&mode=preview" style="width:100%;height:100%;border:none"></iframe>`
           : (isOffice && gdvUrl)
           ? `<iframe src="${gdvUrl}" style="width:100%;height:100%;border:none"></iframe>`
           : `<div style="text-align:center;color:white;padding:40px">
@@ -1219,6 +1212,9 @@ async function downloadBukti(idx) {
   const ext2 = dotIdx2 > -1 ? fileName.substring(dotIdx2 + 1).toLowerCase() : '';
   if (ext2 && !fileName.toLowerCase().endsWith('.' + ext2)) fileName += '.' + ext2;
 
+  // Fix double extension di URL (file lama yang punya .pdf.pdf)
+  const cleanUrl = f.url.replace(/\.pdf\.pdf($|\?)/, '.pdf$1');
+
   async function tryDownload(url) {
     const res = await fetch(url);
     if (!res.ok) throw Object.assign(new Error('HTTP ' + res.status), { status: res.status });
@@ -1230,23 +1226,22 @@ async function downloadBukti(idx) {
     setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
   }
 
-  // Coba URL langsung dulu (works untuk file baru raw+public dan semua image/upload)
-  // Kalau 401/403, fallback ke proxy backend yang pakai Cloudinary Basic Auth
+  // Coba langsung dulu; kalau 401/403 fallback ke proxy backend
   try {
-    const urlHasExt = f.url.split('/').pop().split('?')[0].includes('.');
-    const directUrl = (!urlHasExt && ext2) ? f.url + '.' + ext2 : f.url;
+    const urlHasExt = cleanUrl.split('/').pop().split('?')[0].includes('.');
+    const directUrl = (!urlHasExt && ext2) ? cleanUrl + '.' + ext2 : cleanUrl;
     await tryDownload(directUrl);
   } catch (e) {
     if (e.status === 401 || e.status === 403 || e.status === 404) {
       try {
-        const proxyUrl = `https://vispm.netlify.app/.netlify/functions/sign-url?url=${encodeURIComponent(f.url)}&name=${encodeURIComponent(fileName)}&mode=download`;
+        const proxyUrl = `https://vispm.netlify.app/.netlify/functions/sign-url?url=${encodeURIComponent(cleanUrl)}&name=${encodeURIComponent(fileName)}&mode=download`;
         await tryDownload(proxyUrl);
       } catch (e2) {
-        toast('Gagal download: ' + e2.message, 'error');
-        window.open(f.url, '_blank');
+        toast('Gagal download', 'error');
+        window.open(cleanUrl, '_blank');
       }
     } else {
-      window.open(f.url, '_blank');
+      window.open(cleanUrl, '_blank');
     }
   }
 }

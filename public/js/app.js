@@ -2410,14 +2410,17 @@ function checkUserRole() {
   // Switch modal style: fullscreen untuk Pengelola Program, center untuk role lain
   const modal = document.getElementById('userModal');
   if (modal) {
+    const grid = modal.querySelector('.modal-body > div');
     if (isProgram) {
       modal.classList.add('fullscreen');
       const card = modal.querySelector('.modal-card');
       if (card) card.style.maxWidth = '';
+      if (grid) grid.style.gridTemplateColumns = '1fr 1fr';
     } else {
       modal.classList.remove('fullscreen');
       const card = modal.querySelector('.modal-card');
       if (card) card.style.maxWidth = '680px';
+      if (grid) grid.style.gridTemplateColumns = '1fr';
     }
   }
 }

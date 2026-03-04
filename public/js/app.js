@@ -1955,7 +1955,6 @@ async function _loadMasterTab(tab) {
           </div>
           <div class="modal-body" style="padding:24px;background:#f8fafc">
             <div style="height:100%;display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start">
-              <!-- Kolom kiri: Informasi Akun + Indikator Akses -->
               <div style="display:flex;flex-direction:column;gap:16px">
                 <div class="card" style="padding:24px">
                   <div style="font-weight:700;font-size:13px;color:var(--primary);margin-bottom:16px;display:flex;align-items:center;gap:6px">
@@ -2418,7 +2417,7 @@ function checkUserRole() {
     } else {
       modal.classList.remove('fullscreen');
       const card = modal.querySelector('.modal-card');
-      if (card) card.style.maxWidth = '520px';
+      if (card) card.style.maxWidth = '680px';
     }
   }
 }
@@ -2467,7 +2466,7 @@ function openUserModal(editEmail = null) {
   document.getElementById('uAktif').value = 'true';
   // Reset modal ke center mode dulu sebelum checkUserRole
   const _modal = document.getElementById('userModal');
-  if (_modal) { _modal.classList.remove('fullscreen'); const _card = _modal.querySelector('.modal-card'); if (_card) _card.style.maxWidth = '520px'; }
+  if (_modal) { _modal.classList.remove('fullscreen'); const _card = _modal.querySelector('.modal-card'); if (_card) _card.style.maxWidth = '680px'; }
   // Reset NIP
   const nipResetEl = document.getElementById('uNIP');
   if (nipResetEl) nipResetEl.value = '';

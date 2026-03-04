@@ -47,28 +47,28 @@ exports.handler = async (event) => {
 
     const folder    = 'VISPM/' + (kodePKM||'PKM') + '/' + (tahun||'') + '/' + (bulan||'') + '/' + (noIndikator||'');
     const safeBase  = (baseName + '_' + Math.floor(Date.now() / 1000)).replace(/[^a-zA-Z0-9_\-]/g, '_').substring(0, 60);
-    // publicId tanpa ekstensi untuk raw — Cloudinary raw tidak auto-append, kita tambah manual
-    const publicId  = folder + '/' + safeBase;
     const timestamp = Math.floor(Date.now() / 1000);
 
-    // Semua file pakai 'raw' + access_mode=public agar URL bisa diakses tanpa auth
-    // image resource untuk gambar (agar preview langsung di browser)
+    // Cloudinary DAM mode: gunakan asset_folder (eksplisit) + public_id tanpa path
+    // public_id hanya nama file, folder dipisah via asset_folder
+    const publicId  = safeBase; // tanpa folder prefix
+    const assetFolder = folder;
+
     const imageExts = ['jpg','jpeg','png','gif','webp','bmp','svg'];
     const resourceType = imageExts.includes(ext) ? 'image' : 'raw';
 
-    // Signature mencakup access_mode untuk raw files
-    const sigParts = resourceType === 'raw'
-      ? `access_mode=public&public_id=${publicId}&timestamp=${timestamp}${apiSecret}`
-      : `public_id=${publicId}&timestamp=${timestamp}${apiSecret}`;
+    // Signature: params harus sorted alphabetically
+    // asset_folder < public_id < timestamp
+    const sigParts = `asset_folder=${assetFolder}&public_id=${publicId}&timestamp=${timestamp}${apiSecret}`;
     const signature = crypto.createHash('sha1').update(sigParts).digest('hex');
 
     const params = new URLSearchParams({
       file: 'data:application/octet-stream;base64,' + fileBase64,
       public_id: publicId,
+      asset_folder: assetFolder,
       timestamp: timestamp.toString(),
       api_key: apiKey,
       signature,
-      ...(resourceType === 'raw' ? { access_mode: 'public' } : {}),
     });
 
     const result = await cloudinaryRequest(`/v1_1/${cloudName}/${resourceType}/upload`, params.toString());
@@ -79,14 +79,16 @@ exports.handler = async (event) => {
 
     // Untuk raw: URL tidak punya ekstensi, append manual
     let fileUrl = result.body.secure_url;
-    if (resourceType === 'raw' && ext && !fileUrl.split('/').pop().includes('.')) {
+    if (resourceType === 'raw' && ext && !fileUrl.split('/').pop().split('?')[0].includes('.')) {
       fileUrl = fileUrl + '.' + ext;
     }
+    // Simpan juga folder path untuk referensi
+    const storedPublicId = assetFolder + '/' + result.body.public_id;
 
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({ success: true, fileUrl, publicId: result.body.public_id, originalName: fileName }),
+      body: JSON.stringify({ success: true, fileUrl, publicId: storedPublicId, originalName: fileName }),
     };
   } catch (e) {
     console.error('Upload error:', e);

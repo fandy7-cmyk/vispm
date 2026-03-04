@@ -3157,6 +3157,8 @@ async function hapusPeriode(tahun, bulan, namaBulan) {
     }
   );
 }
+
+async function openPeriodeModal() {
   document.getElementById('pTahun').value = CURRENT_YEAR;
   document.getElementById('pBulan').value = CURRENT_BULAN;
   document.getElementById('pMulai').value = '';

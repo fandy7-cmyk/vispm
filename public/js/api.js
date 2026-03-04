@@ -80,7 +80,11 @@ const API = {
   // Jabatan
   getJabatan: () => API.get('jabatan'),
   saveJabatan: (data) => API.post('jabatan', data),
-  deleteJabatan: (id) => API.del('jabatan', { id })
+  deleteJabatan: (id) => API.del('jabatan', { id }),
+
+  // App Settings
+  getSettings: () => API.get('settings'),
+  saveSettings: (data) => API.put('settings', data),
 };
 
 // Utils

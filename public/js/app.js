@@ -1093,11 +1093,32 @@ function openBuktiModal(noIndikator, startIdx) {
 function _renderBuktiModal() {
   const { links, idx, idUsulan, noIndikator } = window._modalBukti;
   const f = links[idx];
-  const ext = (f.url || '').split('?')[0].split('.').pop().toLowerCase();
+
+  // Nama file asli dari f.name (tersimpan saat upload dengan ekstensi lengkap)
+  // Cloudinary URL untuk raw files tidak mengandung ekstensi, jadi JANGAN ambil dari URL
+  let fileName = (f.name && f.name !== 'File' && f.name.trim()) ? f.name.trim() : null;
+
+  // Kalau tidak ada f.name, coba ekstrak dari publicId (format: ..._namafile.ext)
+  if (!fileName && f.id) {
+    const pidParts = f.id.split('/').pop(); // ambil bagian terakhir publicId
+    // publicId format: PKM11_2026_5_ind4_timestamp_namafile.ext
+    const match = pidParts.match(/_\d+_(.+)$/);
+    if (match) fileName = match[1];
+  }
+
+  // Fallback: nama generik
+  if (!fileName) fileName = 'file';
+
+  // Ekstrak ekstensi dari nama file (bukan dari URL Cloudinary!)
+  const dotIdx = fileName.lastIndexOf('.');
+  const ext = dotIdx > -1 ? fileName.substring(dotIdx + 1).toLowerCase() : '';
+
   const isImage = ['jpg','jpeg','png','gif','webp'].includes(ext);
   const isPDF = ext === 'pdf';
-  const isOffice = ['doc','docx','xls','xlsx','ppt','pptx'].includes(ext);
   const total = links.length;
+
+  // URL download via proxy — bypass CORS + paksa download dengan nama yang benar
+  const downloadUrl = `/.netlify/functions/download?url=${encodeURIComponent(f.url)}&name=${encodeURIComponent(fileName)}`;
 
   let modal = document.getElementById('previewBuktiModal');
   if (!modal) {
@@ -1118,11 +1139,6 @@ function _renderBuktiModal() {
   // Icon per file type
   const fileIcons = { pdf:'&#128196;', doc:'&#128196;', docx:'&#128196;', xls:'&#128202;', xlsx:'&#128202;', ppt:'&#128190;', pptx:'&#128190;' };
   const fileIcon = fileIcons[ext] || '&#128196;';
-  // Get filename with extension - f.name already has it from upload
-  const rawName = f.name || f.url.split('/').pop().split('?')[0] || 'File';
-  // Ensure extension is present
-  const hasExt = rawName.includes('.') && rawName.split('.').pop().length <= 5;
-  const fileName = hasExt ? rawName : (rawName + '.' + ext);
 
   modal.innerHTML = `
     <div style="background:#1e293b;border-radius:14px;width:92%;max-width:920px;height:88vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,0.5)">
@@ -1132,7 +1148,7 @@ function _renderBuktiModal() {
           ${total > 1 ? `<span style="background:#334155;color:#94a3b8;font-size:11px;padding:2px 8px;border-radius:20px;font-weight:600">${idx+1} / ${total}</span>` : ''}
         </div>
         <div style="display:flex;gap:6px;align-items:center">
-          <a href="${f.url}" download="${fileName}" title="Download ${fileName}" style="background:rgba(13,148,136,0.15);color:#0d9488;border:1px solid rgba(13,148,136,0.3);padding:5px 10px;border-radius:7px;font-size:12px;font-weight:600;text-decoration:none;display:flex;align-items:center;gap:5px">${svgDownload}</a>
+          <a href="${downloadUrl}" title="Download ${fileName}" style="background:rgba(13,148,136,0.15);color:#0d9488;border:1px solid rgba(13,148,136,0.3);padding:5px 10px;border-radius:7px;font-size:12px;font-weight:600;text-decoration:none;display:flex;align-items:center;gap:5px">${svgDownload}</a>
           <button onclick="hapusBukti('${idUsulan}',${noIndikator},${idx})" style="background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.3);padding:5px 12px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px">${svgTrashM} Hapus</button>
           <button onclick="document.getElementById('previewBuktiModal').style.display='none'" style="background:rgba(255,255,255,0.08);border:none;cursor:pointer;color:white;border-radius:7px;width:32px;height:32px;font-size:20px;display:flex;align-items:center;justify-content:center">&#215;</button>
         </div>
@@ -1144,9 +1160,9 @@ function _renderBuktiModal() {
           ? `<iframe src="${embedUrl}" style="width:100%;height:100%;border:none"></iframe>`
           : `<div style="text-align:center;color:white;padding:40px">
               <div style="font-size:64px;margin-bottom:16px">${fileIcon}</div>
-              <div style="font-size:14px;color:#e2e8f0;font-weight:500;margin-bottom:6px;max-width:400px;word-break:break-all">${fileName}</div>
-              <div style="font-size:12px;color:#64748b;margin-bottom:24px;text-transform:uppercase;letter-spacing:1px">${ext.toUpperCase()} &bull; Tidak dapat dipreview di browser</div>
-              <a href="${f.url}" download="${fileName}" target="_blank" style="background:#0d9488;color:white;padding:12px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;display:inline-flex;align-items:center;gap:8px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download ${fileName}</a>
+              <div style="font-size:15px;color:#e2e8f0;font-weight:600;margin-bottom:6px;max-width:440px;word-break:break-word">${fileName}</div>
+              <div style="font-size:11px;color:#64748b;margin-bottom:28px;text-transform:uppercase;letter-spacing:1px">${ext ? ext.toUpperCase() + ' &bull; ' : ''}Tidak dapat dipreview di browser</div>
+              <a href="${downloadUrl}" style="background:#0d9488;color:white;padding:12px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;display:inline-flex;align-items:center;gap:8px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download ${fileName}</a>
             </div>`
         }
         ${total > 1 ? navBtn('left','_buktiNav(-1)') : ''}

@@ -45,7 +45,7 @@ async function doLogin() {
   const btn = document.getElementById('authBtn');
   btn.disabled = true;
   btn.innerHTML = '<span class="material-icons" style="animation:spin 0.8s linear infinite">refresh</span> Loading...';
-  setAuthStatus('Memeriksa akses...', '');
+  setAuthStatus('Loading...', '');
 
   try {
     const user = await API.login(email, password);
@@ -868,7 +868,6 @@ async function openIndikatorModal(idUsulan) {
               return `<div style="display:flex;align-items:center;gap:2px">
                 <input type="hidden" id="indLinks-${ind.no}" value='${JSON.stringify(normLinks).replace(/'/g,"&#39;")}' data-idusulan="${idUsulan}">
                 <button onclick="openBuktiModal(${ind.no},0)" title="Preview" style="background:none;border:none;cursor:pointer;padding:2px 4px;border-radius:5px;display:flex;align-items:center;color:#0d9488"><span class="material-icons" style="font-size:16px">visibility</span></button>
-                ${normLinks.length > 1 ? `<span style="font-size:10px;color:#94a3b8">${normLinks.length}</span>` : ''}
               </div>`;
             }
             const hasFiles = normLinks.length > 0;
@@ -1200,15 +1199,27 @@ async function downloadBukti(idx) {
   const dotIdx = fileName.lastIndexOf('.');
   const ext = dotIdx > -1 ? fileName.substring(dotIdx + 1).toLowerCase() : '';
 
-  // Coba URL asli dulu, kalau 404 coba tambah ekstensi (file lama tanpa ekstensi di URL)
+  // Bangun daftar URL yang akan dicoba (dari yang paling mungkin benar)
+  const urlsToTry = [f.url];
+  const urlBase = f.url.split('?')[0];
+  const urlHasExt = urlBase.split('/').pop().includes('.');
+  if (!urlHasExt && ext) {
+    // File lama: Cloudinary raw/upload URL tanpa ekstensi — coba append
+    urlsToTry.push(f.url + '.' + ext);
+  }
+  // Untuk PDF lama yang mungkin di-upload sebagai image resource type
+  if (ext === 'pdf' && f.url.includes('/raw/upload/')) {
+    urlsToTry.push(f.url.replace('/raw/upload/', '/image/upload/'));
+    urlsToTry.push(f.url.replace('/raw/upload/', '/image/upload/') + '.pdf');
+  }
+
   let fetchUrl = f.url;
   try {
-    let response = await fetch(fetchUrl, { method: 'HEAD' });
-    if (response.status === 404 && ext && !f.url.split('/').pop().split('?')[0].includes('.')) {
-      fetchUrl = f.url + '.' + ext;
-      response = await fetch(fetchUrl, { method: 'HEAD' });
+    // Cari URL yang valid
+    for (const u of urlsToTry) {
+      const res = await fetch(u, { method: 'HEAD' });
+      if (res.ok) { fetchUrl = u; break; }
     }
-    if (!response.ok) throw new Error('404');
 
     // Fetch sebagai blob
     const blobRes = await fetch(fetchUrl);
@@ -1454,7 +1465,7 @@ async function viewDetail(idUsulan) {
             <td>${i.no}</td><td style="max-width:220px;font-size:12.5px">${i.nama}</td>
             <td>${i.target}</td><td>${i.capaian}</td>
             
-            <td>${i.linkFile ? (() => { try { const ls = JSON.parse(i.linkFile); const arr = Array.isArray(ls) ? ls.map(f=>typeof f==='string'?{id:null,url:f,name:'File'}:f) : [{id:null,url:i.linkFile,name:'File'}]; window[`_buktiLinks_${i.no}_detail`]={links:arr,idUsulan:i.idUsulan||''}; return `<button onclick="(function(){window._modalBukti={links:${JSON.stringify(arr).replace(/"/g,'&quot;')},idUsulan:'',idx:0,noIndikator:${i.no}};_renderBuktiModal();})()" style="background:none;border:none;cursor:pointer;color:#0d9488;display:inline-flex;align-items:center;gap:3px;font-size:12px;padding:2px 6px;border-radius:5px" onmouseover="this.style.background='rgba(13,148,136,0.08)'" onmouseout="this.style.background='none'"><span class="material-icons" style="font-size:14px">visibility</span>${arr.length>1?arr.length+' file':''}</button>`; } catch(e){ return `<a href="${i.linkFile}" target="_blank" style="color:#0d9488"><span class="material-icons" style="font-size:13px">visibility</span></a>`; } })() : '-'}</td>
+            <td>${i.linkFile ? (() => { try { const ls = JSON.parse(i.linkFile); const arr = Array.isArray(ls) ? ls.map(f=>typeof f==='string'?{id:null,url:f,name:'File'}:f) : [{id:null,url:i.linkFile,name:'File'}]; window[`_buktiLinks_${i.no}`]={links:arr,idUsulan:i.idUsulan||''}; return `<button onclick="openBuktiModal(${i.no},0)" style="background:none;border:none;cursor:pointer;color:#0d9488;display:inline-flex;align-items:center;gap:3px;font-size:12px;padding:2px 6px;border-radius:5px" onmouseover="this.style.background='rgba(13,148,136,0.08)'" onmouseout="this.style.background='none'"><span class="material-icons" style="font-size:14px">visibility</span></button>`; } catch(e){ return `<a href="${i.linkFile}" target="_blank" style="color:#0d9488"><span class="material-icons" style="font-size:13px">visibility</span></a>`; } })() : '-'}</td>
           </tr>`).join('')}</tbody>
         </table>
       </div>
@@ -1602,14 +1613,15 @@ async function openVerifikasi(idUsulan) {
       let buktiHtml = '-';
       if (i.linkFile) {
         try {
-          const links = JSON.parse(i.linkFile);
-          if (Array.isArray(links)) {
-            buktiHtml = links.map((f,idx) => `<a href="${f.url||f}" target="_blank" style="display:inline-flex;align-items:center;gap:3px;color:var(--primary);font-size:12px;margin-right:4px"><span class="material-icons" style="font-size:13px">attach_file</span>File ${idx+1}</a>`).join('');
-          } else {
-            buktiHtml = `<a href="${i.linkFile}" target="_blank" style="display:inline-flex;align-items:center;gap:3px;color:var(--primary);font-size:12px"><span class="material-icons" style="font-size:13px">attach_file</span>Lihat</a>`;
-          }
+          const lsParsed = JSON.parse(i.linkFile);
+          const arrLinks = Array.isArray(lsParsed)
+            ? lsParsed.map(f => typeof f === 'string' ? {id:null,url:f,name:'File'} : f)
+            : [{id:null,url:i.linkFile,name:'File'}];
+          // Simpan ke window untuk modal preview
+          window[`_buktiLinks_${i.no}`] = { links: arrLinks, idUsulan: i.idUsulan || '' };
+          buktiHtml = `<button onclick="openBuktiModal(${i.no},0)" style="background:none;border:none;cursor:pointer;color:#0d9488;display:inline-flex;align-items:center;gap:3px;font-size:12px;padding:2px 6px;border-radius:5px" onmouseover="this.style.background='rgba(13,148,136,0.08)'" onmouseout="this.style.background='none'"><span class="material-icons" style="font-size:14px">visibility</span></button>`;
         } catch {
-          buktiHtml = `<a href="${i.linkFile}" target="_blank" style="display:inline-flex;align-items:center;gap:3px;color:var(--primary);font-size:12px"><span class="material-icons" style="font-size:13px">attach_file</span>Lihat</a>`;
+          buktiHtml = `<button onclick="window.open('${i.linkFile}','_blank')" style="background:none;border:none;cursor:pointer;color:#0d9488;padding:2px 6px;border-radius:5px"><span class="material-icons" style="font-size:14px">visibility</span></button>`;
         }
       }
       return `<tr>
@@ -2194,7 +2206,7 @@ async function deleteUser(email) {
         await API.deleteUser(email);
         toast('User berhasil dihapus');
         allUsers = await API.getUsers();
-        renderUsersTable(allUsers);
+        filterUsers(); // re-apply filter yang aktif, bukan render semua
       } catch (e) { toast(e.message, 'error'); }
     }
   });

@@ -2402,11 +2402,25 @@ async function tambahJabatanBaru() {
 
 function checkUserRole() {
   const role = document.getElementById('uRole').value;
-  document.getElementById('pkmContainer').style.display = ['Operator'].includes(role) ? 'block' : 'none';
+  document.getElementById('pkmContainer').style.display = ['Operator','Kepala Puskesmas'].includes(role) ? 'block' : 'none';
   const isProgram = role === 'Pengelola Program';
   document.getElementById('jabatanContainer').style.display = isProgram ? 'block' : 'none';
   document.getElementById('indContainer').style.display = isProgram ? 'block' : 'none';
   if (isProgram) { populateIndCheckbox([]); loadJabatanDropdown([]); }
+
+  // Switch modal style: fullscreen untuk Pengelola Program, center untuk role lain
+  const modal = document.getElementById('userModal');
+  if (modal) {
+    if (isProgram) {
+      modal.classList.add('fullscreen');
+      const card = modal.querySelector('.modal-card');
+      if (card) card.style.maxWidth = '';
+    } else {
+      modal.classList.remove('fullscreen');
+      const card = modal.querySelector('.modal-card');
+      if (card) card.style.maxWidth = '520px';
+    }
+  }
 }
 
 function populateIndCheckbox(selectedNos = []) {
@@ -2451,6 +2465,9 @@ function openUserModal(editEmail = null) {
   document.getElementById('uRole').value = 'Operator';
   document.getElementById('uPKM').value = '';
   document.getElementById('uAktif').value = 'true';
+  // Reset modal ke center mode dulu sebelum checkUserRole
+  const _modal = document.getElementById('userModal');
+  if (_modal) { _modal.classList.remove('fullscreen'); const _card = _modal.querySelector('.modal-card'); if (_card) _card.style.maxWidth = '520px'; }
   // Reset NIP
   const nipResetEl = document.getElementById('uNIP');
   if (nipResetEl) nipResetEl.value = '';

@@ -51,7 +51,8 @@ exports.handler = async (event) => {
     const baseName = dotIdx > -1 ? fileName.substring(0, dotIdx) : fileName;
     const ext = dotIdx > -1 ? fileName.substring(dotIdx + 1).toLowerCase() : '';
 
-    const imageExts = ['jpg','jpeg','png','gif','webp','bmp','svg'];
+    // PDF di-upload sebagai 'image' agar bisa diakses publik (raw = authenticated by default)
+    const imageExts = ['jpg','jpeg','png','gif','webp','bmp','svg','pdf'];
     const resourceType = imageExts.includes(ext) ? 'image' : 'raw';
 
     const timestamp = Math.floor(Date.now() / 1000);

@@ -1946,47 +1946,74 @@ async function _loadMasterTab(tab) {
         <div style="padding:0" id="usersTable"></div>
       </div>`;
     modals.innerHTML = `
-      <div class="modal" id="userModal">
+      <div class="modal fullscreen" id="userModal">
         <div class="modal-card">
-          <div class="modal-header"><span class="material-icons">person_add</span><h3 id="userModalTitle">Tambah User</h3>
-            <button class="btn-icon" onclick="closeModal('userModal')"><span class="material-icons">close</span></button></div>
-          <div class="modal-body">
-            <div class="form-group"><label>Email *</label>
-              <input class="form-control" id="uEmail" type="email" placeholder="user@example.com" oninput="validateEmailInput(this)">
-              <div id="emailValidMsg" style="font-size:11.5px;margin-top:4px;display:none"></div>
-            </div>
-            <div class="form-group"><label>Nama *</label><input class="form-control" id="uNama" placeholder="Nama Lengkap"></div>
-            <div class="form-group"><label>NIP</label><input class="form-control" id="uNIP" placeholder="Nomor Induk Pegawai (opsional)" maxlength="30"></div>
-            <div class="form-group"><label>Role *</label>
-              <select class="form-control" id="uRole" onchange="checkUserRole()">
-                <option>Admin</option><option>Operator</option><option>Kepala Puskesmas</option>
-                <option>Pengelola Program</option><option>Kadis</option>
-              </select></div>
-            <div id="pkmContainer" style="display:none" class="form-group"><label>Puskesmas</label>
-              <select class="form-control" id="uPKM"><option value="">Pilih Puskesmas</option></select></div>
-            <div id="jabatanContainer" style="display:none" class="form-group">
-              <label>Jabatan / Bidang Tanggung Jawab <span style="font-size:11px;color:var(--text-light)">(bisa pilih lebih dari satu)</span></label>
-              <div id="jabatanCheckboxList" style="max-height:180px;overflow-y:auto;border:1.5px solid var(--border);border-radius:8px;padding:8px;background:white;display:grid;grid-template-columns:1fr;gap:4px">
-                <div style="color:var(--text-light);font-size:12px;padding:4px">Memuat daftar jabatan...</div>
-              </div>
-              <div style="margin-top:6px;display:flex;gap:6px;align-items:center">
-                <input class="form-control" id="uJabatanBaru" placeholder="Tambah jabatan baru..." style="flex:1">
-                <button type="button" class="btn btn-secondary btn-sm" onclick="tambahJabatanBaru()">+ Tambah</button>
-              </div>
-            </div>
-            <div id="indContainer" style="display:none" class="form-group">
-              <label>Indikator Akses</label>
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-                <span style="font-size:12px;color:var(--text-light)">Centang indikator yang dapat diakses</span>
-                <div style="display:flex;gap:8px">
-                  <button type="button" class="btn btn-secondary btn-sm" onclick="checkAllIndikator(true)">Pilih Semua</button>
-                  <button type="button" class="btn btn-secondary btn-sm" onclick="checkAllIndikator(false)">Hapus Semua</button>
+          <div class="modal-header">
+            <span class="material-icons">person</span>
+            <h3 id="userModalTitle">Tambah User</h3>
+            <button class="btn-icon" onclick="closeModal('userModal')"><span class="material-icons">close</span></button>
+          </div>
+          <div class="modal-body" style="padding:32px;background:#f8fafc">
+            <div style="max-width:720px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:20px">
+              <!-- Kolom kiri -->
+              <div style="display:flex;flex-direction:column;gap:16px">
+                <div class="card" style="padding:20px">
+                  <div style="font-weight:700;font-size:13px;color:var(--primary);margin-bottom:14px;display:flex;align-items:center;gap:6px">
+                    <span class="material-icons" style="font-size:16px">badge</span>Informasi Akun
+                  </div>
+                  <div class="form-group"><label>Email *</label>
+                    <input class="form-control" id="uEmail" type="email" placeholder="user@example.com" oninput="validateEmailInput(this)">
+                    <div id="emailValidMsg" style="font-size:11.5px;margin-top:4px;display:none"></div>
+                  </div>
+                  <div class="form-group"><label>Nama *</label>
+                    <input class="form-control" id="uNama" placeholder="Nama Lengkap">
+                  </div>
+                  <div class="form-group"><label>NIP</label>
+                    <input class="form-control" id="uNIP" placeholder="Nomor Induk Pegawai (opsional)" maxlength="30">
+                  </div>
+                  <div class="form-group"><label>Role *</label>
+                    <select class="form-control" id="uRole" onchange="checkUserRole()">
+                      <option>Admin</option><option>Operator</option><option>Kepala Puskesmas</option>
+                      <option>Pengelola Program</option><option>Kadis</option>
+                    </select>
+                  </div>
+                  <div id="pkmContainer" style="display:none" class="form-group"><label>Puskesmas</label>
+                    <select class="form-control" id="uPKM"><option value="">Pilih Puskesmas</option></select>
+                  </div>
+                  <div class="form-group" style="margin-bottom:0"><label>Status</label>
+                    <select class="form-control" id="uAktif">
+                      <option value="true">Aktif</option><option value="false">Non-aktif</option>
+                    </select>
+                  </div>
                 </div>
               </div>
-              <div id="indCheckboxList" style="max-height:220px;overflow-y:auto;border:1.5px solid var(--border);border-radius:8px;padding:8px;background:white;display:grid;grid-template-columns:1fr 1fr;gap:4px"></div>
+              <!-- Kolom kanan -->
+              <div style="display:flex;flex-direction:column;gap:16px">
+                <div class="card" id="jabatanContainer" style="padding:20px;display:none">
+                  <div style="font-weight:700;font-size:13px;color:var(--primary);margin-bottom:14px;display:flex;align-items:center;gap:6px">
+                    <span class="material-icons" style="font-size:16px">work</span>Jabatan / Bidang
+                    <span style="font-size:11px;color:var(--text-light);font-weight:400">(bisa pilih lebih dari satu)</span>
+                  </div>
+                  <div id="jabatanCheckboxList" style="max-height:220px;overflow-y:auto;border:1.5px solid var(--border);border-radius:8px;padding:8px;background:white;display:grid;grid-template-columns:1fr;gap:4px">
+                    <div style="color:var(--text-light);font-size:12px;padding:4px">Memuat daftar jabatan...</div>
+                  </div>
+                  <div style="margin-top:10px;display:flex;gap:6px;align-items:center">
+                    <input class="form-control" id="uJabatanBaru" placeholder="Tambah jabatan baru..." style="flex:1">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="tambahJabatanBaru()">+ Tambah</button>
+                  </div>
+                </div>
+                <div class="card" id="indContainer" style="padding:20px;display:none">
+                  <div style="font-weight:700;font-size:13px;color:var(--primary);margin-bottom:10px;display:flex;align-items:center;gap:6px">
+                    <span class="material-icons" style="font-size:16px">monitor_heart</span>Indikator Akses
+                  </div>
+                  <div style="display:flex;gap:8px;margin-bottom:10px">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="checkAllIndikator(true)">Pilih Semua</button>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="checkAllIndikator(false)">Hapus Semua</button>
+                  </div>
+                  <div id="indCheckboxList" style="max-height:260px;overflow-y:auto;border:1.5px solid var(--border);border-radius:8px;padding:8px;background:white;display:grid;grid-template-columns:1fr 1fr;gap:4px"></div>
+                </div>
+              </div>
             </div>
-            <div class="form-group"><label>Status</label>
-              <select class="form-control" id="uAktif"><option value="true">Aktif</option><option value="false">Non-aktif</option></select></div>
           </div>
           <div class="modal-footer">
             <button class="btn btn-secondary" onclick="closeModal('userModal')">Batal</button>

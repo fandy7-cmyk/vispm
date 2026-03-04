@@ -1129,13 +1129,10 @@ function _renderBuktiModal() {
   const proxyBase = `https://vispm.netlify.app/.netlify/functions/sign-url`;
   const proxyDownload = `${proxyBase}?url=${encodeURIComponent(f.url)}&name=${encodeURIComponent(fileName)}&mode=download`;
 
-  // Preview URL:
-  // - Gambar: f.url langsung
-  // - PDF: f.url langsung (raw+public bisa di-iframe; jika gagal, browser tampilkan error)
-  // - Office: Google Docs Viewer dengan f.url langsung (raw+public bisa diakses GDV)
-  //   File lama (raw tanpa access_mode=public) → GDV mungkin gagal, tampilkan download saja
+  // Office preview via Office Online Viewer (lebih reliable dari Google Docs Viewer)
+  // Office Online bisa akses URL publik Cloudinary langsung
   const gdvUrl = isOffice
-    ? `https://docs.google.com/viewer?embedded=true&url=${encodeURIComponent(f.url)}`
+    ? `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(f.url)}`
     : null;
 
   let modal = document.getElementById('previewBuktiModal');
@@ -1173,7 +1170,14 @@ function _renderBuktiModal() {
         ${isImage
           ? `<img src="${f.url}" style="max-width:100%;max-height:100%;object-fit:contain;padding:16px">`
           : isPDF
-          ? `<iframe src="${f.url}" style="width:100%;height:100%;border:none"></iframe>`
+          ? `<iframe id="pdfFrame_${idx}" src="${f.url}" style="width:100%;height:100%;border:none"
+               onerror="document.getElementById('pdfFrame_${idx}').style.display='none';document.getElementById('pdfFallback_${idx}').style.display='flex'"
+             ></iframe>
+             <div id="pdfFallback_${idx}" style="display:none;text-align:center;color:white;padding:40px;flex-direction:column;align-items:center">
+               <div style="font-size:64px;margin-bottom:16px">📄</div>
+               <div style="font-size:11px;color:#64748b;margin-bottom:28px">PDF tidak dapat dipreview langsung</div>
+               <button onclick="downloadBukti(${idx})" style="background:#0d9488;color:white;padding:12px 32px;border-radius:8px;border:none;font-weight:600;font-size:14px;cursor:pointer;display:inline-flex;align-items:center;gap:8px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download</button>
+             </div>`
           : (isOffice && gdvUrl)
           ? `<iframe src="${gdvUrl}" style="width:100%;height:100%;border:none"></iframe>`
           : `<div style="text-align:center;color:white;padding:40px">

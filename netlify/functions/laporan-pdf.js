@@ -208,9 +208,9 @@ exports.handler = async (event) => {
           <thead>
             <tr style="background:#1e293b;color:white">
               <th style="padding:7px 10px;font-size:10px;border:1px solid #334155;text-align:center">Jumlah Sasaran<br>(Tahun)</th>
-              <th style="padding:7px 10px;font-size:10px;border:1px solid #334155;text-align:center">Target</th>
-              <th style="padding:7px 10px;font-size:10px;border:1px solid #334155;text-align:center">Capaian</th>
-              <th style="padding:7px 10px;font-size:10px;border:1px solid #334155;text-align:center">Realisasi (%)</th>
+              <th style="padding:7px 10px;font-size:10px;border:1px solid #334155;text-align:center">Target Bulan Ini</th>
+              <th style="padding:7px 10px;font-size:10px;border:1px solid #334155;text-align:center">Realisasi Bulan Ini</th>
+              <th style="padding:7px 10px;font-size:10px;border:1px solid #334155;text-align:center">Capaian (%)</th>
             </tr>
           </thead>
           <tbody>

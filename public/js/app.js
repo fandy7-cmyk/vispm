@@ -1685,10 +1685,33 @@ async function openVerifikasi(idUsulan) {
       (currentUser.role === 'Admin' && detail.statusGlobal === 'Menunggu Admin')
     );
 
+    // Cek tanda tangan — blok verifikasi jika belum ada
+    const myUserData = allUsers?.find(u => u.email?.toLowerCase() === currentUser.email?.toLowerCase());
+    const hasTandaTangan = !!myUserData?.tandaTangan;
+    const needsTandaTangan = ['Kepala Puskesmas', 'Pengelola Program', 'Admin'].includes(currentUser.role);
+
     const btnApprove = document.getElementById('btnApprove');
     const btnReject = document.getElementById('btnReject');
 
-    if (sudahVerifUser) {
+    if (needsTandaTangan && !hasTandaTangan && canApprove) {
+      btnApprove.disabled = true;
+      btnReject.disabled = true;
+      // Tampilkan peringatan
+      const warningEl = document.getElementById('ttWarning');
+      if (!warningEl) {
+        const w = document.createElement('div');
+        w.id = 'ttWarning';
+        w.style.cssText = 'background:#fef3c7;border:1.5px solid #f59e0b;border-radius:8px;padding:10px 14px;font-size:12px;color:#92400e;display:flex;align-items:center;gap:8px;margin-top:12px';
+        w.innerHTML = `<span class="material-icons" style="font-size:16px;color:#f59e0b">warning</span>
+          Anda belum mengupload tanda tangan. <a href="#" onclick="event.preventDefault();closeModal('verifikasiModal');setTimeout(()=>openUserModal('${currentUser.email}'),200)" style="color:#92400e;font-weight:700;text-decoration:underline">Upload sekarang</a>`;
+        document.getElementById('verifCatatan')?.closest('.modal-body')?.appendChild(w);
+      }
+      if (tolakKeContainer) tolakKeContainer.style.display = 'none';
+    } else {
+      document.getElementById('ttWarning')?.remove();
+
+      document.getElementById('ttWarning')?.remove();
+      if (sudahVerifUser) {
       btnApprove.style.background = '#16a34a';
       btnApprove.innerHTML = '<span class="material-icons">check_circle</span> Sudah Diverifikasi';
       btnApprove.disabled = true;
@@ -1720,6 +1743,7 @@ async function openVerifikasi(idUsulan) {
         }
       }
     }
+    } // end else hasTandaTangan
   } catch (e) { toast(e.message, 'error'); }
 }
 
@@ -2037,6 +2061,19 @@ async function _loadMasterTab(tab) {
                     </select>
                   </div>
                 </div>
+                <div class="card" style="padding:24px">
+                  <div style="font-weight:700;font-size:13px;color:var(--primary);margin-bottom:16px;display:flex;align-items:center;gap:6px">
+                    <span class="material-icons" style="font-size:16px">draw</span>Tanda Tangan
+                  </div>
+                  <div id="ttPreviewBox" style="border:2px dashed var(--border);border-radius:8px;padding:12px;background:white;min-height:80px;display:flex;align-items:center;justify-content:center;margin-bottom:12px">
+                    <span style="color:var(--text-light);font-size:12px">Belum ada tanda tangan</span>
+                  </div>
+                  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;background:var(--primary-light);border:1.5px solid var(--border);padding:8px 14px;border-radius:8px;font-size:12px;font-weight:600;color:var(--primary)">
+                    <span class="material-icons" style="font-size:16px">upload</span>Upload Tanda Tangan (PNG/JPG)
+                    <input type="file" id="ttFileInput" accept="image/png,image/jpeg,image/jpg" style="display:none" onchange="previewTandaTangan(this)">
+                  </label>
+                  <div style="font-size:11px;color:var(--text-light);margin-top:6px">Format: PNG atau JPG. Gunakan background putih.</div>
+                </div>
                 <div class="card" id="indContainer" style="padding:24px;display:none">
                   <div style="font-weight:700;font-size:13px;color:var(--primary);margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
                     <div style="display:flex;align-items:center;gap:6px">
@@ -2303,8 +2340,17 @@ async function _renderUsers_LEGACY() {
           </div>
           <div class="form-group"><label>Status</label>
             <select class="form-control" id="uAktif"><option value="true">Aktif</option><option value="false">Non-aktif</option></select></div>
-        </div>
-        <div class="modal-footer">
+          <div class="form-group">
+            <label style="display:flex;align-items:center;gap:6px"><span class="material-icons" style="font-size:15px">draw</span>Tanda Tangan</label>
+            <div id="ttPreviewBox" style="border:2px dashed var(--border);border-radius:8px;padding:10px;background:white;min-height:70px;display:flex;align-items:center;justify-content:center;margin-bottom:8px">
+              <span style="color:var(--text-light);font-size:12px">Belum ada tanda tangan</span>
+            </div>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;background:var(--primary-light);border:1.5px solid var(--border);padding:7px 12px;border-radius:8px;font-size:12px;font-weight:600;color:var(--primary)">
+              <span class="material-icons" style="font-size:15px">upload</span>Upload Tanda Tangan (PNG/JPG)
+              <input type="file" id="ttFileInput" accept="image/png,image/jpeg,image/jpg" style="display:none" onchange="previewTandaTangan(this)">
+            </label>
+            <div style="font-size:11px;color:var(--text-light);margin-top:4px">Format: PNG atau JPG. Gunakan background putih.</div>
+          </div>
           <button class="btn btn-secondary" onclick="closeModal('userModal')">Batal</button>
           <button class="btn btn-primary" onclick="saveUser()"><span class="material-icons">save</span>Simpan</button>
         </div>
@@ -2537,6 +2583,13 @@ function openUserModal(editEmail = null) {
   }
   checkUserRole();
 
+  // Reset tanda tangan
+  _ttBase64 = null;
+  const ttBox = document.getElementById('ttPreviewBox');
+  if (ttBox) ttBox.innerHTML = `<span style="color:var(--text-light);font-size:12px">Belum ada tanda tangan</span>`;
+  const ttInput = document.getElementById('ttFileInput');
+  if (ttInput) ttInput.value = '';
+
   if (editEmail) {
     const user = allUsers.find(u => u.email === editEmail);
     if (user) {
@@ -2546,14 +2599,17 @@ function openUserModal(editEmail = null) {
       document.getElementById('uPKM').value = user.kodePKM || '';
       document.getElementById('uAktif').value = user.aktif ? 'true' : 'false';
       checkUserRole();
-      // Isi NIP
       const nipEl = document.getElementById('uNIP');
       if (nipEl) nipEl.value = user.nip || '';
       if (user.role === 'Pengelola Program') {
         populateIndCheckbox(parseIndikatorAksesString(user.indikatorAkses || ''));
-        // Load jabatan checkboxes dengan nilai yang sudah tersimpan
         const savedJabatan = (user.jabatan || '').split('|').map(s=>s.trim()).filter(Boolean);
         loadJabatanDropdown(savedJabatan);
+      }
+      // Load tanda tangan yang sudah ada
+      if (user.tandaTangan && ttBox) {
+        _ttBase64 = user.tandaTangan;
+        ttBox.innerHTML = `<img src="${user.tandaTangan}" style="max-height:80px;max-width:100%;object-fit:contain">`;
       }
     }
     document.getElementById('userModal').dataset.editEmail = editEmail;
@@ -2562,6 +2618,23 @@ function openUserModal(editEmail = null) {
   }
 
   showModal('userModal');
+}
+
+// Tanda tangan — preview saat file dipilih
+let _ttBase64 = null; // simpan base64 tanda tangan yang dipilih
+
+function previewTandaTangan(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (!['image/png','image/jpeg'].includes(file.type)) return toast('Format harus PNG atau JPG', 'error');
+  if (file.size > 2 * 1024 * 1024) return toast('Ukuran maksimal 2MB', 'error');
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    _ttBase64 = e.target.result; // data:image/png;base64,...
+    const box = document.getElementById('ttPreviewBox');
+    if (box) box.innerHTML = `<img src="${_ttBase64}" style="max-height:80px;max-width:100%;object-fit:contain">`;
+  };
+  reader.readAsDataURL(file);
 }
 
 function editUser(email) { openUserModal(email); }
@@ -2584,7 +2657,7 @@ async function saveUser() {
   setLoading(true);
   try {
     if (editEmail) {
-      await API.updateUser({ email, nama, nip, role, kodePKM, indikatorAkses, jabatan, aktif });
+      await API.updateUser({ email, nama, nip, role, kodePKM, indikatorAkses, jabatan, aktif, tandaTangan: _ttBase64 || undefined });
     } else {
       await API.saveUser({ email, nama, nip, role, kodePKM, indikatorAkses, jabatan });
     }

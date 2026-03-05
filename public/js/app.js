@@ -535,10 +535,18 @@ function renderUsulanTable(rows, role) {
       verifBtn = `<button class="btn-icon" title="Menunggu tahap sebelumnya" style="opacity:0.35;cursor:not-allowed" disabled><span class="material-icons">lock</span></button>`;
     }
 
-    // Tombol download PDF — samping viewBtn, hanya kalau Selesai
-    const pdfBtn = u.statusGlobal === 'Selesai'
-      ? `<button class="btn-icon" onclick="downloadLaporanPDF('${u.idUsulan}')" title="Download Laporan PDF" style="background:transparent;border:none;color:#64748b" title="Download Laporan"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10"/><path d="m8 9 4 4 4-4"/><path d="M4 17c0 2.2 1.8 4 4 4h8c2.2 0 4-1.8 4-4"/></svg></button>`
-      : '';
+    // Tombol download PDF — samping viewBtn
+    // Laporan final: statusGlobal === 'Selesai'
+    // Laporan sementara: kapus sudah approve (statusKapus === 'Selesai'), untuk operator & admin
+    const kapusApproved = u.statusKapus === 'Selesai';
+    const isFinished = u.statusGlobal === 'Selesai';
+    const canDlSementara = kapusApproved && !isFinished && ['operator', 'admin'].includes(role);
+
+    const pdfBtn = isFinished
+      ? `<button class="btn-icon" onclick="downloadLaporanPDF('${u.idUsulan}')" title="Download Laporan PDF" style="background:transparent;border:none;color:#64748b"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10"/><path d="m8 9 4 4 4-4"/><path d="M4 17c0 2.2 1.8 4 4 4h8c2.2 0 4-1.8 4-4"/></svg></button>`
+      : canDlSementara
+        ? `<button class="btn-icon" onclick="downloadLaporanSementara('${u.idUsulan}')" title="Download Laporan Sementara (Kapus)" style="background:transparent;border:none;color:#f59e0b"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10"/><path d="m8 9 4 4 4-4"/><path d="M4 17c0 2.2 1.8 4 4 4h8c2.2 0 4-1.8 4-4"/></svg></button>`
+        : '';
 
     if (['kepala-puskesmas', 'program', 'admin'].includes(role)) {
       return viewBtn + pdfBtn + verifBtn;
@@ -679,7 +687,11 @@ async function loadMyUsulan() {
           </td>
           <td>
             <button class="btn-icon view" onclick="viewDetail('${u.idUsulan}')"><span class="material-icons">visibility</span></button>
-            ${u.statusGlobal === 'Selesai' ? `<button class="btn-icon" onclick="downloadLaporanPDF('${u.idUsulan}')" title="Download Laporan PDF" style="background:transparent;border:none;color:#64748b" title="Download Laporan"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10"/><path d="m8 9 4 4 4-4"/><path d="M4 17c0 2.2 1.8 4 4 4h8c2.2 0 4-1.8 4-4"/></svg></button>` : ''}
+            ${u.statusGlobal === 'Selesai'
+              ? `<button class="btn-icon" onclick="downloadLaporanPDF('${u.idUsulan}')" title="Download Laporan PDF" style="background:transparent;border:none;color:#64748b"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10"/><path d="m8 9 4 4 4-4"/><path d="M4 17c0 2.2 1.8 4 4 4h8c2.2 0 4-1.8 4-4"/></svg></button>`
+              : u.statusKapus === 'Selesai'
+                ? `<button class="btn-icon" onclick="downloadLaporanSementara('${u.idUsulan}')" title="Download Laporan Sementara" style="background:transparent;border:none;color:#f59e0b"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10"/><path d="m8 9 4 4 4-4"/><path d="M4 17c0 2.2 1.8 4 4 4h8c2.2 0 4-1.8 4-4"/></svg></button>`
+                : ''}
             ${u.statusGlobal === 'Draft' ? `<button class="btn-icon edit" onclick="openIndikatorModal('${u.idUsulan}')"><span class="material-icons">edit</span></button>` : ''}
             ${u.statusGlobal === 'Draft' ? `<button class="btn-icon del" onclick="deleteUsulan('${u.idUsulan}')"><span class="material-icons">delete</span></button>` : ''}
             ${u.statusGlobal === 'Ditolak' ? `<button class="btn btn-warning btn-sm" onclick="openIndikatorModal('${u.idUsulan}')" style="background:#f59e0b;color:white;border-color:#f59e0b"><span class="material-icons" style="font-size:14px">restart_alt</span> Perbaiki & Ajukan Ulang</button>` : ''}
@@ -852,9 +864,12 @@ async function openIndikatorModal(idUsulan) {
         <td>${isLocked ? `<span>${ind.target}</span>` : `<input type="number" id="t-${ind.no}" value="${ind.target}" min="0" step="0.01"
             style="width:72px;border:1.5px solid var(--border);border-radius:6px;padding:3px 6px;font-size:13px"
             onchange="saveIndikator(${ind.no})" oninput="previewSPM(${ind.no})">`}</td>
-        <td>${isLocked ? `<span>${ind.capaian}</span>` : `<input type="number" id="c-${ind.no}" value="${ind.capaian}" min="0" step="0.01"
-            style="width:72px;border:1.5px solid var(--border);border-radius:6px;padding:3px 6px;font-size:13px"
-            onchange="saveIndikator(${ind.no})" oninput="previewSPM(${ind.no})">`}</td>
+        <td>${isLocked ? `<span>${ind.capaian}</span>` : `<div style="display:flex;flex-direction:column;gap:2px">
+            <input type="number" id="c-${ind.no}" value="${ind.capaian}" min="0" step="0.01"
+              style="width:72px;border:1.5px solid var(--border);border-radius:6px;padding:3px 6px;font-size:13px"
+              onchange="saveIndikator(${ind.no})" oninput="validateRealisasi(${ind.no})">
+            <span id="c-warn-${ind.no}" style="display:none;font-size:10px;color:#ef4444;font-weight:600;white-space:nowrap">≤ target</span>
+          </div>`}</td>
         <td id="cap-${ind.no}" style="text-align:center;font-weight:700;font-size:13px;color:${ind.target>0?(ind.capaian/ind.target*100)>=100?'#16a34a':'#0d9488':'#64748b'}">${ind.target > 0 ? (ind.capaian / ind.target * 100).toFixed(1) + '%' : '-'}</td>
         <td style="min-width:100px;text-align:center">
           ${(() => {
@@ -1366,6 +1381,29 @@ async function doSubmitUsulan(forceSubmit) {
 }
 
 // Preview SPM saat oninput (kalkulasi di client tanpa hit server)
+function validateRealisasi(no) {
+  const cEl = document.getElementById(`c-${no}`);
+  const tEl = document.getElementById(`t-${no}`);
+  const warnEl = document.getElementById(`c-warn-${no}`);
+  if (!cEl || !tEl) return;
+  const c = parseFloat(cEl.value) || 0;
+  const t = parseFloat(tEl.value) || 0;
+  if (t > 0 && c > t) {
+    cEl.value = t; // paksa sama dengan target
+    cEl.style.borderColor = '#ef4444';
+    if (warnEl) warnEl.style.display = 'block';
+    // Toast sekali per indikator (debounce)
+    clearTimeout(cEl._warnTimeout);
+    cEl._warnTimeout = setTimeout(() => {
+      toast(`Indikator ${no}: Realisasi tidak boleh melebihi Target (${t})`, 'warning');
+    }, 300);
+  } else {
+    cEl.style.borderColor = '';
+    if (warnEl) warnEl.style.display = 'none';
+  }
+  previewSPM(no);
+}
+
 function previewSPM(changedNo) {
   // Hitung SPM preview dari semua input yang ada di DOM
   const rows = document.querySelectorAll('[id^="t-"]');
@@ -1553,6 +1591,27 @@ async function downloadLaporanPDF(idUsulan) {
     document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     toast('Laporan berhasil diunduh ✓', 'success');
+  } catch(e) {
+    toast('Gagal: ' + e.message, 'error');
+  }
+}
+
+async function downloadLaporanSementara(idUsulan) {
+  toast('Menyiapkan laporan sementara...', 'success');
+  try {
+    const res = await fetch(`/api/laporan-pdf?id=${idUsulan}&mode=sementara`);
+    if (!res.ok) { toast('Gagal memuat laporan', 'error'); return; }
+    const html = await res.text();
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Laporan-Sementara-SPM-${idUsulan}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast('Laporan sementara berhasil diunduh ✓', 'success');
   } catch(e) {
     toast('Gagal: ' + e.message, 'error');
   }
@@ -1942,7 +2001,11 @@ async function loadLaporan() {
           <td>${statusBadge(r.statusGlobal)}</td>
           <td style="white-space:nowrap">
             <button class="btn-icon view" onclick="viewDetail('${r.idUsulan}')" title="Detail"><span class="material-icons">visibility</span></button>
-            ${r.statusGlobal === 'Selesai' ? `<button class="btn-icon" onclick="downloadLaporanPDF('${r.idUsulan}')" title="Download Laporan" style="background:transparent;border:none;color:#64748b"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10"/><path d="m8 9 4 4 4-4"/><path d="M4 17c0 2.2 1.8 4 4 4h8c2.2 0 4-1.8 4-4"/></svg></button>` : ''}
+            ${r.statusGlobal === 'Selesai'
+              ? `<button class="btn-icon" onclick="downloadLaporanPDF('${r.idUsulan}')" title="Download Laporan" style="background:transparent;border:none;color:#64748b"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10"/><path d="m8 9 4 4 4-4"/><path d="M4 17c0 2.2 1.8 4 4 4h8c2.2 0 4-1.8 4-4"/></svg></button>`
+              : r.statusKapus === 'Selesai'
+                ? `<button class="btn-icon" onclick="downloadLaporanSementara('${r.idUsulan}')" title="Download Laporan Sementara" style="background:transparent;border:none;color:#f59e0b"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10"/><path d="m8 9 4 4 4-4"/><path d="M4 17c0 2.2 1.8 4 4 4h8c2.2 0 4-1.8 4-4"/></svg></button>`
+              : ''}
           </td>
         </tr>`).join('')}
         </tbody>

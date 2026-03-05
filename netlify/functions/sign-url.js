@@ -74,43 +74,46 @@ exports.handler = async (event) => {
       console.log('[sign-url] Strategy 2 basic auth:', result.status);
     }
 
-    // Strategy 3: Admin API — ambil secure_url dari resource info
+    // Strategy 3: Cloudinary Search API — cari file berdasarkan public_id
     if (result.status === 401 || result.status === 403 || result.status === 404) {
       try {
-        // Extract public_id dari URL: .../upload/v123/PUBLIC_ID.ext atau .../upload/PUBLIC_ID.ext
         const urlObj = new URL(url);
         const pathParts = urlObj.pathname.split('/');
         const uploadIdx = pathParts.indexOf('upload');
         if (uploadIdx !== -1) {
-          // Skip version segment (starts with 'v' + digits)
           let pidParts = pathParts.slice(uploadIdx + 1);
           if (pidParts[0] && /^v\d+$/.test(pidParts[0])) pidParts = pidParts.slice(1);
           const pidWithExt = pidParts.join('/');
-          const publicId = pidWithExt.replace(/\.[^.]+$/, ''); // hapus ekstensi
-
-          // Deteksi resource type dari URL path
+          const publicId = pidWithExt.replace(/\.[^.]+$/, '');
           const resourceType = urlObj.pathname.includes('/raw/') ? 'raw' : 'image';
-          const cloudName = urlObj.hostname.split('.')[0] === 'res' 
-            ? url.match(/cloudinary\.com\/([^/]+)\//)?.[1] 
-            : process.env.CLOUDINARY_CLOUD_NAME;
+          const cloudName = url.match(/cloudinary\.com\/([^/]+)\//)?.[1] || process.env.CLOUDINARY_CLOUD_NAME;
 
-          const adminUrl = `https://api.cloudinary.com/v1_1/${cloudName}/resources/${resourceType}/upload/${encodeURIComponent(publicId)}`;
-          console.log('[sign-url] Strategy 3 admin API:', adminUrl);
-          const infoResult = await httpsGet(adminUrl, { 'Authorization': `Basic ${basicAuth}` });
-          
-          if (infoResult.status === 200) {
-            const info = JSON.parse(infoResult.buf.toString());
-            if (info.secure_url) {
-              finalUrl = info.secure_url;
-              // Pastikan ekstensi ada
-              const ext2 = fileName.split('.').pop().toLowerCase();
-              if (ext2 && !finalUrl.split('/').pop().includes('.')) finalUrl += '.' + ext2;
+          // Search API
+          const searchUrl = `https://api.cloudinary.com/v1_1/${cloudName}/resources/search`;
+          const searchBody = JSON.stringify({ expression: `public_id:${publicId}`, resource_type: resourceType, max_results: 1 });
+          const searchResult = await new Promise((resolve, reject) => {
+            const body = Buffer.from(searchBody);
+            const u = new URL(searchUrl);
+            const req = require('https').request({
+              hostname: u.hostname, path: u.pathname, method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Content-Length': body.length, 'Authorization': `Basic ${basicAuth}` }
+            }, (res) => {
+              const chunks = []; res.on('data', c => chunks.push(c));
+              res.on('end', () => resolve({ status: res.statusCode, buf: Buffer.concat(chunks) }));
+              res.on('error', reject);
+            });
+            req.on('error', reject); req.write(body); req.end();
+          });
+
+          console.log('[sign-url] Strategy 3 search status:', searchResult.status);
+          if (searchResult.status === 200) {
+            const searchData = JSON.parse(searchResult.buf.toString());
+            const found = searchData.resources?.[0];
+            if (found?.secure_url) {
+              finalUrl = found.secure_url;
+              console.log('[sign-url] Strategy 3 found secure_url:', finalUrl);
               result = await httpsGet(finalUrl, {});
-              console.log('[sign-url] Strategy 3 result:', result.status, finalUrl);
-              // Coba dengan auth jika masih gagal
-              if (result.status !== 200) {
-                result = await httpsGet(finalUrl, { 'Authorization': `Basic ${basicAuth}` });
-              }
+              if (result.status !== 200) result = await httpsGet(finalUrl, { 'Authorization': `Basic ${basicAuth}` });
             }
           }
         }

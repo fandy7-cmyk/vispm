@@ -2143,8 +2143,8 @@ async function renderMasterData(tab = 'users') {
 
 async function switchMasterTab(tab) {
   _masterTab = tab;
-  // Update tab style
-  ['users','jabatan','pkm','indikator'].forEach(t => {
+  // Update tab style — termasuk 'pengaturan'
+  ['users','jabatan','pkm','indikator','pengaturan'].forEach(t => {
     const btn = document.getElementById(`masterTab-${t}`);
     if (!btn) return;
     btn.style.borderBottomColor = t === tab ? 'var(--primary)' : 'transparent';

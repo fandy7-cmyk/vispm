@@ -79,7 +79,7 @@ async function doLogin() {
   const btn = document.getElementById('authBtn');
   btn.disabled = true;
   btn.innerHTML = '<span class="material-icons" style="animation:spin 0.8s linear infinite">refresh</span> Loading...';
-  setAuthStatus('Loading...', '');
+  setAuthStatus('Memvalidasi kredensial...', '');
 
   try {
     const user = await API.login(email, password);

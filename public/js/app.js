@@ -3161,18 +3161,21 @@ async function loadPeriodeGrid() {
 }
 
 async function hapusPeriode(tahun, bulan, namaBulan) {
-  confirmAction(
-    `Hapus periode <b>${namaBulan} ${tahun}</b>?<br><span style="font-size:12px;color:#ef4444">Tindakan ini tidak bisa dibatalkan.</span>`,
-    async () => {
+  showConfirm({
+    title: 'Hapus Periode',
+    message: `Hapus periode <b>${namaBulan} ${tahun}</b>? Tindakan ini tidak bisa dibatalkan.`,
+    onConfirm: async () => {
       setLoading(true);
       try {
-        await fetch(`/api/periode?tahun=${tahun}&bulan=${bulan}`, { method: 'DELETE' });
+        const res = await fetch(`/api/periode?tahun=${tahun}&bulan=${bulan}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message || 'Gagal menghapus');
         toast(`Periode ${namaBulan} ${tahun} berhasil dihapus`, 'success');
         loadPeriodeGrid();
       } catch (e) { toast(e.message, 'error'); }
       finally { setLoading(false); }
     }
-  );
+  });
 }
 
 async function openPeriodeModal() {

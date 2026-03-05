@@ -1614,6 +1614,10 @@ async function openVerifikasi(idUsulan) {
   if (btnA) { btnA.disabled = true; btnA.style.background = ''; btnA.innerHTML = '<span class="material-icons">check_circle</span> Setujui'; }
   if (btnR) { btnR.disabled = true; btnR.style.background = ''; btnR.style.borderColor = ''; btnR.innerHTML = '<span class="material-icons">cancel</span> Tolak'; }
 
+  // Reset tolakKe dropdown
+  const tolakKeContainer = document.getElementById('tolakKeContainer');
+  if (tolakKeContainer) tolakKeContainer.style.display = 'none';
+
   showModal('verifikasiModal');
   document.getElementById('verifIndikatorBody').innerHTML = `<tr><td colspan="4"><div class="empty-state" style="padding:20px"><p>Memuat...</p></div></td></tr>`;
 
@@ -1685,14 +1689,36 @@ async function openVerifikasi(idUsulan) {
     const btnReject = document.getElementById('btnReject');
 
     if (sudahVerifUser) {
-      // User sudah verifikasi — tombol hijau
       btnApprove.style.background = '#16a34a';
       btnApprove.innerHTML = '<span class="material-icons">check_circle</span> Sudah Diverifikasi';
       btnApprove.disabled = true;
       btnReject.disabled = true;
+      if (tolakKeContainer) tolakKeContainer.style.display = 'none';
     } else {
       btnApprove.disabled = !canApprove;
       btnReject.disabled = !canApprove;
+
+      // Tampilkan dropdown tolakKe sesuai role
+      if (canApprove && tolakKeContainer) {
+        const sel = document.getElementById('verifTolakKe');
+        if (currentUser.role === 'Admin') {
+          // Admin bisa tolak ke: Pengelola Program, Kepala Puskesmas, Operator
+          tolakKeContainer.style.display = 'block';
+          sel.innerHTML = `
+            <option value="Pengelola Program">Pengelola Program</option>
+            <option value="Kepala Puskesmas">Kepala Puskesmas</option>
+            <option value="Operator">Operator</option>`;
+        } else if (currentUser.role === 'Pengelola Program') {
+          // Pengelola Program bisa tolak ke: Kepala Puskesmas atau Operator
+          tolakKeContainer.style.display = 'block';
+          sel.innerHTML = `
+            <option value="Kepala Puskesmas">Kepala Puskesmas</option>
+            <option value="Operator">Operator</option>`;
+        } else {
+          // Kepala Puskesmas → otomatis ke Operator, tidak perlu dropdown
+          tolakKeContainer.style.display = 'none';
+        }
+      }
     }
   } catch (e) { toast(e.message, 'error'); }
 }
@@ -1731,12 +1757,20 @@ async function doApprove() {
 async function doReject() {
   const catatan = document.getElementById('verifCatatan').value;
   if (!catatan) return toast('Isi alasan penolakan', 'warning');
+
+  const role = currentUser.role;
+  let tolakKe = null;
+  if (role === 'Admin' || role === 'Pengelola Program') {
+    tolakKe = document.getElementById('verifTolakKe')?.value;
+    if (!tolakKe) return toast('Pilih tujuan penolakan', 'warning');
+  }
+
   setLoading(true);
   try {
-    await API.rejectUsulan({ idUsulan: verifCurrentUsulan, email: currentUser.email, role: currentUser.role, alasan: catatan });
-    toast('Usulan ditolak', 'warning');
+    await API.rejectUsulan({ idUsulan: verifCurrentUsulan, email: currentUser.email, role, alasan: catatan, tolakKe });
+    const targetLabel = tolakKe ? ` → ${tolakKe}` : ' → Operator';
+    toast(`Usulan ditolak${targetLabel}`, 'warning');
 
-    // Tombol jadi hijau (sudah diverifikasi = tolak) dan disabled
     const btnApprove = document.getElementById('btnApprove');
     const btnReject = document.getElementById('btnReject');
     if (btnApprove) { btnApprove.disabled = true; }
@@ -1746,6 +1780,7 @@ async function doReject() {
       btnReject.innerHTML = '<span class="material-icons">check_circle</span> Sudah Diverifikasi';
       btnReject.disabled = true;
     }
+    document.getElementById('tolakKeContainer').style.display = 'none';
 
     setTimeout(() => {
       closeModal('verifikasiModal');

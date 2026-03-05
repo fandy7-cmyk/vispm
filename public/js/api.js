@@ -82,9 +82,14 @@ const API = {
   saveJabatan: (data) => API.post('jabatan', data),
   deleteJabatan: (id) => API.del('jabatan', { id }),
 
-  // App Settings
+  // Settings
   getSettings: () => API.get('settings'),
   saveSettings: (data) => API.put('settings', data),
+
+  // Pejabat Penandatangan
+  getPejabat: () => API.get('pejabat'),
+  savePejabat: (data) => API.put('pejabat', data),
+  deletePejabat: (id) => API.del('pejabat', { id }),
 };
 
 // Utils

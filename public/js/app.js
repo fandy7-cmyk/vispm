@@ -855,6 +855,7 @@ async function openIndikatorModal(idUsulan) {
         <td>${isLocked ? `<span>${ind.capaian}</span>` : `<input type="number" id="c-${ind.no}" value="${ind.capaian}" min="0" step="0.01"
             style="width:72px;border:1.5px solid var(--border);border-radius:6px;padding:3px 6px;font-size:13px"
             onchange="saveIndikator(${ind.no})" oninput="previewSPM(${ind.no})">`}</td>
+        <td id="cap-${ind.no}" style="text-align:center;font-weight:700;font-size:13px;color:${ind.target>0?(ind.capaian/ind.target*100)>=100?'#16a34a':'#0d9488':'#64748b'}">${ind.target > 0 ? (ind.capaian / ind.target * 100).toFixed(1) + '%' : '-'}</td>
         <td style="min-width:100px;text-align:center">
           ${(() => {
             // Parse link_file: bisa string URL tunggal atau JSON array
@@ -1380,11 +1381,23 @@ function previewSPM(changedNo) {
     const rasio = t > 0 ? Math.min(c / t, 1) : 0;
     totalNilai += bobot * rasio;
     totalBobot += bobot;
+
+    // Update kolom Capaian (%) realtime
+    const capEl = document.getElementById(`cap-${no}`);
+    if (capEl) {
+      if (t > 0) {
+        const pct = (c / t * 100).toFixed(1);
+        capEl.textContent = pct + '%';
+        capEl.style.color = parseFloat(pct) >= 100 ? '#16a34a' : '#0d9488';
+      } else {
+        capEl.textContent = '-';
+        capEl.style.color = '#64748b';
+      }
+    }
   });
   const round2 = n => Math.round((n + Number.EPSILON) * 100) / 100;
   const indeksKinerja = totalBobot > 0 ? round2(totalNilai / totalBobot) : 0;
   const indeksSPM = round2(indeksKinerja * 0.33);
-  // Update display dengan tanda bahwa ini preview (belum tersimpan)
   const topEl = document.getElementById('indModalSPMTop');
   const botEl = document.getElementById('indModalSPM');
   if (topEl) topEl.textContent = indeksSPM.toFixed(2);
@@ -1485,10 +1498,10 @@ async function viewDetail(idUsulan) {
       <div style="font-weight:700;font-size:13.5px;margin-bottom:8px">Detail Indikator</div>
       <div class="table-container">
         <table>
-          <thead><tr><th>No</th><th>Indikator</th><th>Target</th><th>Capaian</th><th>Data Dukung</th></tr></thead>
+          <thead><tr><th>No</th><th>Indikator</th><th>Target</th><th>Realisasi</th><th style="text-align:center">Capaian (%)</th><th>Data Dukung</th></tr></thead>
           <tbody>${inds.map(i => `<tr>
             <td>${i.no}</td><td style="max-width:220px;font-size:12.5px">${i.nama}</td>
-            <td>${i.target}</td><td>${i.capaian}</td>
+            <td>${i.target}</td><td>${i.capaian}</td><td style="text-align:center;font-weight:600;color:${i.target>0?(i.capaian/i.target*100)>=100?'#16a34a':'#0d9488':'#64748b'}">${i.target > 0 ? (i.capaian/i.target*100).toFixed(1)+'%' : '-'}</td>
             
             <td>${i.linkFile ? (() => { try { const ls = JSON.parse(i.linkFile); const arr = Array.isArray(ls) ? ls.map(f=>typeof f==='string'?{id:null,url:f,name:'File'}:f) : [{id:null,url:i.linkFile,name:'File'}]; window[`_buktiLinks_${i.no}`]={links:arr,idUsulan:i.idUsulan||''}; return `<button onclick="openBuktiModal(${i.no},0)" style="background:none;border:none;cursor:pointer;color:#0d9488;display:inline-flex;align-items:center;gap:3px;font-size:12px;padding:2px 6px;border-radius:5px" onmouseover="this.style.background='rgba(13,148,136,0.08)'" onmouseout="this.style.background='none'"><span class="material-icons" style="font-size:14px">visibility</span></button>`; } catch(e){ return `<a href="${i.linkFile}" target="_blank" style="color:#0d9488"><span class="material-icons" style="font-size:13px">visibility</span></a>`; } })() : '-'}</td>
           </tr>`).join('')}</tbody>
@@ -1662,7 +1675,7 @@ async function openVerifikasi(idUsulan) {
       }
       return `<tr>
         <td>${i.no}</td><td style="font-size:13px">${i.nama}</td>
-        <td>${i.target}</td><td>${i.capaian}</td>
+        <td>${i.target}</td><td>${i.capaian}</td><td style="text-align:center;font-weight:600;color:${i.target>0?(i.capaian/i.target*100)>=100?'#16a34a':'#0d9488':'#64748b'}">${i.target > 0 ? (i.capaian/i.target*100).toFixed(1)+'%' : '-'}</td>
         <td>${buktiHtml}</td>
       </tr>`;
     }).join('');
@@ -3100,7 +3113,7 @@ async function loadTargetTahunan() {
         </div>
         <div class="table-container">
           <table>
-            <thead><tr><th style="width:40px">No</th><th>Nama Indikator</th><th style="width:160px;text-align:center">Jumlah Sasaran (Satu Tahun)</th></tr></thead>
+            <thead><tr><th style="width:40px">No</th><th>Nama Indikator</th><th style="width:160px;text-align:center">Jumlah Sasaran (Tahun)</th></tr></thead>
             <tbody>
               ${_ttIndikator.map(ind => `<tr>
                 <td><span style="font-family:'JetBrains Mono';font-weight:700">${ind.noIndikator}</span></td>

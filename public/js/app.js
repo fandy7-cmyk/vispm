@@ -2225,37 +2225,81 @@ async function _loadMasterTab(tab) {
     content.innerHTML = `<div class="empty-state" style="padding:32px"><p>Memuat pengaturan...</p></div>`;
     modals.innerHTML = '';
     try {
-      const s = await API.getSettings();
+      const [s, pejabatList] = await Promise.all([API.getSettings(), API.getPejabat()]);
       const tahunAwal  = s?.tahun_awal  || 2024;
       const tahunAkhir = s?.tahun_akhir || Math.max(CURRENT_YEAR + 3, 2030);
+
+      const defaultPejabat = [
+        { jabatan: 'Kepala Dinas', placeholder: 'Kepala Dinas Kesehatan' },
+        { jabatan: 'Kepala Sub Bagian Perencanaan', placeholder: 'Kepala Sub Bagian Perencanaan' },
+      ];
+
+      function pejabatCard(def) {
+        const p = pejabatList.find(x => x.jabatan === def.jabatan) || {};
+        const ttHtml = p.tanda_tangan
+          ? `<img src="${p.tanda_tangan}" style="max-height:70px;max-width:160px;object-fit:contain">`
+          : `<span style="color:var(--text-light);font-size:12px">Belum ada tanda tangan</span>`;
+        return `<div class="card" style="padding:20px;margin-bottom:16px">
+          <div style="font-weight:700;font-size:13px;color:var(--primary);margin-bottom:14px;display:flex;align-items:center;gap:6px">
+            <span class="material-icons" style="font-size:16px">badge</span>${def.jabatan}
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+            <div class="form-group" style="margin:0">
+              <label>Nama *</label>
+              <input class="form-control" id="pj_nama_${def.jabatan.replace(/\s/g,'_')}" placeholder="${def.placeholder}" value="${p.nama||''}">
+            </div>
+            <div class="form-group" style="margin:0">
+              <label>NIP</label>
+              <input class="form-control" id="pj_nip_${def.jabatan.replace(/\s/g,'_')}" placeholder="Nomor Induk Pegawai" value="${p.nip||''}">
+            </div>
+          </div>
+          <div style="margin-bottom:10px">
+            <label style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:6px;display:block">Tanda Tangan</label>
+            <div id="pj_tt_box_${def.jabatan.replace(/\s/g,'_')}" style="border:2px dashed var(--border);border-radius:8px;padding:10px;background:white;min-height:60px;display:flex;align-items:center;justify-content:center;margin-bottom:8px">${ttHtml}</div>
+            <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;background:var(--primary-light);border:1.5px solid var(--border);padding:6px 12px;border-radius:8px;font-size:12px;font-weight:600;color:var(--primary)">
+              <span class="material-icons" style="font-size:14px">upload</span>Upload PNG/JPG
+              <input type="file" accept="image/png,image/jpeg" style="display:none" onchange="previewPejabatTT(this,'${def.jabatan.replace(/\s/g,'_')}')">
+            </label>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="savePejabat('${def.jabatan}')">
+            <span class="material-icons">save</span>Simpan
+          </button>
+        </div>`;
+      }
+
       content.innerHTML = `
-        <div class="card" style="max-width:480px">
-          <div class="card-body" style="padding:24px">
-            <div style="font-weight:700;font-size:15px;margin-bottom:4px;display:flex;align-items:center;gap:8px">
-              <span class="material-icons" style="color:var(--primary)">calendar_today</span>
-              Range Tahun
-            </div>
-            <div style="font-size:13px;color:var(--text-light);margin-bottom:20px">
-              Mengatur rentang tahun yang tampil pada semua dropdown tahun di seluruh aplikasi.
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
-              <div class="form-group" style="margin:0">
-                <label>Tahun Awal</label>
-                <input class="form-control" id="setTahunAwal" type="number" min="2020" max="2100" value="${tahunAwal}">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start">
+          <div>
+            <div class="card" style="padding:24px;margin-bottom:16px">
+              <div style="font-weight:700;font-size:15px;margin-bottom:4px;display:flex;align-items:center;gap:8px">
+                <span class="material-icons" style="color:var(--primary)">calendar_today</span>Range Tahun
               </div>
-              <div class="form-group" style="margin:0">
-                <label>Tahun Akhir</label>
-                <input class="form-control" id="setTahunAkhir" type="number" min="2020" max="2100" value="${tahunAkhir}">
+              <div style="font-size:13px;color:var(--text-light);margin-bottom:20px">Mengatur rentang tahun yang tampil pada semua dropdown tahun di seluruh aplikasi.</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
+                <div class="form-group" style="margin:0">
+                  <label>Tahun Awal</label>
+                  <input class="form-control" id="setTahunAwal" type="number" min="2020" max="2100" value="${tahunAwal}">
+                </div>
+                <div class="form-group" style="margin:0">
+                  <label>Tahun Akhir</label>
+                  <input class="form-control" id="setTahunAkhir" type="number" min="2020" max="2100" value="${tahunAkhir}">
+                </div>
               </div>
+              <button class="btn btn-primary" onclick="savePengaturanTahun()">
+                <span class="material-icons">save</span>Simpan Pengaturan
+              </button>
             </div>
-            <div style="background:var(--info-light);border-radius:8px;padding:10px 14px;font-size:12.5px;color:var(--text-light);margin-bottom:20px">
-              💡 Contoh: Tahun Awal <b>2024</b> · Tahun Akhir <b>2030</b> → dropdown akan menampilkan 2024 s/d 2030
+          </div>
+          <div>
+            <div style="font-weight:700;font-size:14px;margin-bottom:12px;display:flex;align-items:center;gap:6px">
+              <span class="material-icons" style="color:var(--primary)">draw</span>Pejabat Penandatangan Laporan
             </div>
-            <button class="btn btn-primary" onclick="savePengaturanTahun()">
-              <span class="material-icons">save</span>Simpan Pengaturan
-            </button>
+            ${defaultPejabat.map(pejabatCard).join('')}
           </div>
         </div>`;
+
+      // Simpan base64 tanda tangan sementara per jabatan
+      window._pjTT = {};
     } catch(e) { toast('Gagal memuat pengaturan: ' + e.message, 'error'); }
   }
 }
@@ -2264,6 +2308,39 @@ async function renderUsers() { await renderMasterData('users'); }
 async function renderJabatan() { await renderMasterData('jabatan'); }
 async function renderPKM() { await renderMasterData('pkm'); }
 async function renderIndikator() { await renderMasterData('indikator'); }
+
+function previewPejabatTT(input, jabatanKey) {
+  const file = input.files[0];
+  if (!file) return;
+  if (!['image/png','image/jpeg'].includes(file.type)) return toast('Format harus PNG atau JPG', 'error');
+  if (file.size > 2 * 1024 * 1024) return toast('Ukuran maksimal 2MB', 'error');
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    if (!window._pjTT) window._pjTT = {};
+    window._pjTT[jabatanKey] = e.target.result;
+    const box = document.getElementById(`pj_tt_box_${jabatanKey}`);
+    if (box) box.innerHTML = `<img src="${e.target.result}" style="max-height:70px;max-width:160px;object-fit:contain">`;
+  };
+  reader.readAsDataURL(file);
+}
+
+async function savePejabat(jabatan) {
+  const key = jabatan.replace(/\s/g, '_');
+  const nama = document.getElementById(`pj_nama_${key}`)?.value.trim();
+  const nip  = document.getElementById(`pj_nip_${key}`)?.value.trim();
+  const tt   = window._pjTT?.[key] || null;
+  if (!nama) return toast('Nama wajib diisi', 'warning');
+  setLoading(true);
+  try {
+    // Ambil tanda tangan lama jika tidak ada yang baru diupload
+    const existing = await API.getPejabat();
+    const old = existing.find(x => x.jabatan === jabatan);
+    const tandaTangan = tt || old?.tanda_tangan || null;
+    await API.savePejabat({ jabatan, nama, nip, tandaTangan });
+    toast(`${jabatan} berhasil disimpan`, 'success');
+  } catch(e) { toast(e.message, 'error'); }
+  finally { setLoading(false); }
+}
 
 async function savePengaturanTahun() {
   const awal  = parseInt(document.getElementById('setTahunAwal')?.value);

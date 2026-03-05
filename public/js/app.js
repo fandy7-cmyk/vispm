@@ -1,7 +1,7 @@
 // ============== APP STATE ==============
 
 // ============== PAGINATION UTILITY ==============
-const PAGINATION_SIZE = 15; // baris per halaman default
+const PAGINATION_SIZE = 12; // baris per halaman default
 const _pgState = {}; // { tableId: currentPage }
 
 function renderPagination(containerId, totalItems, currentPage, pageSize, onPageChange) {
@@ -2391,8 +2391,16 @@ async function _loadMasterTab(tab) {
 
       function pejabatCard(def) {
         const p = pejabatList.find(x => x.jabatan === def.jabatan) || {};
-        const ttHtml = p.tanda_tangan
-          ? `<img src="${p.tanda_tangan}" style="max-height:70px;max-width:160px;object-fit:contain">`
+        const jabatanKey = def.jabatan.replace(/\s/g,'_');
+        const ttValid = p.tanda_tangan && (p.tanda_tangan.startsWith('data:image') || p.tanda_tangan.startsWith('http'));
+        const ttHtml = ttValid
+          ? `<div style="position:relative;display:inline-block">
+              <img src="${p.tanda_tangan}" style="max-height:70px;max-width:160px;object-fit:contain"
+                onerror="this.closest('div').outerHTML='<span style=\\'color:#ef4444;font-size:12px\\'>⚠ Gambar tidak valid — hapus dan upload ulang</span>'">
+              <button onclick="hapusPejabatTT('${jabatanKey}')" title="Hapus" style="position:absolute;top:-6px;right:-6px;background:#ef4444;border:none;border-radius:50%;width:20px;height:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0">
+                <span class="material-icons" style="font-size:13px;color:white">close</span>
+              </button>
+            </div>`
           : `<span style="color:var(--text-light);font-size:12px">Belum ada tanda tangan</span>`;
         return `<div class="card" style="padding:20px;margin-bottom:16px">
           <div style="font-weight:700;font-size:13px;color:var(--primary);margin-bottom:14px;display:flex;align-items:center;gap:6px">
@@ -2401,19 +2409,19 @@ async function _loadMasterTab(tab) {
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
             <div class="form-group" style="margin:0">
               <label>Nama *</label>
-              <input class="form-control" id="pj_nama_${def.jabatan.replace(/\s/g,'_')}" placeholder="${def.placeholder}" value="${p.nama||''}">
+              <input class="form-control" id="pj_nama_${jabatanKey}" placeholder="${def.placeholder}" value="${p.nama||''}">
             </div>
             <div class="form-group" style="margin:0">
               <label>NIP</label>
-              <input class="form-control" id="pj_nip_${def.jabatan.replace(/\s/g,'_')}" placeholder="Nomor Induk Pegawai" value="${p.nip||''}">
+              <input class="form-control" id="pj_nip_${jabatanKey}" placeholder="Nomor Induk Pegawai" value="${p.nip||''}">
             </div>
           </div>
           <div style="margin-bottom:10px">
             <label style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:6px;display:block">Tanda Tangan</label>
-            <div id="pj_tt_box_${def.jabatan.replace(/\s/g,'_')}" style="border:2px dashed var(--border);border-radius:8px;padding:10px;background:white;min-height:60px;display:flex;align-items:center;justify-content:center;margin-bottom:8px">${ttHtml}</div>
+            <div id="pj_tt_box_${jabatanKey}" style="border:2px dashed var(--border);border-radius:8px;padding:10px;background:white;min-height:60px;display:flex;align-items:center;justify-content:center;margin-bottom:8px">${ttHtml}</div>
             <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;background:var(--primary-light);border:1.5px solid var(--border);padding:6px 12px;border-radius:8px;font-size:12px;font-weight:600;color:var(--primary)">
               <span class="material-icons" style="font-size:14px">upload</span>Upload PNG/JPG
-              <input type="file" accept="image/png,image/jpeg" style="display:none" onchange="previewPejabatTT(this,'${def.jabatan.replace(/\s/g,'_')}')">
+              <input type="file" accept="image/png,image/jpeg" style="display:none" onchange="previewPejabatTT(this,'${jabatanKey}')">
             </label>
           </div>
           <button class="btn btn-primary btn-sm" onclick="savePejabat('${def.jabatan}')">

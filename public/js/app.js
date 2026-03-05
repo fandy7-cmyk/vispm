@@ -1599,6 +1599,13 @@ async function openVerifikasi(idUsulan) {
   verifCurrentUsulan = idUsulan;
   document.getElementById('verifModalId').textContent = idUsulan;
   document.getElementById('verifCatatan').value = '';
+
+  // Reset tombol ke state default sebelum load data
+  const btnA = document.getElementById('btnApprove');
+  const btnR = document.getElementById('btnReject');
+  if (btnA) { btnA.disabled = true; btnA.style.background = ''; btnA.innerHTML = '<span class="material-icons">check_circle</span> Setujui'; }
+  if (btnR) { btnR.disabled = true; btnR.style.background = ''; btnR.style.borderColor = ''; btnR.innerHTML = '<span class="material-icons">cancel</span> Tolak'; }
+
   showModal('verifikasiModal');
   document.getElementById('verifIndikatorBody').innerHTML = `<tr><td colspan="4"><div class="empty-state" style="padding:20px"><p>Memuat...</p></div></td></tr>`;
 

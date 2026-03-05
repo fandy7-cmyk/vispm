@@ -1,5 +1,4 @@
 const https = require('https');
-const crypto = require('crypto');
 
 function httpsGet(url, reqHeaders) {
   return new Promise((resolve, reject) => {
@@ -7,22 +6,33 @@ function httpsGet(url, reqHeaders) {
       if (hops > 5) return reject(new Error('Too many redirects'));
       let parsedUrl;
       try { parsedUrl = new URL(u); } catch(e) { return reject(new Error('Invalid URL: ' + u)); }
-      const req = https.request({
-        hostname: parsedUrl.hostname, port: 443,
-        path: parsedUrl.pathname + parsedUrl.search, method: 'GET',
+
+      const options = {
+        hostname: parsedUrl.hostname,
+        port: 443,
+        path: parsedUrl.pathname + parsedUrl.search,
+        method: 'GET',
         headers: reqHeaders || {},
-      }, (res) => {
+      };
+
+      const req = https.request(options, (res) => {
         if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
           const loc = res.headers.location;
           const next = loc.startsWith('http') ? loc : `https://${parsedUrl.hostname}${loc}`;
-          res.resume(); return doReq(next, hops + 1);
+          res.resume();
+          return doReq(next, hops + 1);
         }
         const chunks = [];
         res.on('data', c => chunks.push(c));
-        res.on('end', () => resolve({ status: res.statusCode, buf: Buffer.concat(chunks), ct: res.headers['content-type'] || 'application/octet-stream' }));
+        res.on('end', () => resolve({
+          status: res.statusCode,
+          buf: Buffer.concat(chunks),
+          ct: res.headers['content-type'] || 'application/octet-stream',
+        }));
         res.on('error', reject);
       });
-      req.on('error', reject); req.end();
+      req.on('error', reject);
+      req.end();
     };
     doReq(url, 0);
   });
@@ -42,69 +52,77 @@ exports.handler = async (event) => {
 
   const apiKey    = process.env.CLOUDINARY_API_KEY    || '';
   const apiSecret = process.env.CLOUDINARY_API_SECRET || '';
-  const cloudName = process.env.CLOUDINARY_CLOUD_NAME || '';
 
   if (!apiKey || !apiSecret) {
     return { statusCode: 500, headers: cors, body: JSON.stringify({ error: 'Cloudinary env vars tidak di-set' }) };
   }
 
-  const fileName = (name || 'file').trim();
-  const ext = fileName.split('.').pop().toLowerCase();
   const basicAuth = Buffer.from(`${apiKey}:${apiSecret}`).toString('base64');
-  const resourceTypeMatch = url.match(/\/(image|raw|video)\/upload\//);
-  const resourceType = resourceTypeMatch ? resourceTypeMatch[1] : 'raw';
+  const fileName  = (name || 'file').trim();
 
   try {
     let result = null;
+    let finalUrl = url;
 
-    // Strategi 1: Direct URL tanpa auth (access_mode=public)
+    // Strategy 1: Direct access (works if access_mode=public)
     result = await httpsGet(url, {});
+    console.log('[sign-url] Strategy 1 direct:', result.status, url);
 
-    if (result.status === 401 || result.status === 404) {
-      // Strategi 2: Basic Auth
+    // Strategy 2: Basic Auth
+    if (result.status === 401 || result.status === 403 || result.status === 404) {
       result = await httpsGet(url, { 'Authorization': `Basic ${basicAuth}` });
+      console.log('[sign-url] Strategy 2 basic auth:', result.status);
     }
 
-    if (result.status === 401 || result.status === 404) {
-      // Strategi 3: Admin API - fetch via resource URL dengan auth
-      // Extract public_id (tanpa ekstensi) dari URL
-      const pidMatch = url.match(/\/(?:image|raw|video)\/upload\/(?:v\d+\/)?(.+?)(?:\.[a-z0-9]{2,5})?(?:\?|$)/i);
-      if (!pidMatch) throw new Error('Tidak bisa ekstrak public_id dari URL');
-      const publicId = pidMatch[1];
+    // Strategy 3: Admin API — ambil secure_url dari resource info
+    if (result.status === 401 || result.status === 403 || result.status === 404) {
+      try {
+        // Extract public_id dari URL: .../upload/v123/PUBLIC_ID.ext atau .../upload/PUBLIC_ID.ext
+        const urlObj = new URL(url);
+        const pathParts = urlObj.pathname.split('/');
+        const uploadIdx = pathParts.indexOf('upload');
+        if (uploadIdx !== -1) {
+          // Skip version segment (starts with 'v' + digits)
+          let pidParts = pathParts.slice(uploadIdx + 1);
+          if (pidParts[0] && /^v\d+$/.test(pidParts[0])) pidParts = pidParts.slice(1);
+          const pidWithExt = pidParts.join('/');
+          const publicId = pidWithExt.replace(/\.[^.]+$/, ''); // hapus ekstensi
 
-      // Cloudinary Admin API: GET resource info untuk dapat secure_url signed
-      const adminInfoUrl = `https://api.cloudinary.com/v1_1/${cloudName}/resources/${resourceType}/upload/${encodeURIComponent(publicId)}`;
-      const infoResult = await httpsGet(adminInfoUrl, { 'Authorization': `Basic ${basicAuth}` });
+          // Deteksi resource type dari URL path
+          const resourceType = urlObj.pathname.includes('/raw/') ? 'raw' : 'image';
+          const cloudName = urlObj.hostname.split('.')[0] === 'res' 
+            ? url.match(/cloudinary\.com\/([^/]+)\//)?.[1] 
+            : process.env.CLOUDINARY_CLOUD_NAME;
 
-      if (infoResult.status === 200) {
-        const info = JSON.parse(infoResult.buf.toString());
-        if (info.secure_url) {
-          // Coba akses via secure_url dari Admin API
-          result = await httpsGet(info.secure_url, {});
+          const adminUrl = `https://api.cloudinary.com/v1_1/${cloudName}/resources/${resourceType}/upload/${encodeURIComponent(publicId)}`;
+          console.log('[sign-url] Strategy 3 admin API:', adminUrl);
+          const infoResult = await httpsGet(adminUrl, { 'Authorization': `Basic ${basicAuth}` });
+          
+          if (infoResult.status === 200) {
+            const info = JSON.parse(infoResult.buf.toString());
+            if (info.secure_url) {
+              finalUrl = info.secure_url;
+              // Pastikan ekstensi ada
+              const ext2 = fileName.split('.').pop().toLowerCase();
+              if (ext2 && !finalUrl.split('/').pop().includes('.')) finalUrl += '.' + ext2;
+              result = await httpsGet(finalUrl, {});
+              console.log('[sign-url] Strategy 3 result:', result.status, finalUrl);
+              // Coba dengan auth jika masih gagal
+              if (result.status !== 200) {
+                result = await httpsGet(finalUrl, { 'Authorization': `Basic ${basicAuth}` });
+              }
+            }
+          }
         }
-      }
-
-      if (!result || result.status !== 200) {
-        // Strategi 4: Generate signed delivery URL
-        const timestamp = Math.floor(Date.now() / 1000) + 3600;
-        const pidMatch2 = url.match(/\/(?:image|raw|video)\/upload\/(?:v\d+\/)?(.+)/);
-        const fullPid = pidMatch2 ? pidMatch2[1] : '';
-        const toSign = `${timestamp}/${fullPid}`;
-        const sig = crypto.createHmac('sha256', apiSecret).update(toSign).digest('hex').substring(0, 8);
-        const signedUrl = url.replace(/\/upload\//, `/upload/s--${sig}--/e_${timestamp}/`);
-        result = await httpsGet(signedUrl, {});
-      }
+      } catch(e3) { console.error('[sign-url] Strategy 3 error:', e3.message); }
     }
 
     if (!result || result.status !== 200) {
-      console.error('[sign-url] All strategies failed, status:', result?.status);
-      return {
-        statusCode: result?.status || 500,
-        headers: cors,
-        body: JSON.stringify({ error: `File tidak dapat diakses (${result?.status}). Pastikan Cloudinary access mode = public.` })
-      };
+      console.error('[sign-url] All strategies failed, last status:', result?.status, 'url:', finalUrl);
+      return { statusCode: result?.status || 404, headers: cors, body: JSON.stringify({ error: `File tidak dapat diakses (${result?.status})` }) };
     }
 
+    const ext = fileName.split('.').pop().toLowerCase();
     const mimeMap = {
       pdf:  'application/pdf',
       doc:  'application/msword',
@@ -130,6 +148,7 @@ exports.handler = async (event) => {
       };
     }
 
+    // mode=download (default)
     return {
       statusCode: 200,
       headers: {

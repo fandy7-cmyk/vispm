@@ -138,7 +138,13 @@ function startApp() {
     }
   }
   document.getElementById('sidebarAvatar').textContent = (currentUser.nama || 'U')[0].toUpperCase();
-  document.getElementById('topbarUser').textContent = currentUser.nama || currentUser.email;
+  // Topbar avatar dropdown
+  const tAvatar = document.getElementById('topbarAvatar');
+  if (tAvatar) tAvatar.textContent = (currentUser.nama || 'U')[0].toUpperCase();
+  const tName = document.getElementById('topbarDropName');
+  if (tName) tName.textContent = currentUser.nama || currentUser.email;
+  const tMeta = document.getElementById('topbarDropMeta');
+  if (tMeta) tMeta.textContent = currentUser.role + (currentUser.namaPKM ? ' — ' + currentUser.namaPKM : '');
 
   buildSidebar();
   loadPage('dashboard');
@@ -277,6 +283,22 @@ function setActiveNav(page) {
   const el = document.getElementById('nav-' + page);
   if (el) el.classList.add('active');
 }
+
+// ============== TOPBAR DROPDOWN ==============
+function toggleTopbarDropdown() {
+  const dd = document.getElementById('topbarDropdown');
+  if (!dd) return;
+  dd.classList.toggle('open');
+}
+function closeTopbarDropdown() {
+  const dd = document.getElementById('topbarDropdown');
+  if (dd) dd.classList.remove('open');
+}
+// Tutup dropdown kalau klik di luar
+document.addEventListener('click', e => {
+  const wrap = document.getElementById('topbarAvatarWrap');
+  if (wrap && !wrap.contains(e.target)) closeTopbarDropdown();
+});
 
 // ============== ROUTING ==============
 const PAGE_TITLES = {
@@ -2913,6 +2935,131 @@ function previewTandaTangan(input) {
 }
 
 function editUser(email) { openUserModal(email); }
+
+// ============== EDIT PROFIL (SELF) ==============
+function openEditProfil() {
+  if (!currentUser) return;
+
+  let modal = document.getElementById('editProfilModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'editProfilModal';
+    modal.className = 'modal';
+    modal.addEventListener('click', e => { if (e.target === modal) closeModal('editProfilModal'); });
+    document.body.appendChild(modal);
+  }
+
+  const ttSrc = currentUser.tandaTangan || '';
+  const ttHtml = ttSrc
+    ? `<div style="position:relative;display:inline-block">
+        <img src="${ttSrc}" style="max-height:80px;max-width:100%;object-fit:contain"
+          onerror="this.closest('div').outerHTML='<span style=\\'color:#ef4444;font-size:12px\\'>⚠ Gambar tidak valid</span>'">
+        <button onclick="hapusTandaTanganProfil()" title="Hapus" style="position:absolute;top:-6px;right:-6px;background:#ef4444;border:none;border-radius:50%;width:20px;height:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0">
+          <span class="material-icons" style="font-size:13px;color:white">close</span>
+        </button>
+      </div>`
+    : `<span style="color:var(--text-light);font-size:12px">Belum ada tanda tangan</span>`;
+
+  modal.innerHTML = `
+    <div class="modal-card" style="max-width:460px">
+      <div class="modal-header">
+        <span class="material-icons" style="color:var(--primary)">account_circle</span>
+        <h3>Edit Profil</h3>
+        <button class="btn-icon" onclick="closeModal('editProfilModal')"><span class="material-icons">close</span></button>
+      </div>
+      <div class="modal-body" style="padding:20px;display:flex;flex-direction:column;gap:14px">
+        <div style="background:var(--primary-light);border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:10px">
+          <div style="width:36px;height:36px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;font-weight:700;color:white;font-size:15px;flex-shrink:0">${(currentUser.nama||'?')[0].toUpperCase()}</div>
+          <div>
+            <div style="font-weight:700;font-size:13px;color:var(--text)">${currentUser.email}</div>
+            <div style="font-size:11.5px;color:var(--text-light)">${currentUser.role}${currentUser.namaPKM ? ' — ' + currentUser.namaPKM : ''}</div>
+          </div>
+        </div>
+        <div class="form-group" style="margin:0">
+          <label>Nama Lengkap *</label>
+          <input class="form-control" id="epNama" value="${currentUser.nama||''}" placeholder="Nama lengkap">
+        </div>
+        <div class="form-group" style="margin:0">
+          <label>NIP</label>
+          <input class="form-control" id="epNIP" value="${currentUser.nip||''}" placeholder="Nomor Induk Pegawai">
+        </div>
+        <div class="form-group" style="margin:0">
+          <label style="margin-bottom:8px;display:block">Tanda Tangan</label>
+          <div id="epTTBox" style="border:2px dashed var(--border);border-radius:8px;padding:12px;background:#f8fafc;min-height:70px;display:flex;align-items:center;justify-content:center;margin-bottom:8px">${ttHtml}</div>
+          <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;background:var(--primary-light);border:1.5px solid var(--border);padding:6px 12px;border-radius:8px;font-size:12px;font-weight:600;color:var(--primary)">
+            <span class="material-icons" style="font-size:14px">upload</span>Upload PNG/JPG
+            <input type="file" accept="image/png,image/jpeg,image/jpg" style="display:none" onchange="previewTTprofil(this)">
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('editProfilModal')">Batal</button>
+        <button class="btn btn-primary" onclick="saveEditProfil()">
+          <span class="material-icons">save</span>Simpan
+        </button>
+      </div>
+    </div>`;
+
+  window._epTT = ttSrc; // simpan state tanda tangan
+  showModal('editProfilModal');
+}
+
+function previewTTprofil(input) {
+  if (!input.files[0]) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    window._epTT = e.target.result;
+    const box = document.getElementById('epTTBox');
+    if (box) box.innerHTML = `<div style="position:relative;display:inline-block">
+      <img src="${window._epTT}" style="max-height:80px;max-width:100%;object-fit:contain">
+      <button onclick="hapusTandaTanganProfil()" title="Hapus" style="position:absolute;top:-6px;right:-6px;background:#ef4444;border:none;border-radius:50%;width:20px;height:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0">
+        <span class="material-icons" style="font-size:13px;color:white">close</span>
+      </button>
+    </div>`;
+  };
+  reader.readAsDataURL(input.files[0]);
+}
+
+function hapusTandaTanganProfil() {
+  window._epTT = null;
+  const box = document.getElementById('epTTBox');
+  if (box) box.innerHTML = `<span style="color:var(--text-light);font-size:12px">Belum ada tanda tangan</span>`;
+}
+
+async function saveEditProfil() {
+  const nama = document.getElementById('epNama')?.value.trim();
+  const nip  = document.getElementById('epNIP')?.value.trim() || '';
+  if (!nama) return toast('Nama tidak boleh kosong', 'error');
+
+  setLoading(true);
+  try {
+    const tt = window._epTT; // null = hapus, undefined/string = pertahankan/baru
+    await API.updateUser({
+      email: currentUser.email,
+      nama, nip,
+      role: currentUser.role,
+      kodePKM: currentUser.kodePKM || '',
+      indikatorAkses: currentUser.indikatorAksesString || '',
+      jabatan: currentUser.jabatan || '',
+      aktif: true,
+      tandaTangan: tt === null ? '' : (tt || undefined),
+    });
+    // Update currentUser lokal
+    currentUser.nama = nama;
+    currentUser.nip  = nip;
+    if (tt !== undefined) currentUser.tandaTangan = tt || '';
+    // Refresh sidebar & topbar
+    document.getElementById('sidebarName').textContent = nama;
+    document.getElementById('sidebarAvatar').textContent = nama[0].toUpperCase();
+    const tAvatar = document.getElementById('topbarAvatar');
+    if (tAvatar) tAvatar.textContent = nama[0].toUpperCase();
+    const tName = document.getElementById('topbarDropName');
+    if (tName) tName.textContent = nama;
+    closeModal('editProfilModal');
+    toast('Profil berhasil disimpan ✓', 'success');
+  } catch(e) { toast(e.message, 'error'); }
+  finally { setLoading(false); }
+}
 
 async function saveUser() {
   const email = document.getElementById('uEmail').value.trim();

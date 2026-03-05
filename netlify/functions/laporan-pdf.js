@@ -33,6 +33,7 @@ exports.handler = async (event) => {
     await pool.query(`ALTER TABLE verifikasi_program ADD COLUMN IF NOT EXISTS nip_program VARCHAR(50)`).catch(()=>{});
     await pool.query(`ALTER TABLE verifikasi_program ADD COLUMN IF NOT EXISTS jabatan_program TEXT`).catch(()=>{});
     await pool.query(`CREATE TABLE IF NOT EXISTS target_tahunan (id SERIAL PRIMARY KEY, kode_pkm VARCHAR(20) NOT NULL, no_indikator INT NOT NULL, tahun INT NOT NULL, sasaran INT NOT NULL DEFAULT 0, UNIQUE(kode_pkm, no_indikator, tahun))`).catch(()=>{});
+    await pool.query(`CREATE TABLE IF NOT EXISTS pejabat_penandatangan (id SERIAL PRIMARY KEY, jabatan VARCHAR(100) NOT NULL UNIQUE, nama VARCHAR(200) NOT NULL, nip VARCHAR(50), tanda_tangan TEXT, updated_at TIMESTAMPTZ DEFAULT NOW())`).catch(()=>{});
 
     const hdrResult = await pool.query(
       `SELECT uh.*, p.nama_puskesmas,
@@ -61,6 +62,9 @@ exports.handler = async (event) => {
        LEFT JOIN users u ON LOWER(u.email) = LOWER(vp.email_program)
        WHERE vp.id_usulan = $1 ORDER BY vp.created_at`, [idUsulan]
     );
+
+    const pejabatResult = await pool.query(`SELECT * FROM pejabat_penandatangan ORDER BY id`);
+    const pejabatList = pejabatResult.rows;
 
     const bulanNama = ['','Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
     const bulan = bulanNama[h.bulan] || h.bulan;
@@ -120,6 +124,20 @@ exports.handler = async (event) => {
         <div style="margin-top:4px;border-top:1px solid #334155;padding-top:4px;display:inline-block;min-width:150px">
           <div style="font-size:10.5px;font-weight:700">${nama}</div>
           ${nip ? `<div style="font-size:9.5px">NIP. ${nip}</div>` : ''}
+        </div>
+      </div>`;
+    }
+
+    function pejabatSignBlock(p) {
+      const ttImg = p.tanda_tangan
+        ? `<img src="${p.tanda_tangan}" style="height:70px;max-width:160px;object-fit:contain;margin-bottom:4px">`
+        : `<div style="width:80px;height:70px;border-bottom:1px solid #334155;margin:0 auto 4px"></div>`;
+      return `<div style="text-align:center;min-width:180px;max-width:220px">
+        <div style="font-size:10px;color:#334155;margin-bottom:10px;font-weight:600">${p.jabatan}</div>
+        ${ttImg}
+        <div style="margin-top:4px;border-top:1px solid #334155;padding-top:4px;display:inline-block;min-width:150px">
+          <div style="font-size:10.5px;font-weight:700">${p.nama}</div>
+          ${p.nip ? `<div style="font-size:9.5px">NIP. ${p.nip}</div>` : ''}
         </div>
       </div>`;
     }
@@ -211,6 +229,10 @@ exports.handler = async (event) => {
         <div style="margin-top:28px">
           <div style="font-size:10px;color:#334155;margin-bottom:6px;text-align:right">Adean, ${now}</div>
           ${buildSignLayout(verifiers)}
+          ${pejabatList.length > 0 ? `
+          <div style="border-top:1px dashed #cbd5e1;margin-top:28px;padding-top:20px;display:flex;justify-content:space-around;flex-wrap:wrap;gap:20px">
+            ${pejabatList.map(p => pejabatSignBlock(p)).join('')}
+          </div>` : ''}
         </div>
       </div>`;
     }).join('');

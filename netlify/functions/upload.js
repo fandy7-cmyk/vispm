@@ -47,26 +47,22 @@ exports.handler = async (event) => {
 
     const folder    = 'VISPM/' + (kodePKM||'PKM') + '/' + (tahun||'') + '/' + (bulan||'') + '/' + (noIndikator||'');
     const safeBase  = (baseName + '_' + Math.floor(Date.now() / 1000)).replace(/[^a-zA-Z0-9_\-]/g, '_').substring(0, 60);
-    // DAM mode: public_id = filename only, asset_folder = path
-    const publicId  = safeBase;
-    const assetFolder = folder;
+    // Mode lama: public_id = folder/filename (bukan DAM mode)
+    const publicId  = folder + '/' + safeBase;
     const timestamp = Math.floor(Date.now() / 1000);
 
-    // Semua file pakai 'raw' + access_mode=public agar URL bisa diakses tanpa auth
-    // image resource untuk gambar (agar preview langsung di browser)
     const imageExts = ['jpg','jpeg','png','gif','webp','bmp','svg'];
     const resourceType = imageExts.includes(ext) ? 'image' : 'raw';
 
-    // Signature — param harus alphabetical: asset_folder, public_id, timestamp (+ access_mode untuk raw)
+    // Signature — folder masuk ke public_id, access_mode untuk raw
     const sigParts = resourceType === 'raw'
-      ? `access_mode=public&asset_folder=${assetFolder}&public_id=${publicId}&timestamp=${timestamp}${apiSecret}`
-      : `asset_folder=${assetFolder}&public_id=${publicId}&timestamp=${timestamp}${apiSecret}`;
+      ? `access_mode=public&public_id=${publicId}&timestamp=${timestamp}${apiSecret}`
+      : `public_id=${publicId}&timestamp=${timestamp}${apiSecret}`;
     const signature = crypto.createHash('sha1').update(sigParts).digest('hex');
 
     const params = new URLSearchParams({
       file: 'data:application/octet-stream;base64,' + fileBase64,
       public_id: publicId,
-      asset_folder: assetFolder,
       timestamp: timestamp.toString(),
       api_key: apiKey,
       signature,
@@ -79,20 +75,14 @@ exports.handler = async (event) => {
       throw new Error((result.body?.error?.message) || `Cloudinary error ${result.status}`);
     }
 
-    console.log('[upload] Cloudinary response secure_url:', result.body.secure_url, 'public_id:', result.body.public_id, 'version:', result.body.version);
+    console.log('[upload] secure_url:', result.body.secure_url, 'public_id:', result.body.public_id);
 
-    // DAM mode delivery URL format: /raw/upload/v{version}/{public_id}
-    // Ekstensi TIDAK dimasukkan ke URL (Cloudinary DAM serve tanpa ekstensi)
-    // Tapi kita simpan ekstensi di field 'name' untuk keperluan preview
-    const returnedPublicId = result.body.public_id || publicId;
-    const version = result.body.version;
-    let fileUrl;
-    if (version) {
-      fileUrl = `https://res.cloudinary.com/${cloudName}/${resourceType}/upload/v${version}/${returnedPublicId}`;
-    } else {
-      fileUrl = `https://res.cloudinary.com/${cloudName}/${resourceType}/upload/${returnedPublicId}`;
+    // Mode lama: secure_url dari Cloudinary sudah include folder path di public_id
+    let fileUrl = result.body.secure_url;
+    // Untuk raw: pastikan ekstensi ada
+    if (resourceType === 'raw' && ext && !fileUrl.split('/').pop().split('?')[0].includes('.')) {
+      fileUrl = fileUrl + '.' + ext;
     }
-    console.log('[upload] Built fileUrl:', fileUrl);
 
     return {
       statusCode: 200,

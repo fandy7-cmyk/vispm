@@ -1192,36 +1192,51 @@ function _renderBuktiModal() {
 
         if (isPDF) {
           el.innerHTML = `<iframe src="${blobUrl}" style="width:100%;height:100%;border:none"></iframe>`;
-        } else if (isOffice) {
-          // Minta signed URL publik dari Cloudinary untuk Office/Google viewer
-          el.innerHTML = `<div style="color:#94a3b8;font-size:13px;display:flex;align-items:center;gap:8px">
-            <span class="material-icons" style="animation:spin 1s linear infinite">refresh</span> Memuat preview...
-          </div>`;
-          try {
-            const sigRes = await fetch(`/api/get-signed-url?url=${encodeURIComponent(urlWithExt)}`);
-            const sigData = await sigRes.json();
-            if (sigData.signedUrl) {
-              const encodedUrl = encodeURIComponent(sigData.signedUrl);
-              // Coba Office Live Viewer dulu
-              const officeViewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodedUrl}`;
-              const googleViewerUrl = `https://docs.google.com/viewer?url=${encodedUrl}&embedded=true`;
-              el.innerHTML = `<iframe 
-                src="${officeViewerUrl}" 
-                style="width:100%;height:100%;border:none"
-                onerror="this.src='${googleViewerUrl}'"
-              ></iframe>`;
-            } else {
-              throw new Error('Gagal mendapat signed URL');
-            }
-          } catch(sigErr) {
-            // Fallback: download
-            el.innerHTML = `<div style="text-align:center;color:white;padding:40px">
-              <div style="font-size:64px;margin-bottom:16px">${fileIcon}</div>
-              <div style="font-size:13px;color:#94a3b8;margin-bottom:8px">${fileName}</div>
-              <div style="font-size:11px;color:#64748b;margin-bottom:28px;text-transform:uppercase">${ext.toUpperCase()} &bull; Preview tidak tersedia</div>
-              <a href="${blobUrl}" download="${fileName}" style="background:#0d9488;color:white;padding:12px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;display:inline-flex;align-items:center;gap:8px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download ${ext.toUpperCase()}</a>
-            </div>`;
+        } else if (['docx','doc'].includes(ext)) {
+          // Render Word pakai docx-preview library
+          el.innerHTML = `<div id="docxContainer" style="width:100%;height:100%;overflow-y:auto;background:white;padding:0"></div>`;
+          const container = el.querySelector('#docxContainer');
+          if (!window.docx) {
+            await new Promise((res, rej) => {
+              const s = document.createElement('script');
+              s.src = 'https://cdnjs.cloudflare.com/ajax/libs/docx-preview/0.3.2/docx-preview.min.js';
+              s.onload = res; s.onerror = rej;
+              document.head.appendChild(s);
+            });
           }
+          const arrayBuffer = await blob.arrayBuffer();
+          await window.docx.renderAsync(arrayBuffer, container, null, {
+            className: 'docx-preview',
+            inWrapper: true,
+            ignoreWidth: false,
+            ignoreHeight: false,
+            ignoreFonts: false,
+            breakPages: true,
+            useBase64URL: true,
+          });
+        } else if (['xlsx','xls'].includes(ext)) {
+          // Render Excel pakai SheetJS
+          el.innerHTML = `<div style="width:100%;height:100%;overflow:auto;background:white;padding:16px"></div>`;
+          const xlsContainer = el.querySelector('div');
+          if (!window.XLSX) {
+            await new Promise((res, rej) => {
+              const s = document.createElement('script');
+              s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+              s.onload = res; s.onerror = rej;
+              document.head.appendChild(s);
+            });
+          }
+          const arrayBuffer = await blob.arrayBuffer();
+          const workbook = window.XLSX.read(arrayBuffer, { type: 'array' });
+          // Render semua sheet sebagai HTML table
+          let html = `<style>.xlsx-table{border-collapse:collapse;font-size:12px;font-family:sans-serif;margin-bottom:24px}.xlsx-table td,.xlsx-table th{border:1px solid #e2e8f0;padding:4px 10px;white-space:nowrap}.xlsx-table th{background:#f1f5f9;font-weight:600}.xlsx-sheet-title{font-size:13px;font-weight:700;color:#0d9488;margin:16px 0 8px;padding-bottom:4px;border-bottom:2px solid #0d9488}</style>`;
+          workbook.SheetNames.forEach(sheetName => {
+            const ws = workbook.Sheets[sheetName];
+            const tableHtml = window.XLSX.utils.sheet_to_html(ws, { id: 'xlsTable', editable: false });
+            html += `<div class="xlsx-sheet-title">📋 ${sheetName}</div>`;
+            html += tableHtml.replace('<table', '<table class="xlsx-table"');
+          });
+          xlsContainer.innerHTML = html;
         } else {
           el.innerHTML = `<div style="text-align:center;color:white;padding:40px">
             <div style="font-size:64px;margin-bottom:16px">${fileIcon}</div>

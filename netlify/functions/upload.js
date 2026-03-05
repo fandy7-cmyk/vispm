@@ -81,16 +81,11 @@ exports.handler = async (event) => {
 
     console.log('[upload] Cloudinary response secure_url:', result.body.secure_url, 'public_id:', result.body.public_id, 'asset_folder:', result.body.asset_folder);
 
-    // DAM mode: secure_url tidak include asset_folder path
-    // Build URL manual: https://res.cloudinary.com/{cloud}/{type}/upload/{folder}/{filename}.{ext}
-    const version = result.body.version ? `v${result.body.version}` : '';
-    const fileNameInUrl = publicId + (ext ? '.' + ext : '');
-    let fileUrl;
-    if (version) {
-      fileUrl = `https://res.cloudinary.com/${cloudName}/${resourceType}/upload/${version}/${assetFolder}/${fileNameInUrl}`;
-    } else {
-      fileUrl = `https://res.cloudinary.com/${cloudName}/${resourceType}/upload/${assetFolder}/${fileNameInUrl}`;
-    }
+    // DAM mode: delivery URL = https://res.cloudinary.com/{cloud}/{type}/upload/{public_id}.{ext}
+    // Folder (asset_folder) tidak masuk ke delivery URL — hanya metadata
+    const returnedPublicId = result.body.public_id || publicId;
+    const fileNameInUrl = returnedPublicId + (ext ? '.' + ext : '');
+    const fileUrl = `https://res.cloudinary.com/${cloudName}/${resourceType}/upload/${fileNameInUrl}`;
 
     return {
       statusCode: 200,

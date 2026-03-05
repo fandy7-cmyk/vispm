@@ -1,5 +1,39 @@
 // ============== APP STATE ==============
 
+// ============== PAGINATION UTILITY ==============
+const PAGINATION_SIZE = 15; // baris per halaman default
+const _pgState = {}; // { tableId: currentPage }
+
+function renderPagination(containerId, totalItems, currentPage, pageSize, onPageChange) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  const totalPages = Math.ceil(totalItems / pageSize);
+  if (totalPages <= 1) { el.innerHTML = ''; return; }
+
+  const maxBtns = 5;
+  let start = Math.max(1, currentPage - Math.floor(maxBtns / 2));
+  let end = Math.min(totalPages, start + maxBtns - 1);
+  if (end - start < maxBtns - 1) start = Math.max(1, end - maxBtns + 1);
+
+  let html = `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-top:1px solid var(--border);background:white;border-radius:0 0 12px 12px">
+    <span style="font-size:12px;color:var(--text-light)">Menampilkan ${Math.min((currentPage-1)*pageSize+1, totalItems)}–${Math.min(currentPage*pageSize, totalItems)} dari ${totalItems} data</span>
+    <div style="display:flex;gap:4px;align-items:center">`;
+  
+  html += `<button onclick="${onPageChange}(1)" style="padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;background:white;cursor:pointer;font-size:12px;color:var(--text-light)" ${currentPage===1?'disabled':''}>«</button>`;
+  html += `<button onclick="${onPageChange}(${currentPage-1})" style="padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;background:white;cursor:pointer;font-size:12px;color:var(--text-light)" ${currentPage===1?'disabled':''}>‹</button>`;
+  
+  for (let i = start; i <= end; i++) {
+    const active = i === currentPage;
+    html += `<button onclick="${onPageChange}(${i})" style="padding:4px 10px;border:1.5px solid ${active?'var(--primary)':'var(--border)'};border-radius:6px;background:${active?'var(--primary)':'white'};color:${active?'white':'var(--text)'};cursor:pointer;font-size:12px;font-weight:${active?'700':'400'}">${i}</button>`;
+  }
+  
+  html += `<button onclick="${onPageChange}(${currentPage+1})" style="padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;background:white;cursor:pointer;font-size:12px;color:var(--text-light)" ${currentPage===totalPages?'disabled':''}>›</button>`;
+  html += `<button onclick="${onPageChange}(${totalPages})" style="padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;background:white;cursor:pointer;font-size:12px;color:var(--text-light)" ${currentPage===totalPages?'disabled':''}>»</button>`;
+  html += `</div></div>`;
+  el.innerHTML = html;
+}
+
+
 // Format timestamp: DD MMMM YYYY, HH:mm
 function formatTS(ts) {
   if (!ts) return '-';
@@ -554,9 +588,14 @@ function renderUsulanTable(rows, role) {
     return viewBtn;
   };
 
+  const tableKey = 'usulan_' + role;
+  const page = _pgState[tableKey] || 1;
+  const ps = PAGINATION_SIZE;
+  const sliced = rows.slice((page-1)*ps, page*ps);
+
   return `<div class="table-container"><table>
     <thead><tr><th>ID Usulan</th><th>Puskesmas</th><th>Periode</th><th>Status</th><th>Dibuat</th><th>Aksi</th></tr></thead>
-    <tbody>${rows.map(u => `<tr>
+    <tbody>${sliced.map(u => `<tr>
       <td><span style="font-family:'JetBrains Mono',monospace;font-weight:600;font-size:12px;">${u.idUsulan}</span></td>
       <td>${u.namaPKM || u.kodePKM}</td>
       <td>${u.namaBulan || ''} ${u.tahun}</td>
@@ -564,8 +603,16 @@ function renderUsulanTable(rows, role) {
       <td style="font-size:12px;color:var(--text-light)">${formatDateTime(u.createdAt)}</td>
       <td>${actionBtn(u)}</td>
     </tr>`).join('')}</tbody>
-  </table></div>`;
+  </table></div>
+  <div id="pg-${tableKey}"></div>
+  <script>renderPagination('pg-${tableKey}', ${rows.length}, ${page}, ${ps}, 'pgUsulan_${role}');<\/script>`;
 }
+
+// Pagination handler untuk usulan per role
+function pgUsulan_operator(p) { _pgState['usulan_operator'] = p; document.getElementById('verifTable') ? loadVerifData(window._lastVerifStatus||'semua') : renderInput(); }
+function pgUsulan_program(p) { _pgState['usulan_program'] = p; loadVerifData(window._lastVerifStatus||'semua'); }
+function pgUsulan_admin(p) { _pgState['usulan_admin'] = p; loadVerifData(window._lastVerifStatus||'semua'); }
+function pgUsulan_kepala_puskesmas(p) { _pgState['usulan_kepala-puskesmas'] = p; loadVerifData(window._lastVerifStatus||'semua'); }
 
 // ============== INPUT USULAN (OPERATOR) ==============
 async function renderInput() {
@@ -905,10 +952,13 @@ async function openIndikatorModal(idUsulan) {
                 </div>`
               : '';
             return `<div id="uploadCell-${ind.no}" style="display:flex;align-items:center;gap:6px;justify-content:center">
-                <label id="uploadLabel-${ind.no}" style="${btnStyle}">
-                  ${hasFiles ? 'Uploaded' : 'Upload'}
-                  <input type="file" multiple style="display:none" onchange="uploadBuktiIndikator(event,${ind.no},'${idUsulan}','${detail.kodePKM}',${detail.tahun},${detail.bulan},'${namaBulan}')">
-                </label>
+                <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+                  <label id="uploadLabel-${ind.no}" style="${btnStyle}">
+                    ${hasFiles ? 'Uploaded' : 'Upload'}
+                    <input type="file" multiple accept="application/pdf,image/png,image/jpeg,image/jpg,image/gif,image/webp" style="display:none" onchange="uploadBuktiIndikator(event,${ind.no},'${idUsulan}','${detail.kodePKM}',${detail.tahun},${detail.bulan},'${namaBulan}')">
+                  </label>
+                  <span style="font-size:9px;color:#94a3b8">PDF / Gambar</span>
+                </div>
                 <div id="fileControls-${ind.no}">${fileControlHtml}</div>
               </div>`;
           })()}
@@ -929,6 +979,15 @@ const SVG_TRASH = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" s
 async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, tahun, bulan, namaBulan) {
   const files = Array.from(event.target.files);
   if (!files.length) return;
+
+  // Validasi tipe file: hanya PDF dan image
+  const allowed = ['application/pdf','image/png','image/jpeg','image/jpg','image/gif','image/webp'];
+  const invalid = files.filter(f => !allowed.includes(f.type));
+  if (invalid.length) {
+    toast(`Format tidak didukung: ${invalid.map(f=>f.name).join(', ')}. Hanya PDF dan gambar (PNG/JPG) yang diperbolehkan.`, 'error');
+    event.target.value = '';
+    return;
+  }
 
   const cell = document.getElementById(`uploadCell-${noIndikator}`);
   const statusDiv = document.createElement('div');
@@ -1989,10 +2048,13 @@ async function loadLaporan() {
       return;
     }
 
+    const _lpg = _pgState['laporan'] || 1;
+    const _lps = PAGINATION_SIZE;
+    const _lsliced = result.data.slice((_lpg-1)*_lps, _lpg*_lps);
     document.getElementById('lapTable').innerHTML = `
       <div class="table-container"><table>
         <thead><tr><th>No</th><th>Puskesmas</th><th>Periode</th><th>Tgl Dibuat</th><th>Indeks SPM</th><th>Status</th><th>Aksi</th></tr></thead>
-        <tbody>${result.data.map(r => `<tr>
+        <tbody>${_lsliced.map(r => `<tr>
           <td>${r.no}</td>
           <td>${r.namaPKM}</td>
           <td>${r.namaBulan} ${r.tahun}</td>
@@ -2009,7 +2071,8 @@ async function loadLaporan() {
           </td>
         </tr>`).join('')}
         </tbody>
-      </table></div>`;
+      </table></div><div id="pg-laporan"></div>`;
+    renderPagination('pg-laporan', result.data.length, _lpg, _lps, 'pgLaporan');
   } catch (e) { toast(e.message, 'error'); }
 }
 
@@ -2027,6 +2090,8 @@ function exportLaporan() {
   URL.revokeObjectURL(url);
   toast('File CSV berhasil diunduh');
 }
+
+function pgLaporan(p) { _pgState['laporan'] = p; loadLaporan(); }
 
 // ============== ADMIN - USERS ==============
 let allUsers = [], allPKMList = [], allIndList = [];
@@ -2395,9 +2460,21 @@ function previewPejabatTT(input, jabatanKey) {
     if (!window._pjTT) window._pjTT = {};
     window._pjTT[jabatanKey] = e.target.result;
     const box = document.getElementById(`pj_tt_box_${jabatanKey}`);
-    if (box) box.innerHTML = `<img src="${e.target.result}" style="max-height:70px;max-width:160px;object-fit:contain">`;
+    if (box) box.innerHTML = `<div style="position:relative;display:inline-block">
+      <img src="${e.target.result}" style="max-height:70px;max-width:160px;object-fit:contain">
+      <button onclick="hapusPejabatTT('${jabatanKey}')" title="Hapus" style="position:absolute;top:-6px;right:-6px;background:#ef4444;border:none;border-radius:50%;width:20px;height:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0">
+        <span class="material-icons" style="font-size:13px;color:white">close</span>
+      </button>
+    </div>`;
   };
   reader.readAsDataURL(file);
+}
+
+function hapusPejabatTT(jabatanKey) {
+  if (!window._pjTT) window._pjTT = {};
+  window._pjTT[jabatanKey] = ''; // string kosong = hapus
+  const box = document.getElementById(`pj_tt_box_${jabatanKey}`);
+  if (box) box.innerHTML = `<span style="color:var(--text-light);font-size:12px">Belum ada tanda tangan</span>`;
 }
 
 async function savePejabat(jabatan) {
@@ -2411,7 +2488,7 @@ async function savePejabat(jabatan) {
     // Ambil tanda tangan lama jika tidak ada yang baru diupload
     const existing = await API.getPejabat();
     const old = existing.find(x => x.jabatan === jabatan);
-    const tandaTangan = tt || old?.tanda_tangan || null;
+    const tandaTangan = tt === '' ? null : (tt || old?.tanda_tangan || null);
     await API.savePejabat({ jabatan, nama, nip, tandaTangan });
     toast(`${jabatan} berhasil disimpan`, 'success');
   } catch(e) { toast(e.message, 'error'); }
@@ -2534,11 +2611,14 @@ function filterUsers() {
 function renderUsersTable(users) {
   const el = document.getElementById('usersTable');
   if (!el) return;
-  // Sembunyikan Super Admin dari tampilan demi keamanan
   const filteredUsers = users.filter(u => u.role !== 'Super Admin' && u.email !== 'f74262944@gmail.com');
+  const page = _pgState['users'] || 1;
+  const ps = PAGINATION_SIZE;
+  const sliced = filteredUsers.slice((page-1)*ps, page*ps);
+
   el.innerHTML = `<div class="table-container"><table>
     <thead><tr><th>Email</th><th>Nama</th><th>NIP</th><th>Role</th><th>Puskesmas</th><th>Jabatan/Indikator</th><th>Status</th><th>Aksi</th></tr></thead>
-    <tbody>${filteredUsers.map(u => `<tr>
+    <tbody>${sliced.map(u => `<tr>
       <td style="font-family:'JetBrains Mono';font-size:12px">${u.email}</td>
       <td>${u.nama}</td>
       <td style="font-family:'JetBrains Mono';font-size:11px;color:var(--text-light)">${u.nip || '-'}</td>
@@ -2552,8 +2632,10 @@ function renderUsersTable(users) {
         <button class="btn-icon del" onclick="deleteUser('${u.email}')"><span class="material-icons">delete</span></button>
       </td>
     </tr>`).join('')}</tbody>
-  </table></div>`;
+  </table></div><div id="pg-users"></div>`;
+  renderPagination('pg-users', filteredUsers.length, page, ps, 'pgUsers');
 }
+function pgUsers(p) { _pgState['users'] = p; renderUsersTable(allUsers); }
 
 let _resetTargetEmail = '';
 function resetUserPassword(email, nama) {
@@ -2762,7 +2844,12 @@ function openUserModal(editEmail = null) {
       // Load tanda tangan yang sudah ada
       if (user.tandaTangan && ttBox) {
         _ttBase64 = user.tandaTangan;
-        ttBox.innerHTML = `<img src="${user.tandaTangan}" style="max-height:80px;max-width:100%;object-fit:contain">`;
+        ttBox.innerHTML = `<div style="position:relative;display:inline-block">
+          <img src="${user.tandaTangan}" style="max-height:80px;max-width:100%;object-fit:contain">
+          <button onclick="hapusTandaTangan()" title="Hapus Tanda Tangan" style="position:absolute;top:-6px;right:-6px;background:#ef4444;border:none;border-radius:50%;width:20px;height:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0">
+            <span class="material-icons" style="font-size:13px;color:white">close</span>
+          </button>
+        </div>`;
       }
     }
     document.getElementById('userModal').dataset.editEmail = editEmail;
@@ -2771,6 +2858,14 @@ function openUserModal(editEmail = null) {
   }
 
   showModal('userModal');
+}
+
+function hapusTandaTangan() {
+  _ttBase64 = null;
+  const box = document.getElementById('ttPreviewBox');
+  if (box) box.innerHTML = `<span style="color:var(--text-light);font-size:12px">Belum ada tanda tangan</span>`;
+  const input = document.getElementById('ttFileInput');
+  if (input) input.value = '';
 }
 
 // Tanda tangan — preview saat file dipilih
@@ -2783,9 +2878,14 @@ function previewTandaTangan(input) {
   if (file.size > 2 * 1024 * 1024) return toast('Ukuran maksimal 2MB', 'error');
   const reader = new FileReader();
   reader.onload = (e) => {
-    _ttBase64 = e.target.result; // data:image/png;base64,...
+    _ttBase64 = e.target.result;
     const box = document.getElementById('ttPreviewBox');
-    if (box) box.innerHTML = `<img src="${_ttBase64}" style="max-height:80px;max-width:100%;object-fit:contain">`;
+    if (box) box.innerHTML = `<div style="position:relative;display:inline-block">
+      <img src="${_ttBase64}" style="max-height:80px;max-width:100%;object-fit:contain">
+      <button onclick="hapusTandaTangan()" title="Hapus" style="position:absolute;top:-6px;right:-6px;background:#ef4444;border:none;border-radius:50%;width:20px;height:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0">
+        <span class="material-icons" style="font-size:13px;color:white">close</span>
+      </button>
+    </div>`;
   };
   reader.readAsDataURL(file);
 }
@@ -2898,23 +2998,28 @@ async function loadJabatanTable() {
       return;
     }
 
+    const _jpg = _pgState['jabatan'] || 1;
+    const _jps = PAGINATION_SIZE;
+    const _jsliced = _jabatanAllList.slice((_jpg-1)*_jps, _jpg*_jps);
     el.innerHTML = `<div class="table-container"><table>
       <thead><tr><th>No</th><th>Nama Jabatan</th><th>Status</th><th>Aksi</th></tr></thead>
-      <tbody>${_jabatanAllList.map((j, i) => `<tr>
-        <td>${i + 1}</td>
+      <tbody>${_jsliced.map((j, i) => `<tr>
+        <td>${(_jpg-1)*_jps + i + 1}</td>
         <td style="font-weight:500">${j.nama}</td>
         <td>${j.aktif
           ? '<span style="background:#d1fae5;color:#065f46;padding:2px 10px;border-radius:20px;font-size:12px;font-weight:600">Aktif</span>'
           : '<span style="background:#f1f5f9;color:#94a3b8;padding:2px 10px;border-radius:20px;font-size:12px;font-weight:600">Non-aktif</span>'}</td>
         <td>
           <button class="btn-icon edit" onclick="openJabatanModal(${j.id})" title="Edit"><span class="material-icons">edit</span></button>
-          <button class="btn-icon del" onclick="deleteJabatan(${j.id}, '${j.nama.replace(/'/g, "\'")}')" title="Hapus"><span class="material-icons">delete</span></button>
+          <button class="btn-icon del" onclick="deleteJabatan(${j.id}, '${j.nama.replace(/'/g, "\'")}')"><span class="material-icons">delete</span></button>
         </td>
       </tr>`).join('')}
       </tbody>
-    </table></div>`;
+    </table></div><div id="pg-jabatan"></div>`;
+    renderPagination('pg-jabatan', _jabatanAllList.length, _jpg, _jps, 'pgJabatan');
   } catch(e) { toast(e.message, 'error'); }
 }
+function pgJabatan(p) { _pgState['jabatan'] = p; renderMasterData('jabatan'); }
 
 let _editJabatanId = null;
 
@@ -3030,9 +3135,12 @@ function filterPKM() {
 function renderPKMTable(pkm) {
   const el = document.getElementById('pkmTable');
   if (!el) return;
+  const page = _pgState['pkm'] || 1;
+  const ps = PAGINATION_SIZE;
+  const sliced = pkm.slice((page-1)*ps, page*ps);
   el.innerHTML = `<div class="table-container"><table>
     <thead><tr><th>Kode</th><th>Nama Puskesmas</th><th>Indeks Beban Kerja</th><th>Indeks Kesulitan Wilayah</th><th>Status</th><th>Aksi</th></tr></thead>
-    <tbody>${pkm.map(p => `<tr>
+    <tbody>${sliced.map(p => `<tr>
       <td><span style="font-family:'JetBrains Mono';font-weight:700">${p.kode}</span></td>
       <td>${p.nama}</td>
       <td class="rasio-cell">${parseFloat(p.indeks||0).toFixed(2)}</td>
@@ -3043,8 +3151,10 @@ function renderPKMTable(pkm) {
         <button class="btn-icon del" onclick="deletePKM('${p.kode}')"><span class="material-icons">delete</span></button>
       </td>
     </tr>`).join('')}</tbody>
-  </table></div>`;
+  </table></div><div id="pg-pkm"></div>`;
+  renderPagination('pg-pkm', pkm.length, page, ps, 'pgPKM');
 }
+function pgPKM(p) { _pgState['pkm'] = p; renderPKMTable(allPKM); }
 
 function openPKMModal(editKode = null) {
   document.getElementById('pkmModalTitle').textContent = editKode ? 'Edit Puskesmas' : 'Tambah Puskesmas';
@@ -3274,9 +3384,12 @@ function renderIndTable(inds) {
   const totalBobot = allIndikator.filter(i => i.aktif).reduce((s, i) => s + (parseInt(i.bobot) || 0), 0);
   const tbEl = document.getElementById('totalBobot');
   if (tbEl) tbEl.textContent = totalBobot;
+  const page = _pgState['ind'] || 1;
+  const ps = PAGINATION_SIZE;
+  const sliced = inds.slice((page-1)*ps, page*ps);
   el.innerHTML = `<div class="table-container"><table>
     <thead><tr><th>No</th><th>Nama Indikator</th><th>Bobot</th><th>Status</th><th>Aksi</th></tr></thead>
-    <tbody>${inds.map(i => `<tr>
+    <tbody>${sliced.map(i => `<tr>
       <td><span style="font-family:'JetBrains Mono';font-weight:700">${i.no}</span></td>
       <td>${i.nama}</td>
       <td style="text-align:center"><span style="font-family:'JetBrains Mono'">${i.bobot}</span></td>
@@ -3286,8 +3399,10 @@ function renderIndTable(inds) {
         <button class="btn-icon del" onclick="deleteInd(${i.no})"><span class="material-icons">delete</span></button>
       </td>
     </tr>`).join('')}</tbody>
-  </table></div>`;
+  </table></div><div id="pg-ind"></div>`;
+  renderPagination('pg-ind', inds.length, page, ps, 'pgInd');
 }
+function pgInd(p) { _pgState['ind'] = p; renderIndTable(allIndikator); }
 
 function openIndModal(editNo = null) {
   document.getElementById('indModalTitle').textContent = editNo ? 'Edit Indikator' : 'Tambah Indikator';

@@ -79,13 +79,20 @@ exports.handler = async (event) => {
       throw new Error((result.body?.error?.message) || `Cloudinary error ${result.status}`);
     }
 
-    console.log('[upload] Cloudinary response secure_url:', result.body.secure_url, 'public_id:', result.body.public_id, 'asset_folder:', result.body.asset_folder);
+    console.log('[upload] Cloudinary response secure_url:', result.body.secure_url, 'public_id:', result.body.public_id, 'version:', result.body.version);
 
-    // DAM mode: delivery URL = https://res.cloudinary.com/{cloud}/{type}/upload/{public_id}.{ext}
-    // Folder (asset_folder) tidak masuk ke delivery URL — hanya metadata
+    // DAM mode delivery URL format: /raw/upload/v{version}/{public_id}
+    // Ekstensi TIDAK dimasukkan ke URL (Cloudinary DAM serve tanpa ekstensi)
+    // Tapi kita simpan ekstensi di field 'name' untuk keperluan preview
     const returnedPublicId = result.body.public_id || publicId;
-    const fileNameInUrl = returnedPublicId + (ext ? '.' + ext : '');
-    const fileUrl = `https://res.cloudinary.com/${cloudName}/${resourceType}/upload/${fileNameInUrl}`;
+    const version = result.body.version;
+    let fileUrl;
+    if (version) {
+      fileUrl = `https://res.cloudinary.com/${cloudName}/${resourceType}/upload/v${version}/${returnedPublicId}`;
+    } else {
+      fileUrl = `https://res.cloudinary.com/${cloudName}/${resourceType}/upload/${returnedPublicId}`;
+    }
+    console.log('[upload] Built fileUrl:', fileUrl);
 
     return {
       statusCode: 200,

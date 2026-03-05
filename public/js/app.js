@@ -1193,7 +1193,14 @@ function _renderBuktiModal() {
         if (isPDF) {
           el.innerHTML = `<iframe src="${blobUrl}" style="width:100%;height:100%;border:none"></iframe>`;
         } else if (isOffice) {
-          el.innerHTML = `<iframe src="https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(downloadProxyUrl)}" style="width:100%;height:100%;border:none"></iframe>`;
+          // Office viewer butuh URL publik — tidak bisa pakai proxy/blob langsung
+          // Tampilkan download button saja untuk Office files
+          el.innerHTML = `<div style="text-align:center;color:white;padding:40px">
+            <div style="font-size:64px;margin-bottom:16px">${fileIcon}</div>
+            <div style="font-size:13px;color:#94a3b8;margin-bottom:8px">${fileName}</div>
+            <div style="font-size:11px;color:#64748b;margin-bottom:28px;text-transform:uppercase">${ext.toUpperCase()} &bull; Tidak dapat dipreview di browser</div>
+            <a href="${blobUrl}" download="${fileName}" style="background:#0d9488;color:white;padding:12px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;display:inline-flex;align-items:center;gap:8px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download ${ext.toUpperCase()}</a>
+          </div>`;
         } else {
           el.innerHTML = `<div style="text-align:center;color:white;padding:40px">
             <div style="font-size:64px;margin-bottom:16px">${fileIcon}</div>

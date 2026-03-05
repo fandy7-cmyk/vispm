@@ -47,19 +47,20 @@ exports.handler = async (event) => {
 
     const folder    = 'VISPM/' + (kodePKM||'PKM') + '/' + (tahun||'') + '/' + (bulan||'') + '/' + (noIndikator||'');
     const safeBase  = (baseName + '_' + Math.floor(Date.now() / 1000)).replace(/[^a-zA-Z0-9_\-]/g, '_').substring(0, 60);
+    // DAM mode: public_id = filename only, asset_folder = path
+    const publicId  = safeBase;
+    const assetFolder = folder;
     const timestamp = Math.floor(Date.now() / 1000);
 
-    // Cloudinary DAM mode: gunakan asset_folder (eksplisit) + public_id tanpa path
-    // public_id hanya nama file, folder dipisah via asset_folder
-    const publicId  = safeBase; // tanpa folder prefix
-    const assetFolder = folder;
-
+    // Semua file pakai 'raw' + access_mode=public agar URL bisa diakses tanpa auth
+    // image resource untuk gambar (agar preview langsung di browser)
     const imageExts = ['jpg','jpeg','png','gif','webp','bmp','svg'];
     const resourceType = imageExts.includes(ext) ? 'image' : 'raw';
 
-    // Signature: params harus sorted alphabetically
-    // asset_folder < public_id < timestamp
-    const sigParts = `asset_folder=${assetFolder}&public_id=${publicId}&timestamp=${timestamp}${apiSecret}`;
+    // Signature — param harus alphabetical: asset_folder, public_id, timestamp (+ access_mode untuk raw)
+    const sigParts = resourceType === 'raw'
+      ? `access_mode=public&asset_folder=${assetFolder}&public_id=${publicId}&timestamp=${timestamp}${apiSecret}`
+      : `asset_folder=${assetFolder}&public_id=${publicId}&timestamp=${timestamp}${apiSecret}`;
     const signature = crypto.createHash('sha1').update(sigParts).digest('hex');
 
     const params = new URLSearchParams({
@@ -69,6 +70,7 @@ exports.handler = async (event) => {
       timestamp: timestamp.toString(),
       api_key: apiKey,
       signature,
+      ...(resourceType === 'raw' ? { access_mode: 'public' } : {}),
     });
 
     const result = await cloudinaryRequest(`/v1_1/${cloudName}/${resourceType}/upload`, params.toString());
@@ -77,27 +79,20 @@ exports.handler = async (event) => {
       throw new Error((result.body?.error?.message) || `Cloudinary error ${result.status}`);
     }
 
-    // Gunakan secure_url langsung dari Cloudinary response — ini URL yang pasti benar
-    // Log response untuk debug
-    console.log('[upload] Cloudinary response:', JSON.stringify({
-      secure_url: result.body.secure_url,
-      public_id: result.body.public_id,
-      asset_folder: result.body.asset_folder,
-      version: result.body.version,
-    }));
+    console.log('[upload] Cloudinary response secure_url:', result.body.secure_url, 'public_id:', result.body.public_id, 'asset_folder:', result.body.asset_folder);
 
+    // Gunakan secure_url langsung dari Cloudinary
+    // stored public_id = asset_folder + '/' + public_id untuk referensi sign-url
     let fileUrl = result.body.secure_url;
-    const storedPublicId = assetFolder + '/' + result.body.public_id;
-
-    // Untuk raw: append ekstensi jika belum ada di URL
-    if (resourceType === 'raw' && ext && !fileUrl.split('/').pop().split('?')[0].includes('.')) {
+    // Untuk raw: pastikan ekstensi ada di URL
+    if (resourceType === 'raw' && ext && !fileUrl.split('/').pop().includes('.')) {
       fileUrl = fileUrl + '.' + ext;
     }
 
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({ success: true, fileUrl, publicId: storedPublicId, originalName: fileName }),
+      body: JSON.stringify({ success: true, fileUrl, publicId: result.body.public_id, originalName: fileName }),
     };
   } catch (e) {
     console.error('Upload error:', e);

@@ -81,12 +81,15 @@ exports.handler = async (event) => {
 
     console.log('[upload] Cloudinary response secure_url:', result.body.secure_url, 'public_id:', result.body.public_id, 'asset_folder:', result.body.asset_folder);
 
-    // Gunakan secure_url langsung dari Cloudinary
-    // stored public_id = asset_folder + '/' + public_id untuk referensi sign-url
-    let fileUrl = result.body.secure_url;
-    // Untuk raw: pastikan ekstensi ada di URL
-    if (resourceType === 'raw' && ext && !fileUrl.split('/').pop().includes('.')) {
-      fileUrl = fileUrl + '.' + ext;
+    // DAM mode: secure_url tidak include asset_folder path
+    // Build URL manual: https://res.cloudinary.com/{cloud}/{type}/upload/{folder}/{filename}.{ext}
+    const version = result.body.version ? `v${result.body.version}` : '';
+    const fileNameInUrl = publicId + (ext ? '.' + ext : '');
+    let fileUrl;
+    if (version) {
+      fileUrl = `https://res.cloudinary.com/${cloudName}/${resourceType}/upload/${version}/${assetFolder}/${fileNameInUrl}`;
+    } else {
+      fileUrl = `https://res.cloudinary.com/${cloudName}/${resourceType}/upload/${assetFolder}/${fileNameInUrl}`;
     }
 
     return {

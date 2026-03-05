@@ -25,6 +25,7 @@ exports.handler = async (event) => {
 
   const params = event.queryStringParameters || {};
   const idUsulan = params.id;
+  const isSementara = params.mode === 'sementara';
   if (!idUsulan) return { statusCode: 400, headers: { 'Access-Control-Allow-Origin': '*' }, body: 'ID diperlukan' };
 
   const pool = getPool();
@@ -192,7 +193,7 @@ exports.handler = async (event) => {
 
         <!-- JUDUL -->
         <div style="text-align:center;margin-bottom:16px">
-          <div style="font-size:12px;font-weight:700;text-transform:uppercase">Lembar Hasil Verifikasi Laporan Standar Pelayanan Minimal (SPM)</div>
+          <div style="font-size:12px;font-weight:700;text-transform:uppercase">Lembar Hasil Verifikasi Laporan Standar Pelayanan Minimal (SPM)${isSementara ? ' <span style="background:#f59e0b;color:white;font-size:9px;padding:2px 7px;border-radius:4px;vertical-align:middle;letter-spacing:1px;font-weight:700">SEMENTARA</span>' : ''}</div>
           <div style="font-size:12px;font-weight:700;text-transform:uppercase">Bidang Kesehatan Tahun ${h.tahun}</div>
         </div>
 
@@ -225,11 +226,15 @@ exports.handler = async (event) => {
 
         ${catatan ? `<div style="margin-bottom:20px;font-size:10px;color:#334155"><strong>Catatan :</strong> ${catatan}</div>` : ''}
 
-        <!-- TANDA TANGAN: piramida terbalik, kapus selalu kanan atas -->
-        <div style="margin-top:28px">
+        <!-- TANDA TANGAN -->
+        <div style="margin-top:28px;position:relative">
+          ${isSementara ? `<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-20deg);font-size:52px;font-weight:900;color:rgba(239,68,68,0.12);white-space:nowrap;pointer-events:none;z-index:0;letter-spacing:4px">SEMENTARA</div>` : ''}
           <div style="font-size:10px;color:#334155;margin-bottom:6px;text-align:right">Adean, ${now}</div>
-          ${buildSignLayout(verifiers)}
-          ${pejabatList.length > 0 ? `
+          ${isSementara
+            ? `<div style="display:flex;justify-content:flex-end">${kapusSignBlock()}</div>`
+            : buildSignLayout(verifiers)
+          }
+          ${!isSementara && pejabatList.length > 0 ? `
           <div style="border-top:1px dashed #cbd5e1;margin-top:28px;padding-top:20px;display:flex;justify-content:space-around;flex-wrap:wrap;gap:20px">
             ${pejabatList.map(p => pejabatSignBlock(p)).join('')}
           </div>` : ''}

@@ -37,24 +37,31 @@ exports.handler = async (event) => {
     const { fileName, fileBase64, kodePKM, tahun, bulan, noIndikator } = JSON.parse(event.body || '{}');
     if (!fileName || !fileBase64) return { statusCode: 400, headers, body: JSON.stringify({ success: false, error: 'fileName dan fileBase64 diperlukan' }) };
 
+    // Validasi tipe file: hanya PDF dan gambar
+    const dotIdx  = fileName.lastIndexOf('.');
+    const baseName = dotIdx > -1 ? fileName.substring(0, dotIdx) : fileName;
+    const ext      = dotIdx > -1 ? fileName.substring(dotIdx + 1).toLowerCase() : '';
+    const allowedExts = ['pdf', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'];
+    if (!allowedExts.includes(ext)) {
+      return { statusCode: 400, headers, body: JSON.stringify({ success: false, error: `Format file tidak didukung (.${ext}). Hanya PDF dan gambar (PNG, JPG, GIF, WebP) yang diperbolehkan.` }) };
+    }
+
     const cloudName  = process.env.CLOUDINARY_CLOUD_NAME;
     const apiKey     = process.env.CLOUDINARY_API_KEY;
     const apiSecret  = process.env.CLOUDINARY_API_SECRET;
 
-    const dotIdx  = fileName.lastIndexOf('.');
-    const baseName = dotIdx > -1 ? fileName.substring(0, dotIdx) : fileName;
-    const ext      = dotIdx > -1 ? fileName.substring(dotIdx + 1).toLowerCase() : '';
-
     const folder    = 'VISPM/' + (kodePKM||'PKM') + '/' + (tahun||'') + '/' + (bulan||'') + '/' + (noIndikator||'');
     const safeBase  = (baseName + '_' + Math.floor(Date.now() / 1000)).replace(/[^a-zA-Z0-9_\-]/g, '_').substring(0, 60);
-    // Mode lama: public_id = folder/filename (bukan DAM mode)
+    // publicId tanpa ekstensi untuk raw — Cloudinary raw tidak auto-append, kita tambah manual
     const publicId  = folder + '/' + safeBase;
     const timestamp = Math.floor(Date.now() / 1000);
 
+    // Semua file pakai 'raw' + access_mode=public agar URL bisa diakses tanpa auth
+    // image resource untuk gambar (agar preview langsung di browser)
     const imageExts = ['jpg','jpeg','png','gif','webp','bmp','svg'];
     const resourceType = imageExts.includes(ext) ? 'image' : 'raw';
 
-    // Signature — folder masuk ke public_id, access_mode untuk raw
+    // Signature mencakup access_mode untuk raw files
     const sigParts = resourceType === 'raw'
       ? `access_mode=public&public_id=${publicId}&timestamp=${timestamp}${apiSecret}`
       : `public_id=${publicId}&timestamp=${timestamp}${apiSecret}`;
@@ -75,12 +82,9 @@ exports.handler = async (event) => {
       throw new Error((result.body?.error?.message) || `Cloudinary error ${result.status}`);
     }
 
-    console.log('[upload] secure_url:', result.body.secure_url, 'public_id:', result.body.public_id);
-
-    // Mode lama: secure_url dari Cloudinary sudah include folder path di public_id
+    // Untuk raw: URL tidak punya ekstensi, append manual
     let fileUrl = result.body.secure_url;
-    // Untuk raw: pastikan ekstensi ada
-    if (resourceType === 'raw' && ext && !fileUrl.split('/').pop().split('?')[0].includes('.')) {
+    if (resourceType === 'raw' && ext && !fileUrl.split('/').pop().includes('.')) {
       fileUrl = fileUrl + '.' + ext;
     }
 

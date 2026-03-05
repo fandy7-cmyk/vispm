@@ -36,7 +36,7 @@ exports.handler = async (event) => {
 
     const hdrResult = await pool.query(
       `SELECT uh.*, p.nama_puskesmas,
-              ku.nama as kapus_nama, ku.nip as kapus_nip, ku.jabatan as kapus_jabatan
+              ku.nama as kapus_nama, ku.nip as kapus_nip, ku.jabatan as kapus_jabatan, ku.tanda_tangan as kapus_tanda_tangan
        FROM usulan_header uh
        LEFT JOIN master_puskesmas p ON uh.kode_pkm = p.kode_pkm
        LEFT JOIN users ku ON LOWER(ku.email) = LOWER(uh.kapus_approved_by)
@@ -56,7 +56,10 @@ exports.handler = async (event) => {
     );
 
     const vpResult = await pool.query(
-      `SELECT * FROM verifikasi_program WHERE id_usulan = $1 ORDER BY created_at`, [idUsulan]
+      `SELECT vp.*, u.tanda_tangan
+       FROM verifikasi_program vp
+       LEFT JOIN users u ON LOWER(u.email) = LOWER(vp.email_program)
+       WHERE vp.id_usulan = $1 ORDER BY vp.created_at`, [idUsulan]
     );
 
     const bulanNama = ['','Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
@@ -83,12 +86,15 @@ exports.handler = async (event) => {
       const jabatan = v.jabatan_program || 'Pengelola Program';
       const nama = v.nama_program || v.email_program;
       const nip = v.nip_program || '';
+      const ttImg = v.tanda_tangan
+        ? `<img src="${v.tanda_tangan}" style="height:70px;max-width:160px;object-fit:contain;margin-bottom:4px">`
+        : `<div style="width:80px;height:70px;border-bottom:1px solid #334155;margin:0 auto 4px"></div>`;
       return `<div style="text-align:center;min-width:180px;max-width:220px">
         <div style="font-size:10px;color:#334155;margin-bottom:10px;font-weight:600">${jabatan}</div>
         ${approved
-          ? `<div style="display:inline-block;margin-bottom:6px">${approvedBadgeSVG()}</div>
-             <div style="font-size:9px;color:#2d7a47;font-weight:700;margin-bottom:2px">✓ Disetujui: ${fmtDT(v.verified_at)}</div>`
-          : `<div style="width:80px;height:80px;border:2px dashed #cbd5e1;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:#94a3b8;font-size:10px;margin-bottom:6px">Belum</div>
+          ? `${ttImg}
+             <div style="font-size:8px;color:#2d7a47;margin-bottom:4px">✓ ${fmtDT(v.verified_at)}</div>`
+          : `<div style="width:80px;height:70px;border:2px dashed #cbd5e1;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;color:#94a3b8;font-size:10px;margin-bottom:6px">Belum</div>
              <div style="font-size:9px;color:#94a3b8;margin-bottom:2px">Menunggu persetujuan</div>`}
         <div style="margin-top:4px;border-top:1px solid #334155;padding-top:4px;display:inline-block;min-width:150px">
           <div style="font-size:10.5px;font-weight:700">${nama}</div>
@@ -101,12 +107,15 @@ exports.handler = async (event) => {
       const approved = !!h.kapus_approved_by;
       const nama = h.kapus_nama || h.kapus_approved_by || '-';
       const nip = h.kapus_nip || '';
+      const ttImg = h.kapus_tanda_tangan
+        ? `<img src="${h.kapus_tanda_tangan}" style="height:70px;max-width:160px;object-fit:contain;margin-bottom:4px">`
+        : `<div style="width:80px;height:70px;border-bottom:1px solid #334155;margin:0 auto 4px"></div>`;
       return `<div style="text-align:center;min-width:180px;max-width:220px">
         <div style="font-size:10px;color:#334155;margin-bottom:10px;font-weight:600">Kepala UPTD Puskesmas ${h.nama_puskesmas||h.kode_pkm}</div>
         ${approved
-          ? `<div style="display:inline-block;margin-bottom:6px">${approvedBadgeSVG()}</div>
-             <div style="font-size:9px;color:#2d7a47;font-weight:700;margin-bottom:2px">✓ Disetujui: ${fmtDT(h.kapus_approved_at)}</div>`
-          : `<div style="width:80px;height:80px;border:2px dashed #cbd5e1;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:#94a3b8;font-size:10px;margin-bottom:6px">Belum</div>
+          ? `${ttImg}
+             <div style="font-size:8px;color:#2d7a47;margin-bottom:4px">✓ ${fmtDT(h.kapus_approved_at)}</div>`
+          : `<div style="width:80px;height:70px;border:2px dashed #cbd5e1;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;color:#94a3b8;font-size:10px;margin-bottom:6px">Belum</div>
              <div style="font-size:9px;color:#94a3b8;margin-bottom:2px">Menunggu persetujuan</div>`}
         <div style="margin-top:4px;border-top:1px solid #334155;padding-top:4px;display:inline-block;min-width:150px">
           <div style="font-size:10.5px;font-weight:700">${nama}</div>

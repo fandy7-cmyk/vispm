@@ -1112,6 +1112,20 @@ async function hapusBukti(idUsulan, noIndikator, fileIndex) {
           } catch { links = [{ id: null, url: existingInd.linkFile, name: 'File' }]; }
         }
 
+        // Hapus dari Cloudinary dulu (silent — jangan block UI jika gagal)
+        const fileToDelete = links[fileIndex];
+        if (fileToDelete?.id) {
+          try {
+            await fetch('/.netlify/functions/delete-file', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ publicId: fileToDelete.id })
+            });
+          } catch(e) {
+            console.warn('Cloudinary delete gagal (diabaikan):', e.message);
+          }
+        }
+
         links.splice(fileIndex, 1);
         const newLinkFile = links.length ? JSON.stringify(links) : '';
         const tVal = parseFloat(document.getElementById(`t-${noIndikator}`)?.value) || 0;

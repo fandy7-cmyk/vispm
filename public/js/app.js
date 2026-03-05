@@ -1125,9 +1125,11 @@ function _renderBuktiModal() {
   const isOffice = ['doc','docx','xls','xlsx','ppt','pptx'].includes(ext);
   const total = links.length;
 
-  // URL dengan ekstensi (Cloudinary raw tidak auto-append)
+  // Semua akses file lewat sign-url proxy (Cloudinary raw tidak bisa diakses publik langsung)
   const urlWithExt = (f.url && ext && !f.url.split('/').pop().split('?')[0].includes('.'))
     ? f.url + '.' + ext : f.url;
+  const proxyUrl = `/api/sign-url?url=${encodeURIComponent(urlWithExt)}&name=${encodeURIComponent(fileName)}&mode=preview`;
+  const downloadProxyUrl = `/api/sign-url?url=${encodeURIComponent(urlWithExt)}&name=${encodeURIComponent(fileName)}&mode=download`;
 
   let modal = document.getElementById('previewBuktiModal');
   if (!modal) {
@@ -1161,7 +1163,7 @@ function _renderBuktiModal() {
       <div class="modal-body flex-col" style="position:relative;background:#0f172a;">
         <div id="${previewId}" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;">
           ${isImage
-            ? `<img src="${urlWithExt}" style="max-width:100%;max-height:100%;object-fit:contain;padding:16px">`
+            ? `<img src="${proxyUrl}" style="max-width:100%;max-height:100%;object-fit:contain;padding:16px">`
             : `<div style="color:#94a3b8;font-size:13px;display:flex;align-items:center;gap:8px">
                 <span class="material-icons" style="animation:spin 1s linear infinite">refresh</span> Memuat...
               </div>`
@@ -1183,7 +1185,7 @@ function _renderBuktiModal() {
       const el = document.getElementById(previewId);
       if (!el) return;
       try {
-        const res = await fetch(urlWithExt);
+        const res = await fetch(proxyUrl);
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const blob = await res.blob();
         const blobUrl = URL.createObjectURL(blob);
@@ -1191,7 +1193,7 @@ function _renderBuktiModal() {
         if (isPDF) {
           el.innerHTML = `<iframe src="${blobUrl}" style="width:100%;height:100%;border:none"></iframe>`;
         } else if (isOffice) {
-          el.innerHTML = `<iframe src="https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(urlWithExt)}" style="width:100%;height:100%;border:none"></iframe>`;
+          el.innerHTML = `<iframe src="https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(downloadProxyUrl)}" style="width:100%;height:100%;border:none"></iframe>`;
         } else {
           el.innerHTML = `<div style="text-align:center;color:white;padding:40px">
             <div style="font-size:64px;margin-bottom:16px">${fileIcon}</div>
@@ -1234,10 +1236,10 @@ async function downloadBukti(idx) {
   const ext2 = dotIdx2 > -1 ? fileName.substring(dotIdx2 + 1).toLowerCase() : '';
   if (ext2 && !fileName.toLowerCase().endsWith('.' + ext2)) fileName += '.' + ext2;
 
-  // URL langsung — raw+public bisa diakses, append ekstensi kalau belum ada
-  let fetchUrl = f.url.replace(/\.pdf\.pdf($|\?)/, '.pdf$1');
-  const urlHasExt = fetchUrl.split('/').pop().split('?')[0].includes('.');
-  if (!urlHasExt && ext2) fetchUrl = fetchUrl + '.' + ext2;
+  // Semua akses lewat sign-url proxy
+  const urlHasExt2 = f.url.split('/').pop().split('?')[0].includes('.');
+  const urlWithExt2 = (!urlHasExt2 && ext2) ? f.url + '.' + ext2 : f.url;
+  const fetchUrl = `/api/sign-url?url=${encodeURIComponent(urlWithExt2)}&name=${encodeURIComponent(fileName)}&mode=download`;
 
   try {
     const res = await fetch(fetchUrl);

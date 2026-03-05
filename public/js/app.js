@@ -1193,13 +1193,19 @@ function _renderBuktiModal() {
         if (isPDF) {
           el.innerHTML = `<iframe src="${blobUrl}" style="width:100%;height:100%;border:none"></iframe>`;
         } else if (isOffice) {
-          // Office Live → Google Docs viewer (butuh URL publik langsung)
-          const encodedUrl = encodeURIComponent(urlWithExt);
-          const officeUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodedUrl}`;
-          const googleUrl = `https://docs.google.com/viewer?url=${encodedUrl}&embedded=true`;
-          el.innerHTML = `<iframe src="${officeUrl}" style="width:100%;height:100%;border:none"
-            onload="if(this.contentDocument&&this.contentDocument.title.includes('Error'))this.src='${googleUrl}'"
-          ></iframe>`;
+          // Word/Excel: langsung trigger download, tampil info
+          const a = document.createElement('a');
+          a.href = blobUrl; a.download = fileName;
+          document.body.appendChild(a); a.click(); document.body.removeChild(a);
+          el.innerHTML = `<div style="text-align:center;color:white;padding:60px 40px">
+            <div style="font-size:64px;margin-bottom:16px">${fileIcon}</div>
+            <div style="font-size:15px;font-weight:600;color:white;margin-bottom:8px">${fileName}</div>
+            <div style="font-size:12px;color:#64748b;margin-bottom:28px">${ext.toUpperCase()} • File sedang didownload...</div>
+            <a href="${blobUrl}" download="${fileName}" style="background:#0d9488;color:white;padding:10px 28px;border-radius:8px;text-decoration:none;font-weight:600;font-size:13px;display:inline-flex;align-items:center;gap:8px">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Download Lagi
+            </a>
+          </div>`;
         } else {
           el.innerHTML = `<div style="text-align:center;color:white;padding:40px">
             <div style="font-size:64px;margin-bottom:16px">${fileIcon}</div>

@@ -2654,16 +2654,30 @@ async function savePejabat(jabatan) {
   const key = jabatan.replace(/\s/g, '_');
   const nama = document.getElementById(`pj_nama_${key}`)?.value.trim();
   const nip  = document.getElementById(`pj_nip_${key}`)?.value.trim();
-  const tt   = window._pjTT?.[key] || null;
+  // Gunakan undefined check — '' berarti hapus, undefined berarti tidak diubah
+  const ttState = window._pjTT?.[key];
   if (!nama) return toast('Nama wajib diisi', 'warning');
   setLoading(true);
   try {
-    // Ambil tanda tangan lama jika tidak ada yang baru diupload
     const existing = await API.getPejabat();
     const old = existing.find(x => x.jabatan === jabatan);
-    const tandaTangan = tt === '' ? null : (tt || old?.tanda_tangan || null);
+    let tandaTangan;
+    if (ttState === '') {
+      tandaTangan = null; // hapus
+    } else if (ttState) {
+      tandaTangan = ttState; // baru diupload
+    } else {
+      tandaTangan = old?.tanda_tangan || null; // tidak diubah, pakai lama
+    }
     await API.savePejabat({ jabatan, nama, nip, tandaTangan });
+    // Reset state setelah simpan
+    if (window._pjTT) delete window._pjTT[key];
     toast(`${jabatan} berhasil disimpan`, 'success');
+    // Reload tampilan agar tombol hapus hilang jika TT dihapus
+    if (tandaTangan === null) {
+      const box = document.getElementById(`pj_tt_box_${key}`);
+      if (box) box.innerHTML = `<span style="color:var(--text-light);font-size:12px">Belum ada tanda tangan</span>`;
+    }
   } catch(e) { toast(e.message, 'error'); }
   finally { setLoading(false); }
 }

@@ -769,8 +769,19 @@ async function restoreVerifStatus(pool, body) {
 async function getLogAktivitas(pool, idUsulan) {
   if (!idUsulan) return err('idUsulan diperlukan');
   const [logResult, headerResult] = await Promise.all([
-    pool.query(`SELECT * FROM log_aktivitas WHERE id_usulan=$1 ORDER BY timestamp ASC`, [idUsulan]),
-    pool.query(`SELECT uh.*, p.nama_puskesmas FROM usulan_header uh LEFT JOIN master_puskesmas p ON uh.kode_pkm=p.kode_pkm WHERE uh.id_usulan=$1`, [idUsulan])
+    pool.query(
+      `SELECT la.*, u.nama as user_nama
+       FROM log_aktivitas la
+       LEFT JOIN users u ON LOWER(u.email)=LOWER(la.user_email)
+       WHERE la.id_usulan=$1 ORDER BY la.timestamp ASC`,
+      [idUsulan]
+    ),
+    pool.query(
+      `SELECT uh.*, p.nama_puskesmas FROM usulan_header uh
+       LEFT JOIN master_puskesmas p ON uh.kode_pkm=p.kode_pkm
+       WHERE uh.id_usulan=$1`,
+      [idUsulan]
+    )
   ]);
   const usulan = headerResult.rows.length ? mapHeader(headerResult.rows[0]) : null;
   return ok({ logs: logResult.rows, usulan });

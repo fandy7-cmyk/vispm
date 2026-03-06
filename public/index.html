@@ -528,6 +528,59 @@ textarea.form-control { resize: vertical; }
   .stats-grid { grid-template-columns: 1fr; }
   .filter-row { flex-direction: column; }
 }
+
+/* ===== THEME VARIABLES ===== */
+:root {
+  --sidebar-bg1: rgba(4,32,24,0.98);
+  --sidebar-bg2: rgba(10,58,44,0.97);
+  --sidebar-bg3: rgba(13,80,58,0.96);
+}
+[data-theme="dark"] {
+  --bg: #0f172a;
+  --surface: #1e293b;
+  --border: #334155;
+  --border-light: #1e293b;
+  --text: #f1f5f9;
+  --text-light: #94a3b8;
+  --text-xlight: #475569;
+  --primary-light: rgba(13,148,136,0.15);
+  --sidebar-bg1: rgba(2,15,12,0.99);
+  --sidebar-bg2: rgba(5,28,20,0.98);
+  --sidebar-bg3: rgba(7,40,28,0.97);
+}
+[data-theme="dark"] .card { background: #1e293b; }
+[data-theme="dark"] .topbar { background: #1e293b; }
+[data-theme="dark"] .auth-right { background: #1e293b; }
+[data-theme="dark"] .auth-right h2 { color: #f1f5f9; }
+[data-theme="dark"] .auth-right-sub { color: #94a3b8; }
+[data-theme="dark"] .auth-field label { color: #94a3b8; }
+[data-theme="dark"] .auth-input { background: #0f172a; border-color: #334155; color: #f1f5f9; }
+[data-theme="dark"] table { color: #f1f5f9; }
+[data-theme="dark"] th { background: #1e293b !important; color: #94a3b8 !important; }
+[data-theme="dark"] td { border-color: #334155 !important; }
+[data-theme="dark"] tr:hover td { background: rgba(13,148,136,0.06) !important; }
+[data-theme="dark"] .form-control { background: #0f172a; border-color: #334155; color: #f1f5f9; }
+[data-theme="dark"] .modal-card { background: #1e293b; }
+[data-theme="dark"] .modal-body { background: #1e293b; }
+[data-theme="dark"] .modal-footer { background: #1e293b; border-color: #334155; }
+[data-theme="dark"] .modal-header { background: #1e293b; border-color: #334155; }
+[data-theme="dark"] .topbar-dropdown { background: #1e293b; box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
+[data-theme="dark"] .topbar-dropdown-header { background: #0f172a; border-color: #334155; }
+[data-theme="dark"] .topbar-dropdown-item:hover { background: #0f172a; }
+[data-theme="dark"] .topbar-dropdown-name { color: #f1f5f9; }
+[data-theme="dark"] .sidebar-footer { border-color: rgba(13,148,136,0.15); }
+[data-theme="dark"] select { background: #0f172a; border-color: #334155; color: #f1f5f9; }
+
+/* Theme toggle button */
+.theme-toggle-btn {
+  background: none; border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; border-radius: 50%;
+  color: var(--text-light); font-size: 20px;
+  transition: background .15s;
+}
+.theme-toggle-btn:hover { background: var(--border-light); }
+
 </style>
 </head>
 <body>
@@ -640,6 +693,7 @@ textarea.form-control { resize: vertical; }
         <span class="topbar-title" id="topbarTitle">Dashboard</span>
       </div>
       <div class="topbar-right">
+        <button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()" title="Ganti Tema">🌙</button>
         <div class="topbar-avatar-wrap" id="topbarAvatarWrap">
           <div class="topbar-avatar" id="topbarAvatar" onclick="toggleTopbarDropdown()">A</div>
           <div class="topbar-dropdown" id="topbarDropdown">
@@ -776,7 +830,7 @@ textarea.form-control { resize: vertical; }
       <div style="padding:12px 16px;flex-shrink:0">
       <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:linear-gradient(135deg,#0d9488,#06b6d4);border-radius:10px;margin-bottom:12px;color:white">
         <div>
-          <div style="font-size:11px;opacity:0.8;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px">Indeks SPM (Kinerja × Beban Kerja)</div>
+          <div style="font-size:11px;opacity:0.8;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px">Indeks SPM</div>
           <div style="font-size:30px;font-weight:800;font-family:'JetBrains Mono',monospace;line-height:1" id="indModalSPMTop">0.00</div>
         </div>
         <span class="material-icons" style="font-size:40px;opacity:0.3">assessment</span>

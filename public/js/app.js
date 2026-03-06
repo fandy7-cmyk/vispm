@@ -166,6 +166,80 @@ function startApp() {
   if (currentUser.role === 'Operator') {
     setTimeout(() => showPeriodeLoginPopup(), 800);
   }
+
+  // Popup notifikasi tanda tangan untuk verifikator
+  if (['Kepala Puskesmas', 'Pengelola Program', 'Admin'].includes(currentUser.role)) {
+    setTimeout(() => showTTLoginPopup(), 900);
+  }
+}
+
+async function showTTLoginPopup() {
+  try {
+    // Ambil data user terkini dari server
+    const users = await API.getUsers().catch(() => []);
+    const myData = (users || []).find(u => u.email?.toLowerCase() === currentUser.email?.toLowerCase());
+
+    let hasTT = false;
+    if (currentUser.role === 'Admin') {
+      // Admin: cek tanda tangan Kepala Sub Bagian Perencanaan
+      const pejabat = await API.getPejabat().catch(() => []);
+      const kasubag = (pejabat || []).find(p => p.jabatan === 'Kepala Sub Bagian Perencanaan');
+      hasTT = !!(kasubag?.tanda_tangan);
+    } else {
+      hasTT = !!(myData?.tandaTangan || currentUser.tandaTangan);
+    }
+
+    if (hasTT) return;
+
+    const popup = document.createElement('div');
+    popup.id = 'ttLoginPopup';
+    popup.style.cssText = `position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9998;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px);animation:fadeIn 0.3s ease`;
+    popup.innerHTML = `
+      <div style="background:white;border-radius:16px;width:460px;max-width:calc(100vw - 32px);overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,0.3);animation:authIn 0.3s ease">
+        <div style="background:linear-gradient(135deg,#f59e0b,#f97316);padding:20px 24px;color:white">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+            <span class="material-icons" style="font-size:24px">draw</span>
+            <span style="font-size:13px;font-weight:600;opacity:0.85;text-transform:uppercase;letter-spacing:0.5px">Tanda Tangan Diperlukan</span>
+          </div>
+          <div style="font-size:18px;font-weight:800">⚠️ Anda belum upload tanda tangan</div>
+        </div>
+        <div style="padding:20px 24px;display:flex;flex-direction:column;gap:12px">
+          <p style="font-size:13.5px;color:#374151;line-height:1.6;margin:0">
+            Tanda tangan digunakan untuk <strong>laporan resmi</strong> dan wajib ada sebelum Anda dapat melakukan verifikasi usulan.
+          </p>
+          <div style="background:#fef3c7;border:1.5px solid #f59e0b;border-radius:10px;padding:14px 16px">
+            <div style="font-size:12px;font-weight:700;color:#92400e;margin-bottom:8px;display:flex;align-items:center;gap:6px">
+              <span class="material-icons" style="font-size:15px">info</span>Cara Upload
+            </div>
+            <div style="font-size:12.5px;color:#78350f;line-height:1.7">
+              ${currentUser.role === 'Admin'
+                ? 'Buka menu <strong>Master Data</strong> → tab <strong>Pengaturan</strong> → bagian <strong>Kepala Sub Bagian Perencanaan</strong>'
+                : 'Klik <strong>Avatar Profil</strong> di pojok kanan atas → <strong>Edit Profil & Tanda Tangan</strong>'}
+            </div>
+          </div>
+          <div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px;padding:14px 16px">
+            <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:8px;display:flex;align-items:center;gap:6px">
+              <span class="material-icons" style="font-size:15px">check_circle</span>Spesifikasi File
+            </div>
+            <div style="font-size:12px;color:#64748b;line-height:1.9">
+              📄 Format: PNG / JPG<br>
+              🎨 Latar belakang: <strong>putih bersih</strong><br>
+              🖊️ Tinta: <strong>hitam atau biru tua</strong><br>
+              📐 Resolusi: <strong>jelas & tidak buram</strong>
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;margin-top:4px">
+            <button onclick="document.getElementById('ttLoginPopup').remove()" style="flex:1;height:44px;background:#f1f5f9;border:none;border-radius:10px;color:#64748b;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">
+              Nanti
+            </button>
+            <button onclick="document.getElementById('ttLoginPopup').remove();${currentUser.role === 'Admin' ? "setTimeout(()=>loadPage('master-data'),200);setTimeout(()=>switchMasterTab('pengaturan'),400)" : "setTimeout(()=>openEditProfil(),200)"}" style="flex:2;height:44px;background:linear-gradient(135deg,#f59e0b,#f97316);border:none;border-radius:10px;color:white;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">
+              <span class="material-icons" style="font-size:18px">upload</span>Upload Sekarang
+            </button>
+          </div>
+        </div>
+      </div>`;
+    document.body.appendChild(popup);
+  } catch(e) {}
 }
 
 async function showPeriodeLoginPopup() {

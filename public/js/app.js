@@ -363,7 +363,10 @@ function renderAdminDashboard(el, d) {
   // Load recent usulan
   API.getUsulan({ tahun: CURRENT_YEAR }).then(rows => {
     document.getElementById('recentTable').innerHTML = renderUsulanTable(rows.slice(0, 10), 'admin');
-  }).catch(() => {});
+  }).catch(() => {
+    const el = document.getElementById('recentTable');
+    if (el) el.innerHTML = `<div class="empty-state" style="padding:32px"><span class="material-icons">inbox</span><p>Belum ada data usulan</p></div>`;
+  });
 }
 
 function renderOperatorDashboard(el, d) {

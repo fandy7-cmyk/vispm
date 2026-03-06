@@ -1855,39 +1855,53 @@ async function downloadLaporanSementara(idUsulan) {
 }
 
 async function generateAndDownloadPDF(htmlContent, fileName) {
-  // Render HTML ke iframe hidden untuk ambil konten
-  const iframe = document.createElement('iframe');
-  iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:210mm;height:297mm;border:none;visibility:hidden';
-  document.body.appendChild(iframe);
+  // Load html2pdf jika belum ada
+  if (!window.html2pdf) {
+    await new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+      s.onload = resolve;
+      s.onerror = () => {
+        // Fallback: coba unpkg
+        const s2 = document.createElement('script');
+        s2.src = 'https://unpkg.com/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js';
+        s2.onload = resolve;
+        s2.onerror = reject;
+        document.head.appendChild(s2);
+      };
+      document.head.appendChild(s);
+    });
+  }
 
-  await new Promise(resolve => {
-    iframe.onload = resolve;
-    iframe.srcdoc = htmlContent;
-  });
+  // Render HTML ke div hidden
+  const container = document.createElement('div');
+  container.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:210mm;background:white;visibility:hidden';
+  container.innerHTML = htmlContent
+    .replace(/<script[\s\S]*?<\/script>/gi, '') // hapus semua script (termasuk window.print)
+    .replace(/<html[^>]*>|<\/html>|<head[\s\S]*?<\/head>/gi, ''); // ambil body saja
+  document.body.appendChild(container);
 
-  // Tunggu gambar (tanda tangan) selesai load
-  const images = iframe.contentDocument.querySelectorAll('img');
+  // Tunggu gambar load
+  const images = container.querySelectorAll('img');
   await Promise.all(Array.from(images).map(img =>
     img.complete ? Promise.resolve() : new Promise(r => { img.onload = r; img.onerror = r; })
   ));
-  await new Promise(r => setTimeout(r, 500)); // buffer render
-
-  const element = iframe.contentDocument.body;
+  await new Promise(r => setTimeout(r, 800));
 
   const opt = {
-    margin:       [10, 10, 10, 10],
-    filename:     fileName,
-    image:        { type: 'jpeg', quality: 0.98 },
-    html2canvas:  { scale: 2, useCORS: true, allowTaint: true, logging: false },
-    jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
-    pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
+    margin:      [10, 10, 10, 10],
+    filename:    fileName,
+    image:       { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true, allowTaint: true, logging: false },
+    jsPDF:       { unit: 'mm', format: 'a4', orientation: 'portrait' },
+    pagebreak:   { mode: ['avoid-all', 'css', 'legacy'] }
   };
 
   try {
-    await html2pdf().set(opt).from(element).save();
+    await html2pdf().set(opt).from(container).save();
     toast('PDF berhasil didownload ✓', 'success');
   } finally {
-    document.body.removeChild(iframe);
+    document.body.removeChild(container);
   }
 }
 // ============== LOG AKTIVITAS ==============
@@ -2062,8 +2076,8 @@ async function downloadLogPDF(idUsulan) {
 
     const blob = new Blob([html], { type:'text/html' });
     const url = URL.createObjectURL(blob);
-    window.open(url, '_blank');
-    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    await generateAndDownloadPDF(html, `Log-Aktivitas-${idUsulan||'VISPM'}.pdf`);
+    URL.revokeObjectURL(url);
     toast('PDF riwayat siap ✓', 'success');
   } catch(e) {
     toast('Gagal: ' + e.message, 'error');

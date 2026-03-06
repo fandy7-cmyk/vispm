@@ -66,11 +66,6 @@ const API = {
   getUsulan: (params) => API.get('usulan', params),
   getDetailUsulan: (id) => API.get('usulan', { action: 'detail', id }),
   getIndikatorUsulan: (id) => API.get('usulan', { action: 'indikator', id }),
-  getLogAktivitas: (id) => API.get('usulan', { action: 'log', id }),
-
-  // Settings
-  getSettings: () => API.get('settings'),
-  saveSettings: (data) => API.post('settings', data),
   buatUsulan: (data) => API.post('usulan?action=buat', data),
   updateIndikatorUsulan: (data) => API.put('usulan?action=indikator', data),
   submitUsulan: (data) => API.post('usulan?action=submit', data),
@@ -78,7 +73,8 @@ const API = {
   approveProgram: (data) => API.post('usulan?action=approve-program', data),
   approveAdmin: (data) => API.post('usulan?action=approve-admin', data),
   rejectUsulan: (data) => API.post('usulan?action=reject', data),
-  getPenolakanIndikator: (idUsulan) => API.get('usulan', { action: 'penolakan', idUsulan }),
+  getLogAktivitas: (id) => API.get('usulan', { action: 'log', id }),
+  getPenolakanIndikator: (id) => API.get('usulan', { action: 'penolakan', id }),
   respondPenolakan: (data) => API.post('usulan?action=respond-penolakan', data),
 
   // Laporan
@@ -87,11 +83,7 @@ const API = {
   // Jabatan
   getJabatan: () => API.get('jabatan'),
   saveJabatan: (data) => API.post('jabatan', data),
-  deleteJabatan: (id) => API.del('jabatan', { id }),
-
-  // Pejabat Penandatangan
-  getPejabat: () => API.get('pejabat'),
-  savePejabat: (data) => API.post('pejabat', data),
+  deleteJabatan: (id) => API.del('jabatan', { id })
 };
 
 // Utils

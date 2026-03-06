@@ -163,9 +163,14 @@ function startApp() {
   const _lastPage = sessionStorage.getItem('spm_lastPage');
   loadPage(_lastPage || 'dashboard');
 
-  // Default tahun range (getSettings tidak digunakan)
-  window._maxPeriodeTahun = window._maxPeriodeTahun || new Date().getFullYear();
-  window._minPeriodeTahun = window._minPeriodeTahun || 2024;
+  // Load tahun range dari DB settings
+  API.getSettings().then(s => {
+    if (s && s.tahun_awal)  window._minPeriodeTahun = parseInt(s.tahun_awal);
+    if (s && s.tahun_akhir) window._maxPeriodeTahun = parseInt(s.tahun_akhir);
+  }).catch(() => {
+    window._minPeriodeTahun = window._minPeriodeTahun || new Date().getFullYear();
+    window._maxPeriodeTahun = window._maxPeriodeTahun || new Date().getFullYear() + 2;
+  });
 
   // Refresh data user dari DB (termasuk tandaTangan terbaru)
   if (currentUser.email) {
@@ -2453,12 +2458,9 @@ let _masterTab = 'users';
 async function renderMasterData(tab = 'users') {
   _masterTab = tab;
   document.getElementById('mainContent').innerHTML = `
-    <div class="page-header">
-      <h1><span class="material-icons">tune</span>Master Data</h1>
-      <div id="masterDataActionBtn"></div>
-    </div>
     <!-- TAB BAR -->
-    <div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:20px;overflow-x:auto">
+    <div style="display:flex;align-items:center;gap:0;border-bottom:2px solid var(--border);margin-bottom:20px;overflow-x:auto">
+      <div style="display:flex;flex:1;gap:0;overflow-x:auto">
       ${[
         { id:'users',      icon:'group',         label:'Kelola User'      },
         { id:'jabatan',    icon:'badge',          label:'Kelola Jabatan'   },
@@ -2470,6 +2472,8 @@ async function renderMasterData(tab = 'users') {
           style="display:inline-flex;align-items:center;gap:6px;padding:10px 20px;border:none;background:none;cursor:pointer;font-size:13.5px;font-weight:600;white-space:nowrap;border-bottom:3px solid ${tab===t.id?'var(--primary)':'transparent'};color:${tab===t.id?'var(--primary)':'var(--text-light)'};margin-bottom:-2px;transition:all .15s">
           <span class="material-icons" style="font-size:17px">${t.icon}</span>${t.label}
         </button>`).join('')}
+      </div>
+      <div id="masterDataActionBtn" style="flex-shrink:0;padding:0 4px"></div>
     </div>
     <!-- TAB CONTENT -->
     <div id="masterTabContent"></div>
@@ -2719,8 +2723,8 @@ async function _loadMasterTab(tab) {
     modals.innerHTML = '';
     try {
       const [s, pejabatList] = await Promise.all([API.getSettings(), API.getPejabat()]);
-      const tahunAwal  = s?.tahun_awal  || 2024;
-      const tahunAkhir = s?.tahun_akhir || Math.max(CURRENT_YEAR + 3, 2030);
+      const tahunAwal  = s?.tahun_awal  || new Date().getFullYear();
+      const tahunAkhir = s?.tahun_akhir || new Date().getFullYear() + 2;
 
       const defaultPejabat = [
         { jabatan: 'Kepala Dinas', placeholder: 'Kepala Dinas Kesehatan' },

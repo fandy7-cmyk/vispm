@@ -535,7 +535,8 @@ function renderUsulanTable(rows, role) {
     if (role === 'operator') {
       return viewBtn +
         (u.statusGlobal === 'Draft' ? `<button class="btn-icon edit" onclick="openIndikatorModal('${u.idUsulan}')" title="Input"><span class="material-icons">edit</span></button>` : '') +
-        (u.statusGlobal === 'Ditolak' ? `<button class="btn-icon edit" onclick="openIndikatorModal('${u.idUsulan}')" title="Perbaiki"><span class="material-icons">restart_alt</span></button>` : '');
+        (u.statusGlobal === 'Ditolak' ? `<button class="btn-icon edit" onclick="openIndikatorModal('${u.idUsulan}')" title="Perbaiki"><span class="material-icons">restart_alt</span></button>` : '') +
+        pdfBtn + logBtn;
     }
     // Tombol verifikasi hanya muncul kalau status SESUAI tahapan role
     const canVerif =
@@ -1634,10 +1635,10 @@ async function openLogAktivitas(idUsulan) {
       </div>
       <div class="modal-footer">
         <button class="btn btn-secondary" onclick="closeModal('logAktivitasModal')">Tutup</button>
-        <button class="btn btn-primary" id="btnLogDownloadPDF" disabled
-          style="opacity:0.4;cursor:not-allowed"
+        <button class="btn-icon" id="btnLogDownloadPDF" disabled
+          style="opacity:0.4;cursor:not-allowed;background:#e0f2fe;color:#0369a1;border:1.5px solid #7dd3fc;width:36px;height:36px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center"
           title="Laporan PDF hanya tersedia setelah semua verifikasi selesai">
-          <span class="material-icons">picture_as_pdf</span>Download Laporan PDF
+          <span class="material-icons" style="font-size:20px">picture_as_pdf</span>
         </button>
       </div>
     </div>`;
@@ -1931,6 +1932,28 @@ document.addEventListener('click', (e) => {
     closeTopbarDropdown();
   }
 });
+
+
+// ============== THEME TOGGLE ==============
+function toggleTheme() {
+  const html = document.documentElement;
+  const isDark = html.getAttribute('data-theme') === 'dark';
+  const newTheme = isDark ? 'light' : 'dark';
+  html.setAttribute('data-theme', newTheme);
+  localStorage.setItem('spm_theme', newTheme);
+  const btn = document.getElementById('themeToggleBtn');
+  if (btn) btn.textContent = newTheme === 'dark' ? '☀️' : '🌙';
+}
+
+// Terapkan tema yang tersimpan saat load
+(function applyStoredTheme() {
+  const saved = localStorage.getItem('spm_theme');
+  if (saved) {
+    document.documentElement.setAttribute('data-theme', saved);
+    const btn = document.getElementById('themeToggleBtn');
+    if (btn) btn.textContent = saved === 'dark' ? '☀️' : '🌙';
+  }
+})();
 
 // ============== EDIT PROFIL ==============
 function openEditProfil() {

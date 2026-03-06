@@ -436,16 +436,656 @@ async function downloadLaporanDashboardOperator() {
 
 function renderKepalasDashboard(el, d) {
   const periodeList = d.periodeAktifList || (d.periodeAktif ? [d.periodeAktif] : []);
-  const periodeBanner = periodeList.length > 0
-    ? periodeList.map(pr => `
-        <div style="background:linear-gradient(135deg,#0d9488,#06b6d4);border-radius:12px;padding:14px 18px;color:white;margin-bottom:10px;display:flex;align-items:center;gap:14px">
-          <span class="material-icons" style="font-size:24px;opacity:0.9;flex-shrink:0">event_available</span>
-          <div style="flex:1">
-            <div style="font-weight:800;font-size:15px;margin-bottom:2px">Periode Input Aktif: ${pr.nama_bulan} ${pr.tahun}</div>
-            <div style="font-size:12.5px;opacity:0.9">Dibuka: ${formatDate(pr.tanggal_mulai)} pukul ${pr.jam_mulai||'08:00'} — Ditutup: ${formatDate(pr.tanggal_selesai)} pukul ${pr.jam_selesai||'17:00'} WITA</div>
+  const periodeBanner = renderPeriodeBanner(periodeList);
+
+  el.innerHTML = `
+    <div class="stats-grid">
+      ${statCard('orange','pending','Menunggu Verifikasi', d.menunggu)}
+      ${statCard('green','check_circle','Sudah Diverifikasi', d.terverifikasi)}
+      ${statCard('blue','assignment','Total Usulan', d.total)}
+      ${statCard('cyan','event_available','Periode Aktif', periodeList.length > 1 ? `${periodeList.length} Periode Aktif` : (periodeList[0] ? `${periodeList[0].nama_bulan} ${periodeList[0].tahun}` : '-'))}
+    </div>
+    ${periodeBanner}
+    <div class="card">
+      <div class="card-header-bar">
+        <span class="card-title"><span class="material-icons">pending_actions</span>Usulan Menunggu Verifikasi</span>
+        <button class="btn btn-secondary btn-sm" onclick="loadPage('verifikasi')"><span class="material-icons">arrow_forward</span>Lihat Semua</button>
+      </div>
+      <div class="card-body" style="padding:0" id="pendingTable"></div>
+    </div>`;
+
+  API.getUsulan({ kode_pkm: currentUser.kodePKM, status: 'Menunggu Kepala Puskesmas' }).then(rows => {
+    document.getElementById('pendingTable').innerHTML = renderUsulanTable(rows, 'kepala-puskesmas');
+  }).catch(() => {});
+}
+
+function renderProgramDashboard(el, d) {
+  el.innerHTML = `
+    <div class="stats-grid">
+      ${statCard('orange','pending','Menunggu Verifikasi', d.menunggu)}
+      ${statCard('green','check_circle','Sudah Diverifikasi', d.terverifikasi)}
+      ${statCard('blue','assignment','Total Usulan', d.total)}
+      ${statCard('cyan','event_available','Periode Aktif', periodeList.length > 1 ? `${periodeList.length} Periode Aktif` : (periodeList[0] ? `${periodeList[0].nama_bulan} ${periodeList[0].tahun}` : '-'))}
+    </div>
+    <div class="card">
+      <div class="card-header-bar">
+        <span class="card-title"><span class="material-icons">pending_actions</span>Usulan Menunggu Verifikasi Pengelola Program</span>
+        <button class="btn btn-secondary btn-sm" onclick="loadPage('verifikasi')"><span class="material-icons">arrow_forward</span>Lihat Semua</button>
+      </div>
+      <div class="card-body" style="padding:0" id="pendingTable"></div>
+    </div>`;
+
+  API.getUsulan({ status: 'Menunggu Pengelola Program' }).then(rows => {
+    document.getElementById('pendingTable').innerHTML = renderUsulanTable(rows, 'program');
+  }).catch(() => {});
+}
+
+// Helper: render banner periode sebagai grid
+function renderPeriodeBanner(periodeList) {
+  if (!periodeList || periodeList.length === 0)
+    return `<div class="info-card warning"><span class="material-icons">warning</span><div class="info-card-text">Tidak ada periode input yang aktif saat ini. Hubungi Admin.</div></div>`;
+  const items = periodeList.map(pr => {
+    const jamMulai = pr.jam_mulai || pr.jamMulai || '08:00';
+    const jamSelesai = pr.jam_selesai || pr.jamSelesai || '17:00';
+    const tglMulai = pr.tanggal_mulai || pr.tanggalMulai;
+    const tglSelesai = pr.tanggal_selesai || pr.tanggalSelesai;
+    const namaBulan = pr.nama_bulan || pr.namaBulan || '';
+    const notif = pr.notif_operator || pr.notifOperator || '';
+    return `<div style="background:linear-gradient(135deg,#0d9488,#06b6d4);border-radius:12px;padding:14px 16px;color:white;display:flex;align-items:flex-start;gap:12px">
+      <span class="material-icons" style="font-size:22px;opacity:0.9;flex-shrink:0;margin-top:2px">event_available</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:800;font-size:14px;margin-bottom:2px">Periode Aktif: \${namaBulan} \${pr.tahun}</div>
+        <div style="font-size:12px;opacity:0.9">Dibuka: \${formatDate(tglMulai)} \${jamMulai} — Ditutup: \${formatDate(tglSelesai)} \${jamSelesai} WITA</div>
+        \${notif ? `<div style="margin-top:6px;padding:6px 10px;background:rgba(255,255,255,0.15);border-radius:6px;font-size:12px">📢 \${notif}</div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+  return `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px">\${items}</div>`;
+}
+
+function renderKadisDashboard(el, d) {
+  el.innerHTML = `
+    <div class="stats-grid">
+      ${statCard('blue','assignment','Total Usulan', d.totalUsulan)}
+      ${statCard('green','check_circle','Selesai', d.selesai)}
+      ${statCard('orange','pending','Dalam Proses', d.proses)}
+      ${statCard('purple','trending_up','Rata-rata Indeks SPM', d.rataSPM)}
+    </div>
+    <div class="card">
+      <div class="card-header-bar"><span class="card-title"><span class="material-icons">timeline</span>Statistik per Bulan</span></div>
+      <div class="card-body">${renderChart(d.chartData)}</div>
+    </div>
+    <div class="card">
+      <div class="card-header-bar"><span class="card-title"><span class="material-icons">local_hospital</span>Statistik per Puskesmas</span></div>
+      <div class="card-body" style="padding:0">
+        <div class="table-container">
+          <table>
+            <thead><tr><th>Puskesmas</th><th>Total</th><th>Selesai</th><th>Proses</th><th>Rata-rata Indeks</th></tr></thead>
+            <tbody>${(d.statPerPKM || []).map(r => `<tr>
+              <td>${r.nama}</td><td>${r.total}</td><td><span class="badge badge-success">${r.selesai}</span></td>
+              <td>${r.proses}</td><td><span style="font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--primary)">${r.rataIndeks}</span></td>
+            </tr>`).join('') || `<tr><td colspan="5"><div class="empty-state" style="padding:24px"><p>Belum ada data</p></div></td></tr>`}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>`;
+}
+
+function statCard(color, icon, label, value) {
+  return `<div class="stat-card">
+    <div class="stat-icon ${color}"><span class="material-icons">${icon}</span></div>
+    <div class="stat-info"><div class="stat-label">${label}</div><div class="stat-value">${value ?? 0}</div></div>
+  </div>`;
+}
+
+function renderChart(data) {
+  if (!data || data.length === 0) return `<div class="empty-state"><p>Belum ada data chart</p></div>`;
+  const max = Math.max(...data.map(d => d.total || 0), 1);
+  return `<div class="chart-container">${data.map(d => `
+    <div class="chart-bar-wrap">
+      <div class="chart-bar-val">${d.total}</div>
+      <div class="chart-bar" style="height:${Math.max(((d.total || 0) / max) * 160, 4)}px" title="${d.bulan}: ${d.total} usulan"></div>
+      <div class="chart-bar-lbl">${d.bulan}</div>
+    </div>`).join('')}</div>`;
+}
+
+// ============== USULAN TABLE HELPER ==============
+function renderUsulanTable(rows, role) {
+  if (!rows || rows.length === 0) {
+    return `<div class="empty-state" style="padding:32px"><span class="material-icons">inbox</span><p>Belum ada data usulan</p></div>`;
+  }
+  const actionBtn = (u) => {
+    const viewBtn = `<button class="btn-icon view" onclick="viewDetail('${u.idUsulan}')" title="Detail"><span class="material-icons">visibility</span></button>`;
+    if (role === 'operator') {
+      return viewBtn +
+        (u.statusGlobal === 'Draft' ? `<button class="btn-icon edit" onclick="openIndikatorModal('${u.idUsulan}')" title="Input"><span class="material-icons">edit</span></button>` : '') +
+        (u.statusGlobal === 'Ditolak' ? `<button class="btn-icon edit" onclick="openIndikatorModal('${u.idUsulan}')" title="Perbaiki"><span class="material-icons">restart_alt</span></button>` : '') +
+        pdfBtn + logBtn;
+    }
+    // Tombol verifikasi hanya muncul kalau status SESUAI tahapan role
+    const canVerif =
+      (role === 'kepala-puskesmas' && u.statusGlobal === 'Menunggu Kepala Puskesmas') ||
+      (role === 'program' && (u.statusGlobal === 'Menunggu Pengelola Program' || u.statusGlobal === 'Ditolak')) ||
+      (role === 'admin'   && u.statusGlobal === 'Menunggu Admin');
+
+    // Sudah verifikasi: untuk Kepala Puskesmas cek statusKapus, untuk Program cek myVerifStatus, untuk Admin cek Selesai
+    const sudahVerifKepala = role === 'kepala-puskesmas' && (u.statusKapus === 'Selesai' || u.statusKapus === 'Ditolak');
+    const sudahVerifProgram = role === 'program' && u.sudahVerif === true && (u.myVerifStatus === 'Selesai' || u.myVerifStatus === 'Ditolak');
+    const sudahVerifAdmin = role === 'admin' && u.statusGlobal === 'Selesai';
+    const sudahVerif = sudahVerifKepala || sudahVerifProgram || sudahVerifAdmin;
+
+    let verifBtn;
+    if (sudahVerif) {
+      // Sudah approve — tampilkan tombol hijau terkunci
+      verifBtn = `<button class="btn-icon" title="Anda sudah memverifikasi" style="background:#d1fae5;color:#065f46;cursor:default;border:1.5px solid #0d9488" disabled><span class="material-icons">check_circle</span></button>`;
+    } else if (canVerif) {
+      verifBtn = `<button class="btn-icon approve" onclick="openVerifikasi('${u.idUsulan}')" title="Verifikasi Sekarang" style="animation:pulse 1.5s infinite"><span class="material-icons">rate_review</span></button>`;
+    } else {
+      verifBtn = `<button class="btn-icon" title="Menunggu tahap sebelumnya" style="opacity:0.35;cursor:not-allowed" disabled><span class="material-icons">lock</span></button>`;
+    }
+
+    // Tombol download PDF
+    const _svgDl = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10"/><path d="m8 9 4 4 4-4"/><path d="M4 17c0 2.2 1.8 4 4 4h8c2.2 0 4-1.8 4-4"/></svg>`;
+    const pdfBtn = u.statusGlobal === 'Selesai'
+      ? `<button class="btn-icon" onclick="downloadLaporanPDF('${u.idUsulan}')" title="Download Laporan PDF" style="background:transparent;border:none;color:#64748b">${_svgDl}</button>`
+      : (u.statusKapus === 'Selesai' || ['Menunggu Pengelola Program','Menunggu Admin'].includes(u.statusGlobal))
+        ? `<button class="btn-icon" onclick="downloadLaporanSementara('${u.idUsulan}')" title="Download Laporan Sementara" style="background:transparent;border:none;color:#f59e0b">${_svgDl}</button>`
+        : '';
+    const logBtn = `<button class="btn-icon" onclick="openLogAktivitas('${u.idUsulan}')" title="Riwayat Aktivitas" style="background:transparent;border:none;color:#64748b"><span class="material-icons" style="font-size:18px">history</span></button>`;
+
+    if (['kepala-puskesmas', 'program', 'admin'].includes(role)) {
+      return viewBtn + pdfBtn + verifBtn + logBtn;
+    }
+    return viewBtn + pdfBtn + logBtn;
+  };
+
+  return `<div class="table-container"><table>
+    <thead><tr><th>ID Usulan</th><th>Puskesmas</th><th>Periode</th><th>Status</th><th>Dibuat</th><th>Aksi</th></tr></thead>
+    <tbody>${rows.map(u => `<tr>
+      <td><span style="font-family:'JetBrains Mono',monospace;font-weight:600;font-size:12px;">${u.idUsulan}</span></td>
+      <td>${u.namaPKM || u.kodePKM}</td>
+      <td>${u.namaBulan || ''} ${u.tahun}</td>
+      <td>${statusBadge(u.statusGlobal)}</td>
+      <td style="font-size:12px;color:var(--text-light)">${formatDateTime(u.createdAt)}</td>
+      <td>${actionBtn(u)}</td>
+    </tr>`).join('')}</tbody>
+  </table></div>`;
+}
+
+// ============== INPUT USULAN (OPERATOR) ==============
+async function renderInput() {
+  // Guard: hanya Operator yang bisa input usulan
+  if (currentUser && currentUser.role === 'Kepala Puskesmas') {
+    document.getElementById('mainContent').innerHTML = `<div class="empty-state"><span class="material-icons" style="font-size:48px;color:var(--text-xlight)">block</span><p>Kepala Puskesmas tidak memiliki akses untuk input usulan.</p></div>`;
+    return;
+  }
+  let pkmList = [], periodeAktif = null, allPeriode = [], periodeOptions = [];
+  try {
+    [pkmList] = await Promise.all([API.getPKM(true)]);
+    try {
+      const periodeRes = await API.get('periode');
+      allPeriode = Array.isArray(periodeRes) ? periodeRes : [];
+      // Operator hanya bisa pilih periode yang benar-benar aktif hari ini atau masih dalam rentang
+      // isAktifToday = status Aktif DAN dalam rentang tanggal
+      periodeOptions = allPeriode.filter(p => p.isAktifToday);
+      periodeAktif = allPeriode.find(p => p.isAktifToday);
+    } catch(e2) { /* periode API mungkin gagal, tetap lanjut */ }
+  } catch (e) { toast(e.message, 'error'); }
+
+  const isOp = currentUser.role === 'Operator';
+  const pkmSelect = isOp && currentUser.kodePKM
+    ? `<select class="form-control" id="inputPKM" disabled><option value="${currentUser.kodePKM}">${currentUser.namaPKM || currentUser.kodePKM}</option></select>`
+    : `<select class="form-control" id="inputPKM"><option value="">Pilih Puskesmas</option>${pkmList.map(p => `<option value="${p.kode}">${p.nama}</option>`).join('')}</select>`;
+
+  // Tahun yang bisa dipilih: ambil dari periode berstatus Aktif
+  // Jika tidak ada periode sama sekali, tampilkan tahun default
+  const tahunAktif = [...new Set(periodeOptions.map(p => parseInt(p.tahun)))].sort();
+  const defaultTahun = periodeAktif ? periodeAktif.tahun : (tahunAktif[0] || CURRENT_YEAR);
+  const tahunSelectHtml = tahunAktif.length
+    ? tahunAktif.map(y => `<option value="${y}" ${y == defaultTahun ? 'selected' : ''}>${y}</option>`).join('')
+    : `<option value="${defaultTahun}">${defaultTahun}</option>`;
+
+  // Info banner periode - dengan notifikasi dan jam
+  const periodeBanner = renderPeriodeBanner(periodeAktif ? [periodeAktif] : []);
+// ============== APP STATE ==============
+
+// Format timestamp: DD MMMM YYYY, HH:mm
+function formatTS(ts) {
+  if (!ts) return '-';
+  const d = new Date(ts);
+  if (isNaN(d)) return ts;
+  const bulan = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  const tgl = String(d.getDate()).padStart(2,'0');
+  const bln = bulan[d.getMonth()];
+  const thn = d.getFullYear();
+  const jam = String(d.getHours()).padStart(2,'0');
+  const mnt = String(d.getMinutes()).padStart(2,'0');
+  return `${tgl} ${bln} ${thn}, ${jam}:${mnt}`;
+}
+
+let currentUser = null;
+let currentPage = '';
+let pageData = {}; // cache per page
+let verifCurrentUsulan = null; // for verifikasi modal
+
+// ===== GOOGLE DRIVE CONFIG =====
+// Google Drive: menggunakan Service Account (backend)
+window.GDRIVE_FOLDER_ID = "1HywRrWup2JgX3Zig2FND8K5Zc6HWtu-A";
+
+
+// Format date only: DD MMMM YYYY
+function formatDate(ts) {
+  if (!ts) return '-';
+  const d = new Date(ts);
+  if (isNaN(d)) return ts;
+  const bulan = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  return `${String(d.getDate()).padStart(2,'0')} ${bulan[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+// Format datetime: DD MMMM YYYY, HH:mm  
+function formatDateTime(ts) { return formatTS(ts); }
+// ============== AUTH ==============
+async function doLogin() {
+  const email = document.getElementById('authEmail').value.trim();
+  if (!email) return setAuthStatus('Masukkan email Anda', 'error');
+
+  const password = document.getElementById('authPassword')?.value || '';
+
+  const btn = document.getElementById('authBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="material-icons" style="animation:spin 0.8s linear infinite">refresh</span> Loading...';
+  setAuthStatus('Loading...', '');
+
+  try {
+    const user = await API.login(email, password);
+    currentUser = user;
+    localStorage.setItem('spm_user', JSON.stringify(user));
+    startApp();
+    startIdleWatcher();
+  } catch (e) {
+    setAuthStatus(e.message, 'error');
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-icons">login</span> Login';
+  }
+}
+
+function toggleAuthPw() {
+  const inp = document.getElementById('authPassword');
+  const icon = document.getElementById('authPwIcon');
+  if (inp.type === 'password') { inp.type = 'text'; icon.textContent = 'visibility'; }
+  else { inp.type = 'password'; icon.textContent = 'visibility_off'; }
+}
+
+function setAuthStatus(msg, type) {
+  const el = document.getElementById('authStatus');
+  el.textContent = msg;
+  el.className = 'auth-status' + (type ? ' ' + type : '');
+}
+
+function doLogout() {
+  showConfirm({
+    title: 'Keluar dari Sistem',
+    message: 'Yakin ingin keluar dari sistem?',
+    type: 'warning',
+    onConfirm: () => { currentUser = null; localStorage.removeItem('spm_user'); location.reload(); }
+  });
+}
+
+// ============== APP INIT ==============
+function startApp() {
+  document.getElementById('authScreen').style.display = 'none';
+  document.getElementById('appLayout').style.display = 'flex';
+
+  // Set user info
+  document.getElementById('sidebarName').textContent = currentUser.nama || currentUser.email;
+  let roleText = currentUser.role;
+  if (currentUser.namaPKM) {
+    roleText = `${currentUser.role}`;
+  }
+  document.getElementById('sidebarRole').textContent = roleText;
+  const sidebarPKMEl = document.getElementById('sidebarPKM');
+  if (sidebarPKMEl) {
+    if (currentUser.namaPKM) {
+      sidebarPKMEl.textContent = currentUser.namaPKM;
+      sidebarPKMEl.style.display = 'block';
+    } else {
+      sidebarPKMEl.style.display = 'none';
+    }
+  }
+  document.getElementById('sidebarAvatar').textContent = (currentUser.nama || 'U')[0].toUpperCase();
+  const dropNameEl = document.getElementById('topbarDropName');
+  if (dropNameEl) dropNameEl.textContent = currentUser.nama || currentUser.email;
+  const dropMetaEl = document.getElementById('topbarDropMeta');
+  if (dropMetaEl) dropMetaEl.textContent = currentUser.role + (currentUser.namaPKM ? ` · ${currentUser.namaPKM}` : '');
+
+  buildSidebar();
+  loadPage('dashboard');
+
+  // Popup notifikasi periode untuk Operator saat login
+  if (currentUser.role === 'Operator') {
+    setTimeout(() => showPeriodeLoginPopup(), 800);
+  }
+}
+
+async function showPeriodeLoginPopup() {
+  try {
+    const periodeList = await API.get('periode');
+    const aktifList = (periodeList || []).filter(p => p.isAktifToday);
+    if (!aktifList.length) return;
+
+    const periodesHtml = aktifList.map(aktif => `
+      <div style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;margin-bottom:10px">
+        <div style="background:linear-gradient(135deg,#0d9488,#06b6d4);padding:8px 14px;color:white;font-weight:700;font-size:14px">
+          ${aktif.namaBulan} ${aktif.tahun}
+        </div>
+        <div style="display:flex;gap:0">
+          <div style="flex:1;display:flex;align-items:center;gap:8px;padding:10px 14px;background:#f0fdf9;border-right:1px solid #e2e8f0">
+            <span class="material-icons" style="color:#0d9488;font-size:18px;flex-shrink:0">login</span>
+            <div>
+              <div style="font-size:10px;color:#64748b;font-weight:600;text-transform:uppercase">Dibuka</div>
+              <div style="font-size:12.5px;font-weight:700;color:#0f172a">${formatDate(aktif.tanggalMulai)} ${aktif.jamMulai||'08:00'} WITA</div>
+            </div>
           </div>
-        </div>`).join('')
-    : '';
+          <div style="flex:1;display:flex;align-items:center;gap:8px;padding:10px 14px;background:#fef2f2">
+            <span class="material-icons" style="color:#ef4444;font-size:18px;flex-shrink:0">logout</span>
+            <div>
+              <div style="font-size:10px;color:#64748b;font-weight:600;text-transform:uppercase">Ditutup</div>
+              <div style="font-size:12.5px;font-weight:700;color:#0f172a">${formatDate(aktif.tanggalSelesai)} ${aktif.jamSelesai||'17:00'} WITA</div>
+            </div>
+          </div>
+        </div>
+        ${aktif.notifOperator ? `<div style="display:flex;align-items:flex-start;gap:8px;padding:8px 14px;background:#fffbeb;border-top:1px solid #fcd34d"><span style="font-size:16px;flex-shrink:0">📢</span><div style="font-size:12px;color:#0f172a;line-height:1.5">${aktif.notifOperator}</div></div>` : ''}
+      </div>`).join('');
+
+    const popup = document.createElement('div');
+    popup.id = 'periodePopup';
+    popup.style.cssText = `position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9998;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px);animation:fadeIn 0.3s ease`;
+    popup.innerHTML = `
+      <div style="background:white;border-radius:16px;width:480px;max-width:calc(100vw - 32px);overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,0.3);animation:authIn 0.3s ease">
+        <div style="background:linear-gradient(135deg,#0d9488,#06b6d4);padding:16px 20px;color:white">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span class="material-icons" style="font-size:22px">notifications_active</span>
+            <span style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px">Informasi Periode Input</span>
+          </div>
+        </div>
+        <div style="padding:16px 20px">
+          ${periodesHtml}
+          <button onclick="document.getElementById('periodePopup').remove()" style="width:100%;margin-top:4px;height:42px;background:linear-gradient(135deg,#0d9488,#06b6d4);border:none;border-radius:10px;color:white;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">
+            <span style="display:flex;align-items:center;justify-content:center;gap:6px"><span class="material-icons" style="font-size:18px">check</span>Mengerti, Tutup</span>
+          </button>
+        </div>
+      </div>`;
+    popup.addEventListener('click', e => { if (e.target === popup) popup.remove(); });
+    document.body.appendChild(popup);
+  } catch(e) { /* silent fail */ }
+}
+
+function buildSidebar() {
+  const role = currentUser.role;
+  const nav = document.getElementById('sidebarNav');
+  const menuMap = {
+    'Admin': [
+      { label: 'Menu', items: [
+        { id: 'dashboard', icon: 'dashboard', label: 'Dashboard' },
+        { id: 'verifikasi', icon: 'verified', label: 'Verifikasi' },
+        { id: 'laporan', icon: 'bar_chart', label: 'Laporan' }
+      ]},
+      { label: 'Kelola Master', items: [
+        { id: 'users', icon: 'group', label: 'Kelola User' },
+        { id: 'jabatan', icon: 'badge', label: 'Kelola Jabatan' },
+        { id: 'pkm', icon: 'local_hospital', label: 'Kelola Puskesmas' },
+        { id: 'target-tahunan', icon: 'track_changes', label: 'Target Tahunan' },
+        { id: 'indikator', icon: 'monitor_heart', label: 'Kelola Indikator' },
+        { id: 'periode', icon: 'event_available', label: 'Periode Input' }
+      ]},
+      { label: 'Manajemen', items: [
+        { id: 'kelola-usulan', icon: 'manage_accounts', label: 'Kelola Semua Usulan' }
+      ]}
+    ],
+    'Operator': [
+      { label: 'Menu', items: [
+        { id: 'dashboard', icon: 'dashboard', label: 'Dashboard' },
+        { id: 'input', icon: 'edit', label: 'Input Usulan' },
+        { id: 'laporan', icon: 'bar_chart', label: 'Laporan' }
+      ]}
+    ],
+    'Kepala Puskesmas': [
+      { label: 'Menu', items: [
+        { id: 'dashboard', icon: 'dashboard', label: 'Dashboard' },
+        { id: 'verifikasi', icon: 'verified', label: 'Verifikasi' },
+        { id: 'laporan', icon: 'bar_chart', label: 'Laporan' }
+      ]}
+    ],
+    'Pengelola Program': [
+      { label: 'Menu', items: [
+        { id: 'dashboard', icon: 'dashboard', label: 'Dashboard' },
+        { id: 'verifikasi', icon: 'verified', label: 'Verifikasi' },
+        { id: 'laporan', icon: 'bar_chart', label: 'Laporan' }
+      ]}
+    ],
+    'Kadis': [
+      { label: 'Menu', items: [
+        { id: 'dashboard', icon: 'dashboard', label: 'Dashboard' },
+        { id: 'laporan', icon: 'bar_chart', label: 'Laporan' }
+      ]}
+    ]
+  };
+
+  const sections = menuMap[role] || menuMap['Operator'];
+  let html = '';
+  for (const section of sections) {
+    html += `<div class="sidebar-section">${section.label}</div>`;
+    for (const item of section.items) {
+      html += `<div class="menu-item" id="nav-${item.id}" onclick="loadPage('${item.id}')">
+        <span class="material-icons">${item.icon}</span><span>${item.label}</span>
+      </div>`;
+    }
+  }
+  nav.innerHTML = html;
+}
+
+function setActiveNav(page) {
+  document.querySelectorAll('.menu-item').forEach(m => m.classList.remove('active'));
+  const el = document.getElementById('nav-' + page);
+  if (el) el.classList.add('active');
+}
+
+// ============== ROUTING ==============
+const PAGE_TITLES = {
+  dashboard: 'Dashboard', verifikasi: 'Verifikasi', laporan: 'Laporan',
+  users: 'Kelola User', jabatan: 'Kelola Jabatan', pkm: 'Kelola Puskesmas',
+  indikator: 'Kelola Indikator', periode: 'Periode Input', input: 'Input Usulan',
+  'kelola-usulan': 'Kelola Usulan', 'target-tahunan': 'Target Tahunan'
+};
+
+function loadPage(page) {
+  currentPage = page;
+  closeSidebar();
+  setActiveNav(page);
+  document.getElementById('topbarTitle').textContent = PAGE_TITLES[page] || page;
+  setLoading(true);
+
+  const role = currentUser.role;
+  const renders = {
+    dashboard: renderDashboard,
+    verifikasi: renderVerifikasi,
+    laporan: renderLaporan,
+    'kelola-usulan': renderKelolaUsulan,
+    jabatan: renderJabatan,
+    users: renderUsers,
+    pkm: renderPKM,
+    'target-tahunan': renderTargetTahunan,
+    indikator: renderIndikator,
+    periode: renderPeriode,
+    input: renderInput
+  };
+
+  const fn = renders[page];
+  if (fn) {
+    Promise.resolve(fn()).finally(() => setLoading(false));
+  } else {
+    document.getElementById('mainContent').innerHTML = `<div class="empty-state"><span class="material-icons">construction</span><p>Halaman dalam pengembangan</p></div>`;
+    setLoading(false);
+  }
+}
+
+// ============== SIDEBAR MOBILE ==============
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('sidebarOverlay').classList.toggle('show');
+}
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebarOverlay').classList.remove('show');
+}
+
+// ============== HELPER: YEAR SELECT ==============
+function yearOptions(selected, maxYear) {
+  // Gunakan maxYear dari parameter, atau ambil dari state global, minimal CURRENT_YEAR+3
+  const max = maxYear || window._maxPeriodeTahun || Math.max(CURRENT_YEAR + 3, 2030);
+  const min = Math.min(2024, CURRENT_YEAR);
+  let html = '';
+  for (let y = min; y <= max; y++) {
+    html += `<option value="${y}" ${y == selected ? 'selected' : ''}>${y}</option>`;
+  }
+  return html;
+}
+
+function bulanOptions(selected) {
+  const months = BULAN_NAMA.slice(1);
+  return months.map((m, i) => `<option value="${i+1}" ${(i+1) == selected ? 'selected' : ''}>${m}</option>`).join('');
+}
+
+// ============== DASHBOARD ==============
+async function renderDashboard() {
+  const role = currentUser.role;
+  const params = { role, email: currentUser.email, kode_pkm: currentUser.kodePKM };
+
+  let data;
+  try { data = await API.dashboard(params); } catch (e) {
+    toast(e.message, 'error'); return;
+  }
+
+  const content = document.getElementById('mainContent');
+
+  try {
+    if (role === 'Admin') renderAdminDashboard(content, data);
+    else if (role === 'Operator') renderOperatorDashboard(content, data);
+    else if (role === 'Kepala Puskesmas') renderKepalasDashboard(content, data);
+    else if (role === 'Pengelola Program') renderProgramDashboard(content, data);
+    else if (role === 'Kadis') renderKadisDashboard(content, data);
+  } catch(e) {
+    console.error('renderDashboard error:', e);
+    content.innerHTML = `<div class="empty-state"><span class="material-icons" style="color:#ef4444">error</span><p>Error: ${e.message}</p></div>`;
+  }
+}
+
+function renderAdminDashboard(el, d) {
+  el.innerHTML = `
+    <div class="stats-grid">
+      ${statCard('blue','assignment','Total Usulan', d.totalUsulan)}
+      ${statCard('green','check_circle','Selesai', d.selesai)}
+      ${statCard('orange','pending','Menunggu', d.menunggu)}
+      ${statCard('purple','local_hospital','Puskesmas Aktif', d.puskesmasAktif)}
+    </div>
+    <div class="card">
+      <div class="card-header-bar">
+        <span class="card-title"><span class="material-icons">timeline</span>Statistik per Bulan (${CURRENT_YEAR})</span>
+      </div>
+      <div class="card-body">
+        ${renderChart(d.chartData)}
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header-bar">
+        <span class="card-title"><span class="material-icons">history</span>Usulan Terbaru</span>
+        <button class="btn btn-secondary btn-sm" onclick="loadPage('verifikasi')">
+          <span class="material-icons">arrow_forward</span>Lihat Semua
+        </button>
+      </div>
+      <div class="card-body" style="padding:0">
+        <div id="recentTable"><div class="empty-state" style="padding:32px"><span class="material-icons">hourglass_empty</span><p>Memuat...</p></div></div>
+      </div>
+    </div>`;
+
+  // Load recent usulan
+  API.getUsulan({ tahun: CURRENT_YEAR }).then(rows => {
+    document.getElementById('recentTable').innerHTML = renderUsulanTable(rows.slice(0, 10), 'admin');
+  }).catch(() => {
+    const el = document.getElementById('recentTable');
+    if (el) el.innerHTML = `<div class="empty-state" style="padding:32px"><span class="material-icons">inbox</span><p>Belum ada data usulan</p></div>`;
+  });
+}
+
+function renderOperatorDashboard(el, d) {
+  const periodeList = d.periodeAktifList || (d.periodeAktif ? [d.periodeAktif] : []);
+  const p = periodeList[0] || null;
+
+  let periodeBanner = "";
+  if (periodeList.length > 0) {
+    const items = periodeList.map(pr => {
+      const jamMulai = pr.jam_mulai || "08:00";
+      const jamSelesai = pr.jam_selesai || "17:00";
+      return '<div style="background:linear-gradient(135deg,#0d9488,#06b6d4);border-radius:12px;padding:14px 16px;color:white;display:flex;align-items:flex-start;gap:12px">'
+        + '<span class="material-icons" style="font-size:22px;opacity:0.9;flex-shrink:0;margin-top:2px">event_available</span>'
+        + '<div style="flex:1;min-width:0">'
+        + '<div style="font-weight:800;font-size:14px;margin-bottom:2px">Periode Aktif: ' + pr.nama_bulan + ' ' + pr.tahun + '</div>'
+        + '<div style="font-size:12px;opacity:0.9">Dibuka: ' + formatDate(pr.tanggal_mulai) + ' ' + jamMulai + ' — Ditutup: ' + formatDate(pr.tanggal_selesai) + ' ' + jamSelesai + ' WITA</div>'
+        + (pr.notif_operator ? '<div style="margin-top:6px;padding:6px 10px;background:rgba(255,255,255,0.15);border-radius:6px;font-size:12px">📢 ' + pr.notif_operator + '</div>' : '')
+        + '</div></div>';
+    }).join("");
+    periodeBanner = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px">' + items + '</div>';
+  } else {
+    periodeBanner = `<div class="info-card warning"><span class="material-icons">warning</span><div class="info-card-text">Tidak ada periode input yang aktif saat ini. Hubungi Admin.</div></div>`;
+  }
+
+  const periodeLabel = periodeList.length > 1
+    ? `${periodeList.length} Periode Aktif`
+    : (p ? `${p.nama_bulan} ${p.tahun}` : "-");
+
+  el.innerHTML = `
+    <div class="stats-grid">
+      ${statCard("blue","assignment","Total Usulan Saya", d.totalUsulan)}
+      ${statCard("green","check_circle","Selesai/Disetujui", d.disetujui)}
+      ${statCard("orange","pending","Dalam Proses", d.menunggu)}
+      ${statCard("cyan","event_available","Periode Aktif", periodeLabel)}
+    </div>
+    ${periodeBanner}
+    <div class="card">
+      <div class="card-header-bar">
+        <span class="card-title"><span class="material-icons">quickreply</span>Aksi Cepat</span>
+      </div>
+      <div class="card-body" style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="loadPage('input')"><span class="material-icons">add</span>Buat Usulan Baru</button>
+        <button class="btn btn-secondary" onclick="loadPage('laporan')"><span class="material-icons">bar_chart</span>Lihat Laporan</button>
+
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header-bar"><span class="card-title"><span class="material-icons">history</span>Usulan Terbaru Saya</span></div>
+      <div class="card-body" style="padding:0" id="recentTable"></div>
+    </div>`;
+
+  API.getUsulan({ email_operator: currentUser.email }).then(rows => {
+    document.getElementById("recentTable").innerHTML = renderUsulanTable(rows.slice(0, 5), "operator");
+  }).catch(() => {
+    const el2 = document.getElementById("recentTable");
+    if (el2) el2.innerHTML = `<div class="empty-state" style="padding:32px"><span class="material-icons">inbox</span><p>Belum ada data usulan</p></div>`;
+  });
+}
+
+async function downloadLaporanDashboardOperator() {
+  try {
+    const rows = await API.getUsulan({ email_operator: currentUser.email, status: "Selesai" });
+    if (!rows || !rows.length) { toast("Belum ada laporan yang selesai diverifikasi", "warning"); return; }
+    await downloadLaporanPDF(rows[0].idUsulan);
+  } catch(e) { toast(e.message, "error"); }
+}
+
+function renderKepalasDashboard(el, d) {
+  const periodeList = d.periodeAktifList || (d.periodeAktif ? [d.periodeAktif] : []);
+  const periodeBanner = renderPeriodeBanner(periodeList);
 
   el.innerHTML = `
     <div class="stats-grid">
@@ -2000,6 +2640,7 @@ function openEditProfil() {
             <label>Role</label>
             <input class="form-control" id="epRole" disabled style="background:#f8fafc;color:var(--text-light)">
           </div>
+          \${['Kepala Puskesmas','Pengelola Program','Admin'].includes(currentUser.role) ? \`
           <div class="form-group">
             <label>Tanda Tangan <span style="font-size:11px;color:#94a3b8">(upload gambar, maks 2MB)</span></label>
             <div style="border:2px dashed #cbd5e1;border-radius:8px;padding:10px;text-align:center;cursor:pointer;position:relative" id="epTTWrap" onclick="document.getElementById('epTTInput').click()">
@@ -2010,7 +2651,7 @@ function openEditProfil() {
             <button type="button" id="epTTHapus" style="display:none;margin-top:6px;font-size:12px;color:#ef4444;background:none;border:none;cursor:pointer;padding:0" onclick="hapusTandaTangan()">
               <span class="material-icons" style="font-size:14px;vertical-align:middle">delete</span> Hapus tanda tangan
             </button>
-          </div>
+          </div>\` : ''}
           <div id="epStatus" style="font-size:12.5px;color:#ef4444;min-height:18px"></div>
         </div>
         <div class="modal-footer">

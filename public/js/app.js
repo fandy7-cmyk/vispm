@@ -1872,33 +1872,35 @@ async function generateAndDownloadPDF(htmlContent, fileName) {
     });
   }
 
-  // Hapus script tags (window.print dll), biarkan CSS utuh
-  const cleanHtml = htmlContent.replace(/<script[\s\S]*?<\/script>/gi, '');
+  // Parse HTML - ambil CSS dari <head> dan body content
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(htmlContent, 'text/html');
 
-  // Inject style agar body punya lebar A4 eksplisit
-  const styledHtml = cleanHtml.replace('</head>', `
-  <style>
-    html, body { width: 794px !important; margin: 0 !important; padding: 15mm 18mm !important; background: white !important; }
-  </style>
-  </head>`);
-
-  const iframe = document.createElement('iframe');
-  iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:794px;height:1123px;border:none;visibility:hidden';
-  document.body.appendChild(iframe);
-
-  await new Promise(resolve => {
-    iframe.onload = resolve;
-    iframe.srcdoc = styledHtml;
+  // Inject CSS laporan ke halaman utama (sementara)
+  const styleEls = [];
+  doc.querySelectorAll('style').forEach(s => {
+    const el = document.createElement('style');
+    el.setAttribute('data-pdf-temp', '1');
+    el.textContent = s.textContent
+      .replace(/@page[^{]*{[^}]*}/g, '') // hapus @page agar tidak ganggu halaman utama
+      .replace(/window\.print[^;]*/g, '');
+    document.head.appendChild(el);
+    styleEls.push(el);
   });
 
-  // Tunggu gambar (tanda tangan) selesai load
-  const images = iframe.contentDocument.querySelectorAll('img');
+  // Buat container dengan konten body laporan
+  const container = document.createElement('div');
+  container.setAttribute('data-pdf-temp', '1');
+  container.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;background:white;z-index:-1';
+  container.innerHTML = doc.body.innerHTML;
+  document.body.appendChild(container);
+
+  // Tunggu gambar load
+  const images = container.querySelectorAll('img');
   await Promise.all(Array.from(images).map(img =>
     img.complete ? Promise.resolve() : new Promise(r => { img.onload = r; img.onerror = r; })
   ));
-  await new Promise(r => setTimeout(r, 1000));
-
-  const element = iframe.contentDocument.body;
+  await new Promise(r => setTimeout(r, 800));
 
   const opt = {
     margin:      [15, 18, 15, 18],
@@ -1910,10 +1912,11 @@ async function generateAndDownloadPDF(htmlContent, fileName) {
   };
 
   try {
-    await html2pdf().set(opt).from(element).save();
+    await html2pdf().set(opt).from(container).save();
     toast('PDF berhasil didownload ✓', 'success');
   } finally {
-    document.body.removeChild(iframe);
+    // Cleanup semua elemen temporary
+    document.querySelectorAll('[data-pdf-temp]').forEach(el => el.remove());
   }
 }
 // ============== LOG AKTIVITAS ==============

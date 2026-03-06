@@ -636,7 +636,10 @@ function renderProgramDashboard(el, d) {
       <div class="card-body" style="padding:0" id="pendingTable"></div>
     </div>`;
 
-  API.getUsulan({ status: 'Menunggu Pengelola Program' }).then(rows => {
+  API.getUsulan({
+    email_program: currentUser.email,
+    status_program: 'Menunggu Pengelola Program,Menunggu Admin,Selesai,Ditolak'
+  }).then(rows => {
     document.getElementById('pendingTable').innerHTML = renderUsulanTable(rows, 'program');
   }).catch(() => {});
 }
@@ -708,7 +711,12 @@ function renderUsulanTable(rows, role) {
 
     // Sudah verifikasi: untuk Kepala Puskesmas cek statusKapus, untuk Program cek myVerifStatus, untuk Admin cek Selesai
     const sudahVerifKepala = role === 'kepala-puskesmas' && (u.statusKapus === 'Selesai' || u.statusKapus === 'Ditolak');
-    const sudahVerifProgram = role === 'program' && u.sudahVerif === true && (u.myVerifStatus === 'Selesai' || u.myVerifStatus === 'Ditolak');
+    const sudahVerifProgram = role === 'program' && (
+      u.sudahVerif === true ||
+      (u.myVerifStatus === 'Selesai' || u.myVerifStatus === 'Ditolak') ||
+      u.statusGlobal === 'Menunggu Admin' ||
+      u.statusGlobal === 'Selesai'
+    );
     const sudahVerifAdmin = role === 'admin' && u.statusGlobal === 'Selesai';
     const sudahVerif = sudahVerifKepala || sudahVerifProgram || sudahVerifAdmin;
 

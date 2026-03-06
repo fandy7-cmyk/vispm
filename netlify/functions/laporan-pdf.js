@@ -34,11 +34,10 @@ exports.handler = async (event) => {
     await pool.query(`ALTER TABLE verifikasi_program ADD COLUMN IF NOT EXISTS nip_program VARCHAR(50)`).catch(()=>{});
     await pool.query(`ALTER TABLE verifikasi_program ADD COLUMN IF NOT EXISTS jabatan_program TEXT`).catch(()=>{});
     await pool.query(`CREATE TABLE IF NOT EXISTS target_tahunan (id SERIAL PRIMARY KEY, kode_pkm VARCHAR(20) NOT NULL, no_indikator INT NOT NULL, tahun INT NOT NULL, sasaran INT NOT NULL DEFAULT 0, UNIQUE(kode_pkm, no_indikator, tahun))`).catch(()=>{});
-    await pool.query(`CREATE TABLE IF NOT EXISTS pejabat_penandatangan (id SERIAL PRIMARY KEY, jabatan VARCHAR(100) NOT NULL UNIQUE, nama VARCHAR(200) NOT NULL, nip VARCHAR(50), tanda_tangan TEXT, updated_at TIMESTAMPTZ DEFAULT NOW())`).catch(()=>{});
 
     const hdrResult = await pool.query(
       `SELECT uh.*, p.nama_puskesmas,
-              ku.nama as kapus_nama, ku.nip as kapus_nip, ku.jabatan as kapus_jabatan, ku.tanda_tangan as kapus_tanda_tangan
+              ku.nama as kapus_nama, ku.nip as kapus_nip, ku.jabatan as kapus_jabatan
        FROM usulan_header uh
        LEFT JOIN master_puskesmas p ON uh.kode_pkm = p.kode_pkm
        LEFT JOIN users ku ON LOWER(ku.email) = LOWER(uh.kapus_approved_by)
@@ -58,14 +57,8 @@ exports.handler = async (event) => {
     );
 
     const vpResult = await pool.query(
-      `SELECT vp.*, u.tanda_tangan
-       FROM verifikasi_program vp
-       LEFT JOIN users u ON LOWER(u.email) = LOWER(vp.email_program)
-       WHERE vp.id_usulan = $1 ORDER BY vp.created_at`, [idUsulan]
+      `SELECT * FROM verifikasi_program WHERE id_usulan = $1 ORDER BY created_at`, [idUsulan]
     );
-
-    const pejabatResult = await pool.query(`SELECT * FROM pejabat_penandatangan ORDER BY id`);
-    const pejabatList = pejabatResult.rows;
 
     const bulanNama = ['','Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
     const bulan = bulanNama[h.bulan] || h.bulan;
@@ -91,15 +84,12 @@ exports.handler = async (event) => {
       const jabatan = v.jabatan_program || 'Pengelola Program';
       const nama = v.nama_program || v.email_program;
       const nip = v.nip_program || '';
-      const ttImg = v.tanda_tangan
-        ? `<img src="${v.tanda_tangan}" style="height:70px;max-width:160px;object-fit:contain;margin-bottom:4px">`
-        : `<div style="width:80px;height:70px;border-bottom:1px solid #334155;margin:0 auto 4px"></div>`;
       return `<div style="text-align:center;min-width:180px;max-width:220px">
         <div style="font-size:10px;color:#334155;margin-bottom:10px;font-weight:600">${jabatan}</div>
         ${approved
-          ? `${ttImg}
-             <div style="font-size:8px;color:#2d7a47;margin-bottom:4px">✓ ${fmtDT(v.verified_at)}</div>`
-          : `<div style="width:80px;height:70px;border:2px dashed #cbd5e1;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;color:#94a3b8;font-size:10px;margin-bottom:6px">Belum</div>
+          ? `<div style="display:inline-block;margin-bottom:6px">${approvedBadgeSVG()}</div>
+             <div style="font-size:9px;color:#2d7a47;font-weight:700;margin-bottom:2px">✓ Disetujui: ${fmtDT(v.verified_at)}</div>`
+          : `<div style="width:80px;height:80px;border:2px dashed #cbd5e1;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:#94a3b8;font-size:10px;margin-bottom:6px">Belum</div>
              <div style="font-size:9px;color:#94a3b8;margin-bottom:2px">Menunggu persetujuan</div>`}
         <div style="margin-top:4px;border-top:1px solid #334155;padding-top:4px;display:inline-block;min-width:150px">
           <div style="font-size:10.5px;font-weight:700">${nama}</div>
@@ -112,15 +102,12 @@ exports.handler = async (event) => {
       const approved = !!h.kapus_approved_by;
       const nama = h.kapus_nama || h.kapus_approved_by || '-';
       const nip = h.kapus_nip || '';
-      const ttImg = h.kapus_tanda_tangan
-        ? `<img src="${h.kapus_tanda_tangan}" style="height:70px;max-width:160px;object-fit:contain;margin-bottom:4px">`
-        : `<div style="width:80px;height:70px;border-bottom:1px solid #334155;margin:0 auto 4px"></div>`;
       return `<div style="text-align:center;min-width:180px;max-width:220px">
         <div style="font-size:10px;color:#334155;margin-bottom:10px;font-weight:600">Kepala UPTD Puskesmas ${h.nama_puskesmas||h.kode_pkm}</div>
         ${approved
-          ? `${ttImg}
-             <div style="font-size:8px;color:#2d7a47;margin-bottom:4px">✓ ${fmtDT(h.kapus_approved_at)}</div>`
-          : `<div style="width:80px;height:70px;border:2px dashed #cbd5e1;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;color:#94a3b8;font-size:10px;margin-bottom:6px">Belum</div>
+          ? `<div style="display:inline-block;margin-bottom:6px">${approvedBadgeSVG()}</div>
+             <div style="font-size:9px;color:#2d7a47;font-weight:700;margin-bottom:2px">✓ Disetujui: ${fmtDT(h.kapus_approved_at)}</div>`
+          : `<div style="width:80px;height:80px;border:2px dashed #cbd5e1;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:#94a3b8;font-size:10px;margin-bottom:6px">Belum</div>
              <div style="font-size:9px;color:#94a3b8;margin-bottom:2px">Menunggu persetujuan</div>`}
         <div style="margin-top:4px;border-top:1px solid #334155;padding-top:4px;display:inline-block;min-width:150px">
           <div style="font-size:10.5px;font-weight:700">${nama}</div>
@@ -129,24 +116,14 @@ exports.handler = async (event) => {
       </div>`;
     }
 
-    function pejabatSignBlock(p) {
-      const ttImg = p.tanda_tangan
-        ? `<img src="${p.tanda_tangan}" style="height:70px;max-width:160px;object-fit:contain;margin-bottom:4px">`
-        : `<div style="width:80px;height:70px;border-bottom:1px solid #334155;margin:0 auto 4px"></div>`;
-      return `<div style="text-align:center;min-width:180px;max-width:220px">
-        <div style="font-size:10px;color:#334155;margin-bottom:10px;font-weight:600">${p.jabatan}</div>
-        ${ttImg}
-        <div style="margin-top:4px;border-top:1px solid #334155;padding-top:4px;display:inline-block;min-width:150px">
-          <div style="font-size:10.5px;font-weight:700">${p.nama}</div>
-          ${p.nip ? `<div style="font-size:9.5px">NIP. ${p.nip}</div>` : ''}
-        </div>
-      </div>`;
-    }
-
     // Layout tanda tangan: piramida terbalik
     // Kapus selalu kanan atas, pengelola di kiri; baris berikutnya tengah
     function buildSignLayout(verifiers) {
       const kapus = kapusSignBlock();
+      // Mode sementara: hanya tanda tangan Kepala Puskesmas
+      if (isSementara) {
+        return `<div style="display:flex;justify-content:flex-end">${kapus}</div>`;
+      }
       if (verifiers.length === 0) {
         return `<div style="display:flex;justify-content:flex-end">${kapus}</div>`;
       }
@@ -193,7 +170,7 @@ exports.handler = async (event) => {
 
         <!-- JUDUL -->
         <div style="text-align:center;margin-bottom:16px">
-          <div style="font-size:12px;font-weight:700;text-transform:uppercase">Lembar Hasil Verifikasi Laporan Standar Pelayanan Minimal (SPM)${isSementara ? ' <span style="background:#f59e0b;color:white;font-size:9px;padding:2px 7px;border-radius:4px;vertical-align:middle;letter-spacing:1px;font-weight:700">SEMENTARA</span>' : ''}</div>
+          <div style="font-size:12px;font-weight:700;text-transform:uppercase">Lembar Hasil Verifikasi Laporan Standar Pelayanan Minimal (SPM)</div>
           <div style="font-size:12px;font-weight:700;text-transform:uppercase">Bidang Kesehatan Tahun ${h.tahun}</div>
         </div>
 
@@ -209,9 +186,9 @@ exports.handler = async (event) => {
           <thead>
             <tr style="background:#1e293b;color:white">
               <th style="padding:7px 10px;font-size:10px;border:1px solid #334155;text-align:center">Jumlah Sasaran<br>(Tahun)</th>
-              <th style="padding:7px 10px;font-size:10px;border:1px solid #334155;text-align:center">Target Bulan Ini</th>
-              <th style="padding:7px 10px;font-size:10px;border:1px solid #334155;text-align:center">Realisasi Bulan Ini</th>
-              <th style="padding:7px 10px;font-size:10px;border:1px solid #334155;text-align:center">Capaian (%)</th>
+              <th style="padding:7px 10px;font-size:10px;border:1px solid #334155;text-align:center">Target</th>
+              <th style="padding:7px 10px;font-size:10px;border:1px solid #334155;text-align:center">Capaian</th>
+              <th style="padding:7px 10px;font-size:10px;border:1px solid #334155;text-align:center">Realisasi (%)</th>
             </tr>
           </thead>
           <tbody>
@@ -226,27 +203,23 @@ exports.handler = async (event) => {
 
         ${catatan ? `<div style="margin-bottom:20px;font-size:10px;color:#334155"><strong>Catatan :</strong> ${catatan}</div>` : ''}
 
-        <!-- TANDA TANGAN -->
-        <div style="margin-top:28px;position:relative">
-          ${isSementara ? `<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-20deg);font-size:52px;font-weight:900;color:rgba(239,68,68,0.12);white-space:nowrap;pointer-events:none;z-index:0;letter-spacing:4px">SEMENTARA</div>` : ''}
+        <!-- TANDA TANGAN: piramida terbalik, kapus selalu kanan atas -->
+        <div style="margin-top:28px">
           <div style="font-size:10px;color:#334155;margin-bottom:6px;text-align:right">Adean, ${now}</div>
-          ${isSementara
-            ? `<div style="display:flex;justify-content:flex-end">${kapusSignBlock()}</div>`
-            : buildSignLayout(verifiers)
-          }
-          ${!isSementara && pejabatList.length > 0 ? `
-          <div style="border-top:1px dashed #cbd5e1;margin-top:28px;padding-top:20px;display:flex;justify-content:space-around;flex-wrap:wrap;gap:20px">
-            ${pejabatList.map(p => pejabatSignBlock(p)).join('')}
-          </div>` : ''}
+          ${buildSignLayout(verifiers)}
         </div>
       </div>`;
     }).join('');
+
+    const titleDoc = isSementara
+      ? `Laporan Sementara SPM - ${idUsulan}`
+      : `Laporan SPM Per Indikator - ${idUsulan}`;
 
     const html = `<!DOCTYPE html>
 <html lang="id">
 <head>
 <meta charset="UTF-8">
-<title>Laporan SPM Per Indikator - ${idUsulan}</title>
+<title>${titleDoc}</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
   body { font-family: Arial, sans-serif; color: #1e293b; background: white; font-size: 12px; }
@@ -259,17 +232,26 @@ exports.handler = async (event) => {
   }
   .page-break { padding-bottom: 20px; }
 </style>
+<script>
+  window.onload = function() {
+    setTimeout(function() { window.print(); }, 600);
+  };
+<\/script>
 </head>
 <body>
 ${pagesHtml}
 </body>
 </html>`;
 
+    const filename = isSementara
+      ? `Laporan-Sementara-SPM-${idUsulan}.pdf`
+      : `Laporan-SPM-${idUsulan}.pdf`;
+
     return {
       statusCode: 200,
       headers: {
         'Content-Type': 'text/html; charset=utf-8',
-        'Content-Disposition': `attachment; filename="Laporan-SPM-${idUsulan}.html"`,
+        'Content-Disposition': `inline; filename="${filename}"`,
         'Access-Control-Allow-Origin': '*'
       },
       body: html

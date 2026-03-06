@@ -85,19 +85,28 @@ async function operatorStats(pool, email) {
 }
 
 async function kapusStats(pool, kodePKM) {
-  const result = await pool.query(
-    `SELECT
-      COUNT(*) FILTER(WHERE status_global='Menunggu Kepala Puskesmas') as menunggu,
-      COUNT(*) FILTER(WHERE status_program='Selesai') as terverifikasi,
-      COUNT(*) as total
-     FROM usulan_header WHERE kode_pkm=$1`,
-    [kodePKM]
-  );
+  const [result, periodeResult] = await Promise.all([
+    pool.query(
+      `SELECT
+        COUNT(*) FILTER(WHERE status_global='Menunggu Kepala Puskesmas') as menunggu,
+        COUNT(*) FILTER(WHERE status_kapus='Selesai') as terverifikasi,
+        COUNT(*) as total
+       FROM usulan_header WHERE kode_pkm=$1`,
+      [kodePKM]
+    ),
+    pool.query(
+      `SELECT tahun, bulan, nama_bulan, tanggal_mulai, tanggal_selesai, jam_mulai, jam_selesai, notif_operator
+       FROM periode_input
+       WHERE status='Aktif' AND tanggal_mulai <= CURRENT_DATE AND tanggal_selesai >= CURRENT_DATE
+       ORDER BY tahun, bulan`
+    )
+  ]);
   const s = result.rows[0];
   return ok({
     menunggu: parseInt(s.menunggu) || 0,
     terverifikasi: parseInt(s.terverifikasi) || 0,
-    total: parseInt(s.total) || 0
+    total: parseInt(s.total) || 0,
+    periodeAktifList: periodeResult.rows
   });
 }
 
@@ -105,7 +114,7 @@ async function programStats(pool) {
   const result = await pool.query(
     `SELECT
       COUNT(*) FILTER(WHERE status_global='Menunggu Pengelola Program') as menunggu,
-      COUNT(*) FILTER(WHERE status_final='Selesai') as terverifikasi,
+      COUNT(*) FILTER(WHERE status_final='Disetujui') as terverifikasi,
       COUNT(*) as total
      FROM usulan_header`
   );

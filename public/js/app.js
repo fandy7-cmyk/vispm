@@ -1872,26 +1872,13 @@ async function generateAndDownloadPDF(htmlContent, fileName) {
     });
   }
 
-  // Parse HTML - ambil CSS dari <head> dan body content
+  // Parse HTML
   const parser = new DOMParser();
   const doc = parser.parseFromString(htmlContent, 'text/html');
 
-  // Inject CSS laporan ke halaman utama (sementara)
-  const styleEls = [];
-  doc.querySelectorAll('style').forEach(s => {
-    const el = document.createElement('style');
-    el.setAttribute('data-pdf-temp', '1');
-    el.textContent = s.textContent
-      .replace(/@page[^{]*{[^}]*}/g, '') // hapus @page agar tidak ganggu halaman utama
-      .replace(/window\.print[^;]*/g, '');
-    document.head.appendChild(el);
-    styleEls.push(el);
-  });
-
-  // Buat container dengan konten body laporan
+  // Buat container — HARUS position:absolute dan visible agar html2canvas bisa render
   const container = document.createElement('div');
-  container.setAttribute('data-pdf-temp', '1');
-  container.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;background:white;z-index:-1';
+  container.style.cssText = 'position:absolute;top:0;left:0;width:794px;background:white;z-index:99999;opacity:0.01;pointer-events:none';
   container.innerHTML = doc.body.innerHTML;
   document.body.appendChild(container);
 
@@ -1900,13 +1887,13 @@ async function generateAndDownloadPDF(htmlContent, fileName) {
   await Promise.all(Array.from(images).map(img =>
     img.complete ? Promise.resolve() : new Promise(r => { img.onload = r; img.onerror = r; })
   ));
-  await new Promise(r => setTimeout(r, 800));
+  await new Promise(r => setTimeout(r, 1000));
 
   const opt = {
-    margin:      [15, 18, 15, 18],
+    margin:      [10, 15, 10, 15],
     filename:    fileName,
     image:       { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true, allowTaint: true, logging: false, width: 794, windowWidth: 794 },
+    html2canvas: { scale: 2, useCORS: true, allowTaint: true, logging: false, width: 794, windowWidth: 794, scrollY: 0 },
     jsPDF:       { unit: 'mm', format: 'a4', orientation: 'portrait' },
     pagebreak:   { mode: ['css', 'legacy'], before: '.page-break' }
   };
@@ -1915,8 +1902,7 @@ async function generateAndDownloadPDF(htmlContent, fileName) {
     await html2pdf().set(opt).from(container).save();
     toast('PDF berhasil didownload ✓', 'success');
   } finally {
-    // Cleanup semua elemen temporary
-    document.querySelectorAll('[data-pdf-temp]').forEach(el => el.remove());
+    container.remove();
   }
 }
 // ============== LOG AKTIVITAS ==============

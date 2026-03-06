@@ -19,8 +19,9 @@ exports.handler = async (event) => {
     if (method === 'POST' && path === 'approve-program') return await approveProgram(pool, body);
     if (method === 'POST' && path === 'approve-admin') return await approveAdmin(pool, body);
     if (method === 'POST' && path === 'reject') return await rejectUsulan(pool, body);
-  if (method === 'GET'  && path === 'penolakan') return await getPenolakanIndikator(pool, params);
-  if (method === 'POST' && path === 'respond-penolakan') return await respondPenolakan(pool, body);
+    if (method === 'GET'  && path === 'penolakan') return await getPenolakanIndikator(pool, params);
+    if (method === 'POST' && path === 'respond-penolakan') return await respondPenolakan(pool, body);
+    if (method === 'GET'  && path === 'log') return await getLogAktivitas(pool, params.id);
     if (method === 'PUT' && path === 'drive-folder') return await saveDriveFolder(pool, body);
     if (method === 'POST' && path === 'admin-reset') return await adminResetUsulan(pool, body);
     if (method === 'POST' && path === 'restore-verif') return await restoreVerifStatus(pool, body);
@@ -186,27 +187,26 @@ async function buatUsulan(pool, body) {
   const ppResult = await pool.query(`SELECT email, nama, nip, jabatan, indikator_akses FROM users WHERE role='Pengelola Program' AND aktif=true`);
   const client = await pool.connect();
   try {
-    await client.query('BEGIN');
-    // Auto-migrate kolom nip_program dan jabatan_program
-    await client.query(`ALTER TABLE verifikasi_program ADD COLUMN IF NOT EXISTS nip_program VARCHAR(50)`).catch(()=>{});
-    await client.query(`ALTER TABLE verifikasi_program ADD COLUMN IF NOT EXISTS sanggahan TEXT`).catch(()=>{});
-    await client.query(`ALTER TABLE usulan_header ADD COLUMN IF NOT EXISTS ditolak_oleh VARCHAR(50)`).catch(()=>{});
-    // Tabel penolakan per indikator oleh Admin
-    await client.query(`CREATE TABLE IF NOT EXISTS penolakan_indikator (
+    // Auto-migrate di luar transaksi (DDL tidak bisa di-rollback di PG)
+    await pool.query(`ALTER TABLE verifikasi_program ADD COLUMN IF NOT EXISTS nip_program VARCHAR(50)`).catch(()=>{});
+    await pool.query(`ALTER TABLE verifikasi_program ADD COLUMN IF NOT EXISTS jabatan_program TEXT`).catch(()=>{});
+    await pool.query(`ALTER TABLE verifikasi_program ADD COLUMN IF NOT EXISTS sanggahan TEXT`).catch(()=>{});
+    await pool.query(`ALTER TABLE usulan_header ADD COLUMN IF NOT EXISTS ditolak_oleh VARCHAR(50)`).catch(()=>{});
+    await pool.query(`CREATE TABLE IF NOT EXISTS penolakan_indikator (
       id SERIAL PRIMARY KEY,
       id_usulan VARCHAR(50) NOT NULL,
       no_indikator INT NOT NULL,
       alasan TEXT NOT NULL,
       email_admin VARCHAR(200) NOT NULL,
       created_at TIMESTAMPTZ DEFAULT NOW(),
-      -- Respon Pengelola Program
       email_program VARCHAR(200),
-      aksi VARCHAR(20), -- 'sanggah' atau 'tolak'
+      aksi VARCHAR(20),
       catatan_program TEXT,
       responded_at TIMESTAMPTZ,
       UNIQUE(id_usulan, no_indikator)
     )`).catch(()=>{});
-    await client.query(`ALTER TABLE verifikasi_program ADD COLUMN IF NOT EXISTS jabatan_program TEXT`).catch(()=>{});
+
+    await client.query('BEGIN');
     await client.query(
       `INSERT INTO usulan_header (id_usulan,tahun,bulan,periode_key,kode_pkm,total_nilai,total_bobot,indeks_kinerja_spm,indeks_beban_kerja,indeks_spm,status_kapus,status_program,status_final,status_global,is_locked,created_by,created_at)
        VALUES ($1,$2,$3,$4,$5,0,$6,0,$7,0,'Menunggu','Menunggu','Menunggu','Draft',false,$8,NOW())`,

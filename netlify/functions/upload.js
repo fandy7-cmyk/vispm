@@ -37,20 +37,16 @@ exports.handler = async (event) => {
     const { fileName, fileBase64, kodePKM, tahun, bulan, noIndikator } = JSON.parse(event.body || '{}');
     if (!fileName || !fileBase64) return { statusCode: 400, headers, body: JSON.stringify({ success: false, error: 'fileName dan fileBase64 diperlukan' }) };
 
-    // Validasi tipe file: hanya PDF dan gambar
-    const dotIdx  = fileName.lastIndexOf('.');
-    const baseName = dotIdx > -1 ? fileName.substring(0, dotIdx) : fileName;
-    const ext      = dotIdx > -1 ? fileName.substring(dotIdx + 1).toLowerCase() : '';
-    const allowedExts = ['pdf', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'];
-    if (!allowedExts.includes(ext)) {
-      return { statusCode: 400, headers, body: JSON.stringify({ success: false, error: `Format file tidak didukung (.${ext}). Hanya PDF dan gambar (PNG, JPG, GIF, WebP) yang diperbolehkan.` }) };
-    }
-
     const cloudName  = process.env.CLOUDINARY_CLOUD_NAME;
     const apiKey     = process.env.CLOUDINARY_API_KEY;
     const apiSecret  = process.env.CLOUDINARY_API_SECRET;
 
-    const folder    = 'VISPM/' + (kodePKM||'PKM') + '/' + (tahun||'') + '/' + (bulan||'') + '/' + (noIndikator||'');
+    const dotIdx  = fileName.lastIndexOf('.');
+    const baseName = dotIdx > -1 ? fileName.substring(0, dotIdx) : fileName;
+    const ext      = dotIdx > -1 ? fileName.substring(dotIdx + 1).toLowerCase() : '';
+
+    const indFolder = noIndikator ? 'Indikator-' + noIndikator : 'Lainnya';
+    const folder    = 'VISPM/' + (kodePKM||'PKM') + '/' + (tahun||'') + '/' + (bulan||'') + '/' + indFolder;
     const safeBase  = (baseName + '_' + Math.floor(Date.now() / 1000)).replace(/[^a-zA-Z0-9_\-]/g, '_').substring(0, 60);
     // publicId tanpa ekstensi untuk raw — Cloudinary raw tidak auto-append, kita tambah manual
     const publicId  = folder + '/' + safeBase;

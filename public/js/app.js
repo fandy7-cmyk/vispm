@@ -152,15 +152,20 @@ function startApp() {
   const tMeta = document.getElementById('topbarDropMeta');
   if (tMeta) tMeta.textContent = currentUser.role + (currentUser.namaPKM ? ' — ' + currentUser.namaPKM : '');
 
+  // Sembunyikan "Edit Profil & Tanda Tangan" untuk Admin dan Operator
+  const btnEditProfilTT = document.getElementById('btnEditProfilTT');
+  if (btnEditProfilTT) {
+    const showTT = ['Kepala Puskesmas', 'Pengelola Program'].includes(currentUser.role);
+    btnEditProfilTT.style.display = showTT ? '' : 'none';
+  }
+
   buildSidebar();
   const _lastPage = sessionStorage.getItem('spm_lastPage');
   loadPage(_lastPage || 'dashboard');
 
-  // Load app settings (tahun range, dll)
-  API.getSettings().then(s => {
-    if (s && s.tahun_akhir) window._maxPeriodeTahun = parseInt(s.tahun_akhir);
-    if (s && s.tahun_awal)  window._minPeriodeTahun = parseInt(s.tahun_awal);
-  }).catch(() => {});
+  // Default tahun range (getSettings tidak digunakan)
+  window._maxPeriodeTahun = window._maxPeriodeTahun || new Date().getFullYear();
+  window._minPeriodeTahun = window._minPeriodeTahun || 2024;
 
   // Refresh data user dari DB (termasuk tandaTangan terbaru)
   if (currentUser.email) {
@@ -1857,7 +1862,7 @@ async function openLogAktivitas(idUsulan) {
         <button class="btn btn-primary" id="btnDownloadLog"><span class="material-icons">picture_as_pdf</span>Download PDF</button>
       </div>
     </div>`;
-  modal.style.display = 'flex';
+  showModal('logAktivitasModal');
 
   try {
     const data = await API.getLogAktivitas(idUsulan);

@@ -7,8 +7,8 @@ exports.handler = async (event) => {
   try {
     if (method === 'GET') {
       const r = await pool.query(
-        `SELECT u.email, u.nama, u.nip, u.role, u.kode_pkm, u.indikator_akses, u.jabatan, u.aktif, u.tanda_tangan,
-                p.nama_puskesmas
+        `SELECT u.email, u.nama, u.nip, u.role, u.kode_pkm, u.indikator_akses, u.jabatan, u.aktif,
+                u.tanda_tangan, p.nama_puskesmas
          FROM users u LEFT JOIN master_puskesmas p ON u.kode_pkm=p.kode_pkm
          WHERE u.role != 'Super Admin' ORDER BY u.nama`
       );
@@ -17,7 +17,7 @@ exports.handler = async (event) => {
         role: x.role, kodePKM: x.kode_pkm || '', namaPKM: x.nama_puskesmas || '',
         indikatorAkses: x.indikator_akses ? x.indikator_akses.toString() : '',
         jabatan: x.jabatan || '', aktif: x.aktif,
-        tandaTangan: x.tanda_tangan || null
+        tandaTangan: x.tanda_tangan || ''
       })));
     }
     const body = JSON.parse(event.body || '{}');
@@ -37,14 +37,12 @@ exports.handler = async (event) => {
       return ok({ message: 'User berhasil ditambahkan' });
     }
     if (method === 'PUT') {
-      const { email, nama, nip, role, kodePKM, indikatorAkses, jabatan, aktif, tandaTangan } = body;
+      const { email, nama, nip, role, kodePKM, indikatorAkses, jabatan, aktif } = body;
       if (!email) return err('Email diperlukan');
-      // Migration: pastikan kolom tanda_tangan ada
-      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS tanda_tangan TEXT`).catch(()=>{});
       await pool.query(
-        `UPDATE users SET nama=$1, nip=$2, role=$3, kode_pkm=$4, indikator_akses=$5, jabatan=$6, aktif=$7, tanda_tangan=$8
-         WHERE LOWER(email)=LOWER($9)`,
-        [nama, nip||null, role, kodePKM||null, indikatorAkses||null, jabatan||null, aktif!==false, tandaTangan||null, email]
+        `UPDATE users SET nama=$1, nip=$2, role=$3, kode_pkm=$4, indikator_akses=$5, jabatan=$6, aktif=$7
+         WHERE LOWER(email)=LOWER($8)`,
+        [nama, nip||null, role, kodePKM||null, indikatorAkses||null, jabatan||null, aktif!==false, email]
       );
       return ok({ message: 'User berhasil diupdate' });
     }

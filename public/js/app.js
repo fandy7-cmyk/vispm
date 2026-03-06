@@ -118,7 +118,7 @@ function doLogout() {
     title: 'Keluar dari Sistem',
     message: 'Yakin ingin keluar dari sistem?',
     type: 'warning',
-    onConfirm: () => { currentUser = null; localStorage.removeItem('spm_user'); location.reload(); }
+    onConfirm: () => { currentUser = null; localStorage.removeItem('spm_user'); sessionStorage.removeItem('spm_lastPage'); location.reload(); }
   });
 }
 
@@ -160,8 +160,18 @@ function startApp() {
   }
 
   buildSidebar();
+
+  // Halaman yang boleh diakses per role
+  const allowedPages = {
+    'Admin':            ['dashboard','verifikasi','laporan','master-data','users','jabatan','pkm','indikator','pengaturan','target-tahunan','periode','kelola-usulan'],
+    'Operator':         ['dashboard','input','laporan'],
+    'Kepala Puskesmas': ['dashboard','verifikasi','laporan'],
+    'Pengelola Program':['dashboard','verifikasi','laporan'],
+  };
+  const allowed = allowedPages[currentUser.role] || ['dashboard'];
   const _lastPage = sessionStorage.getItem('spm_lastPage');
-  loadPage(_lastPage || 'dashboard');
+  const startPage = (_lastPage && allowed.includes(_lastPage)) ? _lastPage : 'dashboard';
+  loadPage(startPage);
 
   // Load tahun range dari DB settings
   API.getSettings().then(s => {
@@ -4160,6 +4170,7 @@ function resetIdleTimer() {
     if (currentUser) {
       currentUser = null;
       localStorage.removeItem('spm_user');
+      sessionStorage.removeItem('spm_lastPage');
       toast('Sesi berakhir karena tidak ada aktivitas. Silakan login kembali.', 'warning');
       setTimeout(() => location.reload(), 2000);
     }
@@ -4195,6 +4206,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   } catch(e) {
     localStorage.removeItem('spm_user');
+    sessionStorage.removeItem('spm_lastPage');
   }
 });
 

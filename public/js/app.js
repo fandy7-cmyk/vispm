@@ -2582,6 +2582,9 @@ async function _loadMasterTab(tab) {
       }
 
       content.innerHTML = `
+        <div class="page-header">
+          <h1><span class="material-icons">settings</span>Pengaturan</h1>
+        </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start">
           <div>
             <div class="card" style="padding:24px;margin-bottom:16px">

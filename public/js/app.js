@@ -1067,11 +1067,11 @@ async function openIndikatorModal(idUsulan) {
         <td><span style="font-family:'JetBrains Mono';font-weight:700">${ind.no}</span></td>
         <td style="max-width:220px;font-size:12.5px">${ind.nama}</td>
         <input type="hidden" id="bobot-${ind.no}" value="${ind.bobot}">
-        <td>${isLocked ? `<span>${ind.target}</span>` : `<input type="number" id="t-${ind.no}" value="${ind.target}" min="0" step="0.01"
+        <td>${isLocked ? `<span>${ind.target}</span>` : `<input type="number" id="t-${ind.no}" value="${Math.round(ind.target||0)}" min="0" step="1"
             style="width:72px;border:1.5px solid var(--border);border-radius:6px;padding:3px 6px;font-size:13px"
             onchange="saveIndikator(${ind.no})" oninput="previewSPM(${ind.no})">`}</td>
         <td>${isLocked ? `<span>${ind.capaian}</span>` : `<div style="display:flex;flex-direction:column;gap:2px">
-            <input type="number" id="c-${ind.no}" value="${ind.capaian}" min="0" step="0.01"
+            <input type="number" id="c-${ind.no}" value="${Math.round(ind.capaian||0)}" min="0" step="1"
               style="width:72px;border:1.5px solid var(--border);border-radius:6px;padding:3px 6px;font-size:13px"
               onchange="saveIndikator(${ind.no})" oninput="validateRealisasi(${ind.no})">
             <span id="c-warn-${ind.no}" style="display:none;font-size:10px;color:#ef4444;font-weight:600;white-space:nowrap">Nilai tidak bisa melebihi target</span>
@@ -1207,8 +1207,8 @@ async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, tahun
     const allLinks = [...existingLinks, ...uploadedLinks];
     const linkToSave = JSON.stringify(allLinks);
 
-    const tVal = parseFloat(document.getElementById(`t-${noIndikator}`)?.value) || 0;
-    const cVal = parseFloat(document.getElementById(`c-${noIndikator}`)?.value) || 0;
+    const tVal = parseInt(document.getElementById(`t-${noIndikator}`)?.value) || 0;
+    const cVal = parseInt(document.getElementById(`c-${noIndikator}`)?.value) || 0;
     await API.updateIndikatorUsulan({ idUsulan, noIndikator, target: tVal, capaian: cVal, linkFile: linkToSave });
 
     statusDiv.remove();
@@ -1287,8 +1287,8 @@ async function hapusBukti(idUsulan, noIndikator, fileIndex) {
 
         links.splice(fileIndex, 1);
         const newLinkFile = links.length ? JSON.stringify(links) : '';
-        const tVal = parseFloat(document.getElementById(`t-${noIndikator}`)?.value) || 0;
-        const cVal = parseFloat(document.getElementById(`c-${noIndikator}`)?.value) || 0;
+        const tVal = parseInt(document.getElementById(`t-${noIndikator}`)?.value) || 0;
+        const cVal = parseInt(document.getElementById(`c-${noIndikator}`)?.value) || 0;
         await API.updateIndikatorUsulan({ idUsulan, noIndikator, target: tVal, capaian: cVal, linkFile: newLinkFile });
 
         toast('File berhasil dihapus', 'success');
@@ -1513,8 +1513,8 @@ async function downloadBukti(idx) {
 }
 
 async function saveIndikator(noIndikator) {
-  const target  = parseFloat(document.getElementById(`t-${noIndikator}`)?.value) || 0;
-  const capaian = parseFloat(document.getElementById(`c-${noIndikator}`)?.value) || 0;
+  const target  = parseInt(document.getElementById(`t-${noIndikator}`)?.value) || 0;
+  const capaian = parseInt(document.getElementById(`c-${noIndikator}`)?.value) || 0;
 
   try {
     // Kirim update — tanpa linkFile supaya link yg sudah ada tidak terhapus
@@ -1614,14 +1614,17 @@ async function doSubmitUsulan(forceSubmit) {
 
 // Preview SPM saat oninput (kalkulasi di client tanpa hit server)
 function validateRealisasi(no) {
-  const cEl = document.getElementById(`c-${no}`);
   const tEl = document.getElementById(`t-${no}`);
+  const cEl = document.getElementById(`c-${no}`);
+  // Paksa nilai jadi integer
+  if (tEl && tEl.value.includes('.')) tEl.value = Math.round(parseFloat(tEl.value));
+  if (cEl && cEl.value.includes('.')) cEl.value = Math.round(parseFloat(cEl.value));
   const warnEl = document.getElementById(`c-warn-${no}`);
   if (!cEl || !tEl) return;
-  const c = parseFloat(cEl.value) || 0;
-  const t = parseFloat(tEl.value) || 0;
+  const c = parseInt(cEl.value) || 0;
+  const t = parseInt(tEl.value) || 0;
   if (t > 0 && c > t) {
-    cEl.value = t; // paksa sama dengan target
+    cEl.value = t;
     cEl.style.borderColor = '#ef4444';
     if (warnEl) { warnEl.style.display = 'block'; clearTimeout(warnEl._hideT); warnEl._hideT = setTimeout(() => { warnEl.style.display = 'none'; }, 2000); }
   } else {

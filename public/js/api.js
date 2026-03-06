@@ -85,7 +85,11 @@ const API = {
   // Jabatan
   getJabatan: () => API.get('jabatan'),
   saveJabatan: (data) => API.post('jabatan', data),
-  deleteJabatan: (id) => API.del('jabatan', { id })
+  deleteJabatan: (id) => API.del('jabatan', { id }),
+
+  // Pejabat Penandatangan
+  getPejabat: () => API.get('pejabat'),
+  savePejabat: (data) => API.post('pejabat', data),
 };
 
 // Utils

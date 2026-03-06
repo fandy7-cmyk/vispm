@@ -1928,7 +1928,7 @@ async function openLogAktivitas(idUsulan) {
                   <span style="font-size:12.5px;font-weight:700;color:${cfg.color};background:${cfg.bg};padding:2px 10px;border-radius:20px;border:1px solid ${cfg.color}">${cfg.label}</span>
                   <span style="font-size:11px;color:#64748b;font-weight:600">${log.role}</span>
                 </div>
-                <div style="font-size:13px;font-weight:600;color:#0f172a;margin-bottom:2px">${log.userNama}</div>
+                <div style="font-size:13px;font-weight:600;color:#0f172a;margin-bottom:2px">${log.user_nama || log.user_email}</div>
                 <div style="font-size:11px;color:#94a3b8;margin-bottom:${log.detail?'6px':'0'}">${fmtDT(log.timestamp)}</div>
                 ${log.detail ? `<div style="font-size:12px;color:#334155;background:#f8fafc;border-left:3px solid ${cfg.color};padding:6px 10px;border-radius:0 6px 6px 0;line-height:1.5">${log.detail}</div>` : ''}
               </div>
@@ -1938,7 +1938,7 @@ async function openLogAktivitas(idUsulan) {
     document.getElementById('logAktivitasBody').innerHTML = `
       <div style="background:#f8fafc;border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:12.5px;color:#334155">
         <div style="font-weight:700;font-size:13px;margin-bottom:4px">📋 ${usulan.idUsulan}</div>
-        <div>${usulan.namaPuskesmas} · ${usulan.bulan} ${usulan.tahun}</div>
+        <div>${usulan.namaPKM} · ${usulan.namaBulan} ${usulan.tahun}</div>
       </div>
       <div style="max-height:420px;overflow-y:auto;padding-right:4px">${timelineHtml}</div>`;
 

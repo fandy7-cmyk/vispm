@@ -162,6 +162,19 @@ function startApp() {
     if (s && s.tahun_awal)  window._minPeriodeTahun = parseInt(s.tahun_awal);
   }).catch(() => {});
 
+  // Refresh data user dari DB (termasuk tandaTangan terbaru)
+  if (currentUser.email) {
+    API.get('users').then(users => {
+      const fresh = (users || []).find(u => u.email?.toLowerCase() === currentUser.email.toLowerCase());
+      if (fresh) {
+        currentUser.tandaTangan = fresh.tandaTangan || '';
+        currentUser.nama = fresh.nama || currentUser.nama;
+        currentUser.nip = fresh.nip || currentUser.nip;
+        localStorage.setItem('spm_user', JSON.stringify(currentUser));
+      }
+    }).catch(() => {});
+  }
+
   // Popup notifikasi periode untuk Operator saat login
   if (currentUser.role === 'Operator') {
     setTimeout(() => showPeriodeLoginPopup(), 800);
@@ -1824,20 +1837,24 @@ async function openLogAktivitas(idUsulan) {
   if (!modal) {
     modal = document.createElement('div');
     modal.id = 'logAktivitasModal';
-    modal.className = 'modal';
+    modal.className = 'modal fullscreen';
     modal.style.zIndex = '3500';
     modal.addEventListener('click', e => { if (e.target === modal) closeModal('logAktivitasModal'); });
     document.body.appendChild(modal);
   }
   modal.innerHTML = `
-    <div class="modal-card" style="max-width:560px;width:100%">
+    <div class="modal-card" style="display:flex;flex-direction:column;height:100%;border-radius:0">
       <div class="modal-header">
         <span class="material-icons">history</span>
         <span>Riwayat Aktivitas</span>
         <button class="btn-icon" onclick="closeModal('logAktivitasModal')"><span class="material-icons">close</span></button>
       </div>
-      <div class="modal-body" style="padding:20px">
+      <div class="modal-body" id="logAktivitasBody" style="padding:20px;flex:1;overflow-y:auto">
         <div class="empty-state"><span class="material-icons" style="animation:spin 1s linear infinite">refresh</span><p>Memuat riwayat...</p></div>
+      </div>
+      <div class="modal-footer" id="logAktivitasFooter">
+        <button class="btn btn-secondary" onclick="closeModal('logAktivitasModal')">Tutup</button>
+        <button class="btn btn-primary" id="btnDownloadLog"><span class="material-icons">picture_as_pdf</span>Download PDF</button>
       </div>
     </div>`;
   modal.style.display = 'flex';
@@ -1887,25 +1904,18 @@ async function openLogAktivitas(idUsulan) {
             </div>`;
         }).join('');
 
-    modal.querySelector('.modal-body').innerHTML = `
+    document.getElementById('logAktivitasBody').innerHTML = `
       <div style="background:#f8fafc;border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:12.5px;color:#334155">
         <div style="font-weight:700;font-size:13px;margin-bottom:4px">📋 ${usulan.idUsulan}</div>
         <div>${usulan.namaPuskesmas} · ${usulan.bulan} ${usulan.tahun}</div>
       </div>
       <div style="max-height:420px;overflow-y:auto;padding-right:4px">${timelineHtml}</div>`;
 
-    modal.querySelector('.modal-footer')?.remove();
-    const footer = document.createElement('div');
-    footer.className = 'modal-footer';
-    footer.innerHTML = `
-      <button class="btn btn-secondary" onclick="closeModal('logAktivitasModal')">Tutup</button>
-      <button class="btn btn-primary" onclick="downloadLogPDF('${idUsulan}')">
-        <span class="material-icons">picture_as_pdf</span>Download PDF
-      </button>`;
-    modal.querySelector('.modal-card').appendChild(footer);
+    const btnDl = document.getElementById('btnDownloadLog');
+    if (btnDl) btnDl.onclick = () => downloadLogPDF('${idUsulan}');
 
   } catch(e) {
-    modal.querySelector('.modal-body').innerHTML = `<div class="empty-state"><span class="material-icons" style="color:#ef4444">error</span><p>Gagal memuat: ${e.message}</p></div>`;
+    const errBody = document.getElementById('logAktivitasBody'); if(errBody) errBody.innerHTML = `<div class="empty-state"><span class="material-icons" style="color:#ef4444">error</span><p>Gagal memuat: ${e.message}</p></div>`;
   }
 }
 

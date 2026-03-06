@@ -531,11 +531,11 @@ function renderUsulanTable(rows, role) {
     }
 
     // Tombol download PDF
-    const svgDl = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10"/><path d="m8 9 4 4 4-4"/><path d="M4 17c0 2.2 1.8 4 4 4h8c2.2 0 4-1.8 4-4"/></svg>`;
+    const _svgDl = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10"/><path d="m8 9 4 4 4-4"/><path d="M4 17c0 2.2 1.8 4 4 4h8c2.2 0 4-1.8 4-4"/></svg>`;
     const pdfBtn = u.statusGlobal === 'Selesai'
-      ? `<button class="btn-icon" onclick="downloadLaporanPDF('${u.idUsulan}')" title="Download Laporan PDF" style="background:transparent;border:none;color:#64748b">${svgDl}</button>`
+      ? `<button class="btn-icon" onclick="downloadLaporanPDF('${u.idUsulan}')" title="Download Laporan PDF" style="background:transparent;border:none;color:#64748b">${_svgDl}</button>`
       : (u.statusKapus === 'Selesai' || ['Menunggu Pengelola Program','Menunggu Admin'].includes(u.statusGlobal))
-        ? `<button class="btn-icon" onclick="downloadLaporanSementara('${u.idUsulan}')" title="Download Laporan Sementara" style="background:transparent;border:none;color:#f59e0b">${svgDl}</button>`
+        ? `<button class="btn-icon" onclick="downloadLaporanSementara('${u.idUsulan}')" title="Download Laporan Sementara" style="background:transparent;border:none;color:#f59e0b">${_svgDl}</button>`
         : '';
     const logBtn = `<button class="btn-icon" onclick="openLogAktivitas('${u.idUsulan}')" title="Riwayat Aktivitas" style="background:transparent;border:none;color:#64748b"><span class="material-icons" style="font-size:18px">history</span></button>`;
 
@@ -1544,8 +1544,7 @@ async function generateAndDownloadPDF(htmlContent, fileName) {
       s.onerror = () => {
         const s2 = document.createElement('script');
         s2.src = 'https://unpkg.com/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js';
-        s2.onload = resolve;
-        s2.onerror = reject;
+        s2.onload = resolve; s2.onerror = reject;
         document.head.appendChild(s2);
       };
       document.head.appendChild(s);
@@ -1553,7 +1552,6 @@ async function generateAndDownloadPDF(htmlContent, fileName) {
   }
   const parser = new DOMParser();
   const doc = parser.parseFromString(htmlContent, 'text/html');
-
   const wrapper = document.createElement('div');
   wrapper.style.cssText = 'position:absolute;top:-99999px;left:0;width:794px;background:white;z-index:-9999';
   const container = document.createElement('div');
@@ -1561,32 +1559,27 @@ async function generateAndDownloadPDF(htmlContent, fileName) {
   container.innerHTML = doc.body.innerHTML;
   wrapper.appendChild(container);
   document.body.appendChild(wrapper);
-
   const images = container.querySelectorAll('img');
   await Promise.all(Array.from(images).map(img =>
     img.complete ? Promise.resolve() : new Promise(r => { img.onload = r; img.onerror = r; })
   ));
   await new Promise(r => setTimeout(r, 600));
-
   const opt = {
-    margin:      [10, 15, 10, 15],
-    filename:    fileName,
-    image:       { type: 'jpeg', quality: 0.98 },
+    margin: [10, 15, 10, 15], filename: fileName,
+    image: { type: 'jpeg', quality: 0.98 },
     html2canvas: { scale: 2, useCORS: true, allowTaint: true, logging: false, width: 794, windowWidth: 794, scrollX: 0, scrollY: 0 },
-    jsPDF:       { unit: 'mm', format: 'a4', orientation: 'portrait' },
-    pagebreak:   { mode: ['css', 'legacy'], before: '.page-break' }
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+    pagebreak: { mode: ['css', 'legacy'], before: '.page-break' }
   };
   try {
     await html2pdf().set(opt).from(container).save();
     toast('PDF berhasil didownload ✓', 'success');
   } catch(err) {
-    toast('Gagal generate PDF: ' + err.message, 'error');
-  } finally {
-    wrapper.remove();
-  }
+    toast('Gagal: ' + err.message, 'error');
+  } finally { wrapper.remove(); }
 }
+
 async function openLogAktivitas(idUsulan) {
-  // Buat modal dahulu dengan loading state
   let modal = document.getElementById('logAktivitasModal');
   if (!modal) {
     modal = document.createElement('div');
@@ -1606,164 +1599,62 @@ async function openLogAktivitas(idUsulan) {
       <div class="modal-body" id="logAktivitasBody" style="padding:20px;flex:1;overflow-y:auto">
         <div class="empty-state"><span class="material-icons" style="animation:spin 1s linear infinite">refresh</span><p>Memuat riwayat...</p></div>
       </div>
-      <div class="modal-footer" id="logAktivitasFooter">
+      <div class="modal-footer">
         <button class="btn btn-secondary" onclick="closeModal('logAktivitasModal')">Tutup</button>
-        <button class="btn btn-primary" id="btnDownloadLog"><span class="material-icons">picture_as_pdf</span>Download PDF</button>
       </div>
     </div>`;
   showModal('logAktivitasModal');
-
   try {
     const data = await API.getLogAktivitas(idUsulan);
     const { logs, usulan } = data;
-
     const aksiConfig = {
-      'Submit':        { color: '#0d9488', bg: '#f0fdf9', icon: 'send',         label: 'Diajukan' },
-      'Ajukan Ulang':  { color: '#0d9488', bg: '#f0fdf9', icon: 'restart_alt',  label: 'Ajukan Ulang' },
-      'Approve':       { color: '#16a34a', bg: '#f0fdf4', icon: 'check_circle', label: 'Disetujui' },
-      'Approve Final': { color: '#16a34a', bg: '#f0fdf4', icon: 'verified',     label: 'Final Disetujui' },
-      'Tolak':         { color: '#dc2626', bg: '#fef2f2', icon: 'cancel',       label: 'Ditolak' },
-      'Reset':         { color: '#d97706', bg: '#fffbeb', icon: 'restart_alt',  label: 'Direset Admin' },
-      'Restore Verif': { color: '#6366f1', bg: '#f5f3ff', icon: 'restore',      label: 'Dipulihkan' },
+      'Submit':{ color:'#0d9488',bg:'#f0fdf9',icon:'send',label:'Diajukan' },
+      'Ajukan Ulang':{ color:'#0d9488',bg:'#f0fdf9',icon:'restart_alt',label:'Ajukan Ulang' },
+      'Approve':{ color:'#16a34a',bg:'#f0fdf4',icon:'check_circle',label:'Disetujui' },
+      'Approve Final':{ color:'#16a34a',bg:'#f0fdf4',icon:'verified',label:'Final Disetujui' },
+      'Tolak':{ color:'#dc2626',bg:'#fef2f2',icon:'cancel',label:'Ditolak' },
+      'Reset':{ color:'#d97706',bg:'#fffbeb',icon:'restart_alt',label:'Direset Admin' },
+      'Restore Verif':{ color:'#6366f1',bg:'#f5f3ff',icon:'restore',label:'Dipulihkan' },
     };
-
     function fmtDT(ts) {
       const d = new Date(ts);
-      return d.toLocaleDateString('id-ID', { day:'2-digit', month:'long', year:'numeric' })
-        + ', ' + d.toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit' }) + ' WITA';
+      return d.toLocaleDateString('id-ID',{day:'2-digit',month:'long',year:'numeric'})
+        + ', ' + d.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'}) + ' WITA';
     }
-
     const timelineHtml = logs.length === 0
       ? `<div class="empty-state"><span class="material-icons">history_toggle_off</span><p>Belum ada aktivitas</p></div>`
       : logs.map((log, i) => {
-          const cfg = aksiConfig[log.aksi] || { color:'#64748b', bg:'#f8fafc', icon:'info', label: log.aksi };
+          const cfg = aksiConfig[log.aksi] || { color:'#64748b',bg:'#f8fafc',icon:'info',label:log.aksi };
           const isLast = i === logs.length - 1;
-          return `
-            <div style="display:flex;gap:14px;margin-bottom:${isLast?'0':'16px'}">
-              <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0">
-                <div style="width:36px;height:36px;border-radius:50%;background:${cfg.bg};border:2px solid ${cfg.color};display:flex;align-items:center;justify-content:center">
-                  <span class="material-icons" style="font-size:17px;color:${cfg.color}">${cfg.icon}</span>
-                </div>
-                ${!isLast ? `<div style="width:2px;flex:1;background:#e2e8f0;margin-top:4px;min-height:16px"></div>` : ''}
+          return `<div style="display:flex;gap:14px;margin-bottom:${isLast?'0':'16px'}">
+            <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0">
+              <div style="width:36px;height:36px;border-radius:50%;background:${cfg.bg};border:2px solid ${cfg.color};display:flex;align-items:center;justify-content:center">
+                <span class="material-icons" style="font-size:17px;color:${cfg.color}">${cfg.icon}</span>
               </div>
-              <div style="flex:1;padding-bottom:4px">
-                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px">
-                  <span style="font-size:12.5px;font-weight:700;color:${cfg.color};background:${cfg.bg};padding:2px 10px;border-radius:20px;border:1px solid ${cfg.color}">${cfg.label}</span>
-                  <span style="font-size:11px;color:#64748b;font-weight:600">${log.role}</span>
-                </div>
-                <div style="font-size:13px;font-weight:600;color:#0f172a;margin-bottom:2px">${log.user_nama || log.user_email}</div>
-                <div style="font-size:11px;color:#94a3b8;margin-bottom:${log.detail?'6px':'0'}">${fmtDT(log.timestamp)}</div>
-                ${log.detail ? `<div style="font-size:12px;color:#334155;background:#f8fafc;border-left:3px solid ${cfg.color};padding:6px 10px;border-radius:0 6px 6px 0;line-height:1.5">${log.detail}</div>` : ''}
+              ${!isLast?`<div style="width:2px;flex:1;background:#e2e8f0;margin-top:4px;min-height:16px"></div>`:''}
+            </div>
+            <div style="flex:1;padding-bottom:4px">
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px">
+                <span style="font-size:12.5px;font-weight:700;color:${cfg.color};background:${cfg.bg};padding:2px 10px;border-radius:20px;border:1px solid ${cfg.color}">${cfg.label}</span>
+                <span style="font-size:11px;color:#64748b;font-weight:600">${log.role}</span>
               </div>
-            </div>`;
+              <div style="font-size:13px;font-weight:600;color:#0f172a;margin-bottom:2px">${log.user_nama||log.user_email}</div>
+              <div style="font-size:11px;color:#94a3b8;margin-bottom:${log.detail?'6px':'0'}">${fmtDT(log.timestamp)}</div>
+              ${log.detail?`<div style="font-size:12px;color:#334155;background:#f8fafc;border-left:3px solid ${cfg.color};padding:6px 10px;border-radius:0 6px 6px 0;line-height:1.5">${log.detail}</div>`:''}
+            </div>
+          </div>`;
         }).join('');
-
     document.getElementById('logAktivitasBody').innerHTML = `
       <div style="background:#f8fafc;border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:12.5px;color:#334155">
         <div style="font-weight:700;font-size:13px;margin-bottom:4px">📋 ${usulan.idUsulan}</div>
         <div>${usulan.namaPKM} · ${usulan.namaBulan} ${usulan.tahun}</div>
       </div>
-      <div style="max-height:420px;overflow-y:auto;padding-right:4px">${timelineHtml}</div>`;
-
-    const btnDl = document.getElementById('btnDownloadLog');
-    if (btnDl) btnDl.onclick = () => downloadLogPDF('${idUsulan}');
-
+      <div style="max-height:500px;overflow-y:auto;padding-right:4px">${timelineHtml}</div>`;
   } catch(e) {
-    const errBody = document.getElementById('logAktivitasBody'); if(errBody) errBody.innerHTML = `<div class="empty-state"><span class="material-icons" style="color:#ef4444">error</span><p>Gagal memuat: ${e.message}</p></div>`;
+    const b = document.getElementById('logAktivitasBody');
+    if(b) b.innerHTML = `<div class="empty-state"><span class="material-icons" style="color:#ef4444">error</span><p>Gagal memuat: ${e.message}</p></div>`;
   }
 }
-
-async function downloadLogPDF(idUsulan) {
-  toast('Menyiapkan PDF riwayat...', 'success');
-  try {
-    const data = await API.getLogAktivitas(idUsulan);
-    const { logs, usulan } = data;
-    const now = new Date().toLocaleDateString('id-ID', { day:'2-digit', month:'long', year:'numeric' });
-
-    function fmtDT(ts) {
-      const d = new Date(ts);
-      return d.toLocaleDateString('id-ID', { day:'2-digit', month:'long', year:'numeric' })
-        + ', ' + d.toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit' }) + ' WITA';
-    }
-
-    const aksiLabel = {
-      'Submit':'Diajukan','Ajukan Ulang':'Ajukan Ulang','Approve':'Disetujui',
-      'Approve Final':'Final Disetujui','Tolak':'Ditolak','Reset':'Direset Admin','Restore Verif':'Dipulihkan'
-    };
-    const aksiColor = {
-      'Submit':'#0d9488','Ajukan Ulang':'#0d9488','Approve':'#16a34a',
-      'Approve Final':'#16a34a','Tolak':'#dc2626','Reset':'#d97706','Restore Verif':'#6366f1'
-    };
-
-    const rowsHtml = logs.map((log, i) => {
-      const color = aksiColor[log.aksi] || '#64748b';
-      const label = aksiLabel[log.aksi] || log.aksi;
-      return `<tr style="background:${i%2===0?'#ffffff':'#f8fafc'}">
-        <td style="padding:8px 10px;border:1px solid #e2e8f0;font-size:11px;color:#64748b;white-space:nowrap">${fmtDT(log.timestamp)}</td>
-        <td style="padding:8px 10px;border:1px solid #e2e8f0;font-size:11px"><span style="background:${color}18;color:${color};padding:2px 8px;border-radius:10px;font-weight:700;font-size:10.5px">${label}</span></td>
-        <td style="padding:8px 10px;border:1px solid #e2e8f0;font-size:11px;font-weight:600">${log.userNama}</td>
-        <td style="padding:8px 10px;border:1px solid #e2e8f0;font-size:11px;color:#64748b">${log.role}</td>
-        <td style="padding:8px 10px;border:1px solid #e2e8f0;font-size:11px">${log.detail||'-'}</td>
-      </tr>`;
-    }).join('');
-
-    const html = `<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8">
-<title>Riwayat Aktivitas - ${idUsulan}</title>
-<style>
-  * { margin:0;padding:0;box-sizing:border-box; }
-  body { font-family:Arial,sans-serif;color:#1e293b;background:white;font-size:12px; }
-  @page { size:A4 landscape;margin:15mm 18mm; }
-  @media print { body{-webkit-print-color-adjust:exact;print-color-adjust:exact;} }
-</style>
-<script>window.onload=function(){setTimeout(function(){window.print();},600);};<\/script>
-</head><body>
-<div style="display:flex;align-items:center;gap:14px;padding-bottom:10px;margin-bottom:14px;border-bottom:4px solid #1e293b">
-  <img src="https://vispm.netlify.app/logobalut.png" style="width:60px;height:60px;object-fit:contain" onerror="this.style.display='none'">
-  <div style="flex:1;text-align:center;line-height:1.6">
-    <div style="font-size:11px;font-weight:400;text-transform:uppercase">PEMERINTAH KABUPATEN BANGGAI LAUT</div>
-    <div style="font-size:13px;font-weight:900;text-transform:uppercase">DINAS KESEHATAN, PENGENDALIAN PENDUDUK DAN KELUARGA BERENCANA</div>
-    <div style="font-size:10px">Jl. KM 7, Adean, Banggai Tengah, Banggai Laut, Sulawesi Tengah 94895</div>
-  </div>
-</div>
-<div style="text-align:center;margin-bottom:14px">
-  <div style="font-size:13px;font-weight:700;text-transform:uppercase">Riwayat Aktivitas Verifikasi Usulan SPM</div>
-</div>
-<table style="width:100%;margin-bottom:12px;border-collapse:collapse">
-  <tr><td style="width:100px;font-size:11px;padding:2px 0">ID Usulan</td><td style="font-size:11px;padding:2px 0">: <strong>${usulan.idUsulan}</strong></td>
-      <td style="width:100px;font-size:11px;padding:2px 0">Puskesmas</td><td style="font-size:11px;padding:2px 0">: <strong>${usulan.namaPuskesmas}</strong></td></tr>
-  <tr><td style="font-size:11px;padding:2px 0">Periode</td><td style="font-size:11px;padding:2px 0">: ${usulan.bulan} ${usulan.tahun}</td>
-      <td style="font-size:11px;padding:2px 0">Dicetak</td><td style="font-size:11px;padding:2px 0">: ${now}</td></tr>
-</table>
-<table style="width:100%;border-collapse:collapse">
-  <thead>
-    <tr style="background:#1e293b;color:white">
-      <th style="padding:8px 10px;font-size:11px;border:1px solid #334155;white-space:nowrap">Waktu</th>
-      <th style="padding:8px 10px;font-size:11px;border:1px solid #334155">Aksi</th>
-      <th style="padding:8px 10px;font-size:11px;border:1px solid #334155">Nama</th>
-      <th style="padding:8px 10px;font-size:11px;border:1px solid #334155">Role</th>
-      <th style="padding:8px 10px;font-size:11px;border:1px solid #334155">Keterangan</th>
-    </tr>
-  </thead>
-  <tbody>${rowsHtml}</tbody>
-</table>
-<div style="margin-top:30px;display:flex;justify-content:flex-end">
-  <div style="text-align:center;min-width:200px">
-    <div style="font-size:11px;margin-bottom:60px">Adean, ${now}</div>
-    <div style="font-size:11px;font-weight:700;border-top:1px solid #1e293b;padding-top:4px">Admin VISPM</div>
-  </div>
-</div>
-</body></html>`;
-
-    const blob = new Blob([html], { type:'text/html' });
-    const url = URL.createObjectURL(blob);
-    await generateAndDownloadPDF(html, `Log-Aktivitas-${idUsulan||'VISPM'}.pdf`);
-    URL.revokeObjectURL(url);
-    toast('PDF riwayat siap ✓', 'success');
-  } catch(e) {
-    toast('Gagal: ' + e.message, 'error');
-  }
-}
-
 // ============== VERIFIKASI ==============
 async function renderVerifikasi() {
   const role = currentUser.role;

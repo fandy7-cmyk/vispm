@@ -1,3 +1,4 @@
+// VISPM app.js v2.1 - 2026-03-06 22:13
 // ============== APP STATE ==============
 
 // Format timestamp: DD MMMM YYYY, HH:mm
@@ -319,11 +320,16 @@ async function renderDashboard() {
 
   const content = document.getElementById('mainContent');
 
-  if (role === 'Admin') renderAdminDashboard(content, data);
-  else if (role === 'Operator') renderOperatorDashboard(content, data);
-  else if (role === 'Kepala Puskesmas') renderKepalasDashboard(content, data);
-  else if (role === 'Pengelola Program') renderProgramDashboard(content, data);
-  else if (role === 'Kadis') renderKadisDashboard(content, data);
+  try {
+    if (role === 'Admin') renderAdminDashboard(content, data);
+    else if (role === 'Operator') renderOperatorDashboard(content, data);
+    else if (role === 'Kepala Puskesmas') renderKepalasDashboard(content, data);
+    else if (role === 'Pengelola Program') renderProgramDashboard(content, data);
+    else if (role === 'Kadis') renderKadisDashboard(content, data);
+  } catch(e) {
+    console.error('renderDashboard error:', e);
+    content.innerHTML = `<div class="empty-state"><span class="material-icons" style="color:#ef4444">error</span><p>Error: ${e.message}</p></div>`;
+  }
 }
 
 function renderAdminDashboard(el, d) {

@@ -5,10 +5,12 @@ exports.handler = async (event) => {
   const pool = getPool();
   const method = event.httpMethod;
   try {
+    // Auto-migrate: pastikan kolom tanda_tangan ada (TEXT untuk simpan base64/URL)
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS tanda_tangan TEXT`).catch(()=>{});
     if (method === 'GET') {
       const r = await pool.query(
         `SELECT u.email, u.nama, u.nip, u.role, u.kode_pkm, u.indikator_akses, u.jabatan, u.aktif,
-                p.nama_puskesmas
+                u.tanda_tangan, p.nama_puskesmas
          FROM users u LEFT JOIN master_puskesmas p ON u.kode_pkm=p.kode_pkm
          WHERE u.role != 'Super Admin' ORDER BY u.nama`
       );
@@ -16,7 +18,8 @@ exports.handler = async (event) => {
         email: x.email, nama: x.nama, nip: x.nip || '',
         role: x.role, kodePKM: x.kode_pkm || '', namaPKM: x.nama_puskesmas || '',
         indikatorAkses: x.indikator_akses ? x.indikator_akses.toString() : '',
-        jabatan: x.jabatan || '', aktif: x.aktif
+        jabatan: x.jabatan || '', aktif: x.aktif,
+        tandaTangan: x.tanda_tangan || ''
       })));
     }
     const body = JSON.parse(event.body || '{}');

@@ -1793,14 +1793,9 @@ async function downloadLaporanPDF(idUsulan) {
     const html = await res.text();
     const blob = new Blob([html], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `Laporan-SPM-${idUsulan}.html`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    toast('Laporan berhasil diunduh ✓', 'success');
+    window.open(url, '_blank');
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    toast('Laporan siap — simpan sebagai PDF dari dialog print ✓', 'success');
   } catch(e) {
     toast('Gagal: ' + e.message, 'error');
   }
@@ -1814,14 +1809,9 @@ async function downloadLaporanSementara(idUsulan) {
     const html = await res.text();
     const blob = new Blob([html], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `Laporan-Sementara-SPM-${idUsulan}.html`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    toast('Laporan sementara berhasil diunduh ✓', 'success');
+    window.open(url, '_blank');
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    toast('Laporan sementara siap — simpan sebagai PDF dari dialog print ✓', 'success');
   } catch(e) {
     toast('Gagal: ' + e.message, 'error');
   }
@@ -1976,71 +1966,65 @@ async function openVerifikasi(idUsulan) {
     const btnApprove = document.getElementById('btnApprove');
     const btnReject = document.getElementById('btnReject');
 
-    if (needsTandaTangan && !hasTandaTangan && canApprove) {
+    // Kunci tombol jika belum ada TT — tidak perlu cek canApprove
+    if (needsTandaTangan && !hasTandaTangan) {
       btnApprove.disabled = true;
       btnReject.disabled = true;
-      // Tampilkan peringatan
-      const warningEl = document.getElementById('ttWarning');
-      if (!warningEl) {
-        const w = document.createElement('div');
-        w.id = 'ttWarning';
-        w.style.cssText = 'background:#fef3c7;border:1.5px solid #f59e0b;border-radius:8px;padding:10px 14px;font-size:12px;color:#92400e;display:flex;align-items:center;gap:8px;margin-top:12px';
-        w.style.cssText = 'background:#fef3c7;border:1.5px solid #f59e0b;border-radius:10px;padding:12px 14px;font-size:12px;color:#92400e;margin-top:12px';
-        w.innerHTML = `
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-weight:700;font-size:13px">
-            <span class="material-icons" style="font-size:17px;color:#f59e0b">warning</span>
-            ⚠️ Anda belum mengupload tanda tangan
-          </div>
-          <div style="margin-bottom:8px">
-            Upload melalui menu: <span style="background:#fff8e1;padding:1px 6px;border-radius:4px;font-weight:700">Avatar Profil › Edit Profil & Tanda Tangan</span>
-          </div>
-          <div style="font-size:11.5px;color:#a16207;line-height:1.7;border-top:1px solid rgba(245,158,11,0.25);padding-top:8px;margin-top:4px">
-            <b>Spesifikasi file:</b> PNG / JPG · Latar belakang putih · Resolusi jelas · Tinta hitam/biru tua
-          </div>
-          <div style="margin-top:8px">
-            <a href="#" onclick="event.preventDefault();window._reopenVerifikasiId='${idUsulan}';closeModal('verifikasiModal');setTimeout(()=>openEditProfil(),200)" style="display:inline-flex;align-items:center;gap:5px;background:#f59e0b;color:white;padding:6px 14px;border-radius:7px;font-weight:700;font-size:12px;text-decoration:none">
-              <span class="material-icons" style="font-size:14px">upload</span>Upload Sekarang
-            </a>
-          </div>`;
-        document.getElementById('verifCatatan')?.closest('.modal-body')?.appendChild(w);
-      }
-      if (tolakKeContainer) tolakKeContainer.style.display = 'none';
-    } else {
-      document.getElementById('ttWarning')?.remove();
-
-      document.getElementById('ttWarning')?.remove();
-      if (sudahVerifUser) {
-      btnApprove.style.background = '#16a34a';
-      btnApprove.innerHTML = '<span class="material-icons">check_circle</span> Sudah Diverifikasi';
-      btnApprove.disabled = true;
-      btnReject.disabled = true;
-      if (tolakKeContainer) tolakKeContainer.style.display = 'none';
-    } else {
-      btnApprove.disabled = !canApprove;
-      btnReject.disabled = !canApprove;
-
-      // Tampilkan dropdown tolakKe sesuai role
-      if (canApprove && tolakKeContainer) {
-        const sel = document.getElementById('verifTolakKe');
-        if (currentUser.role === 'Admin') {
-          // Admin bisa tolak ke: Pengelola Program, Kepala Puskesmas, Operator
-          tolakKeContainer.style.display = 'block';
-          sel.innerHTML = `
-            <option value="Pengelola Program">Pengelola Program</option>
-            <option value="Kepala Puskesmas">Kepala Puskesmas</option>
-            <option value="Operator">Operator</option>`;
-        } else if (currentUser.role === 'Pengelola Program') {
-          // Pengelola Program bisa tolak ke: Kepala Puskesmas atau Operator
-          tolakKeContainer.style.display = 'block';
-          sel.innerHTML = `
-            <option value="Kepala Puskesmas">Kepala Puskesmas</option>
-            <option value="Operator">Operator</option>`;
-        } else {
-          // Kepala Puskesmas → otomatis ke Operator, tidak perlu dropdown
-          tolakKeContainer.style.display = 'none';
+      // Tampilkan peringatan hanya jika giliran user ini verifikasi
+      if (canApprove) {
+        if (!document.getElementById('ttWarning')) {
+          const w = document.createElement('div');
+          w.id = 'ttWarning';
+          w.style.cssText = 'background:#fef3c7;border:1.5px solid #f59e0b;border-radius:10px;padding:12px 14px;font-size:12px;color:#92400e;margin-top:12px';
+          w.innerHTML = `
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-weight:700;font-size:13px">
+              <span class="material-icons" style="font-size:17px;color:#f59e0b">warning</span>
+              ⚠️ Anda belum mengupload tanda tangan
+            </div>
+            <div style="margin-bottom:8px">
+              Upload melalui menu: <span style="background:#fff8e1;padding:1px 6px;border-radius:4px;font-weight:700">Avatar Profil › Edit Profil & Tanda Tangan</span>
+            </div>
+            <div style="font-size:11.5px;color:#a16207;line-height:1.7;border-top:1px solid rgba(245,158,11,0.25);padding-top:8px;margin-top:4px">
+              <b>Spesifikasi file:</b> PNG / JPG · Latar belakang putih · Resolusi jelas · Tinta hitam/biru tua
+            </div>
+            <div style="margin-top:8px">
+              <a href="#" onclick="event.preventDefault();window._reopenVerifikasiId='${idUsulan}';closeModal('verifikasiModal');setTimeout(()=>openEditProfil(),200)" style="display:inline-flex;align-items:center;gap:5px;background:#f59e0b;color:white;padding:6px 14px;border-radius:7px;font-weight:700;font-size:12px;text-decoration:none">
+                <span class="material-icons" style="font-size:14px">upload</span>Upload Sekarang
+              </a>
+            </div>`;
+          document.getElementById('verifCatatan')?.closest('.modal-body')?.appendChild(w);
         }
       }
-    }
+      if (tolakKeContainer) tolakKeContainer.style.display = 'none';
+    } else {
+      document.getElementById('ttWarning')?.remove();
+      if (sudahVerifUser) {
+        btnApprove.style.background = '#16a34a';
+        btnApprove.innerHTML = '<span class="material-icons">check_circle</span> Sudah Diverifikasi';
+        btnApprove.disabled = true;
+        btnReject.disabled = true;
+        if (tolakKeContainer) tolakKeContainer.style.display = 'none';
+      } else {
+        btnApprove.disabled = !canApprove;
+        btnReject.disabled = !canApprove;
+        if (canApprove && tolakKeContainer) {
+          const sel = document.getElementById('verifTolakKe');
+          if (currentUser.role === 'Admin') {
+            tolakKeContainer.style.display = 'block';
+            sel.innerHTML = `
+              <option value="Pengelola Program">Pengelola Program</option>
+              <option value="Kepala Puskesmas">Kepala Puskesmas</option>
+              <option value="Operator">Operator</option>`;
+          } else if (currentUser.role === 'Pengelola Program') {
+            tolakKeContainer.style.display = 'block';
+            sel.innerHTML = `
+              <option value="Kepala Puskesmas">Kepala Puskesmas</option>
+              <option value="Operator">Operator</option>`;
+          } else {
+            tolakKeContainer.style.display = 'none';
+          }
+        }
+      }
     } // end else hasTandaTangan
   } catch (e) { toast(e.message, 'error'); }
 }

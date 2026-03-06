@@ -1831,16 +1831,12 @@ function approvalBox(label, by, at, alasanTolak = '') {
 
 // ============== LAPORAN PDF ==============
 async function downloadLaporanPDF(idUsulan) {
-  toast('Menyiapkan laporan...', 'success');
+  toast('Menyiapkan laporan PDF...', 'success');
   try {
     const res = await fetch(`/api/laporan-pdf?id=${idUsulan}`);
     if (!res.ok) { toast('Gagal memuat laporan', 'error'); return; }
     const html = await res.text();
-    const blob = new Blob([html], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    window.open(url, '_blank');
-    setTimeout(() => URL.revokeObjectURL(url), 5000);
-    toast('Laporan siap — simpan sebagai PDF dari dialog print ✓', 'success');
+    await generateAndDownloadPDF(html, `Laporan-SPM-${idUsulan}.pdf`);
   } catch(e) {
     toast('Gagal: ' + e.message, 'error');
   }
@@ -1852,13 +1848,46 @@ async function downloadLaporanSementara(idUsulan) {
     const res = await fetch(`/api/laporan-pdf?id=${idUsulan}&mode=sementara`);
     if (!res.ok) { toast('Gagal memuat laporan', 'error'); return; }
     const html = await res.text();
-    const blob = new Blob([html], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    window.open(url, '_blank');
-    setTimeout(() => URL.revokeObjectURL(url), 5000);
-    toast('Laporan sementara siap — simpan sebagai PDF dari dialog print ✓', 'success');
+    await generateAndDownloadPDF(html, `Laporan-Sementara-${idUsulan}.pdf`);
   } catch(e) {
     toast('Gagal: ' + e.message, 'error');
+  }
+}
+
+async function generateAndDownloadPDF(htmlContent, fileName) {
+  // Render HTML ke iframe hidden untuk ambil konten
+  const iframe = document.createElement('iframe');
+  iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:210mm;height:297mm;border:none;visibility:hidden';
+  document.body.appendChild(iframe);
+
+  await new Promise(resolve => {
+    iframe.onload = resolve;
+    iframe.srcdoc = htmlContent;
+  });
+
+  // Tunggu gambar (tanda tangan) selesai load
+  const images = iframe.contentDocument.querySelectorAll('img');
+  await Promise.all(Array.from(images).map(img =>
+    img.complete ? Promise.resolve() : new Promise(r => { img.onload = r; img.onerror = r; })
+  ));
+  await new Promise(r => setTimeout(r, 500)); // buffer render
+
+  const element = iframe.contentDocument.body;
+
+  const opt = {
+    margin:       [10, 10, 10, 10],
+    filename:     fileName,
+    image:        { type: 'jpeg', quality: 0.98 },
+    html2canvas:  { scale: 2, useCORS: true, allowTaint: true, logging: false },
+    jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+    pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
+  };
+
+  try {
+    await html2pdf().set(opt).from(element).save();
+    toast('PDF berhasil didownload ✓', 'success');
+  } finally {
+    document.body.removeChild(iframe);
   }
 }
 // ============== LOG AKTIVITAS ==============

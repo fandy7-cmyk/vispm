@@ -436,12 +436,25 @@ async function downloadLaporanDashboardOperator() {
 }
 
 function renderKepalasDashboard(el, d) {
+  const periodeList = d.periodeAktifList || (d.periodeAktif ? [d.periodeAktif] : []);
+  const periodeBanner = periodeList.length > 0
+    ? periodeList.map(pr => `
+        <div style="background:linear-gradient(135deg,#0d9488,#06b6d4);border-radius:12px;padding:14px 18px;color:white;margin-bottom:10px;display:flex;align-items:center;gap:14px">
+          <span class="material-icons" style="font-size:24px;opacity:0.9;flex-shrink:0">event_available</span>
+          <div style="flex:1">
+            <div style="font-weight:800;font-size:15px;margin-bottom:2px">Periode Input Aktif: ${pr.nama_bulan} ${pr.tahun}</div>
+            <div style="font-size:12.5px;opacity:0.9">Dibuka: ${formatDate(pr.tanggal_mulai)} pukul ${pr.jam_mulai||'08:00'} — Ditutup: ${formatDate(pr.tanggal_selesai)} pukul ${pr.jam_selesai||'17:00'} WITA</div>
+          </div>
+        </div>`).join('')
+    : '';
+
   el.innerHTML = `
     <div class="stats-grid">
       ${statCard('orange','pending','Menunggu Verifikasi', d.menunggu)}
       ${statCard('green','check_circle','Sudah Diverifikasi', d.terverifikasi)}
       ${statCard('blue','assignment','Total Usulan', d.total)}
     </div>
+    ${periodeBanner}
     <div class="card">
       <div class="card-header-bar">
         <span class="card-title"><span class="material-icons">pending_actions</span>Usulan Menunggu Verifikasi</span>
@@ -1986,6 +1999,17 @@ function openEditProfil() {
             <label>Role</label>
             <input class="form-control" id="epRole" disabled style="background:#f8fafc;color:var(--text-light)">
           </div>
+          <div class="form-group">
+            <label>Tanda Tangan <span style="font-size:11px;color:#94a3b8">(upload gambar, maks 2MB)</span></label>
+            <div style="border:2px dashed #cbd5e1;border-radius:8px;padding:10px;text-align:center;cursor:pointer;position:relative" id="epTTWrap" onclick="document.getElementById('epTTInput').click()">
+              <img id="epTTPreview" style="max-height:80px;max-width:100%;display:none;margin:0 auto">
+              <div id="epTTPlaceholder" style="color:#94a3b8;font-size:13px;padding:8px"><span class="material-icons" style="font-size:28px;display:block;margin:0 auto 4px">draw</span>Klik untuk upload tanda tangan</div>
+              <input type="file" id="epTTInput" accept="image/*" style="display:none" onchange="previewTandaTangan(event)">
+            </div>
+            <button type="button" id="epTTHapus" style="display:none;margin-top:6px;font-size:12px;color:#ef4444;background:none;border:none;cursor:pointer;padding:0" onclick="hapusTandaTangan()">
+              <span class="material-icons" style="font-size:14px;vertical-align:middle">delete</span> Hapus tanda tangan
+            </button>
+          </div>
           <div id="epStatus" style="font-size:12.5px;color:#ef4444;min-height:18px"></div>
         </div>
         <div class="modal-footer">
@@ -2001,8 +2025,45 @@ function openEditProfil() {
   document.getElementById('epEmail').value = currentUser.email || '';
   document.getElementById('epRole').value = currentUser.role || '';
   document.getElementById('epStatus').textContent = '';
+  // Tampilkan tanda tangan jika ada
+  const ttPreview = document.getElementById('epTTPreview');
+  const ttPlaceholder = document.getElementById('epTTPlaceholder');
+  const ttHapus = document.getElementById('epTTHapus');
+  if (currentUser.tandaTangan) {
+    ttPreview.src = currentUser.tandaTangan; ttPreview.style.display = 'block';
+    ttPlaceholder.style.display = 'none'; ttHapus.style.display = 'inline-block';
+  } else {
+    ttPreview.src = ''; ttPreview.style.display = 'none';
+    ttPlaceholder.style.display = 'block'; ttHapus.style.display = 'none';
+  }
   showModal('editProfilModal');
   setTimeout(() => document.getElementById('epNama').focus(), 100);
+}
+
+
+function previewTandaTangan(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  if (file.size > 2 * 1024 * 1024) { alert('File terlalu besar, maks 2MB'); e.target.value=''; return; }
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const b64 = ev.target.result;
+    document.getElementById('epTTPreview').src = b64;
+    document.getElementById('epTTPreview').style.display = 'block';
+    document.getElementById('epTTPlaceholder').style.display = 'none';
+    document.getElementById('epTTHapus').style.display = 'inline-block';
+    e.target._newTT = b64;
+  };
+  reader.readAsDataURL(file);
+}
+
+function hapusTandaTangan() {
+  document.getElementById('epTTPreview').src = '';
+  document.getElementById('epTTPreview').style.display = 'none';
+  document.getElementById('epTTPlaceholder').style.display = 'block';
+  document.getElementById('epTTHapus').style.display = 'none';
+  const inp = document.getElementById('epTTInput');
+  inp.value = ''; inp._newTT = null;
 }
 
 async function saveEditProfil() {
@@ -2012,6 +2073,9 @@ async function saveEditProfil() {
   if (!nama) { statusEl.textContent = 'Nama tidak boleh kosong'; return; }
   setLoading(true);
   try {
+    const ttInput = document.getElementById('epTTInput');
+    let tandaTangan = currentUser.tandaTangan || null;
+    if (ttInput && ttInput._newTT !== undefined) tandaTangan = ttInput._newTT;
     await API.updateUser({
       email: currentUser.email,
       nama,
@@ -2020,11 +2084,13 @@ async function saveEditProfil() {
       kodePKM: currentUser.kodePKM || '',
       indikatorAkses: currentUser.indikatorAkses || '',
       jabatan: currentUser.jabatan || '',
-      aktif: true
+      aktif: true,
+      tandaTangan
     });
     // Update state lokal
     currentUser.nama = nama;
     currentUser.nip = nip;
+    if (tandaTangan !== undefined) currentUser.tandaTangan = tandaTangan;
     localStorage.setItem('spm_user', JSON.stringify(currentUser));
     // Update tampilan
     document.getElementById('sidebarName').textContent = nama;

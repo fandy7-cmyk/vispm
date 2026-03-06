@@ -67,6 +67,10 @@ const API = {
   getDetailUsulan: (id) => API.get('usulan', { action: 'detail', id }),
   getIndikatorUsulan: (id) => API.get('usulan', { action: 'indikator', id }),
   getLogAktivitas: (id) => API.get('usulan', { action: 'log', id }),
+
+  // Settings
+  getSettings: () => API.get('settings'),
+  saveSettings: (data) => API.post('settings', data),
   buatUsulan: (data) => API.post('usulan?action=buat', data),
   updateIndikatorUsulan: (data) => API.put('usulan?action=indikator', data),
   submitUsulan: (data) => API.post('usulan?action=submit', data),

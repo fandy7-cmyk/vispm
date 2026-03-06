@@ -175,10 +175,6 @@ function startApp() {
 
 async function showTTLoginPopup() {
   try {
-    // Ambil data user terkini dari server
-    const users = await API.getUsers().catch(() => []);
-    const myData = (users || []).find(u => u.email?.toLowerCase() === currentUser.email?.toLowerCase());
-
     let hasTT = false;
     if (currentUser.role === 'Admin') {
       // Admin: cek tanda tangan Kepala Sub Bagian Perencanaan
@@ -186,7 +182,8 @@ async function showTTLoginPopup() {
       const kasubag = (pejabat || []).find(p => p.jabatan === 'Kepala Sub Bagian Perencanaan');
       hasTT = !!(kasubag?.tanda_tangan);
     } else {
-      hasTT = !!(myData?.tandaTangan || currentUser.tandaTangan);
+      // Kepala Puskesmas & Pengelola Program: cek dari sesi login
+      hasTT = !!(currentUser.tandaTangan);
     }
 
     if (hasTT) return;

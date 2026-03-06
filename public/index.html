@@ -374,6 +374,7 @@ tbody tr:hover td { background: #f8fafc; }
 .btn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 18px; border-radius: 8px; font-size: 13.5px; font-weight: 600; cursor: pointer; transition: all 0.15s; border: none; font-family: inherit; white-space: nowrap; }
 .btn-primary { background: linear-gradient(135deg, #0d9488, #06b6d4); color: white; }
 .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(13,148,136,0.25); }
+.btn-primary:disabled, .btn-danger:disabled, .btn-success:disabled { background: #cbd5e1 !important; color: #94a3b8 !important; cursor: not-allowed !important; opacity: 1 !important; transform: none !important; box-shadow: none !important; pointer-events: none; }
 .btn-secondary { background: var(--surface); color: var(--text-md); border: 1px solid var(--border); }
 .btn-secondary:hover { background: var(--border-light); }
 .btn-danger { background: var(--danger); color: white; }

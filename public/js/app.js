@@ -122,50 +122,47 @@ function startApp() {
 async function showPeriodeLoginPopup() {
   try {
     const periodeList = await API.get('periode');
-    const aktif = (periodeList || []).find(p => p.isAktifToday);
-    if (!aktif) return;
+    const aktifList = (periodeList || []).filter(p => p.isAktifToday);
+    if (!aktifList.length) return;
 
-    // Buat popup element
+    const periodesHtml = aktifList.map(aktif => `
+      <div style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;margin-bottom:10px">
+        <div style="background:linear-gradient(135deg,#0d9488,#06b6d4);padding:8px 14px;color:white;font-weight:700;font-size:14px">
+          ${aktif.namaBulan} ${aktif.tahun}
+        </div>
+        <div style="display:flex;gap:0">
+          <div style="flex:1;display:flex;align-items:center;gap:8px;padding:10px 14px;background:#f0fdf9;border-right:1px solid #e2e8f0">
+            <span class="material-icons" style="color:#0d9488;font-size:18px;flex-shrink:0">login</span>
+            <div>
+              <div style="font-size:10px;color:#64748b;font-weight:600;text-transform:uppercase">Dibuka</div>
+              <div style="font-size:12.5px;font-weight:700;color:#0f172a">${formatDate(aktif.tanggalMulai)} ${aktif.jamMulai||'08:00'} WITA</div>
+            </div>
+          </div>
+          <div style="flex:1;display:flex;align-items:center;gap:8px;padding:10px 14px;background:#fef2f2">
+            <span class="material-icons" style="color:#ef4444;font-size:18px;flex-shrink:0">logout</span>
+            <div>
+              <div style="font-size:10px;color:#64748b;font-weight:600;text-transform:uppercase">Ditutup</div>
+              <div style="font-size:12.5px;font-weight:700;color:#0f172a">${formatDate(aktif.tanggalSelesai)} ${aktif.jamSelesai||'17:00'} WITA</div>
+            </div>
+          </div>
+        </div>
+        ${aktif.notifOperator ? `<div style="display:flex;align-items:flex-start;gap:8px;padding:8px 14px;background:#fffbeb;border-top:1px solid #fcd34d"><span style="font-size:16px;flex-shrink:0">📢</span><div style="font-size:12px;color:#0f172a;line-height:1.5">${aktif.notifOperator}</div></div>` : ''}
+      </div>`).join('');
+
     const popup = document.createElement('div');
     popup.id = 'periodePopup';
-    popup.style.cssText = `
-      position:fixed;top:0;left:0;right:0;bottom:0;
-      background:rgba(0,0,0,0.5);z-index:9998;
-      display:flex;align-items:center;justify-content:center;
-      backdrop-filter:blur(3px);animation:fadeIn 0.3s ease
-    `;
+    popup.style.cssText = `position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9998;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px);animation:fadeIn 0.3s ease`;
     popup.innerHTML = `
-      <div style="background:white;border-radius:16px;width:440px;max-width:calc(100vw - 32px);overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,0.3);animation:authIn 0.3s ease">
-        <div style="background:linear-gradient(135deg,#0d9488,#06b6d4);padding:20px 24px;color:white">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
-            <span class="material-icons" style="font-size:24px">notifications_active</span>
-            <span style="font-size:13px;font-weight:600;opacity:0.85;text-transform:uppercase;letter-spacing:0.5px">Informasi Periode Input</span>
+      <div style="background:white;border-radius:16px;width:480px;max-width:calc(100vw - 32px);overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,0.3);animation:authIn 0.3s ease">
+        <div style="background:linear-gradient(135deg,#0d9488,#06b6d4);padding:16px 20px;color:white">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span class="material-icons" style="font-size:22px">notifications_active</span>
+            <span style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px">Informasi Periode Input</span>
           </div>
-          <div style="font-size:20px;font-weight:800">${aktif.namaBulan} ${aktif.tahun}</div>
         </div>
-        <div style="padding:20px 24px">
-          <div style="display:flex;flex-direction:column;gap:10px">
-            <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#f0fdf9;border-radius:8px;border:1px solid #0d9488">
-              <span class="material-icons" style="color:#0d9488;font-size:20px">login</span>
-              <div>
-                <div style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase">Dibuka</div>
-                <div style="font-size:14px;font-weight:700;color:#0f172a">${formatDate(aktif.tanggalMulai)} pukul ${aktif.jamMulai||'08:00'} WITA</div>
-              </div>
-            </div>
-            <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#fef2f2;border-radius:8px;border:1px solid #fca5a5">
-              <span class="material-icons" style="color:#ef4444;font-size:20px">logout</span>
-              <div>
-                <div style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase">Ditutup</div>
-                <div style="font-size:14px;font-weight:700;color:#0f172a">${formatDate(aktif.tanggalSelesai)} pukul ${aktif.jamSelesai||'17:00'} WITA</div>
-              </div>
-            </div>
-            ${aktif.notifOperator ? `
-            <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 14px;background:#fffbeb;border-radius:8px;border:1px solid #fcd34d">
-              <span style="font-size:18px;flex-shrink:0;margin-top:1px">📢</span>
-              <div style="font-size:13px;color:#0f172a;line-height:1.5">${aktif.notifOperator}</div>
-            </div>` : ''}
-          </div>
-          <button onclick="document.getElementById('periodePopup').remove()" style="width:100%;margin-top:16px;height:44px;background:linear-gradient(135deg,#0d9488,#06b6d4);border:none;border-radius:10px;color:white;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">
+        <div style="padding:16px 20px">
+          ${periodesHtml}
+          <button onclick="document.getElementById('periodePopup').remove()" style="width:100%;margin-top:4px;height:42px;background:linear-gradient(135deg,#0d9488,#06b6d4);border:none;border-radius:10px;color:white;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">
             <span style="display:flex;align-items:center;justify-content:center;gap:6px"><span class="material-icons" style="font-size:18px">check</span>Mengerti, Tutup</span>
           </button>
         </div>
@@ -414,7 +411,7 @@ function renderOperatorDashboard(el, d) {
       <div class="card-body" style="display:flex;gap:10px;flex-wrap:wrap;">
         <button class="btn btn-primary" onclick="loadPage('input')"><span class="material-icons">add</span>Buat Usulan Baru</button>
         <button class="btn btn-secondary" onclick="loadPage('laporan')"><span class="material-icons">bar_chart</span>Lihat Laporan</button>
-        <button class="btn btn-secondary" onclick="downloadLaporanDashboardOperator()"><span class="material-icons">picture_as_pdf</span>Download Laporan PDF</button>
+
       </div>
     </div>
     <div class="card">
@@ -422,7 +419,7 @@ function renderOperatorDashboard(el, d) {
       <div class="card-body" style="padding:0" id="recentTable"></div>
     </div>`;
 
-  API.getUsulan({ email_operator: currentUser.email, tahun: CURRENT_YEAR }).then(rows => {
+  API.getUsulan({ email_operator: currentUser.email }).then(rows => {
     document.getElementById("recentTable").innerHTML = renderUsulanTable(rows.slice(0, 5), "operator");
   }).catch(() => {
     const el2 = document.getElementById("recentTable");

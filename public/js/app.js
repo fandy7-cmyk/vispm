@@ -703,9 +703,9 @@ function renderUsulanTable(rows, role) {
         : '';
 
     if (['kepala-puskesmas', 'program', 'admin'].includes(role)) {
-      return viewBtn + pdfBtn + verifBtn;
+      return viewBtn + pdfBtn + verifBtn + `<button class="btn-icon" onclick="openLogAktivitas('${u.idUsulan}')" title="Riwayat Aktivitas" style="background:transparent;border:none;color:#64748b"><span class="material-icons" style="font-size:18px">history</span></button>`;
     }
-    return viewBtn;
+    return viewBtn + `<button class="btn-icon" onclick="openLogAktivitas('${u.idUsulan}')" title="Riwayat Aktivitas" style="background:transparent;border:none;color:#64748b"><span class="material-icons" style="font-size:18px">history</span></button>`;
   };
 
   const tableKey = 'usulan_' + role;
@@ -863,6 +863,7 @@ async function loadMyUsulan() {
             ${u.statusGlobal === 'Draft' ? `<button class="btn-icon del" onclick="deleteUsulan('${u.idUsulan}')"><span class="material-icons">delete</span></button>` : ''}
             ${u.statusGlobal === 'Ditolak' ? `<button class="btn btn-warning btn-sm" onclick="openIndikatorModal('${u.idUsulan}')" style="background:#f59e0b;color:white;border-color:#f59e0b"><span class="material-icons" style="font-size:14px">restart_alt</span> Perbaiki & Ajukan Ulang</button>` : ''}
             ${(u.statusGlobal || '').startsWith('Menunggu') ? `<button class="btn-icon" title="Sedang diproses" style="background:#d1fae5;color:#065f46;border:1.5px solid #0d9488;cursor:default" disabled><span class="material-icons">check_circle</span></button>` : ''}
+            <button class="btn-icon" onclick="openLogAktivitas('${u.idUsulan}')" title="Riwayat Aktivitas" style="background:transparent;border:none;color:#64748b"><span class="material-icons" style="font-size:18px">history</span></button>
           </td>
         </tr>`).join('')}
         </tbody>
@@ -1816,6 +1817,189 @@ async function downloadLaporanSementara(idUsulan) {
     toast('Gagal: ' + e.message, 'error');
   }
 }
+// ============== LOG AKTIVITAS ==============
+async function openLogAktivitas(idUsulan) {
+  // Buat modal dahulu dengan loading state
+  let modal = document.getElementById('logAktivitasModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'logAktivitasModal';
+    modal.className = 'modal';
+    modal.style.zIndex = '3500';
+    modal.addEventListener('click', e => { if (e.target === modal) closeModal('logAktivitasModal'); });
+    document.body.appendChild(modal);
+  }
+  modal.innerHTML = `
+    <div class="modal-card" style="max-width:560px;width:100%">
+      <div class="modal-header">
+        <span class="material-icons">history</span>
+        <span>Riwayat Aktivitas</span>
+        <button class="btn-icon" onclick="closeModal('logAktivitasModal')"><span class="material-icons">close</span></button>
+      </div>
+      <div class="modal-body" style="padding:20px">
+        <div class="empty-state"><span class="material-icons" style="animation:spin 1s linear infinite">refresh</span><p>Memuat riwayat...</p></div>
+      </div>
+    </div>`;
+  modal.style.display = 'flex';
+
+  try {
+    const data = await API.getLogAktivitas(idUsulan);
+    const { logs, usulan } = data;
+
+    const aksiConfig = {
+      'Submit':        { color: '#0d9488', bg: '#f0fdf9', icon: 'send',         label: 'Diajukan' },
+      'Ajukan Ulang':  { color: '#0d9488', bg: '#f0fdf9', icon: 'restart_alt',  label: 'Ajukan Ulang' },
+      'Approve':       { color: '#16a34a', bg: '#f0fdf4', icon: 'check_circle', label: 'Disetujui' },
+      'Approve Final': { color: '#16a34a', bg: '#f0fdf4', icon: 'verified',     label: 'Final Disetujui' },
+      'Tolak':         { color: '#dc2626', bg: '#fef2f2', icon: 'cancel',       label: 'Ditolak' },
+      'Reset':         { color: '#d97706', bg: '#fffbeb', icon: 'restart_alt',  label: 'Direset Admin' },
+      'Restore Verif': { color: '#6366f1', bg: '#f5f3ff', icon: 'restore',      label: 'Dipulihkan' },
+    };
+
+    function fmtDT(ts) {
+      const d = new Date(ts);
+      return d.toLocaleDateString('id-ID', { day:'2-digit', month:'long', year:'numeric' })
+        + ', ' + d.toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit' }) + ' WITA';
+    }
+
+    const timelineHtml = logs.length === 0
+      ? `<div class="empty-state"><span class="material-icons">history_toggle_off</span><p>Belum ada aktivitas</p></div>`
+      : logs.map((log, i) => {
+          const cfg = aksiConfig[log.aksi] || { color:'#64748b', bg:'#f8fafc', icon:'info', label: log.aksi };
+          const isLast = i === logs.length - 1;
+          return `
+            <div style="display:flex;gap:14px;margin-bottom:${isLast?'0':'16px'}">
+              <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0">
+                <div style="width:36px;height:36px;border-radius:50%;background:${cfg.bg};border:2px solid ${cfg.color};display:flex;align-items:center;justify-content:center">
+                  <span class="material-icons" style="font-size:17px;color:${cfg.color}">${cfg.icon}</span>
+                </div>
+                ${!isLast ? `<div style="width:2px;flex:1;background:#e2e8f0;margin-top:4px;min-height:16px"></div>` : ''}
+              </div>
+              <div style="flex:1;padding-bottom:4px">
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px">
+                  <span style="font-size:12.5px;font-weight:700;color:${cfg.color};background:${cfg.bg};padding:2px 10px;border-radius:20px;border:1px solid ${cfg.color}">${cfg.label}</span>
+                  <span style="font-size:11px;color:#64748b;font-weight:600">${log.role}</span>
+                </div>
+                <div style="font-size:13px;font-weight:600;color:#0f172a;margin-bottom:2px">${log.userNama}</div>
+                <div style="font-size:11px;color:#94a3b8;margin-bottom:${log.detail?'6px':'0'}">${fmtDT(log.timestamp)}</div>
+                ${log.detail ? `<div style="font-size:12px;color:#334155;background:#f8fafc;border-left:3px solid ${cfg.color};padding:6px 10px;border-radius:0 6px 6px 0;line-height:1.5">${log.detail}</div>` : ''}
+              </div>
+            </div>`;
+        }).join('');
+
+    modal.querySelector('.modal-body').innerHTML = `
+      <div style="background:#f8fafc;border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:12.5px;color:#334155">
+        <div style="font-weight:700;font-size:13px;margin-bottom:4px">📋 ${usulan.idUsulan}</div>
+        <div>${usulan.namaPuskesmas} · ${usulan.bulan} ${usulan.tahun}</div>
+      </div>
+      <div style="max-height:420px;overflow-y:auto;padding-right:4px">${timelineHtml}</div>`;
+
+    modal.querySelector('.modal-footer')?.remove();
+    const footer = document.createElement('div');
+    footer.className = 'modal-footer';
+    footer.innerHTML = `
+      <button class="btn btn-secondary" onclick="closeModal('logAktivitasModal')">Tutup</button>
+      <button class="btn btn-primary" onclick="downloadLogPDF('${idUsulan}')">
+        <span class="material-icons">picture_as_pdf</span>Download PDF
+      </button>`;
+    modal.querySelector('.modal-card').appendChild(footer);
+
+  } catch(e) {
+    modal.querySelector('.modal-body').innerHTML = `<div class="empty-state"><span class="material-icons" style="color:#ef4444">error</span><p>Gagal memuat: ${e.message}</p></div>`;
+  }
+}
+
+async function downloadLogPDF(idUsulan) {
+  toast('Menyiapkan PDF riwayat...', 'success');
+  try {
+    const data = await API.getLogAktivitas(idUsulan);
+    const { logs, usulan } = data;
+    const now = new Date().toLocaleDateString('id-ID', { day:'2-digit', month:'long', year:'numeric' });
+
+    function fmtDT(ts) {
+      const d = new Date(ts);
+      return d.toLocaleDateString('id-ID', { day:'2-digit', month:'long', year:'numeric' })
+        + ', ' + d.toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit' }) + ' WITA';
+    }
+
+    const aksiLabel = {
+      'Submit':'Diajukan','Ajukan Ulang':'Ajukan Ulang','Approve':'Disetujui',
+      'Approve Final':'Final Disetujui','Tolak':'Ditolak','Reset':'Direset Admin','Restore Verif':'Dipulihkan'
+    };
+    const aksiColor = {
+      'Submit':'#0d9488','Ajukan Ulang':'#0d9488','Approve':'#16a34a',
+      'Approve Final':'#16a34a','Tolak':'#dc2626','Reset':'#d97706','Restore Verif':'#6366f1'
+    };
+
+    const rowsHtml = logs.map((log, i) => {
+      const color = aksiColor[log.aksi] || '#64748b';
+      const label = aksiLabel[log.aksi] || log.aksi;
+      return `<tr style="background:${i%2===0?'#ffffff':'#f8fafc'}">
+        <td style="padding:8px 10px;border:1px solid #e2e8f0;font-size:11px;color:#64748b;white-space:nowrap">${fmtDT(log.timestamp)}</td>
+        <td style="padding:8px 10px;border:1px solid #e2e8f0;font-size:11px"><span style="background:${color}18;color:${color};padding:2px 8px;border-radius:10px;font-weight:700;font-size:10.5px">${label}</span></td>
+        <td style="padding:8px 10px;border:1px solid #e2e8f0;font-size:11px;font-weight:600">${log.userNama}</td>
+        <td style="padding:8px 10px;border:1px solid #e2e8f0;font-size:11px;color:#64748b">${log.role}</td>
+        <td style="padding:8px 10px;border:1px solid #e2e8f0;font-size:11px">${log.detail||'-'}</td>
+      </tr>`;
+    }).join('');
+
+    const html = `<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8">
+<title>Riwayat Aktivitas - ${idUsulan}</title>
+<style>
+  * { margin:0;padding:0;box-sizing:border-box; }
+  body { font-family:Arial,sans-serif;color:#1e293b;background:white;font-size:12px; }
+  @page { size:A4 landscape;margin:15mm 18mm; }
+  @media print { body{-webkit-print-color-adjust:exact;print-color-adjust:exact;} }
+</style>
+<script>window.onload=function(){setTimeout(function(){window.print();},600);};<\/script>
+</head><body>
+<div style="display:flex;align-items:center;gap:14px;padding-bottom:10px;margin-bottom:14px;border-bottom:4px solid #1e293b">
+  <img src="https://vispm.netlify.app/logobalut.png" style="width:60px;height:60px;object-fit:contain" onerror="this.style.display='none'">
+  <div style="flex:1;text-align:center;line-height:1.6">
+    <div style="font-size:11px;font-weight:400;text-transform:uppercase">PEMERINTAH KABUPATEN BANGGAI LAUT</div>
+    <div style="font-size:13px;font-weight:900;text-transform:uppercase">DINAS KESEHATAN, PENGENDALIAN PENDUDUK DAN KELUARGA BERENCANA</div>
+    <div style="font-size:10px">Jl. KM 7, Adean, Banggai Tengah, Banggai Laut, Sulawesi Tengah 94895</div>
+  </div>
+</div>
+<div style="text-align:center;margin-bottom:14px">
+  <div style="font-size:13px;font-weight:700;text-transform:uppercase">Riwayat Aktivitas Verifikasi Usulan SPM</div>
+</div>
+<table style="width:100%;margin-bottom:12px;border-collapse:collapse">
+  <tr><td style="width:100px;font-size:11px;padding:2px 0">ID Usulan</td><td style="font-size:11px;padding:2px 0">: <strong>${usulan.idUsulan}</strong></td>
+      <td style="width:100px;font-size:11px;padding:2px 0">Puskesmas</td><td style="font-size:11px;padding:2px 0">: <strong>${usulan.namaPuskesmas}</strong></td></tr>
+  <tr><td style="font-size:11px;padding:2px 0">Periode</td><td style="font-size:11px;padding:2px 0">: ${usulan.bulan} ${usulan.tahun}</td>
+      <td style="font-size:11px;padding:2px 0">Dicetak</td><td style="font-size:11px;padding:2px 0">: ${now}</td></tr>
+</table>
+<table style="width:100%;border-collapse:collapse">
+  <thead>
+    <tr style="background:#1e293b;color:white">
+      <th style="padding:8px 10px;font-size:11px;border:1px solid #334155;white-space:nowrap">Waktu</th>
+      <th style="padding:8px 10px;font-size:11px;border:1px solid #334155">Aksi</th>
+      <th style="padding:8px 10px;font-size:11px;border:1px solid #334155">Nama</th>
+      <th style="padding:8px 10px;font-size:11px;border:1px solid #334155">Role</th>
+      <th style="padding:8px 10px;font-size:11px;border:1px solid #334155">Keterangan</th>
+    </tr>
+  </thead>
+  <tbody>${rowsHtml}</tbody>
+</table>
+<div style="margin-top:30px;display:flex;justify-content:flex-end">
+  <div style="text-align:center;min-width:200px">
+    <div style="font-size:11px;margin-bottom:60px">Adean, ${now}</div>
+    <div style="font-size:11px;font-weight:700;border-top:1px solid #1e293b;padding-top:4px">Admin VISPM</div>
+  </div>
+</div>
+</body></html>`;
+
+    const blob = new Blob([html], { type:'text/html' });
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    toast('PDF riwayat siap ✓', 'success');
+  } catch(e) {
+    toast('Gagal: ' + e.message, 'error');
+  }
+}
+
 // ============== VERIFIKASI ==============
 async function renderVerifikasi() {
   const role = currentUser.role;

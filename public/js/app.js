@@ -1872,17 +1872,23 @@ async function generateAndDownloadPDF(htmlContent, fileName) {
     });
   }
 
-  // Render ke iframe hidden - lebih aman untuk preserve CSS dari <head>
-  const iframe = document.createElement('iframe');
-  iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:210mm;border:none;visibility:hidden;height:0';
-  document.body.appendChild(iframe);
-
-  // Hapus hanya script tags (window.print dll), biarkan CSS tetap
+  // Hapus script tags (window.print dll), biarkan CSS utuh
   const cleanHtml = htmlContent.replace(/<script[\s\S]*?<\/script>/gi, '');
+
+  // Inject style agar body punya lebar A4 eksplisit
+  const styledHtml = cleanHtml.replace('</head>', `
+  <style>
+    html, body { width: 794px !important; margin: 0 !important; padding: 15mm 18mm !important; background: white !important; }
+  </style>
+  </head>`);
+
+  const iframe = document.createElement('iframe');
+  iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:794px;height:1123px;border:none;visibility:hidden';
+  document.body.appendChild(iframe);
 
   await new Promise(resolve => {
     iframe.onload = resolve;
-    iframe.srcdoc = cleanHtml;
+    iframe.srcdoc = styledHtml;
   });
 
   // Tunggu gambar (tanda tangan) selesai load
@@ -1890,15 +1896,15 @@ async function generateAndDownloadPDF(htmlContent, fileName) {
   await Promise.all(Array.from(images).map(img =>
     img.complete ? Promise.resolve() : new Promise(r => { img.onload = r; img.onerror = r; })
   ));
-  await new Promise(r => setTimeout(r, 800));
+  await new Promise(r => setTimeout(r, 1000));
 
   const element = iframe.contentDocument.body;
 
   const opt = {
-    margin:      [0, 0, 0, 0],
+    margin:      [15, 18, 15, 18],
     filename:    fileName,
     image:       { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true, allowTaint: true, logging: false, windowWidth: 794 },
+    html2canvas: { scale: 2, useCORS: true, allowTaint: true, logging: false, width: 794, windowWidth: 794 },
     jsPDF:       { unit: 'mm', format: 'a4', orientation: 'portrait' },
     pagebreak:   { mode: ['css', 'legacy'], before: '.page-break' }
   };

@@ -78,6 +78,8 @@ const API = {
   approveProgram: (data) => API.post('usulan?action=approve-program', data),
   approveAdmin: (data) => API.post('usulan?action=approve-admin', data),
   rejectUsulan: (data) => API.post('usulan?action=reject', data),
+  getPenolakanIndikator: (idUsulan) => API.get('usulan', { action: 'penolakan', idUsulan }),
+  respondPenolakan: (data) => API.post('usulan?action=respond-penolakan', data),
 
   // Laporan
   getLaporan: (params) => API.get('laporan', params),

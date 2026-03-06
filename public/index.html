@@ -911,20 +911,16 @@ input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-o
       <div style="margin-top:16px;">
         <div class="form-group">
           <label>Catatan Verifikasi</label>
-          <textarea id="verifCatatan" class="form-control" rows="3" placeholder="Opsional..."></textarea>
+          <textarea id="verifCatatan" class="form-control" rows="3" placeholder="Catatan verifikasi (wajib untuk Tolak / Sanggah)..."></textarea>
         </div>
-        <div class="form-group" id="tolakKeContainer" style="display:none;margin-top:10px">
-          <label>Kembalikan ke <span style="color:#ef4444">*</span></label>
-          <select id="verifTolakKe" class="form-control">
-            <option value="Pengelola Program">Pengelola Program</option>
-            <option value="Kepala Puskesmas">Kepala Puskesmas</option>
-            <option value="Operator">Operator</option>
-          </select>
-        </div>
+
       </div>
     </div>
     <div class="modal-footer" style="flex-shrink:0">
       <button class="btn btn-secondary" onclick="closeModal('verifikasiModal')">Batal</button>
+      <button class="btn btn-warning" id="btnSanggah" onclick="doSanggah()" style="display:none;background:#f59e0b;border-color:#f59e0b;color:white">
+        <span class="material-icons">gavel</span> Sanggah
+      </button>
       <button class="btn btn-danger" id="btnReject" onclick="doReject()">
         <span class="material-icons">cancel</span> Tolak
       </button>

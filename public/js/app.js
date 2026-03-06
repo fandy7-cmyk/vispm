@@ -1,45 +1,5 @@
 // ============== APP STATE ==============
 
-// ============== PAGINATION UTILITY ==============
-const PAGINATION_SIZE = 12; // baris per halaman default
-function fmtPct(pct) {
-  const p = parseFloat(pct);
-  if (isNaN(p)) return '-';
-  return p >= 100 ? '100%' : p.toFixed(1) + '%';
-}
-
-const _pgState = {}; // { tableId: currentPage }
-
-function renderPagination(containerId, totalItems, currentPage, pageSize, onPageChange) {
-  const el = document.getElementById(containerId);
-  if (!el) return;
-  const totalPages = Math.ceil(totalItems / pageSize);
-  if (totalPages <= 1) { el.innerHTML = ''; return; }
-
-  const maxBtns = 5;
-  let start = Math.max(1, currentPage - Math.floor(maxBtns / 2));
-  let end = Math.min(totalPages, start + maxBtns - 1);
-  if (end - start < maxBtns - 1) start = Math.max(1, end - maxBtns + 1);
-
-  let html = `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-top:1px solid var(--border);background:white;border-radius:0 0 12px 12px">
-    <span style="font-size:12px;color:var(--text-light)">Menampilkan ${Math.min((currentPage-1)*pageSize+1, totalItems)}–${Math.min(currentPage*pageSize, totalItems)} dari ${totalItems} data</span>
-    <div style="display:flex;gap:4px;align-items:center">`;
-  
-  html += `<button onclick="${onPageChange}(1)" style="padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;background:white;cursor:pointer;font-size:12px;color:var(--text-light)" ${currentPage===1?'disabled':''}>«</button>`;
-  html += `<button onclick="${onPageChange}(${currentPage-1})" style="padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;background:white;cursor:pointer;font-size:12px;color:var(--text-light)" ${currentPage===1?'disabled':''}>‹</button>`;
-  
-  for (let i = start; i <= end; i++) {
-    const active = i === currentPage;
-    html += `<button onclick="${onPageChange}(${i})" style="padding:4px 10px;border:1.5px solid ${active?'var(--primary)':'var(--border)'};border-radius:6px;background:${active?'var(--primary)':'white'};color:${active?'white':'var(--text)'};cursor:pointer;font-size:12px;font-weight:${active?'700':'400'}">${i}</button>`;
-  }
-  
-  html += `<button onclick="${onPageChange}(${currentPage+1})" style="padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;background:white;cursor:pointer;font-size:12px;color:var(--text-light)" ${currentPage===totalPages?'disabled':''}>›</button>`;
-  html += `<button onclick="${onPageChange}(${totalPages})" style="padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;background:white;cursor:pointer;font-size:12px;color:var(--text-light)" ${currentPage===totalPages?'disabled':''}>»</button>`;
-  html += `</div></div>`;
-  el.innerHTML = html;
-}
-
-
 // Format timestamp: DD MMMM YYYY, HH:mm
 function formatTS(ts) {
   if (!ts) return '-';
@@ -85,7 +45,7 @@ async function doLogin() {
   const btn = document.getElementById('authBtn');
   btn.disabled = true;
   btn.innerHTML = '<span class="material-icons" style="animation:spin 0.8s linear infinite">refresh</span> Loading...';
-  setAuthStatus('Memvalidasi kredensial...', '');
+  setAuthStatus('Loading...', '');
 
   try {
     const user = await API.login(email, password);
@@ -118,7 +78,7 @@ function doLogout() {
     title: 'Keluar dari Sistem',
     message: 'Yakin ingin keluar dari sistem?',
     type: 'warning',
-    onConfirm: () => { currentUser = null; localStorage.removeItem('spm_user'); sessionStorage.removeItem('spm_lastPage'); location.reload(); }
+    onConfirm: () => { currentUser = null; localStorage.removeItem('spm_user'); location.reload(); }
   });
 }
 
@@ -144,159 +104,22 @@ function startApp() {
     }
   }
   document.getElementById('sidebarAvatar').textContent = (currentUser.nama || 'U')[0].toUpperCase();
-  // Topbar avatar dropdown
-  const tAvatar = document.getElementById('topbarAvatar');
-  if (tAvatar) tAvatar.textContent = (currentUser.nama || 'U')[0].toUpperCase();
-  const tName = document.getElementById('topbarDropName');
-  if (tName) tName.textContent = currentUser.nama || currentUser.email;
-  const tMeta = document.getElementById('topbarDropMeta');
-  if (tMeta) tMeta.textContent = currentUser.role + (currentUser.namaPKM ? ' — ' + currentUser.namaPKM : '');
-
-  // Sembunyikan "Edit Profil & Tanda Tangan" untuk Admin dan Operator
-  const btnEditProfilTT = document.getElementById('btnEditProfilTT');
-  if (btnEditProfilTT) {
-    const showTT = ['Kepala Puskesmas', 'Pengelola Program'].includes(currentUser.role);
-    btnEditProfilTT.style.display = showTT ? '' : 'none';
-  }
+  document.getElementById('topbarUser').textContent = currentUser.nama || currentUser.email;
 
   buildSidebar();
-
-  // Halaman yang boleh diakses per role
-  const allowedPages = {
-    'Admin':            ['dashboard','verifikasi','laporan','master-data','users','jabatan','pkm','indikator','pengaturan','target-tahunan','periode','kelola-usulan'],
-    'Operator':         ['dashboard','input','laporan'],
-    'Kepala Puskesmas': ['dashboard','verifikasi','laporan'],
-    'Pengelola Program':['dashboard','verifikasi','laporan'],
-  };
-  const allowed = allowedPages[currentUser.role] || ['dashboard'];
-  const _lastPage = sessionStorage.getItem('spm_lastPage');
-  const startPage = (_lastPage && allowed.includes(_lastPage)) ? _lastPage : 'dashboard';
-  loadPage(startPage);
-
-  // Load tahun range dari DB settings
-  API.getSettings().then(s => {
-    if (s && s.tahun_awal)  window._minPeriodeTahun = parseInt(s.tahun_awal);
-    if (s && s.tahun_akhir) window._maxPeriodeTahun = parseInt(s.tahun_akhir);
-  }).catch(() => {
-    window._minPeriodeTahun = window._minPeriodeTahun || new Date().getFullYear();
-    window._maxPeriodeTahun = window._maxPeriodeTahun || new Date().getFullYear() + 2;
-  });
-
-  // Refresh data user dari DB (termasuk tandaTangan terbaru)
-  if (currentUser.email) {
-    API.get('users').then(users => {
-      const fresh = (users || []).find(u => u.email?.toLowerCase() === currentUser.email.toLowerCase());
-      if (fresh) {
-        currentUser.tandaTangan = fresh.tandaTangan || '';
-        currentUser.nama = fresh.nama || currentUser.nama;
-        currentUser.nip = fresh.nip || currentUser.nip;
-        localStorage.setItem('spm_user', JSON.stringify(currentUser));
-      }
-    }).catch(() => {});
-  }
+  loadPage('dashboard');
 
   // Popup notifikasi periode untuk Operator saat login
   if (currentUser.role === 'Operator') {
     setTimeout(() => showPeriodeLoginPopup(), 800);
   }
-
-  // Popup notifikasi tanda tangan untuk verifikator
-  if (['Kepala Puskesmas', 'Pengelola Program', 'Admin'].includes(currentUser.role)) {
-    setTimeout(() => showTTLoginPopup(), 900);
-  }
-}
-
-async function showTTLoginPopup() {
-  try {
-    let hasTT = false;
-    if (currentUser.role === 'Admin') {
-      // Admin: cek tanda tangan Kepala Sub Bagian Perencanaan
-      const pejabat = await API.getPejabat().catch(() => []);
-      const kasubag = (pejabat || []).find(p => p.jabatan === 'Kepala Sub Bagian Perencanaan');
-      hasTT = !!(kasubag?.tanda_tangan);
-    } else {
-      // Kepala Puskesmas & Pengelola Program: cek dari sesi login
-      hasTT = !!(currentUser.tandaTangan);
-    }
-
-    if (hasTT) return;
-
-    const popup = document.createElement('div');
-    popup.id = 'ttLoginPopup';
-    popup.style.cssText = `position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9998;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px);animation:fadeIn 0.3s ease`;
-    popup.innerHTML = `
-      <div style="background:white;border-radius:16px;width:460px;max-width:calc(100vw - 32px);overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,0.3);animation:authIn 0.3s ease">
-        <div style="background:linear-gradient(135deg,#f59e0b,#f97316);padding:20px 24px;color:white">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
-            <span class="material-icons" style="font-size:24px">draw</span>
-            <span style="font-size:13px;font-weight:600;opacity:0.85;text-transform:uppercase;letter-spacing:0.5px">Tanda Tangan Diperlukan</span>
-          </div>
-          <div style="font-size:18px;font-weight:800">⚠️ Anda belum upload tanda tangan</div>
-        </div>
-        <div style="padding:20px 24px;display:flex;flex-direction:column;gap:12px">
-          <p style="font-size:13.5px;color:#374151;line-height:1.6;margin:0">
-            Tanda tangan digunakan untuk <strong>laporan resmi</strong> dan wajib ada sebelum Anda dapat melakukan verifikasi usulan.
-          </p>
-          <div style="background:#fef3c7;border:1.5px solid #f59e0b;border-radius:10px;padding:14px 16px">
-            <div style="font-size:12px;font-weight:700;color:#92400e;margin-bottom:8px;display:flex;align-items:center;gap:6px">
-              <span class="material-icons" style="font-size:15px">info</span>Cara Upload
-            </div>
-            <div style="font-size:12.5px;color:#78350f;line-height:1.7">
-              ${currentUser.role === 'Admin'
-                ? 'Buka menu <strong>Master Data</strong> → tab <strong>Pengaturan</strong> → bagian <strong>Kepala Sub Bagian Perencanaan</strong>'
-                : 'Klik <strong>Avatar Profil</strong> di pojok kanan atas → <strong>Edit Profil & Tanda Tangan</strong>'}
-            </div>
-          </div>
-          <div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px;padding:14px 16px">
-            <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:8px;display:flex;align-items:center;gap:6px">
-              <span class="material-icons" style="font-size:15px">check_circle</span>Spesifikasi File
-            </div>
-            <div style="font-size:12px;color:#64748b;line-height:1.9">
-              📄 Format: PNG / JPG<br>
-              🎨 Latar belakang: <strong>putih bersih</strong><br>
-              🖊️ Tinta: <strong>hitam atau biru tua</strong><br>
-              📐 Resolusi: <strong>jelas & tidak buram</strong>
-            </div>
-          </div>
-          <div style="display:flex;gap:10px;margin-top:4px">
-            <button onclick="document.getElementById('ttLoginPopup').remove()" style="flex:1;height:44px;background:#f1f5f9;border:none;border-radius:10px;color:#64748b;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">
-              Nanti
-            </button>
-            <button onclick="document.getElementById('ttLoginPopup').remove();${currentUser.role === 'Admin' ? "setTimeout(()=>loadPage('master-data'),200);setTimeout(()=>switchMasterTab('pengaturan'),400)" : "setTimeout(()=>openEditProfil(),200)"}" style="flex:2;height:44px;background:linear-gradient(135deg,#f59e0b,#f97316);border:none;border-radius:10px;color:white;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">
-              <span class="material-icons" style="font-size:18px">upload</span>Upload Sekarang
-            </button>
-          </div>
-        </div>
-      </div>`;
-    document.body.appendChild(popup);
-  } catch(e) {}
 }
 
 async function showPeriodeLoginPopup() {
   try {
     const periodeList = await API.get('periode');
-    const aktifList = (periodeList || []).filter(p => p.isAktifToday);
-    if (!aktifList.length) return;
-
-    const periodeCards = aktifList.map(aktif => `
-      <div style="border:1.5px solid #0d9488;border-radius:10px;overflow:hidden;margin-bottom:10px">
-        <div style="background:linear-gradient(135deg,#0d9488,#06b6d4);padding:10px 14px;color:white;font-weight:800;font-size:15px">
-          📅 ${aktif.namaBulan} ${aktif.tahun}
-        </div>
-        <div style="padding:10px 14px;display:flex;flex-direction:column;gap:8px;background:#f0fdf9">
-          <div style="display:flex;align-items:center;gap:8px;font-size:13px">
-            <span class="material-icons" style="color:#0d9488;font-size:16px">login</span>
-            <span style="color:#64748b;font-weight:600">Dibuka:</span>
-            <span style="font-weight:700;color:#0f172a">${formatDate(aktif.tanggalMulai)} pukul ${aktif.jamMulai||'08:00'} WITA</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px;font-size:13px">
-            <span class="material-icons" style="color:#ef4444;font-size:16px">logout</span>
-            <span style="color:#64748b;font-weight:600">Ditutup:</span>
-            <span style="font-weight:700;color:#0f172a">${formatDate(aktif.tanggalSelesai)} pukul ${aktif.jamSelesai||'17:00'} WITA</span>
-          </div>
-          ${aktif.notifOperator ? `<div style="display:flex;align-items:flex-start;gap:8px;padding:8px 10px;background:#fffbeb;border-radius:7px;border:1px solid #fcd34d;font-size:12.5px;color:#0f172a;line-height:1.5"><span style="flex-shrink:0">📢</span>${aktif.notifOperator}</div>` : ''}
-        </div>
-      </div>`).join('');
+    const aktif = (periodeList || []).find(p => p.isAktifToday);
+    if (!aktif) return;
 
     // Buat popup element
     const popup = document.createElement('div');
@@ -308,17 +131,37 @@ async function showPeriodeLoginPopup() {
       backdrop-filter:blur(3px);animation:fadeIn 0.3s ease
     `;
     popup.innerHTML = `
-      <div style="background:white;border-radius:16px;width:460px;max-width:calc(100vw - 32px);overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,0.3);animation:authIn 0.3s ease;max-height:calc(100vh - 64px);display:flex;flex-direction:column">
-        <div style="background:linear-gradient(135deg,#0d9488,#06b6d4);padding:20px 24px;color:white;flex-shrink:0">
+      <div style="background:white;border-radius:16px;width:440px;max-width:calc(100vw - 32px);overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,0.3);animation:authIn 0.3s ease">
+        <div style="background:linear-gradient(135deg,#0d9488,#06b6d4);padding:20px 24px;color:white">
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
             <span class="material-icons" style="font-size:24px">notifications_active</span>
             <span style="font-size:13px;font-weight:600;opacity:0.85;text-transform:uppercase;letter-spacing:0.5px">Informasi Periode Input</span>
           </div>
-          <div style="font-size:18px;font-weight:800">${aktifList.length} Periode Sedang Aktif</div>
+          <div style="font-size:20px;font-weight:800">${aktif.namaBulan} ${aktif.tahun}</div>
         </div>
-        <div style="padding:20px 24px;overflow-y:auto;flex:1">
-          ${periodeCards}
-          <button onclick="document.getElementById('periodePopup').remove()" style="width:100%;margin-top:6px;height:44px;background:linear-gradient(135deg,#0d9488,#06b6d4);border:none;border-radius:10px;color:white;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">
+        <div style="padding:20px 24px">
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#f0fdf9;border-radius:8px;border:1px solid #0d9488">
+              <span class="material-icons" style="color:#0d9488;font-size:20px">login</span>
+              <div>
+                <div style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase">Dibuka</div>
+                <div style="font-size:14px;font-weight:700;color:#0f172a">${formatDate(aktif.tanggalMulai)} pukul ${aktif.jamMulai||'08:00'} WITA</div>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#fef2f2;border-radius:8px;border:1px solid #fca5a5">
+              <span class="material-icons" style="color:#ef4444;font-size:20px">logout</span>
+              <div>
+                <div style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase">Ditutup</div>
+                <div style="font-size:14px;font-weight:700;color:#0f172a">${formatDate(aktif.tanggalSelesai)} pukul ${aktif.jamSelesai||'17:00'} WITA</div>
+              </div>
+            </div>
+            ${aktif.notifOperator ? `
+            <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 14px;background:#fffbeb;border-radius:8px;border:1px solid #fcd34d">
+              <span style="font-size:18px;flex-shrink:0;margin-top:1px">📢</span>
+              <div style="font-size:13px;color:#0f172a;line-height:1.5">${aktif.notifOperator}</div>
+            </div>` : ''}
+          </div>
+          <button onclick="document.getElementById('periodePopup').remove()" style="width:100%;margin-top:16px;height:44px;background:linear-gradient(135deg,#0d9488,#06b6d4);border:none;border-radius:10px;color:white;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">
             <span style="display:flex;align-items:center;justify-content:center;gap:6px"><span class="material-icons" style="font-size:18px">check</span>Mengerti, Tutup</span>
           </button>
         </div>
@@ -339,8 +182,11 @@ function buildSidebar() {
         { id: 'laporan', icon: 'bar_chart', label: 'Laporan' }
       ]},
       { label: 'Kelola Master', items: [
-        { id: 'master-data', icon: 'tune', label: 'Master Data' },
+        { id: 'users', icon: 'group', label: 'Kelola User' },
+        { id: 'jabatan', icon: 'badge', label: 'Kelola Jabatan' },
+        { id: 'pkm', icon: 'local_hospital', label: 'Kelola Puskesmas' },
         { id: 'target-tahunan', icon: 'track_changes', label: 'Target Tahunan' },
+        { id: 'indikator', icon: 'monitor_heart', label: 'Kelola Indikator' },
         { id: 'periode', icon: 'event_available', label: 'Periode Input' }
       ]},
       { label: 'Manajemen', items: [
@@ -395,51 +241,16 @@ function setActiveNav(page) {
   if (el) el.classList.add('active');
 }
 
-// ============== TOPBAR DROPDOWN ==============
-function toggleTopbarDropdown() {
-  const dd = document.getElementById('topbarDropdown');
-  if (!dd) return;
-  dd.classList.toggle('open');
-}
-function closeTopbarDropdown() {
-  const dd = document.getElementById('topbarDropdown');
-  if (dd) dd.classList.remove('open');
-}
-// Tutup dropdown kalau klik di luar
-document.addEventListener('click', e => {
-  const wrap = document.getElementById('topbarAvatarWrap');
-  if (wrap && !wrap.contains(e.target)) closeTopbarDropdown();
-});
-
-
-// ============== THEME (DARK/LIGHT MODE) ==============
-function initTheme() {
-  const saved = localStorage.getItem('spm_theme') || 'light';
-  applyTheme(saved);
-}
-function applyTheme(theme) {
-  document.documentElement.setAttribute('data-theme', theme);
-  localStorage.setItem('spm_theme', theme);
-  const btn = document.getElementById('themeToggleBtn');
-  if (btn) btn.textContent = theme === 'dark' ? '🌞' : '🌙';
-}
-function toggleTheme() {
-  const current = document.documentElement.getAttribute('data-theme') || 'light';
-  applyTheme(current === 'dark' ? 'light' : 'dark');
-}
-
 // ============== ROUTING ==============
 const PAGE_TITLES = {
   dashboard: 'Dashboard', verifikasi: 'Verifikasi', laporan: 'Laporan',
-  users: 'Master Data', jabatan: 'Master Data', pkm: 'Master Data',
-  'master-data': 'Master Data',
+  users: 'Kelola User', jabatan: 'Kelola Jabatan', pkm: 'Kelola Puskesmas',
   indikator: 'Kelola Indikator', periode: 'Periode Input', input: 'Input Usulan',
   'kelola-usulan': 'Kelola Usulan', 'target-tahunan': 'Target Tahunan'
 };
 
 function loadPage(page) {
   currentPage = page;
-  sessionStorage.setItem('spm_lastPage', page);
   closeSidebar();
   setActiveNav(page);
   document.getElementById('topbarTitle').textContent = PAGE_TITLES[page] || page;
@@ -451,12 +262,11 @@ function loadPage(page) {
     verifikasi: renderVerifikasi,
     laporan: renderLaporan,
     'kelola-usulan': renderKelolaUsulan,
-    jabatan: () => renderMasterData('jabatan'),
-    users: () => renderMasterData('users'),
-    pkm: () => renderMasterData('pkm'),
-    'master-data': () => renderMasterData('users'),
+    jabatan: renderJabatan,
+    users: renderUsers,
+    pkm: renderPKM,
     'target-tahunan': renderTargetTahunan,
-    indikator: () => renderMasterData('indikator'),
+    indikator: renderIndikator,
     periode: renderPeriode,
     input: renderInput
   };
@@ -484,7 +294,7 @@ function closeSidebar() {
 function yearOptions(selected, maxYear) {
   // Gunakan maxYear dari parameter, atau ambil dari state global, minimal CURRENT_YEAR+3
   const max = maxYear || window._maxPeriodeTahun || Math.max(CURRENT_YEAR + 3, 2030);
-  const min = window._minPeriodeTahun || Math.min(2024, CURRENT_YEAR);
+  const min = Math.min(2024, CURRENT_YEAR);
   let html = '';
   for (let y = min; y <= max; y++) {
     html += `<option value="${y}" ${y == selected ? 'selected' : ''}>${y}</option>`;
@@ -552,8 +362,6 @@ function renderAdminDashboard(el, d) {
 
 function renderOperatorDashboard(el, d) {
   const p = d.periodeAktif;
-  const periodeAktifList = d.periodeAktifList || (p ? [p] : []);
-  // Build banner untuk semua periode aktif
 
   // Banner periode + notifikasi
   let periodeBanner = '';
@@ -579,7 +387,7 @@ function renderOperatorDashboard(el, d) {
       ${statCard('blue','assignment','Total Usulan Saya', d.totalUsulan)}
       ${statCard('green','check_circle','Selesai/Disetujui', d.disetujui)}
       ${statCard('orange','pending','Dalam Proses', d.menunggu)}
-      ${statCard('cyan','event_available','Periode Aktif', periodeAktifList.length > 0 ? periodeAktifList.length + ' Periode' : '-')}
+      ${statCard('cyan','event_available','Periode Aktif', p ? `${p.nama_bulan} ${p.tahun}` : '-')}
     </div>
     ${periodeBanner}
     <div class="card">
@@ -636,10 +444,7 @@ function renderProgramDashboard(el, d) {
       <div class="card-body" style="padding:0" id="pendingTable"></div>
     </div>`;
 
-  API.getUsulan({
-    email_program: currentUser.email,
-    status_program: 'Menunggu Pengelola Program,Menunggu Admin,Selesai,Ditolak'
-  }).then(rows => {
+  API.getUsulan({ status: 'Menunggu Pengelola Program' }).then(rows => {
     document.getElementById('pendingTable').innerHTML = renderUsulanTable(rows, 'program');
   }).catch(() => {});
 }
@@ -711,12 +516,7 @@ function renderUsulanTable(rows, role) {
 
     // Sudah verifikasi: untuk Kepala Puskesmas cek statusKapus, untuk Program cek myVerifStatus, untuk Admin cek Selesai
     const sudahVerifKepala = role === 'kepala-puskesmas' && (u.statusKapus === 'Selesai' || u.statusKapus === 'Ditolak');
-    const sudahVerifProgram = role === 'program' && (
-      u.sudahVerif === true ||
-      (u.myVerifStatus === 'Selesai' || u.myVerifStatus === 'Ditolak') ||
-      u.statusGlobal === 'Menunggu Admin' ||
-      u.statusGlobal === 'Selesai'
-    );
+    const sudahVerifProgram = role === 'program' && u.sudahVerif === true && (u.myVerifStatus === 'Selesai' || u.myVerifStatus === 'Ditolak');
     const sudahVerifAdmin = role === 'admin' && u.statusGlobal === 'Selesai';
     const sudahVerif = sudahVerifKepala || sudahVerifProgram || sudahVerifAdmin;
 
@@ -731,31 +531,23 @@ function renderUsulanTable(rows, role) {
     }
 
     // Tombol download PDF
-    // Laporan final: statusGlobal === 'Selesai'; Laporan sementara: kapus sudah approve, semua role
-    const kapusApproved = u.statusKapus === 'Selesai';
-    const isFinished = u.statusGlobal === 'Selesai';
-    const canDlSementara = kapusApproved && !isFinished; // semua role bisa download laporan sementara
-
-    const pdfBtn = isFinished
-      ? `<button class="btn-icon" onclick="downloadLaporanPDF('${u.idUsulan}')" title="Download Laporan PDF" style="background:transparent;border:none;color:#64748b"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10"/><path d="m8 9 4 4 4-4"/><path d="M4 17c0 2.2 1.8 4 4 4h8c2.2 0 4-1.8 4-4"/></svg></button>`
-      : canDlSementara
-        ? `<button class="btn-icon" onclick="downloadLaporanSementara('${u.idUsulan}')" title="Download Laporan Sementara (Kapus)" style="background:transparent;border:none;color:#f59e0b"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10"/><path d="m8 9 4 4 4-4"/><path d="M4 17c0 2.2 1.8 4 4 4h8c2.2 0 4-1.8 4-4"/></svg></button>`
+    const svgDl = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10"/><path d="m8 9 4 4 4-4"/><path d="M4 17c0 2.2 1.8 4 4 4h8c2.2 0 4-1.8 4-4"/></svg>`;
+    const pdfBtn = u.statusGlobal === 'Selesai'
+      ? `<button class="btn-icon" onclick="downloadLaporanPDF('${u.idUsulan}')" title="Download Laporan PDF" style="background:transparent;border:none;color:#64748b">${svgDl}</button>`
+      : (u.statusKapus === 'Selesai' || ['Menunggu Pengelola Program','Menunggu Admin'].includes(u.statusGlobal))
+        ? `<button class="btn-icon" onclick="downloadLaporanSementara('${u.idUsulan}')" title="Download Laporan Sementara" style="background:transparent;border:none;color:#f59e0b">${svgDl}</button>`
         : '';
+    const logBtn = `<button class="btn-icon" onclick="openLogAktivitas('${u.idUsulan}')" title="Riwayat Aktivitas" style="background:transparent;border:none;color:#64748b"><span class="material-icons" style="font-size:18px">history</span></button>`;
 
     if (['kepala-puskesmas', 'program', 'admin'].includes(role)) {
-      return viewBtn + pdfBtn + verifBtn + `<button class="btn-icon" onclick="openLogAktivitas('${u.idUsulan}')" title="Riwayat Aktivitas" style="background:transparent;border:none;color:#64748b"><span class="material-icons" style="font-size:18px">history</span></button>`;
+      return viewBtn + pdfBtn + verifBtn + logBtn;
     }
-    return viewBtn + `<button class="btn-icon" onclick="openLogAktivitas('${u.idUsulan}')" title="Riwayat Aktivitas" style="background:transparent;border:none;color:#64748b"><span class="material-icons" style="font-size:18px">history</span></button>`;
+    return viewBtn + pdfBtn + logBtn;
   };
-
-  const tableKey = 'usulan_' + role;
-  const page = _pgState[tableKey] || 1;
-  const ps = PAGINATION_SIZE;
-  const sliced = rows.slice((page-1)*ps, page*ps);
 
   return `<div class="table-container"><table>
     <thead><tr><th>ID Usulan</th><th>Puskesmas</th><th>Periode</th><th>Status</th><th>Dibuat</th><th>Aksi</th></tr></thead>
-    <tbody>${sliced.map(u => `<tr>
+    <tbody>${rows.map(u => `<tr>
       <td><span style="font-family:'JetBrains Mono',monospace;font-weight:600;font-size:12px;">${u.idUsulan}</span></td>
       <td>${u.namaPKM || u.kodePKM}</td>
       <td>${u.namaBulan || ''} ${u.tahun}</td>
@@ -763,16 +555,8 @@ function renderUsulanTable(rows, role) {
       <td style="font-size:12px;color:var(--text-light)">${formatDateTime(u.createdAt)}</td>
       <td>${actionBtn(u)}</td>
     </tr>`).join('')}</tbody>
-  </table></div>
-  <div id="pg-${tableKey}"></div>
-  <script>renderPagination('pg-${tableKey}', ${rows.length}, ${page}, ${ps}, 'pgUsulan_${role}');<\/script>`;
+  </table></div>`;
 }
-
-// Pagination handler untuk usulan per role
-function pgUsulan_operator(p) { _pgState['usulan_operator'] = p; document.getElementById('verifTable') ? loadVerifData(window._lastVerifStatus||'semua') : renderInput(); }
-function pgUsulan_program(p) { _pgState['usulan_program'] = p; loadVerifData(window._lastVerifStatus||'semua'); }
-function pgUsulan_admin(p) { _pgState['usulan_admin'] = p; loadVerifData(window._lastVerifStatus||'semua'); }
-function pgUsulan_kepala_puskesmas(p) { _pgState['usulan_kepala-puskesmas'] = p; loadVerifData(window._lastVerifStatus||'semua'); }
 
 // ============== INPUT USULAN (OPERATOR) ==============
 async function renderInput() {
@@ -894,16 +678,12 @@ async function loadMyUsulan() {
           </td>
           <td>
             <button class="btn-icon view" onclick="viewDetail('${u.idUsulan}')"><span class="material-icons">visibility</span></button>
-            ${u.statusGlobal === 'Selesai'
-              ? `<button class="btn-icon" onclick="downloadLaporanPDF('${u.idUsulan}')" title="Download Laporan PDF" style="background:transparent;border:none;color:#64748b"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10"/><path d="m8 9 4 4 4-4"/><path d="M4 17c0 2.2 1.8 4 4 4h8c2.2 0 4-1.8 4-4"/></svg></button>`
-              : u.statusKapus === 'Selesai'
-                ? `<button class="btn-icon" onclick="downloadLaporanSementara('${u.idUsulan}')" title="Download Laporan Sementara" style="background:transparent;border:none;color:#f59e0b"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10"/><path d="m8 9 4 4 4-4"/><path d="M4 17c0 2.2 1.8 4 4 4h8c2.2 0 4-1.8 4-4"/></svg></button>`
-                : ''}
+            ${u.statusGlobal === 'Selesai' ? `<button class="btn-icon" onclick="downloadLaporanPDF('${u.idUsulan}')" title="Download Laporan PDF" style="background:transparent;border:none;color:#64748b"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10"/><path d="m8 9 4 4 4-4"/><path d="M4 17c0 2.2 1.8 4 4 4h8c2.2 0 4-1.8 4-4"/></svg></button>` : (u.statusKapus === 'Selesai' || ['Menunggu Pengelola Program','Menunggu Admin'].includes(u.statusGlobal)) ? `<button class="btn-icon" onclick="downloadLaporanSementara('${u.idUsulan}')" title="Download Laporan Sementara" style="background:transparent;border:none;color:#f59e0b"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10"/><path d="m8 9 4 4 4-4"/><path d="M4 17c0 2.2 1.8 4 4 4h8c2.2 0 4-1.8 4-4"/></svg></button>` : ''}
+            <button class="btn-icon" onclick="openLogAktivitas('${u.idUsulan}')" title="Riwayat Aktivitas" style="background:transparent;border:none;color:#64748b"><span class="material-icons" style="font-size:18px">history</span></button>
             ${u.statusGlobal === 'Draft' ? `<button class="btn-icon edit" onclick="openIndikatorModal('${u.idUsulan}')"><span class="material-icons">edit</span></button>` : ''}
             ${u.statusGlobal === 'Draft' ? `<button class="btn-icon del" onclick="deleteUsulan('${u.idUsulan}')"><span class="material-icons">delete</span></button>` : ''}
             ${u.statusGlobal === 'Ditolak' ? `<button class="btn btn-warning btn-sm" onclick="openIndikatorModal('${u.idUsulan}')" style="background:#f59e0b;color:white;border-color:#f59e0b"><span class="material-icons" style="font-size:14px">restart_alt</span> Perbaiki & Ajukan Ulang</button>` : ''}
-            
-            <button class="btn-icon" onclick="openLogAktivitas('${u.idUsulan}')" title="Riwayat Aktivitas" style="background:transparent;border:none;color:#64748b"><span class="material-icons" style="font-size:18px">history</span></button>
+            ${(u.statusGlobal || '').startsWith('Menunggu') ? `<button class="btn-icon" title="Sedang diproses" style="background:#d1fae5;color:#065f46;border:1.5px solid #0d9488;cursor:default" disabled><span class="material-icons">check_circle</span></button>` : ''}
           </td>
         </tr>`).join('')}
         </tbody>
@@ -964,30 +744,10 @@ async function createUsulan() {
 }
 
 async function deleteUsulan(idUsulan) {
-  showConfirm({ title: 'Hapus Usulan', message: `Hapus usulan ${idUsulan}? Semua data dukung di Cloudinary juga akan dihapus.`,
-    type: 'danger',
+  showConfirm({ title: 'Hapus Usulan', message: `Hapus usulan ${idUsulan}? Data tidak dapat dikembalikan.`,
     onConfirm: async () => {
       try {
-        // Ambil semua file terkait usulan ini dulu
-        const inds = await API.getIndikatorUsulan(idUsulan).catch(() => []);
-        // Hapus dari DB
         await API.del('usulan', { idUsulan });
-        // Hapus semua file dari Cloudinary (background, silent)
-        for (const ind of (inds || [])) {
-          if (!ind.linkFile) continue;
-          try {
-            const links = JSON.parse(ind.linkFile);
-            for (const f of (Array.isArray(links) ? links : [])) {
-              if (f?.id) {
-                fetch('/.netlify/functions/delete-file', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ publicId: f.id })
-                }).catch(() => {});
-              }
-            }
-          } catch(e) {}
-        }
         toast('Usulan berhasil dihapus');
         loadMyUsulan();
       } catch (e) { toast(e.message, 'error'); }
@@ -1089,16 +849,12 @@ async function openIndikatorModal(idUsulan) {
         <td><span style="font-family:'JetBrains Mono';font-weight:700">${ind.no}</span></td>
         <td style="max-width:220px;font-size:12.5px">${ind.nama}</td>
         <input type="hidden" id="bobot-${ind.no}" value="${ind.bobot}">
-        <td>${isLocked ? `<span>${ind.target}</span>` : `<input type="number" id="t-${ind.no}" value="${Math.round(ind.target||0)}" step="1"
+        <td>${isLocked ? `<span>${ind.target}</span>` : `<input type="number" id="t-${ind.no}" value="${ind.target}" min="0" step="0.01"
             style="width:72px;border:1.5px solid var(--border);border-radius:6px;padding:3px 6px;font-size:13px"
             onchange="saveIndikator(${ind.no})" oninput="previewSPM(${ind.no})">`}</td>
-        <td>${isLocked ? `<span>${ind.capaian}</span>` : `<div style="display:flex;flex-direction:column;gap:2px">
-            <input type="number" id="c-${ind.no}" value="${Math.round(ind.capaian||0)}" step="1"
-              style="width:72px;border:1.5px solid var(--border);border-radius:6px;padding:3px 6px;font-size:13px"
-              onchange="saveIndikator(${ind.no})" oninput="validateRealisasi(${ind.no})">
-            <span id="c-warn-${ind.no}" style="display:none;font-size:10px;color:#ef4444;font-weight:600;white-space:nowrap">Nilai tidak bisa melebihi target</span>
-          </div>`}</td>
-        <td id="cap-${ind.no}" style="text-align:center;font-weight:700;font-size:13px;color:${ind.target>0?(ind.capaian/ind.target*100)>=100?'#16a34a':'#0d9488':'#64748b'}">${ind.target > 0 ? (ind.capaian / ind.target * 100).toFixed(1) + '%' : '-'}</td>
+        <td>${isLocked ? `<span>${ind.capaian}</span>` : `<input type="number" id="c-${ind.no}" value="${ind.capaian}" min="0" step="0.01"
+            style="width:72px;border:1.5px solid var(--border);border-radius:6px;padding:3px 6px;font-size:13px"
+            onchange="saveIndikator(${ind.no})" oninput="previewSPM(${ind.no})">`}</td>
         <td style="min-width:100px;text-align:center">
           ${(() => {
             // Parse link_file: bisa string URL tunggal atau JSON array
@@ -1133,13 +889,10 @@ async function openIndikatorModal(idUsulan) {
                 </div>`
               : '';
             return `<div id="uploadCell-${ind.no}" style="display:flex;align-items:center;gap:6px;justify-content:center">
-                <div style="display:flex;flex-direction:column;align-items:flex-start;gap:2px">
-                  <label id="uploadLabel-${ind.no}" style="${btnStyle}">
-                    ${hasFiles ? 'Uploaded' : 'Upload'}
-                    <input type="file" multiple accept="application/pdf,image/png,image/jpeg,image/jpg,image/gif,image/webp" style="display:none" onchange="uploadBuktiIndikator(event,${ind.no},'${idUsulan}','${detail.kodePKM}',${detail.tahun},${detail.bulan},'${namaBulan}')">
-                  </label>
-                  <span style="font-size:9px;color:#94a3b8;padding-left:2px">PDF / Gambar</span>
-                </div>
+                <label id="uploadLabel-${ind.no}" style="${btnStyle}">
+                  ${hasFiles ? 'Uploaded' : 'Upload'}
+                  <input type="file" multiple style="display:none" onchange="uploadBuktiIndikator(event,${ind.no},'${idUsulan}','${detail.kodePKM}',${detail.tahun},${detail.bulan},'${namaBulan}')">
+                </label>
                 <div id="fileControls-${ind.no}">${fileControlHtml}</div>
               </div>`;
           })()}
@@ -1160,15 +913,6 @@ const SVG_TRASH = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" s
 async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, tahun, bulan, namaBulan) {
   const files = Array.from(event.target.files);
   if (!files.length) return;
-
-  // Validasi tipe file: hanya PDF dan image
-  const allowed = ['application/pdf','image/png','image/jpeg','image/jpg','image/gif','image/webp'];
-  const invalid = files.filter(f => !allowed.includes(f.type));
-  if (invalid.length) {
-    toast(`Format tidak didukung: ${invalid.map(f=>f.name).join(', ')}. Hanya PDF dan gambar (PNG/JPG) yang diperbolehkan.`, 'error');
-    event.target.value = '';
-    return;
-  }
 
   const cell = document.getElementById(`uploadCell-${noIndikator}`);
   const statusDiv = document.createElement('div');
@@ -1229,8 +973,8 @@ async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, tahun
     const allLinks = [...existingLinks, ...uploadedLinks];
     const linkToSave = JSON.stringify(allLinks);
 
-    const tVal = parseInt(document.getElementById(`t-${noIndikator}`)?.value) || 0;
-    const cVal = parseInt(document.getElementById(`c-${noIndikator}`)?.value) || 0;
+    const tVal = parseFloat(document.getElementById(`t-${noIndikator}`)?.value) || 0;
+    const cVal = parseFloat(document.getElementById(`c-${noIndikator}`)?.value) || 0;
     await API.updateIndikatorUsulan({ idUsulan, noIndikator, target: tVal, capaian: cVal, linkFile: linkToSave });
 
     statusDiv.remove();
@@ -1293,24 +1037,10 @@ async function hapusBukti(idUsulan, noIndikator, fileIndex) {
           } catch { links = [{ id: null, url: existingInd.linkFile, name: 'File' }]; }
         }
 
-        // Hapus dari Cloudinary dulu (silent — jangan block UI jika gagal)
-        const fileToDelete = links[fileIndex];
-        if (fileToDelete?.id) {
-          try {
-            await fetch('/.netlify/functions/delete-file', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ publicId: fileToDelete.id })
-            });
-          } catch(e) {
-            console.warn('Cloudinary delete gagal (diabaikan):', e.message);
-          }
-        }
-
         links.splice(fileIndex, 1);
         const newLinkFile = links.length ? JSON.stringify(links) : '';
-        const tVal = parseInt(document.getElementById(`t-${noIndikator}`)?.value) || 0;
-        const cVal = parseInt(document.getElementById(`c-${noIndikator}`)?.value) || 0;
+        const tVal = parseFloat(document.getElementById(`t-${noIndikator}`)?.value) || 0;
+        const cVal = parseFloat(document.getElementById(`c-${noIndikator}`)?.value) || 0;
         await API.updateIndikatorUsulan({ idUsulan, noIndikator, target: tVal, capaian: cVal, linkFile: newLinkFile });
 
         toast('File berhasil dihapus', 'success');
@@ -1395,11 +1125,9 @@ function _renderBuktiModal() {
   const isOffice = ['doc','docx','xls','xlsx','ppt','pptx'].includes(ext);
   const total = links.length;
 
-  // Semua akses file lewat sign-url proxy (Cloudinary raw tidak bisa diakses publik langsung)
+  // URL dengan ekstensi (Cloudinary raw tidak auto-append)
   const urlWithExt = (f.url && ext && !f.url.split('/').pop().split('?')[0].includes('.'))
     ? f.url + '.' + ext : f.url;
-  const proxyUrl = `/api/sign-url?url=${encodeURIComponent(urlWithExt)}&name=${encodeURIComponent(fileName)}&mode=preview`;
-  const downloadProxyUrl = `/api/sign-url?url=${encodeURIComponent(urlWithExt)}&name=${encodeURIComponent(fileName)}&mode=download`;
 
   let modal = document.getElementById('previewBuktiModal');
   if (!modal) {
@@ -1433,7 +1161,7 @@ function _renderBuktiModal() {
       <div class="modal-body flex-col" style="position:relative;background:#0f172a;">
         <div id="${previewId}" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;">
           ${isImage
-            ? `<img src="${proxyUrl}" style="max-width:100%;max-height:100%;object-fit:contain;padding:16px">`
+            ? `<img src="${urlWithExt}" style="max-width:100%;max-height:100%;object-fit:contain;padding:16px">`
             : `<div style="color:#94a3b8;font-size:13px;display:flex;align-items:center;gap:8px">
                 <span class="material-icons" style="animation:spin 1s linear infinite">refresh</span> Memuat...
               </div>`
@@ -1455,7 +1183,7 @@ function _renderBuktiModal() {
       const el = document.getElementById(previewId);
       if (!el) return;
       try {
-        const res = await fetch(proxyUrl);
+        const res = await fetch(urlWithExt);
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const blob = await res.blob();
         const blobUrl = URL.createObjectURL(blob);
@@ -1463,15 +1191,7 @@ function _renderBuktiModal() {
         if (isPDF) {
           el.innerHTML = `<iframe src="${blobUrl}" style="width:100%;height:100%;border:none"></iframe>`;
         } else if (isOffice) {
-          el.innerHTML = `<div style="text-align:center;color:white;padding:60px 40px">
-            <div style="font-size:64px;margin-bottom:16px">${fileIcon}</div>
-            <div style="font-size:15px;font-weight:600;color:white;margin-bottom:8px">${fileName}</div>
-            <div style="font-size:12px;color:#64748b;margin-bottom:28px">${ext.toUpperCase()} • Tidak dapat dipreview di browser</div>
-            <a href="${blobUrl}" download="${fileName}" style="background:#0d9488;color:white;padding:10px 28px;border-radius:8px;text-decoration:none;font-weight:600;font-size:13px;display:inline-flex;align-items:center;gap:8px">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              Download ${ext.toUpperCase()}
-            </a>
-          </div>`;
+          el.innerHTML = `<iframe src="https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(urlWithExt)}" style="width:100%;height:100%;border:none"></iframe>`;
         } else {
           el.innerHTML = `<div style="text-align:center;color:white;padding:40px">
             <div style="font-size:64px;margin-bottom:16px">${fileIcon}</div>
@@ -1514,10 +1234,10 @@ async function downloadBukti(idx) {
   const ext2 = dotIdx2 > -1 ? fileName.substring(dotIdx2 + 1).toLowerCase() : '';
   if (ext2 && !fileName.toLowerCase().endsWith('.' + ext2)) fileName += '.' + ext2;
 
-  // Semua akses lewat sign-url proxy
-  const urlHasExt2 = f.url.split('/').pop().split('?')[0].includes('.');
-  const urlWithExt2 = (!urlHasExt2 && ext2) ? f.url + '.' + ext2 : f.url;
-  const fetchUrl = `/api/sign-url?url=${encodeURIComponent(urlWithExt2)}&name=${encodeURIComponent(fileName)}&mode=download`;
+  // URL langsung — raw+public bisa diakses, append ekstensi kalau belum ada
+  let fetchUrl = f.url.replace(/\.pdf\.pdf($|\?)/, '.pdf$1');
+  const urlHasExt = fetchUrl.split('/').pop().split('?')[0].includes('.');
+  if (!urlHasExt && ext2) fetchUrl = fetchUrl + '.' + ext2;
 
   try {
     const res = await fetch(fetchUrl);
@@ -1535,8 +1255,8 @@ async function downloadBukti(idx) {
 }
 
 async function saveIndikator(noIndikator) {
-  const target  = parseInt(document.getElementById(`t-${noIndikator}`)?.value) || 0;
-  const capaian = parseInt(document.getElementById(`c-${noIndikator}`)?.value) || 0;
+  const target  = parseFloat(document.getElementById(`t-${noIndikator}`)?.value) || 0;
+  const capaian = parseFloat(document.getElementById(`c-${noIndikator}`)?.value) || 0;
 
   try {
     // Kirim update — tanpa linkFile supaya link yg sudah ada tidak terhapus
@@ -1635,27 +1355,6 @@ async function doSubmitUsulan(forceSubmit) {
 }
 
 // Preview SPM saat oninput (kalkulasi di client tanpa hit server)
-function validateRealisasi(no) {
-  const tEl = document.getElementById(`t-${no}`);
-  const cEl = document.getElementById(`c-${no}`);
-  // Paksa nilai jadi integer
-  if (tEl && tEl.value.includes('.')) tEl.value = Math.round(parseFloat(tEl.value));
-  if (cEl && cEl.value.includes('.')) cEl.value = Math.round(parseFloat(cEl.value));
-  const warnEl = document.getElementById(`c-warn-${no}`);
-  if (!cEl || !tEl) return;
-  const c = parseInt(cEl.value) || 0;
-  const t = parseInt(tEl.value) || 0;
-  if (t > 0 && c > t) {
-    cEl.value = t;
-    cEl.style.borderColor = '#ef4444';
-    if (warnEl) { warnEl.style.display = 'block'; clearTimeout(warnEl._hideT); warnEl._hideT = setTimeout(() => { warnEl.style.display = 'none'; }, 2000); }
-  } else {
-    cEl.style.borderColor = '';
-    if (warnEl) warnEl.style.display = 'none';
-  }
-  previewSPM(no);
-}
-
 function previewSPM(changedNo) {
   // Hitung SPM preview dari semua input yang ada di DOM
   const rows = document.querySelectorAll('[id^="t-"]');
@@ -1671,23 +1370,11 @@ function previewSPM(changedNo) {
     const rasio = t > 0 ? Math.min(c / t, 1) : 0;
     totalNilai += bobot * rasio;
     totalBobot += bobot;
-
-    // Update kolom Capaian (%) realtime
-    const capEl = document.getElementById(`cap-${no}`);
-    if (capEl) {
-      if (t > 0) {
-        const pct = fmtPct(c / t * 100);
-        capEl.textContent = pct;
-        capEl.style.color = pct === '100%' || parseFloat(pct) >= 100 ? '#16a34a' : '#0d9488';
-      } else {
-        capEl.textContent = '-';
-        capEl.style.color = '#64748b';
-      }
-    }
   });
   const round2 = n => Math.round((n + Number.EPSILON) * 100) / 100;
   const indeksKinerja = totalBobot > 0 ? round2(totalNilai / totalBobot) : 0;
   const indeksSPM = round2(indeksKinerja * 0.33);
+  // Update display dengan tanda bahwa ini preview (belum tersimpan)
   const topEl = document.getElementById('indModalSPMTop');
   const botEl = document.getElementById('indModalSPM');
   if (topEl) topEl.textContent = indeksSPM.toFixed(2);
@@ -1707,11 +1394,9 @@ async function viewDetail(idUsulan) {
         <div style="font-weight:700;font-size:13px;margin-bottom:8px;display:flex;align-items:center;gap:6px">
           <span class="material-icons" style="font-size:16px;color:var(--primary)">groups</span>
           Progress Verifikasi Pengelola Program
-          &nbsp;
-          <span style="display:inline-flex;align-items:center;gap:3px;font-size:12px;font-weight:700;color:#16a34a;background:#dcfce7;padding:2px 8px;border-radius:20px">✅ ${vp.filter(v=>v.status==='Selesai').length} selesai</span>
-          ${vp.filter(v=>v.status==='Ditolak').length ? `<span style="display:inline-flex;align-items:center;gap:3px;font-size:12px;font-weight:700;color:#dc2626;background:#fee2e2;padding:2px 8px;border-radius:20px">❌ ${vp.filter(v=>v.status==='Ditolak').length} menolak</span>` : ''}
-          <span style="display:inline-flex;align-items:center;gap:3px;font-size:12px;font-weight:700;color:#d97706;background:#fef3c7;padding:2px 8px;border-radius:20px">⏳ ${vp.filter(v=>v.status==='Menunggu').length} menunggu</span>
-          <span style="display:inline-flex;align-items:center;gap:3px;font-size:12px;font-weight:600;color:#64748b;background:#f1f5f9;padding:2px 8px;border-radius:20px">📁 Total: ${vp.length}</span>
+          (${vp.filter(v=>v.status==='Selesai').length} selesai
+          ${vp.filter(v=>v.status==='Ditolak').length ? `· <span style="color:#ef4444">${vp.filter(v=>v.status==='Ditolak').length} menolak</span>` : ''}
+          · ${vp.filter(v=>v.status==='Menunggu').length} menunggu dari ${vp.length})
         </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px">
           ${vp.map(v => {
@@ -1790,10 +1475,10 @@ async function viewDetail(idUsulan) {
       <div style="font-weight:700;font-size:13.5px;margin-bottom:8px">Detail Indikator</div>
       <div class="table-container">
         <table>
-          <thead><tr><th>No</th><th>Indikator</th><th>Target</th><th>Realisasi</th><th style="text-align:center">Capaian (%)</th><th>Data Dukung</th></tr></thead>
+          <thead><tr><th>No</th><th>Indikator</th><th>Target</th><th>Capaian</th><th>Data Dukung</th></tr></thead>
           <tbody>${inds.map(i => `<tr>
             <td>${i.no}</td><td style="max-width:220px;font-size:12.5px">${i.nama}</td>
-            <td>${i.target}</td><td>${i.capaian}</td><td style="text-align:center;font-weight:600;color:${i.target>0?(i.capaian/i.target*100)>=100?'#16a34a':'#0d9488':'#64748b'}">${i.target > 0 ? fmtPct(i.capaian/i.target*100) : '-'}</td>
+            <td>${i.target}</td><td>${i.capaian}</td>
             
             <td>${i.linkFile ? (() => { try { const ls = JSON.parse(i.linkFile); const arr = Array.isArray(ls) ? ls.map(f=>typeof f==='string'?{id:null,url:f,name:'File'}:f) : [{id:null,url:i.linkFile,name:'File'}]; window[`_buktiLinks_${i.no}`]={links:arr,idUsulan:i.idUsulan||''}; return `<button onclick="openBuktiModal(${i.no},0)" style="background:none;border:none;cursor:pointer;color:#0d9488;display:inline-flex;align-items:center;gap:3px;font-size:12px;padding:2px 6px;border-radius:5px" onmouseover="this.style.background='rgba(13,148,136,0.08)'" onmouseout="this.style.background='none'"><span class="material-icons" style="font-size:14px">visibility</span></button>`; } catch(e){ return `<a href="${i.linkFile}" target="_blank" style="color:#0d9488"><span class="material-icons" style="font-size:13px">visibility</span></a>`; } })() : '-'}</td>
           </tr>`).join('')}</tbody>
@@ -1835,15 +1520,8 @@ async function downloadLaporanPDF(idUsulan) {
     const res = await fetch(`/api/laporan-pdf?id=${idUsulan}`);
     if (!res.ok) { toast('Gagal memuat laporan', 'error'); return; }
     const html = await res.text();
-    // Inject auto-print saat halaman load
-    const printHtml = html.replace('</head>', `<script>window.onload=function(){setTimeout(function(){window.print();},800);};<\/script></head>`);
-    const blob = new Blob([printHtml], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    window.open(url, '_blank');
-    setTimeout(() => URL.revokeObjectURL(url), 30000);
-  } catch(e) {
-    toast('Gagal: ' + e.message, 'error');
-  }
+    await generateAndDownloadPDF(html, `Laporan-SPM-${idUsulan}.pdf`);
+  } catch(e) { toast('Gagal: ' + e.message, 'error'); }
 }
 
 async function downloadLaporanSementara(idUsulan) {
@@ -1852,14 +1530,8 @@ async function downloadLaporanSementara(idUsulan) {
     const res = await fetch(`/api/laporan-pdf?id=${idUsulan}&mode=sementara`);
     if (!res.ok) { toast('Gagal memuat laporan', 'error'); return; }
     const html = await res.text();
-    const printHtml = html.replace('</head>', `<script>window.onload=function(){setTimeout(function(){window.print();},800);};<\/script></head>`);
-    const blob = new Blob([printHtml], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    window.open(url, '_blank');
-    setTimeout(() => URL.revokeObjectURL(url), 30000);
-  } catch(e) {
-    toast('Gagal: ' + e.message, 'error');
-  }
+    await generateAndDownloadPDF(html, `Laporan-Sementara-${idUsulan}.pdf`);
+  } catch(e) { toast('Gagal: ' + e.message, 'error'); }
 }
 
 async function generateAndDownloadPDF(htmlContent, fileName) {
@@ -1879,17 +1551,14 @@ async function generateAndDownloadPDF(htmlContent, fileName) {
       document.head.appendChild(s);
     });
   }
-
   const parser = new DOMParser();
   const doc = parser.parseFromString(htmlContent, 'text/html');
 
   const wrapper = document.createElement('div');
   wrapper.style.cssText = 'position:absolute;top:-99999px;left:0;width:794px;background:white;z-index:-9999';
-
   const container = document.createElement('div');
   container.style.cssText = 'width:794px;background:white;font-family:Arial,sans-serif;color:#1e293b;font-size:12px';
   container.innerHTML = doc.body.innerHTML;
-
   wrapper.appendChild(container);
   document.body.appendChild(wrapper);
 
@@ -1907,19 +1576,15 @@ async function generateAndDownloadPDF(htmlContent, fileName) {
     jsPDF:       { unit: 'mm', format: 'a4', orientation: 'portrait' },
     pagebreak:   { mode: ['css', 'legacy'], before: '.page-break' }
   };
-
   try {
     await html2pdf().set(opt).from(container).save();
     toast('PDF berhasil didownload ✓', 'success');
   } catch(err) {
     toast('Gagal generate PDF: ' + err.message, 'error');
-    console.error('html2pdf error:', err);
   } finally {
     wrapper.remove();
   }
 }
-
-// ============== LOG AKTIVITAS ==============
 async function openLogAktivitas(idUsulan) {
   // Buat modal dahulu dengan loading state
   let modal = document.getElementById('logAktivitasModal');
@@ -2162,13 +1827,6 @@ async function openVerifikasi(idUsulan) {
   verifCurrentUsulan = idUsulan;
   document.getElementById('verifModalId').textContent = idUsulan;
   document.getElementById('verifCatatan').value = '';
-
-  // Reset tombol ke state default sebelum load data
-  const btnA = document.getElementById('btnApprove');
-  const btnR = document.getElementById('btnReject');
-  if (btnA) { btnA.disabled = true; btnA.style.background = ''; btnA.innerHTML = '<span class="material-icons">check_circle</span> Setujui'; }
-  if (btnR) { btnR.disabled = true; btnR.style.background = ''; btnR.style.borderColor = ''; btnR.innerHTML = '<span class="material-icons">cancel</span> Tolak'; }
-
   showModal('verifikasiModal');
   document.getElementById('verifIndikatorBody').innerHTML = `<tr><td colspan="4"><div class="empty-state" style="padding:20px"><p>Memuat...</p></div></td></tr>`;
 
@@ -2188,24 +1846,7 @@ async function openVerifikasi(idUsulan) {
       </div>
       <div class="detail-item"><label>Indeks Beban Kerja</label><span style="font-family:'JetBrains Mono'">${parseFloat(detail.indeksBeban||0).toFixed(2)}</span></div>
       <div class="detail-item"><label>Indeks Kesulitan Wilayah</label><span style="font-family:'JetBrains Mono'">${parseFloat(detail.indeksKesulitan||0).toFixed(2)}</span></div>
-      <div class="detail-item"><label>Indeks SPM</label><span style="font-family:'JetBrains Mono';font-size:16px;font-weight:800;color:var(--primary)">${parseFloat(detail.indeksSPM).toFixed(2)}</span></div>
-      ${detail.alasanTolak ? `
-        <div class="detail-item" style="grid-column:1/-1">
-          <label>Alasan Penolakan (${detail.ditolakOleh||'Verifikator'})</label>
-          <span style="color:#dc2626;font-style:italic">"${detail.alasanTolak}"</span>
-        </div>` : ''}
-      ${(detail.verifikasiProgram||[]).some(v=>v.sanggahan) && currentUser.role === 'Admin' ? `
-        <div class="detail-item" style="grid-column:1/-1">
-          <label>Sanggahan Pengelola Program</label>
-          <div style="display:flex;flex-direction:column;gap:6px">
-            ${(detail.verifikasiProgram||[]).filter(v=>v.sanggahan).map(v=>`
-              <div style="background:#fef9c3;border:1.5px solid #f59e0b;border-radius:8px;padding:8px 12px;font-size:12.5px">
-                <span style="font-weight:700;color:#92400e">${v.nama_program||v.email_program}</span>
-                <span style="color:#78350f;margin-left:8px;font-style:italic">"${v.sanggahan}"</span>
-              </div>`).join('')}
-          </div>
-        </div>` : ''}
-      `;
+      <div class="detail-item"><label>Indeks SPM</label><span style="font-family:'JetBrains Mono';font-size:16px;font-weight:800;color:var(--primary)">${parseFloat(detail.indeksSPM).toFixed(2)}</span></div>`;
 
     // Filter inds for program role
     let displayInds = inds;
@@ -2230,7 +1871,7 @@ async function openVerifikasi(idUsulan) {
       }
       return `<tr>
         <td>${i.no}</td><td style="font-size:13px">${i.nama}</td>
-        <td>${i.target}</td><td>${i.capaian}</td><td style="text-align:center;font-weight:600;color:${i.target>0?(i.capaian/i.target*100)>=100?'#16a34a':'#0d9488':'#64748b'}">${i.target > 0 ? fmtPct(i.capaian/i.target*100) : '-'}</td>
+        <td>${i.target}</td><td>${i.capaian}</td>
         <td>${buktiHtml}</td>
       </tr>`;
     }).join('');
@@ -2249,85 +1890,23 @@ async function openVerifikasi(idUsulan) {
     // Adjust buttons based on status & sudah verifikasi
     const canApprove = !sudahVerifUser && (
       (currentUser.role === 'Kepala Puskesmas' && detail.statusGlobal === 'Menunggu Kepala Puskesmas') ||
-      (currentUser.role === 'Pengelola Program' && (
-        detail.statusGlobal === 'Menunggu Pengelola Program' ||
-        (detail.statusGlobal === 'Ditolak' && detail.ditolakOleh === 'Admin') // sanggah atau tolak ke operator
-      )) ||
-      (currentUser.role === 'Admin' && (detail.statusGlobal === 'Menunggu Admin'))
+      (currentUser.role === 'Pengelola Program' && (detail.statusGlobal === 'Menunggu Pengelola Program' || detail.statusGlobal === 'Ditolak')) ||
+      (currentUser.role === 'Admin' && detail.statusGlobal === 'Menunggu Admin')
     );
-
-    // Cek tanda tangan — blok verifikasi jika belum ada
-    // Prioritas: currentUser (sudah diupdate saat saveEditProfil), fallback allUsers untuk Admin
-    const myUserData = allUsers?.find(u => u.email?.toLowerCase() === currentUser.email?.toLowerCase());
-    const hasTandaTangan = !!(currentUser.tandaTangan || myUserData?.tandaTangan);
-    const needsTandaTangan = ['Kepala Puskesmas', 'Pengelola Program', 'Admin'].includes(currentUser.role);
 
     const btnApprove = document.getElementById('btnApprove');
     const btnReject = document.getElementById('btnReject');
 
-    // Kunci tombol jika belum ada TT — tidak perlu cek canApprove
-    if (needsTandaTangan && !hasTandaTangan) {
+    if (sudahVerifUser) {
+      // User sudah verifikasi — tombol hijau
+      btnApprove.style.background = '#16a34a';
+      btnApprove.innerHTML = '<span class="material-icons">check_circle</span> Sudah Diverifikasi';
       btnApprove.disabled = true;
       btnReject.disabled = true;
-      // Tampilkan peringatan hanya jika giliran user ini verifikasi
-      if (canApprove) {
-        if (!document.getElementById('ttWarning')) {
-          const w = document.createElement('div');
-          w.id = 'ttWarning';
-          w.style.cssText = 'background:#fef3c7;border:1.5px solid #f59e0b;border-radius:10px;padding:12px 14px;font-size:12px;color:#92400e;margin-top:12px';
-          w.innerHTML = `
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-weight:700;font-size:13px">
-              <span class="material-icons" style="font-size:17px;color:#f59e0b">warning</span>
-              ⚠️ Anda belum mengupload tanda tangan
-            </div>
-            <div style="margin-bottom:8px">
-              Upload melalui menu: <span style="background:#fff8e1;padding:1px 6px;border-radius:4px;font-weight:700">Avatar Profil › Edit Profil & Tanda Tangan</span>
-            </div>
-            <div style="font-size:11.5px;color:#a16207;line-height:1.7;border-top:1px solid rgba(245,158,11,0.25);padding-top:8px;margin-top:4px">
-              <b>Spesifikasi file:</b> PNG / JPG · Latar belakang putih · Resolusi jelas · Tinta hitam/biru tua
-            </div>
-            <div style="margin-top:8px">
-              <a href="#" onclick="event.preventDefault();window._reopenVerifikasiId='${idUsulan}';closeModal('verifikasiModal');setTimeout(()=>openEditProfil(),200)" style="display:inline-flex;align-items:center;gap:5px;background:#f59e0b;color:white;padding:6px 14px;border-radius:7px;font-weight:700;font-size:12px;text-decoration:none">
-                <span class="material-icons" style="font-size:14px">upload</span>Upload Sekarang
-              </a>
-            </div>`;
-          document.getElementById('verifCatatan')?.closest('.modal-body')?.appendChild(w);
-        }
-      }
     } else {
-      document.getElementById('ttWarning')?.remove();
-      if (sudahVerifUser) {
-        btnApprove.style.background = '#16a34a';
-        btnApprove.innerHTML = '<span class="material-icons">check_circle</span> Sudah Diverifikasi';
-        btnApprove.disabled = true;
-        btnReject.disabled = true;
-        const btnSanggahDone = document.getElementById('btnSanggah');
-        if (btnSanggahDone) btnSanggahDone.style.display = 'none';
-      } else {
-        btnApprove.disabled = !canApprove;
-        btnReject.disabled = !canApprove;
-
-        // Tombol Sanggah/Respond: untuk Pengelola Program saat ada penolakan indikator miliknya
-        const btnSanggah = document.getElementById('btnSanggah');
-        if (btnSanggah) {
-          const myVP = (detail.verifikasiProgram||[]).find(v =>
-            v.email_program?.toLowerCase() === currentUser.email?.toLowerCase()
-          );
-          const myAkses = myVP ? (myVP.indikator_akses||'').toString().split(',').map(x=>parseInt(x.trim())).filter(Boolean) : [];
-          const adaPenolakanSaya = (detail.penolakanIndikator||[]).some(pi =>
-            pi.aksi === null && myAkses.includes(pi.no_indikator)
-          );
-          const showSanggah = currentUser.role === 'Pengelola Program' &&
-            detail.statusGlobal === 'Ditolak' &&
-            detail.ditolakOleh === 'Admin' &&
-            adaPenolakanSaya;
-          btnSanggah.style.display = showSanggah ? '' : 'none';
-          btnSanggah.disabled = false;
-          if (showSanggah) btnSanggah.textContent = '';
-          if (showSanggah) btnSanggah.innerHTML = '<span class="material-icons">gavel</span> Respon Penolakan';
-        }
-      }
-    } // end else hasTandaTangan
+      btnApprove.disabled = !canApprove;
+      btnReject.disabled = !canApprove;
+    }
   } catch (e) { toast(e.message, 'error'); }
 }
 
@@ -2363,243 +1942,31 @@ async function doApprove() {
 }
 
 async function doReject() {
-  const role = currentUser.role;
-
-  if (role === 'Admin') {
-    // Admin: buka modal pilih indikator
-    await openAdminTolakModal(verifCurrentUsulan);
-    return;
-  }
-
-  // Kepala Puskesmas
-  const catatan = document.getElementById('verifCatatan').value.trim();
+  const catatan = document.getElementById('verifCatatan').value;
   if (!catatan) return toast('Isi alasan penolakan', 'warning');
   setLoading(true);
   try {
-    await API.rejectUsulan({ idUsulan: verifCurrentUsulan, email: currentUser.email, role, alasan: catatan });
+    await API.rejectUsulan({ idUsulan: verifCurrentUsulan, email: currentUser.email, role: currentUser.role, alasan: catatan });
     toast('Usulan ditolak', 'warning');
+
+    // Tombol jadi hijau (sudah diverifikasi = tolak) dan disabled
     const btnApprove = document.getElementById('btnApprove');
-    const btnReject  = document.getElementById('btnReject');
-    if (btnApprove) btnApprove.disabled = true;
-    if (btnReject) { btnReject.style.background = '#dc2626'; btnReject.innerHTML = '<span class="material-icons">cancel</span> Ditolak'; btnReject.disabled = true; }
-    setTimeout(() => { closeModal('verifikasiModal'); renderVerifikasi(); }, 800);
+    const btnReject = document.getElementById('btnReject');
+    if (btnApprove) { btnApprove.disabled = true; }
+    if (btnReject) {
+      btnReject.style.background = '#16a34a';
+      btnReject.style.borderColor = '#16a34a';
+      btnReject.innerHTML = '<span class="material-icons">check_circle</span> Sudah Diverifikasi';
+      btnReject.disabled = true;
+    }
+
+    setTimeout(() => {
+      closeModal('verifikasiModal');
+      renderVerifikasi();
+    }, 800);
   } catch (e) { toast(e.message, 'error'); }
   finally { setLoading(false); }
 }
-
-async function openAdminTolakModal(idUsulan) {
-  const inds = await API.getIndikatorUsulan(idUsulan).catch(() => []);
-  if (!inds.length) return toast('Gagal memuat indikator', 'error');
-
-  let modal = document.getElementById('adminTolakModal');
-  if (!modal) {
-    modal = document.createElement('div');
-    modal.id = 'adminTolakModal';
-    modal.className = 'modal';
-    modal.style.zIndex = '4000';
-    modal.addEventListener('click', e => { if (e.target === modal) closeModal('adminTolakModal'); });
-    document.body.appendChild(modal);
-  }
-
-  const rowsHtml = inds.map(i => {
-    return `<div style="border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;transition:border-color .15s" id="atRow-${i.no}">
-      <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer">
-        <input type="checkbox" id="atChk-${i.no}" onchange="toggleAdminTolakRow(${i.no})"
-          style="width:16px;height:16px;margin-top:2px;accent-color:#ef4444;flex-shrink:0">
-        <span>
-          <span style="font-weight:700;font-size:13px">Indikator ${i.no}</span>
-          <span style="font-size:12.5px;color:var(--text-light);margin-left:6px">${i.nama||''}</span>
-        </span>
-      </label>
-      <div id="atAlasan-${i.no}" style="display:none;margin-top:10px">
-        <textarea class="form-control" id="atText-${i.no}" rows="2"
-          placeholder="Alasan penolakan indikator ${i.no}..."
-          style="font-size:12.5px;resize:vertical"></textarea>
-      </div>
-    </div>`;
-  }).join('');
-
-  modal.innerHTML = `
-    <div class="modal-card" style="max-width:680px;width:100%">
-      <div class="modal-header">
-        <span class="material-icons" style="color:#ef4444">cancel</span>
-        <h3>Tolak Usulan — Pilih Indikator Bermasalah</h3>
-        <button class="btn-icon" onclick="closeModal('adminTolakModal')"><span class="material-icons">close</span></button>
-      </div>
-      <div class="modal-body" style="padding:16px 20px;max-height:60vh;overflow-y:auto">
-        <p style="font-size:13px;color:var(--text-light);margin-bottom:14px">Centang indikator yang bermasalah dan isi alasan per indikator.</p>
-        <div style="display:flex;flex-direction:column;gap:10px" id="adminTolakList">${rowsHtml}</div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-secondary" onclick="closeModal('adminTolakModal')">Batal</button>
-        <button class="btn btn-danger" onclick="submitAdminTolak('${idUsulan}')">
-          <span class="material-icons">send</span>Kirim Penolakan
-        </button>
-      </div>
-    </div>`;
-  showModal('adminTolakModal');
-}
-
-function toggleAdminTolakRow(no) {
-  const chk = document.getElementById(`atChk-${no}`);
-  const row = document.getElementById(`atRow-${no}`);
-  const alasan = document.getElementById(`atAlasan-${no}`);
-  if (chk.checked) {
-    row.style.borderColor = '#ef4444';
-    alasan.style.display = 'block';
-    document.getElementById(`atText-${no}`)?.focus();
-  } else {
-    row.style.borderColor = '';
-    alasan.style.display = 'none';
-  }
-}
-
-async function submitAdminTolak(idUsulan) {
-  const checkboxes = document.querySelectorAll('#adminTolakList input[type=checkbox]:checked');
-  if (!checkboxes.length) return toast('Pilih minimal 1 indikator yang bermasalah', 'warning');
-
-  const indikatorList = [];
-  for (const chk of checkboxes) {
-    const no = parseInt(chk.id.replace('atChk-', ''));
-    const alasan = document.getElementById(`atText-${no}`)?.value.trim();
-    if (!alasan) return toast(`Isi alasan untuk indikator ${no}`, 'warning');
-    indikatorList.push({ noIndikator: no, alasan });
-  }
-
-  setLoading(true);
-  try {
-    await API.rejectUsulan({ idUsulan, email: currentUser.email, role: 'Admin', alasan: '-', indikatorList });
-    toast(`Usulan ditolak — ${indikatorList.length} indikator dikembalikan ke Pengelola Program`, 'warning');
-    closeModal('adminTolakModal');
-    setTimeout(() => { closeModal('verifikasiModal'); renderVerifikasi(); }, 600);
-  } catch (e) { toast(e.message, 'error'); }
-  finally { setLoading(false); }
-}
-
-
-async function doSanggah() {
-  // Untuk Pengelola Program — buka modal respond per indikator
-  await openProgramRespondModal(verifCurrentUsulan);
-}
-
-async function openProgramRespondModal(idUsulan) {
-  const [detail, inds] = await Promise.all([
-    API.getDetailUsulan(idUsulan),
-    API.getIndikatorUsulan(idUsulan)
-  ]).catch(() => [null, []]);
-  if (!detail) return toast('Gagal memuat data', 'error');
-
-  const myVP = (detail.verifikasiProgram||[]).find(v =>
-    v.email_program?.toLowerCase() === currentUser.email?.toLowerCase()
-  );
-  const myAkses = myVP ? (myVP.indikator_akses||'').toString().split(',').map(x=>parseInt(x.trim())).filter(Boolean) : [];
-  const penolakanSaya = (detail.penolakanIndikator||[]).filter(pi =>
-    pi.aksi === null && myAkses.includes(pi.no_indikator)
-  );
-  if (!penolakanSaya.length) return toast('Tidak ada indikator yang perlu direspons', 'info');
-
-  let modal = document.getElementById('programRespondModal');
-  if (!modal) {
-    modal = document.createElement('div');
-    modal.id = 'programRespondModal';
-    modal.className = 'modal';
-    modal.style.zIndex = '4000';
-    modal.addEventListener('click', e => { if (e.target === modal) closeModal('programRespondModal'); });
-    document.body.appendChild(modal);
-  }
-
-  const rowsHtml = penolakanSaya.map(pi => {
-    const ind = inds.find(i => i.no === pi.no_indikator) || {};
-    return `<div style="border:1.5px solid var(--border);border-radius:10px;padding:14px 16px" id="prRow-${pi.no_indikator}">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px">
-        <div>
-          <span style="font-weight:700;font-size:13.5px">Indikator ${pi.no_indikator}</span>
-          <span style="font-size:12px;color:var(--text-light);margin-left:6px">${ind.nama||''}</span>
-        </div>
-        <div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:6px;padding:4px 10px;font-size:11.5px;color:#dc2626;max-width:250px">
-          Admin: "${pi.alasan}"
-        </div>
-      </div>
-      <div style="display:flex;gap:8px;margin-bottom:10px">
-        <button onclick="setProgramAksi(${pi.no_indikator},'sanggah')" id="prBtnSanggah-${pi.no_indikator}"
-          class="btn btn-sm" style="background:#f59e0b;color:white;border:2px solid #f59e0b;flex:1">
-          <span class="material-icons" style="font-size:14px">gavel</span> Sanggah (Data Sudah Benar)
-        </button>
-        <button onclick="setProgramAksi(${pi.no_indikator},'tolak')" id="prBtnTolak-${pi.no_indikator}"
-          class="btn btn-sm btn-danger" style="border:2px solid #ef4444;flex:1">
-          <span class="material-icons" style="font-size:14px">cancel</span> Tolak (Kembalikan Operator)
-        </button>
-      </div>
-      <textarea class="form-control" id="prText-${pi.no_indikator}" rows="2"
-        placeholder="Catatan / alasan..."
-        style="font-size:12.5px;resize:vertical"></textarea>
-      <input type="hidden" id="prAksi-${pi.no_indikator}" value="">
-    </div>`;
-  }).join('');
-
-  modal.innerHTML = `
-    <div class="modal-card" style="max-width:700px;width:100%">
-      <div class="modal-header">
-        <span class="material-icons" style="color:#f59e0b">gavel</span>
-        <h3>Respon Penolakan Admin — Per Indikator</h3>
-        <button class="btn-icon" onclick="closeModal('programRespondModal')"><span class="material-icons">close</span></button>
-      </div>
-      <div class="modal-body" style="padding:16px 20px;max-height:65vh;overflow-y:auto">
-        <div style="background:#fef3c7;border:1.5px solid #f59e0b;border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:12.5px;color:#92400e">
-          <b>Sanggah</b> = data sudah benar, kirim alasan ke Admin. &nbsp;|&nbsp;
-          <b>Tolak</b> = akui ada kesalahan, kembalikan ke Operator untuk perbaikan.
-        </div>
-        <div style="display:flex;flex-direction:column;gap:14px">${rowsHtml}</div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-secondary" onclick="closeModal('programRespondModal')">Batal</button>
-        <button class="btn btn-primary" onclick="submitProgramRespond('${idUsulan}')">
-          <span class="material-icons">send</span>Kirim Respon
-        </button>
-      </div>
-    </div>`;
-  showModal('programRespondModal');
-}
-
-function setProgramAksi(no, aksi) {
-  document.getElementById(`prAksi-${no}`).value = aksi;
-  const row = document.getElementById(`prRow-${no}`);
-  const btnS = document.getElementById(`prBtnSanggah-${no}`);
-  const btnT = document.getElementById(`prBtnTolak-${no}`);
-  if (aksi === 'sanggah') {
-    row.style.borderColor = '#f59e0b';
-    btnS.style.opacity = '1'; btnS.style.fontWeight = '800';
-    btnT.style.opacity = '0.4'; btnT.style.fontWeight = '';
-  } else {
-    row.style.borderColor = '#ef4444';
-    btnT.style.opacity = '1'; btnT.style.fontWeight = '800';
-    btnS.style.opacity = '0.4'; btnS.style.fontWeight = '';
-  }
-}
-
-async function submitProgramRespond(idUsulan) {
-  const hiddenInputs = document.querySelectorAll('[id^="prAksi-"]');
-  const responList = [];
-  for (const el of hiddenInputs) {
-    const no = parseInt(el.id.replace('prAksi-', ''));
-    const aksi = el.value;
-    if (!aksi) return toast(`Pilih Sanggah atau Tolak untuk indikator ${no}`, 'warning');
-    const catatan = document.getElementById(`prText-${no}`)?.value.trim();
-    if (!catatan) return toast(`Isi catatan untuk indikator ${no}`, 'warning');
-    responList.push({ noIndikator: no, aksi, catatan });
-  }
-
-  setLoading(true);
-  try {
-    const res = await API.respondPenolakan({ idUsulan, email: currentUser.email, responList });
-    toast(res.message || 'Respon tersimpan', 'success');
-    closeModal('programRespondModal');
-    setTimeout(() => { closeModal('verifikasiModal'); renderVerifikasi(); }, 600);
-  } catch (e) { toast(e.message, 'error'); }
-  finally { setLoading(false); }
-}
-
-
 
 // ===== UBAH PASSWORD =====
 function showChangePassword() {
@@ -2639,6 +2006,7 @@ async function renderLaporan() {
   document.getElementById('mainContent').innerHTML = `
     <div class="page-header">
       <h1><span class="material-icons">bar_chart</span>Laporan</h1>
+      <button class="btn btn-primary" onclick="exportLaporan()"><span class="material-icons">download</span>Export CSV</button>
     </div>
     <div class="card">
       <div class="card-header-bar"><span class="card-title"><span class="material-icons">filter_list</span>Filter</span></div>
@@ -2703,13 +2071,10 @@ async function loadLaporan() {
       return;
     }
 
-    const _lpg = _pgState['laporan'] || 1;
-    const _lps = PAGINATION_SIZE;
-    const _lsliced = result.data.slice((_lpg-1)*_lps, _lpg*_lps);
     document.getElementById('lapTable').innerHTML = `
       <div class="table-container"><table>
         <thead><tr><th>No</th><th>Puskesmas</th><th>Periode</th><th>Tgl Dibuat</th><th>Indeks SPM</th><th>Status</th><th>Aksi</th></tr></thead>
-        <tbody>${_lsliced.map(r => `<tr>
+        <tbody>${result.data.map(r => `<tr>
           <td>${r.no}</td>
           <td>${r.namaPKM}</td>
           <td>${r.namaBulan} ${r.tahun}</td>
@@ -2718,17 +2083,12 @@ async function loadLaporan() {
           <td>${statusBadge(r.statusGlobal)}</td>
           <td style="white-space:nowrap">
             <button class="btn-icon view" onclick="viewDetail('${r.idUsulan}')" title="Detail"><span class="material-icons">visibility</span></button>
-            ${r.statusGlobal === 'Selesai'
-              ? `<button class="btn-icon" onclick="downloadLaporanPDF('${r.idUsulan}')" title="Download Laporan" style="background:transparent;border:none;color:#64748b"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10"/><path d="m8 9 4 4 4-4"/><path d="M4 17c0 2.2 1.8 4 4 4h8c2.2 0 4-1.8 4-4"/></svg></button>`
-              : r.statusKapus === 'Selesai'
-                ? `<button class="btn-icon" onclick="downloadLaporanSementara('${r.idUsulan}')" title="Download Laporan Sementara" style="background:transparent;border:none;color:#f59e0b"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10"/><path d="m8 9 4 4 4-4"/><path d="M4 17c0 2.2 1.8 4 4 4h8c2.2 0 4-1.8 4-4"/></svg></button>`
-              : ''}
+            ${r.statusGlobal === 'Selesai' ? `<button class="btn-icon" onclick="downloadLaporanPDF('${r.idUsulan}')" title="Download Laporan PDF" style="background:transparent;border:none;color:#64748b"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10"/><path d="m8 9 4 4 4-4"/><path d="M4 17c0 2.2 1.8 4 4 4h8c2.2 0 4-1.8 4-4"/></svg></button>` : (r.statusKapus === 'Selesai' || ['Menunggu Pengelola Program','Menunggu Admin'].includes(r.statusGlobal)) ? `<button class="btn-icon" onclick="downloadLaporanSementara('${r.idUsulan}')" title="Download Laporan Sementara" style="background:transparent;border:none;color:#f59e0b"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10"/><path d="m8 9 4 4 4-4"/><path d="M4 17c0 2.2 1.8 4 4 4h8c2.2 0 4-1.8 4-4"/></svg></button>` : ''}
             <button class="btn-icon" onclick="openLogAktivitas('${r.idUsulan}')" title="Riwayat Aktivitas" style="background:transparent;border:none;color:#64748b"><span class="material-icons" style="font-size:18px">history</span></button>
           </td>
         </tr>`).join('')}
         </tbody>
-      </table></div><div id="pg-laporan"></div>`;
-    renderPagination('pg-laporan', result.data.length, _lpg, _lps, 'pgLaporan');
+      </table></div>`;
   } catch (e) { toast(e.message, 'error'); }
 }
 
@@ -2747,448 +2107,10 @@ function exportLaporan() {
   toast('File CSV berhasil diunduh');
 }
 
-function pgLaporan(p) { _pgState['laporan'] = p; loadLaporan(); }
-
 // ============== ADMIN - USERS ==============
 let allUsers = [], allPKMList = [], allIndList = [];
 
-// ─── MASTER DATA (Tab: User | Jabatan | Puskesmas | Indikator) ───────────────
-let _masterTab = 'users';
-async function renderMasterData(tab = 'users') {
-  _masterTab = tab;
-  document.getElementById('mainContent').innerHTML = `
-    <!-- TAB BAR -->
-    <div style="display:flex;align-items:center;gap:0;border-bottom:2px solid var(--border);margin-bottom:20px;overflow-x:auto">
-      <div style="display:flex;flex:1;gap:0;overflow-x:auto">
-      ${[
-        { id:'users',      icon:'group',         label:'Kelola User'      },
-        { id:'jabatan',    icon:'badge',          label:'Kelola Jabatan'   },
-        { id:'pkm',        icon:'local_hospital', label:'Kelola Puskesmas' },
-        { id:'indikator',  icon:'monitor_heart',  label:'Kelola Indikator' },
-        { id:'pengaturan', icon:'settings',       label:'Pengaturan'       },
-      ].map(t => `
-        <button onclick="switchMasterTab('${t.id}')" id="masterTab-${t.id}"
-          style="display:inline-flex;align-items:center;gap:6px;padding:10px 20px;border:none;background:none;cursor:pointer;font-size:13.5px;font-weight:600;white-space:nowrap;border-bottom:3px solid ${tab===t.id?'var(--primary)':'transparent'};color:${tab===t.id?'var(--primary)':'var(--text-light)'};margin-bottom:-2px;transition:all .15s">
-          <span class="material-icons" style="font-size:17px">${t.icon}</span>${t.label}
-        </button>`).join('')}
-      </div>
-      <div id="masterDataActionBtn" style="flex-shrink:0;padding:0 4px"></div>
-    </div>
-    <!-- TAB CONTENT -->
-    <div id="masterTabContent"></div>
-    <!-- MODALS CONTAINER -->
-    <div id="masterModals"></div>`;
-
-  await _loadMasterTab(tab);
-}
-
-async function switchMasterTab(tab) {
-  _masterTab = tab;
-  // Update tab style — termasuk 'pengaturan'
-  ['users','jabatan','pkm','indikator','pengaturan'].forEach(t => {
-    const btn = document.getElementById(`masterTab-${t}`);
-    if (!btn) return;
-    btn.style.borderBottomColor = t === tab ? 'var(--primary)' : 'transparent';
-    btn.style.color = t === tab ? 'var(--primary)' : 'var(--text-light)';
-  });
-  await _loadMasterTab(tab);
-}
-
-async function _loadMasterTab(tab) {
-  const content = document.getElementById('masterTabContent');
-  const modals  = document.getElementById('masterModals');
-  const actionBtn = document.getElementById('masterDataActionBtn');
-  if (!content) return;
-  content.innerHTML = `<div class="empty-state" style="padding:32px"><p>Memuat...</p></div>`;
-
-  if (tab === 'users') {
-    actionBtn.innerHTML = `<button class="btn btn-primary" onclick="openUserModal()"><span class="material-icons">person_add</span>Tambah User</button>`;
-    content.innerHTML = `
-      <div class="card">
-        <div class="card-body" style="padding:12px 16px">
-          <div class="search-row">
-            <div class="search-input-wrap"><span class="material-icons search-icon">search</span><input class="search-input" id="searchUser" placeholder="Cari email atau nama..." oninput="filterUsers()"></div>
-            <select class="form-control" id="filterRole" onchange="filterUsers()" style="width:160px">
-              <option value="">Semua Role</option>
-              <option>Admin</option><option>Operator</option><option>Kepala Puskesmas</option>
-              <option>Pengelola Program</option><option>Kadis</option>
-            </select>
-          </div>
-        </div>
-        <div style="padding:0" id="usersTable"></div>
-      </div>`;
-    modals.innerHTML = `
-      <div class="modal fullscreen" id="userModal">
-        <div class="modal-card">
-          <div class="modal-header">
-            <span class="material-icons">person</span>
-            <h3 id="userModalTitle">Tambah User</h3>
-            <button class="btn-icon" onclick="closeModal('userModal')"><span class="material-icons">close</span></button>
-          </div>
-          <div class="modal-body" style="padding:24px;background:#f8fafc">
-            <div style="height:100%;display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start">
-              <div style="display:flex;flex-direction:column;gap:16px">
-                <div class="card" style="padding:24px">
-                  <div style="font-weight:700;font-size:13px;color:var(--primary);margin-bottom:16px;display:flex;align-items:center;gap:6px">
-                    <span class="material-icons" style="font-size:16px">badge</span>Informasi Akun
-                  </div>
-                  <div class="form-group"><label>Email *</label>
-                    <input class="form-control" id="uEmail" type="email" placeholder="user@example.com" oninput="validateEmailInput(this)">
-                    <div id="emailValidMsg" style="font-size:11.5px;margin-top:4px;display:none"></div>
-                  </div>
-                  <div class="form-group"><label>Nama *</label>
-                    <input class="form-control" id="uNama" placeholder="Nama Lengkap">
-                  </div>
-                  <div class="form-group"><label>NIP</label>
-                    <input class="form-control" id="uNIP" placeholder="Nomor Induk Pegawai (opsional)" maxlength="30">
-                  </div>
-                  <div class="form-group"><label>Role *</label>
-                    <select class="form-control" id="uRole" onchange="checkUserRole()">
-                      <option>Admin</option><option>Operator</option><option>Kepala Puskesmas</option>
-                      <option>Pengelola Program</option><option>Kadis</option>
-                    </select>
-                  </div>
-                  <div id="pkmContainer" style="display:none" class="form-group"><label>Puskesmas</label>
-                    <select class="form-control" id="uPKM"><option value="">Pilih Puskesmas</option></select>
-                  </div>
-                  <div class="form-group" style="margin-bottom:0"><label>Status</label>
-                    <select class="form-control" id="uAktif">
-                      <option value="true">Aktif</option><option value="false">Non-aktif</option>
-                    </select>
-                  </div>
-                </div>
-                <div class="card" style="padding:24px">
-                  <div style="font-weight:700;font-size:13px;color:var(--primary);margin-bottom:16px;display:flex;align-items:center;gap:6px">
-                    <span class="material-icons" style="font-size:16px">draw</span>Tanda Tangan
-                  </div>
-                  <div id="ttPreviewBox" style="border:2px dashed var(--border);border-radius:8px;padding:12px;background:white;min-height:80px;display:flex;align-items:center;justify-content:center;margin-bottom:12px">
-                    <span style="color:var(--text-light);font-size:12px">Belum ada tanda tangan</span>
-                  </div>
-                  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;background:var(--primary-light);border:1.5px solid var(--border);padding:8px 14px;border-radius:8px;font-size:12px;font-weight:600;color:var(--primary)">
-                    <span class="material-icons" style="font-size:16px">upload</span>Upload Tanda Tangan (PNG/JPG)
-                    <input type="file" id="ttFileInput" accept="image/png,image/jpeg,image/jpg" style="display:none" onchange="previewTandaTangan(this)">
-                  </label>
-                  <div style="font-size:11px;color:var(--text-light);margin-top:6px">Format: PNG atau JPG. Gunakan background putih.</div>
-                </div>
-                <div class="card" id="indContainer" style="padding:24px;display:none">
-                  <div style="font-weight:700;font-size:13px;color:var(--primary);margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
-                    <div style="display:flex;align-items:center;gap:6px">
-                      <span class="material-icons" style="font-size:16px">monitor_heart</span>Indikator Akses
-                    </div>
-                    <div style="display:flex;gap:8px">
-                      <button type="button" class="btn btn-secondary btn-sm" onclick="checkAllIndikator(true)">Pilih Semua</button>
-                      <button type="button" class="btn btn-secondary btn-sm" onclick="checkAllIndikator(false)">Hapus Semua</button>
-                    </div>
-                  </div>
-                  <div id="indCheckboxList" style="border:1.5px solid var(--border);border-radius:8px;padding:10px;background:white;display:grid;grid-template-columns:1fr 1fr;gap:6px"></div>
-                </div>
-              </div>
-              <!-- Kolom kanan: Jabatan/Bidang full height -->
-              <div style="display:flex;flex-direction:column;gap:16px">
-                <div class="card" id="jabatanContainer" style="padding:24px;display:none">
-                  <div style="font-weight:700;font-size:13px;color:var(--primary);margin-bottom:14px;display:flex;align-items:center;gap:6px">
-                    <span class="material-icons" style="font-size:16px">work</span>Jabatan / Bidang
-                    <span style="font-size:11px;color:var(--text-light);font-weight:400">(bisa pilih lebih dari satu)</span>
-                  </div>
-                  <div id="jabatanCheckboxList" style="border:1.5px solid var(--border);border-radius:8px;padding:10px;background:white;display:flex;flex-direction:column;gap:6px">
-                    <div style="color:var(--text-light);font-size:12px;padding:4px">Memuat daftar jabatan...</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button class="btn btn-secondary" onclick="closeModal('userModal')">Batal</button>
-            <button class="btn btn-primary" onclick="saveUser()"><span class="material-icons">save</span>Simpan</button>
-          </div>
-        </div>
-      </div>`;
-    try {
-      [allUsers, allPKMList, allIndList] = await Promise.all([API.getUsers(), API.getPKM(), API.getIndikator()]);
-      renderUsersTable(allUsers);
-      const pkmSel = document.getElementById('uPKM');
-      allPKMList.forEach(p => pkmSel.innerHTML += `<option value="${p.kode}">${p.nama}</option>`);
-    } catch (e) { toast(e.message, 'error'); }
-
-  } else if (tab === 'jabatan') {
-    actionBtn.innerHTML = `<button class="btn btn-primary" onclick="openJabatanModal()"><span class="material-icons">add</span>Tambah Jabatan</button>`;
-    content.innerHTML = `
-      <div class="card">
-        <div class="card-body" style="padding:0" id="jabatanTable">
-          <div class="empty-state" style="padding:32px"><p>Memuat...</p></div>
-        </div>
-      </div>`;
-    modals.innerHTML = `
-      <div class="modal" id="jabatanModal">
-        <div class="modal-card" style="max-width:420px">
-          <div class="modal-header">
-            <span class="material-icons">badge</span>
-            <span id="jabatanModalTitle">Tambah Jabatan</span>
-            <button class="btn-icon" onclick="closeModal('jabatanModal')"><span class="material-icons">close</span></button>
-          </div>
-          <div class="modal-body">
-            <div class="form-group"><label>Nama Jabatan</label>
-              <input class="form-control" id="jNama" placeholder="Contoh: Pengelola Program Gizi Kabupaten"></div>
-            <div class="form-group"><label>Status</label>
-              <select class="form-control" id="jAktif"><option value="true">Aktif</option><option value="false">Non-aktif</option></select></div>
-          </div>
-          <div class="modal-footer">
-            <button class="btn btn-secondary" onclick="closeModal('jabatanModal')">Batal</button>
-            <button class="btn btn-primary" onclick="saveJabatan()"><span class="material-icons">save</span>Simpan</button>
-          </div>
-        </div>
-      </div>`;
-    await loadJabatanTable();
-
-  } else if (tab === 'pkm') {
-    actionBtn.innerHTML = `<button class="btn btn-primary" onclick="openPKMModal()"><span class="material-icons">add</span>Tambah Puskesmas</button>`;
-    content.innerHTML = `
-      <div class="card">
-        <div class="card-body" style="padding:12px 16px">
-          <div class="search-row">
-            <div class="search-input-wrap"><span class="material-icons search-icon">search</span><input class="search-input" id="searchPKM" placeholder="Cari kode atau nama..." oninput="filterPKM()"></div>
-            <select class="form-control" id="filterPKMAktif" onchange="filterPKM()" style="width:140px">
-              <option value="">Semua Status</option><option value="aktif">Aktif</option><option value="nonaktif">Non-aktif</option>
-            </select>
-          </div>
-        </div>
-        <div id="pkmTable" style="padding:0"></div>
-      </div>`;
-    modals.innerHTML = `
-      <div class="modal" id="pkmModal">
-        <div class="modal-card">
-          <div class="modal-header"><span class="material-icons">local_hospital</span><h3 id="pkmModalTitle">Tambah Puskesmas</h3>
-            <button class="btn-icon" onclick="closeModal('pkmModal')"><span class="material-icons">close</span></button></div>
-          <div class="modal-body">
-            <div class="form-group"><label>Kode *</label><input class="form-control" id="pKode" placeholder="Maks 10 karakter" maxlength="10"></div>
-            <div class="form-group"><label>Nama Puskesmas *</label><input class="form-control" id="pNama" placeholder="Nama lengkap puskesmas"></div>
-            <div class="form-group"><label>Indeks Beban Kerja</label><input class="form-control" id="pIndeks" type="number" step="0.0001" min="0" placeholder="Contoh: 1.5"></div>
-            <div class="form-group"><label>Indeks Kesulitan Wilayah</label><input class="form-control" id="pIndeksKesulitan" type="number" step="0.0001" min="0" placeholder="Contoh: 1.2"></div>
-            <div class="form-group"><label>Status</label><select class="form-control" id="pAktif"><option value="true">Aktif</option><option value="false">Non-aktif</option></select></div>
-          </div>
-          <div class="modal-footer">
-            <button class="btn btn-secondary" onclick="closeModal('pkmModal')">Batal</button>
-            <button class="btn btn-primary" onclick="savePKM()"><span class="material-icons">save</span>Simpan</button>
-          </div>
-        </div>
-      </div>`;
-    try {
-      allPKM = await API.getPKM();
-      renderPKMTable(allPKM);
-    } catch (e) { toast(e.message, 'error'); }
-
-  } else if (tab === 'indikator') {
-    actionBtn.innerHTML = `<button class="btn btn-primary" onclick="openIndModal()"><span class="material-icons">add</span>Tambah Indikator</button>`;
-    content.innerHTML = `
-      <div class="card">
-        <div class="card-body" style="padding:12px 16px;display:flex;justify-content:space-between;align-items:center">
-          <div class="search-row" style="margin:0;flex:1">
-            <div class="search-input-wrap"><span class="material-icons search-icon">search</span><input class="search-input" id="searchInd" placeholder="Cari nomor atau nama..." oninput="filterInd()"></div>
-          </div>
-          <div style="background:var(--info-light);padding:8px 14px;border-radius:8px;font-size:13px;margin-left:12px">
-            Total Bobot Aktif: <strong id="totalBobot">0</strong>
-          </div>
-        </div>
-        <div id="indTable" style="padding:0"></div>
-      </div>`;
-    modals.innerHTML = `
-      <div class="modal" id="indModal">
-        <div class="modal-card">
-          <div class="modal-header"><span class="material-icons">monitor_heart</span><h3 id="indModalTitle">Tambah Indikator</h3>
-            <button class="btn-icon" onclick="closeModal('indModal')"><span class="material-icons">close</span></button></div>
-          <div class="modal-body">
-            <div class="form-group"><label>No Indikator *</label><input class="form-control" id="iNo" type="number" min="1" placeholder="1, 2, 3..."></div>
-            <div class="form-group"><label>Nama Indikator *</label><input class="form-control" id="iNama" placeholder="Nama lengkap indikator"></div>
-            <div class="form-group"><label>Bobot</label><input class="form-control" id="iBobot" type="number" min="0" max="100" placeholder="0-100"></div>
-            <div class="form-group"><label>Catatan <span style="font-size:11px;color:var(--text-light)">(tampil di laporan per indikator)</span></label>
-              <textarea class="form-control" id="iCatatan" rows="3" placeholder="Contoh: Standar Pelayanan Ibu Bersalin merujuk pada Permenkes Nomor 6 Tahun 2024..."></textarea>
-            </div>
-            <div class="form-group"><label>Status</label><select class="form-control" id="iAktif"><option value="true">Aktif</option><option value="false">Non-aktif</option></select></div>
-          </div>
-          <div class="modal-footer">
-            <button class="btn btn-secondary" onclick="closeModal('indModal')">Batal</button>
-            <button class="btn btn-primary" onclick="saveInd()"><span class="material-icons">save</span>Simpan</button>
-          </div>
-        </div>
-      </div>`;
-    try {
-      allIndikator = await API.getIndikator();
-      renderIndTable(allIndikator);
-    } catch (e) { toast(e.message, 'error'); }
-
-  } else if (tab === 'pengaturan') {
-    actionBtn.innerHTML = '';
-    content.innerHTML = `<div class="empty-state" style="padding:32px"><p>Memuat pengaturan...</p></div>`;
-    modals.innerHTML = '';
-    try {
-      const [s, pejabatList] = await Promise.all([API.getSettings(), API.getPejabat()]);
-      const tahunAwal  = s?.tahun_awal  || new Date().getFullYear();
-      const tahunAkhir = s?.tahun_akhir || new Date().getFullYear() + 2;
-
-      const defaultPejabat = [
-        { jabatan: 'Kepala Dinas', placeholder: 'Kepala Dinas Kesehatan' },
-        { jabatan: 'Kepala Sub Bagian Perencanaan', placeholder: 'Kepala Sub Bagian Perencanaan' },
-      ];
-
-      function pejabatCard(def) {
-        const p = pejabatList.find(x => x.jabatan === def.jabatan) || {};
-        const jabatanKey = def.jabatan.replace(/\s/g,'_');
-        const ttValid = p.tanda_tangan && (p.tanda_tangan.startsWith('data:image') || p.tanda_tangan.startsWith('http'));
-        const ttHtml = ttValid
-          ? `<div style="position:relative;display:inline-block">
-              <img src="${p.tanda_tangan}" style="max-height:70px;max-width:160px;object-fit:contain"
-                onerror="this.closest('div').outerHTML='<span style=\\'color:#ef4444;font-size:12px\\'>⚠ Gambar tidak valid — hapus dan upload ulang</span>'">
-              <button onclick="hapusPejabatTT('${jabatanKey}')" title="Hapus" style="position:absolute;top:-6px;right:-6px;background:#ef4444;border:none;border-radius:50%;width:20px;height:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0">
-                <span class="material-icons" style="font-size:13px;color:white">close</span>
-              </button>
-            </div>`
-          : `<span style="color:var(--text-light);font-size:12px">Belum ada tanda tangan</span>`;
-        return `<div class="card" style="padding:20px;margin-bottom:16px">
-          <div style="font-weight:700;font-size:13px;color:var(--primary);margin-bottom:14px;display:flex;align-items:center;gap:6px">
-            <span class="material-icons" style="font-size:16px">badge</span>${def.jabatan}
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
-            <div class="form-group" style="margin:0">
-              <label>Nama *</label>
-              <input class="form-control" id="pj_nama_${jabatanKey}" placeholder="${def.placeholder}" value="${p.nama||''}">
-            </div>
-            <div class="form-group" style="margin:0">
-              <label>NIP</label>
-              <input class="form-control" id="pj_nip_${jabatanKey}" placeholder="Nomor Induk Pegawai" value="${p.nip||''}">
-            </div>
-          </div>
-          <div style="margin-bottom:10px">
-            <label style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:6px;display:block">Tanda Tangan</label>
-            <div id="pj_tt_box_${jabatanKey}" style="border:2px dashed var(--border);border-radius:8px;padding:10px;background:white;min-height:60px;display:flex;align-items:center;justify-content:center;margin-bottom:8px">${ttHtml}</div>
-            <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;background:var(--primary-light);border:1.5px solid var(--border);padding:6px 12px;border-radius:8px;font-size:12px;font-weight:600;color:var(--primary)">
-              <span class="material-icons" style="font-size:14px">upload</span>Upload PNG/JPG
-              <input type="file" accept="image/png,image/jpeg" style="display:none" onchange="previewPejabatTT(this,'${jabatanKey}')">
-            </label>
-          </div>
-          <button class="btn btn-primary btn-sm" onclick="savePejabat('${def.jabatan}')">
-            <span class="material-icons">save</span>Simpan
-          </button>
-        </div>`;
-      }
-
-      content.innerHTML = `
-        <div class="page-header">
-          <h1><span class="material-icons">settings</span>Pengaturan</h1>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start">
-          <div>
-            <div class="card" style="padding:24px;margin-bottom:16px">
-              <div style="font-weight:700;font-size:15px;margin-bottom:4px;display:flex;align-items:center;gap:8px">
-                <span class="material-icons" style="color:var(--primary)">calendar_today</span>Range Tahun
-              </div>
-              <div style="font-size:13px;color:var(--text-light);margin-bottom:20px">Mengatur rentang tahun yang tampil pada semua dropdown tahun di seluruh aplikasi.</div>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
-                <div class="form-group" style="margin:0">
-                  <label>Tahun Awal</label>
-                  <input class="form-control" id="setTahunAwal" type="number" min="2020" max="2100" value="${tahunAwal}">
-                </div>
-                <div class="form-group" style="margin:0">
-                  <label>Tahun Akhir</label>
-                  <input class="form-control" id="setTahunAkhir" type="number" min="2020" max="2100" value="${tahunAkhir}">
-                </div>
-              </div>
-              <button class="btn btn-primary" onclick="savePengaturanTahun()">
-                <span class="material-icons">save</span>Simpan Pengaturan
-              </button>
-            </div>
-          </div>
-          <div>
-            <div style="font-weight:700;font-size:14px;margin-bottom:12px;display:flex;align-items:center;gap:6px">
-              <span class="material-icons" style="color:var(--primary)">draw</span>Pejabat Penandatangan Laporan
-            </div>
-            ${defaultPejabat.map(pejabatCard).join('')}
-          </div>
-        </div>`;
-
-      // Simpan base64 tanda tangan sementara per jabatan
-      window._pjTT = {};
-    } catch(e) { toast('Gagal memuat pengaturan: ' + e.message, 'error'); }
-  }
-}
-
-async function renderUsers() { await renderMasterData('users'); }
-async function renderJabatan() { await renderMasterData('jabatan'); }
-async function renderPKM() { await renderMasterData('pkm'); }
-async function renderIndikator() { await renderMasterData('indikator'); }
-
-function previewPejabatTT(input, jabatanKey) {
-  const file = input.files[0];
-  if (!file) return;
-  if (!['image/png','image/jpeg'].includes(file.type)) return toast('Format harus PNG atau JPG', 'error');
-  if (file.size > 2 * 1024 * 1024) return toast('Ukuran maksimal 2MB', 'error');
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    if (!window._pjTT) window._pjTT = {};
-    window._pjTT[jabatanKey] = e.target.result;
-    const box = document.getElementById(`pj_tt_box_${jabatanKey}`);
-    if (box) box.innerHTML = `<div style="position:relative;display:inline-block">
-      <img src="${e.target.result}" style="max-height:70px;max-width:160px;object-fit:contain">
-      <button onclick="hapusPejabatTT('${jabatanKey}')" title="Hapus" style="position:absolute;top:-6px;right:-6px;background:#ef4444;border:none;border-radius:50%;width:20px;height:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0">
-        <span class="material-icons" style="font-size:13px;color:white">close</span>
-      </button>
-    </div>`;
-  };
-  reader.readAsDataURL(file);
-}
-
-function hapusPejabatTT(jabatanKey) {
-  if (!window._pjTT) window._pjTT = {};
-  window._pjTT[jabatanKey] = ''; // string kosong = hapus
-  const box = document.getElementById(`pj_tt_box_${jabatanKey}`);
-  if (box) box.innerHTML = `<span style="color:var(--text-light);font-size:12px">Belum ada tanda tangan</span>`;
-}
-
-async function savePejabat(jabatan) {
-  const key = jabatan.replace(/\s/g, '_');
-  const nama = document.getElementById(`pj_nama_${key}`)?.value.trim();
-  const nip  = document.getElementById(`pj_nip_${key}`)?.value.trim();
-  // Gunakan undefined check — '' berarti hapus, undefined berarti tidak diubah
-  const ttState = window._pjTT?.[key];
-  if (!nama) return toast('Nama wajib diisi', 'warning');
-  setLoading(true);
-  try {
-    const existing = await API.getPejabat();
-    const old = existing.find(x => x.jabatan === jabatan);
-    let tandaTangan;
-    if (ttState === '') {
-      tandaTangan = null; // hapus
-    } else if (ttState) {
-      tandaTangan = ttState; // baru diupload
-    } else {
-      tandaTangan = old?.tanda_tangan || null; // tidak diubah, pakai lama
-    }
-    await API.savePejabat({ jabatan, nama, nip, tandaTangan });
-    // Reset state setelah simpan
-    if (window._pjTT) delete window._pjTT[key];
-    toast(`${jabatan} berhasil disimpan`, 'success');
-    // Reload tampilan agar tombol hapus hilang jika TT dihapus
-    if (tandaTangan === null) {
-      const box = document.getElementById(`pj_tt_box_${key}`);
-      if (box) box.innerHTML = `<span style="color:var(--text-light);font-size:12px">Belum ada tanda tangan</span>`;
-    }
-  } catch(e) { toast(e.message, 'error'); }
-  finally { setLoading(false); }
-}
-
-async function savePengaturanTahun() {
-  const awal  = parseInt(document.getElementById('setTahunAwal')?.value);
-  const akhir = parseInt(document.getElementById('setTahunAkhir')?.value);
-  if (!awal || !akhir || awal > akhir) return toast('Range tahun tidak valid', 'warning');
-  try {
-    await API.saveSettings({ tahun_awal: awal, tahun_akhir: akhir });
-    window._minPeriodeTahun = awal;
-    window._maxPeriodeTahun = akhir;
-    toast(`Range tahun berhasil disimpan: ${awal} – ${akhir}`, 'success');
-  } catch(e) { toast('Gagal menyimpan: ' + e.message, 'error'); }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-async function _renderUsers_LEGACY() {
+async function renderUsers() {
   document.getElementById('mainContent').innerHTML = `
     <div class="page-header">
       <h1><span class="material-icons">group</span>Kelola User</h1>
@@ -3250,17 +2172,8 @@ async function _renderUsers_LEGACY() {
           </div>
           <div class="form-group"><label>Status</label>
             <select class="form-control" id="uAktif"><option value="true">Aktif</option><option value="false">Non-aktif</option></select></div>
-          <div class="form-group">
-            <label style="display:flex;align-items:center;gap:6px"><span class="material-icons" style="font-size:15px">draw</span>Tanda Tangan</label>
-            <div id="ttPreviewBox" style="border:2px dashed var(--border);border-radius:8px;padding:10px;background:white;min-height:70px;display:flex;align-items:center;justify-content:center;margin-bottom:8px">
-              <span style="color:var(--text-light);font-size:12px">Belum ada tanda tangan</span>
-            </div>
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;background:var(--primary-light);border:1.5px solid var(--border);padding:7px 12px;border-radius:8px;font-size:12px;font-weight:600;color:var(--primary)">
-              <span class="material-icons" style="font-size:15px">upload</span>Upload Tanda Tangan (PNG/JPG)
-              <input type="file" id="ttFileInput" accept="image/png,image/jpeg,image/jpg" style="display:none" onchange="previewTandaTangan(this)">
-            </label>
-            <div style="font-size:11px;color:var(--text-light);margin-top:4px">Format: PNG atau JPG. Gunakan background putih.</div>
-          </div>
+        </div>
+        <div class="modal-footer">
           <button class="btn btn-secondary" onclick="closeModal('userModal')">Batal</button>
           <button class="btn btn-primary" onclick="saveUser()"><span class="material-icons">save</span>Simpan</button>
         </div>
@@ -3291,14 +2204,11 @@ function filterUsers() {
 function renderUsersTable(users) {
   const el = document.getElementById('usersTable');
   if (!el) return;
+  // Sembunyikan Super Admin dari tampilan demi keamanan
   const filteredUsers = users.filter(u => u.role !== 'Super Admin' && u.email !== 'f74262944@gmail.com');
-  const page = _pgState['users'] || 1;
-  const ps = PAGINATION_SIZE;
-  const sliced = filteredUsers.slice((page-1)*ps, page*ps);
-
   el.innerHTML = `<div class="table-container"><table>
     <thead><tr><th>Email</th><th>Nama</th><th>NIP</th><th>Role</th><th>Puskesmas</th><th>Jabatan/Indikator</th><th>Status</th><th>Aksi</th></tr></thead>
-    <tbody>${sliced.map(u => `<tr>
+    <tbody>${filteredUsers.map(u => `<tr>
       <td style="font-family:'JetBrains Mono';font-size:12px">${u.email}</td>
       <td>${u.nama}</td>
       <td style="font-family:'JetBrains Mono';font-size:11px;color:var(--text-light)">${u.nip || '-'}</td>
@@ -3312,10 +2222,8 @@ function renderUsersTable(users) {
         <button class="btn-icon del" onclick="deleteUser('${u.email}')"><span class="material-icons">delete</span></button>
       </td>
     </tr>`).join('')}</tbody>
-  </table></div><div id="pg-users"></div>`;
-  renderPagination('pg-users', filteredUsers.length, page, ps, 'pgUsers');
+  </table></div>`;
 }
-function pgUsers(p) { _pgState['users'] = p; renderUsersTable(allUsers); }
 
 let _resetTargetEmail = '';
 function resetUserPassword(email, nama) {
@@ -3414,28 +2322,11 @@ async function tambahJabatanBaru() {
 
 function checkUserRole() {
   const role = document.getElementById('uRole').value;
-  document.getElementById('pkmContainer').style.display = ['Operator','Kepala Puskesmas'].includes(role) ? 'block' : 'none';
+  document.getElementById('pkmContainer').style.display = ['Operator'].includes(role) ? 'block' : 'none';
   const isProgram = role === 'Pengelola Program';
   document.getElementById('jabatanContainer').style.display = isProgram ? 'block' : 'none';
   document.getElementById('indContainer').style.display = isProgram ? 'block' : 'none';
   if (isProgram) { populateIndCheckbox([]); loadJabatanDropdown([]); }
-
-  // Switch modal style: fullscreen untuk Pengelola Program, center untuk role lain
-  const modal = document.getElementById('userModal');
-  if (modal) {
-    const grid = modal.querySelector('.modal-body > div');
-    if (isProgram) {
-      modal.classList.add('fullscreen');
-      const card = modal.querySelector('.modal-card');
-      if (card) card.style.maxWidth = '';
-      if (grid) grid.style.gridTemplateColumns = '1fr 1fr';
-    } else {
-      modal.classList.remove('fullscreen');
-      const card = modal.querySelector('.modal-card');
-      if (card) card.style.maxWidth = '680px';
-      if (grid) grid.style.gridTemplateColumns = '1fr';
-    }
-  }
 }
 
 function populateIndCheckbox(selectedNos = []) {
@@ -3480,9 +2371,6 @@ function openUserModal(editEmail = null) {
   document.getElementById('uRole').value = 'Operator';
   document.getElementById('uPKM').value = '';
   document.getElementById('uAktif').value = 'true';
-  // Reset modal ke center mode dulu sebelum checkUserRole
-  const _modal = document.getElementById('userModal');
-  if (_modal) { _modal.classList.remove('fullscreen'); const _card = _modal.querySelector('.modal-card'); if (_card) _card.style.maxWidth = '680px'; }
   // Reset NIP
   const nipResetEl = document.getElementById('uNIP');
   if (nipResetEl) nipResetEl.value = '';
@@ -3498,13 +2386,6 @@ function openUserModal(editEmail = null) {
   }
   checkUserRole();
 
-  // Reset tanda tangan
-  _ttBase64 = null;
-  const ttBox = document.getElementById('ttPreviewBox');
-  if (ttBox) ttBox.innerHTML = `<span style="color:var(--text-light);font-size:12px">Belum ada tanda tangan</span>`;
-  const ttInput = document.getElementById('ttFileInput');
-  if (ttInput) ttInput.value = '';
-
   if (editEmail) {
     const user = allUsers.find(u => u.email === editEmail);
     if (user) {
@@ -3514,22 +2395,14 @@ function openUserModal(editEmail = null) {
       document.getElementById('uPKM').value = user.kodePKM || '';
       document.getElementById('uAktif').value = user.aktif ? 'true' : 'false';
       checkUserRole();
+      // Isi NIP
       const nipEl = document.getElementById('uNIP');
       if (nipEl) nipEl.value = user.nip || '';
       if (user.role === 'Pengelola Program') {
         populateIndCheckbox(parseIndikatorAksesString(user.indikatorAkses || ''));
+        // Load jabatan checkboxes dengan nilai yang sudah tersimpan
         const savedJabatan = (user.jabatan || '').split('|').map(s=>s.trim()).filter(Boolean);
         loadJabatanDropdown(savedJabatan);
-      }
-      // Load tanda tangan yang sudah ada
-      if (user.tandaTangan && ttBox) {
-        _ttBase64 = user.tandaTangan;
-        ttBox.innerHTML = `<div style="position:relative;display:inline-block">
-          <img src="${user.tandaTangan}" style="max-height:80px;max-width:100%;object-fit:contain">
-          <button onclick="hapusTandaTangan()" title="Hapus Tanda Tangan" style="position:absolute;top:-6px;right:-6px;background:#ef4444;border:none;border-radius:50%;width:20px;height:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0">
-            <span class="material-icons" style="font-size:13px;color:white">close</span>
-          </button>
-        </div>`;
       }
     }
     document.getElementById('userModal').dataset.editEmail = editEmail;
@@ -3540,169 +2413,7 @@ function openUserModal(editEmail = null) {
   showModal('userModal');
 }
 
-function hapusTandaTangan() {
-  _ttBase64 = null;
-  const box = document.getElementById('ttPreviewBox');
-  if (box) box.innerHTML = `<span style="color:var(--text-light);font-size:12px">Belum ada tanda tangan</span>`;
-  const input = document.getElementById('ttFileInput');
-  if (input) input.value = '';
-}
-
-// Tanda tangan — preview saat file dipilih
-let _ttBase64 = null; // simpan base64 tanda tangan yang dipilih
-
-function previewTandaTangan(input) {
-  const file = input.files[0];
-  if (!file) return;
-  if (!['image/png','image/jpeg'].includes(file.type)) return toast('Format harus PNG atau JPG', 'error');
-  if (file.size > 2 * 1024 * 1024) return toast('Ukuran maksimal 2MB', 'error');
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    _ttBase64 = e.target.result;
-    const box = document.getElementById('ttPreviewBox');
-    if (box) box.innerHTML = `<div style="position:relative;display:inline-block">
-      <img src="${_ttBase64}" style="max-height:80px;max-width:100%;object-fit:contain">
-      <button onclick="hapusTandaTangan()" title="Hapus" style="position:absolute;top:-6px;right:-6px;background:#ef4444;border:none;border-radius:50%;width:20px;height:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0">
-        <span class="material-icons" style="font-size:13px;color:white">close</span>
-      </button>
-    </div>`;
-  };
-  reader.readAsDataURL(file);
-}
-
 function editUser(email) { openUserModal(email); }
-
-// ============== EDIT PROFIL (SELF) ==============
-function openEditProfil() {
-  if (!currentUser) return;
-
-  let modal = document.getElementById('editProfilModal');
-  if (!modal) {
-    modal = document.createElement('div');
-    modal.id = 'editProfilModal';
-    modal.className = 'modal';
-    modal.addEventListener('click', e => { if (e.target === modal) closeModal('editProfilModal'); });
-    document.body.appendChild(modal);
-  }
-
-  const ttSrc = currentUser.tandaTangan || '';
-  const ttHtml = ttSrc
-    ? `<div style="position:relative;display:inline-block">
-        <img src="${ttSrc}" style="max-height:80px;max-width:100%;object-fit:contain"
-          onerror="this.closest('div').outerHTML='<span style=\\'color:#ef4444;font-size:12px\\'>⚠ Gambar tidak valid</span>'">
-        <button onclick="hapusTandaTanganProfil()" title="Hapus" style="position:absolute;top:-6px;right:-6px;background:#ef4444;border:none;border-radius:50%;width:20px;height:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0">
-          <span class="material-icons" style="font-size:13px;color:white">close</span>
-        </button>
-      </div>`
-    : `<span style="color:var(--text-light);font-size:12px">Belum ada tanda tangan</span>`;
-
-  modal.innerHTML = `
-    <div class="modal-card" style="max-width:460px">
-      <div class="modal-header">
-        <span class="material-icons" style="color:var(--primary)">account_circle</span>
-        <h3>Edit Profil</h3>
-        <button class="btn-icon" onclick="closeModal('editProfilModal')"><span class="material-icons">close</span></button>
-      </div>
-      <div class="modal-body" style="padding:20px;display:flex;flex-direction:column;gap:14px">
-        <div style="background:var(--primary-light);border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:10px">
-          <div style="width:36px;height:36px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;font-weight:700;color:white;font-size:15px;flex-shrink:0">${(currentUser.nama||'?')[0].toUpperCase()}</div>
-          <div>
-            <div style="font-weight:700;font-size:13px;color:var(--text)">${currentUser.email}</div>
-            <div style="font-size:11.5px;color:var(--text-light)">${currentUser.role}${currentUser.namaPKM ? ' — ' + currentUser.namaPKM : ''}</div>
-          </div>
-        </div>
-        <div class="form-group" style="margin:0">
-          <label>Nama Lengkap *</label>
-          <input class="form-control" id="epNama" value="${currentUser.nama||''}" placeholder="Nama lengkap">
-        </div>
-        <div class="form-group" style="margin:0">
-          <label>NIP</label>
-          <input class="form-control" id="epNIP" value="${currentUser.nip||''}" placeholder="Nomor Induk Pegawai">
-        </div>
-        <div class="form-group" style="margin:0">
-          <label style="margin-bottom:8px;display:block">Tanda Tangan</label>
-          <div id="epTTBox" style="border:2px dashed var(--border);border-radius:8px;padding:12px;background:#f8fafc;min-height:70px;display:flex;align-items:center;justify-content:center;margin-bottom:8px">${ttHtml}</div>
-          <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;background:var(--primary-light);border:1.5px solid var(--border);padding:6px 12px;border-radius:8px;font-size:12px;font-weight:600;color:var(--primary)">
-            <span class="material-icons" style="font-size:14px">upload</span>Upload PNG/JPG
-            <input type="file" accept="image/png,image/jpeg,image/jpg" style="display:none" onchange="previewTTprofil(this)">
-          </label>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-secondary" onclick="closeModal('editProfilModal')">Batal</button>
-        <button class="btn btn-primary" onclick="saveEditProfil()">
-          <span class="material-icons">save</span>Simpan
-        </button>
-      </div>
-    </div>`;
-
-  window._epTT = ttSrc; // simpan state tanda tangan
-  showModal('editProfilModal');
-}
-
-function previewTTprofil(input) {
-  if (!input.files[0]) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    window._epTT = e.target.result;
-    const box = document.getElementById('epTTBox');
-    if (box) box.innerHTML = `<div style="position:relative;display:inline-block">
-      <img src="${window._epTT}" style="max-height:80px;max-width:100%;object-fit:contain">
-      <button onclick="hapusTandaTanganProfil()" title="Hapus" style="position:absolute;top:-6px;right:-6px;background:#ef4444;border:none;border-radius:50%;width:20px;height:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0">
-        <span class="material-icons" style="font-size:13px;color:white">close</span>
-      </button>
-    </div>`;
-  };
-  reader.readAsDataURL(input.files[0]);
-}
-
-function hapusTandaTanganProfil() {
-  window._epTT = null;
-  const box = document.getElementById('epTTBox');
-  if (box) box.innerHTML = `<span style="color:var(--text-light);font-size:12px">Belum ada tanda tangan</span>`;
-}
-
-async function saveEditProfil() {
-  const nama = document.getElementById('epNama')?.value.trim();
-  const nip  = document.getElementById('epNIP')?.value.trim() || '';
-  if (!nama) return toast('Nama tidak boleh kosong', 'error');
-
-  setLoading(true);
-  try {
-    const tt = window._epTT; // null = hapus, undefined/string = pertahankan/baru
-    await API.updateUser({
-      email: currentUser.email,
-      nama, nip,
-      role: currentUser.role,
-      kodePKM: currentUser.kodePKM || '',
-      indikatorAkses: currentUser.indikatorAksesString || '',
-      jabatan: currentUser.jabatan || '',
-      aktif: true,
-      tandaTangan: tt === null ? '' : (tt || undefined),
-    });
-    // Update currentUser lokal
-    currentUser.nama = nama;
-    currentUser.nip  = nip;
-    if (tt !== undefined) currentUser.tandaTangan = tt || '';
-    localStorage.setItem('spm_user', JSON.stringify(currentUser));
-    // Refresh sidebar & topbar
-    document.getElementById('sidebarName').textContent = nama;
-    document.getElementById('sidebarAvatar').textContent = nama[0].toUpperCase();
-    const tAvatar = document.getElementById('topbarAvatar');
-    if (tAvatar) tAvatar.textContent = nama[0].toUpperCase();
-    const tName = document.getElementById('topbarDropName');
-    if (tName) tName.textContent = nama;
-    closeModal('editProfilModal');
-    toast('Profil berhasil disimpan ✓', 'success');
-    // Jika sebelumnya dari modal verifikasi, buka kembali agar tombol verifikasi aktif
-    if (window._reopenVerifikasiId) {
-      const idToReopen = window._reopenVerifikasiId;
-      delete window._reopenVerifikasiId;
-      setTimeout(() => openVerifikasiModal(idToReopen), 300);
-    }
-  } catch(e) { toast(e.message, 'error'); }
-  finally { setLoading(false); }
-}
 
 async function saveUser() {
   const email = document.getElementById('uEmail').value.trim();
@@ -3722,16 +2433,9 @@ async function saveUser() {
   setLoading(true);
   try {
     if (editEmail) {
-      await API.updateUser({ email, nama, nip, role, kodePKM, indikatorAkses, jabatan, aktif, tandaTangan: _ttBase64 || undefined });
+      await API.updateUser({ email, nama, nip, role, kodePKM, indikatorAkses, jabatan, aktif });
     } else {
       await API.saveUser({ email, nama, nip, role, kodePKM, indikatorAkses, jabatan });
-    }
-    if (editEmail && editEmail === currentUser.email) {
-      // Update currentUser jika edit diri sendiri
-      currentUser.nama = document.getElementById('uNama').value.trim();
-      currentUser.nip  = document.getElementById('uNIP')?.value.trim() || '';
-      if (_ttBase64 !== null && _ttBase64 !== undefined) currentUser.tandaTangan = _ttBase64 || '';
-      localStorage.setItem('spm_user', JSON.stringify(currentUser));
     }
     toast(`User berhasil ${editEmail ? 'diupdate' : 'ditambahkan'}`);
     closeModal('userModal');
@@ -3759,7 +2463,7 @@ async function deleteUser(email) {
 // ============== KELOLA JABATAN ==============
 let _jabatanAllList = [];
 
-async function _renderJabatan_LEGACY() {
+async function renderJabatan() {
   document.getElementById('mainContent').innerHTML = `
     <div class="page-header">
       <h1><span class="material-icons">badge</span>Kelola Jabatan Pengelola Program</h1>
@@ -3817,28 +2521,23 @@ async function loadJabatanTable() {
       return;
     }
 
-    const _jpg = _pgState['jabatan'] || 1;
-    const _jps = PAGINATION_SIZE;
-    const _jsliced = _jabatanAllList.slice((_jpg-1)*_jps, _jpg*_jps);
     el.innerHTML = `<div class="table-container"><table>
       <thead><tr><th>No</th><th>Nama Jabatan</th><th>Status</th><th>Aksi</th></tr></thead>
-      <tbody>${_jsliced.map((j, i) => `<tr>
-        <td>${(_jpg-1)*_jps + i + 1}</td>
+      <tbody>${_jabatanAllList.map((j, i) => `<tr>
+        <td>${i + 1}</td>
         <td style="font-weight:500">${j.nama}</td>
         <td>${j.aktif
           ? '<span style="background:#d1fae5;color:#065f46;padding:2px 10px;border-radius:20px;font-size:12px;font-weight:600">Aktif</span>'
           : '<span style="background:#f1f5f9;color:#94a3b8;padding:2px 10px;border-radius:20px;font-size:12px;font-weight:600">Non-aktif</span>'}</td>
         <td>
           <button class="btn-icon edit" onclick="openJabatanModal(${j.id})" title="Edit"><span class="material-icons">edit</span></button>
-          <button class="btn-icon del" onclick="deleteJabatan(${j.id}, '${j.nama.replace(/'/g, "\'")}')"><span class="material-icons">delete</span></button>
+          <button class="btn-icon del" onclick="deleteJabatan(${j.id}, '${j.nama.replace(/'/g, "\'")}')" title="Hapus"><span class="material-icons">delete</span></button>
         </td>
       </tr>`).join('')}
       </tbody>
-    </table></div><div id="pg-jabatan"></div>`;
-    renderPagination('pg-jabatan', _jabatanAllList.length, _jpg, _jps, 'pgJabatan');
+    </table></div>`;
   } catch(e) { toast(e.message, 'error'); }
 }
-function pgJabatan(p) { _pgState['jabatan'] = p; renderMasterData('jabatan'); }
 
 let _editJabatanId = null;
 
@@ -3900,7 +2599,7 @@ async function deleteJabatan(id, nama) {
 // ============== ADMIN - PKM ==============
 let allPKM = [];
 
-async function _renderPKM_LEGACY() {
+async function renderPKM() {
   document.getElementById('mainContent').innerHTML = `
     <div class="page-header">
       <h1><span class="material-icons">local_hospital</span>Kelola Puskesmas</h1>
@@ -3954,12 +2653,9 @@ function filterPKM() {
 function renderPKMTable(pkm) {
   const el = document.getElementById('pkmTable');
   if (!el) return;
-  const page = _pgState['pkm'] || 1;
-  const ps = PAGINATION_SIZE;
-  const sliced = pkm.slice((page-1)*ps, page*ps);
   el.innerHTML = `<div class="table-container"><table>
     <thead><tr><th>Kode</th><th>Nama Puskesmas</th><th>Indeks Beban Kerja</th><th>Indeks Kesulitan Wilayah</th><th>Status</th><th>Aksi</th></tr></thead>
-    <tbody>${sliced.map(p => `<tr>
+    <tbody>${pkm.map(p => `<tr>
       <td><span style="font-family:'JetBrains Mono';font-weight:700">${p.kode}</span></td>
       <td>${p.nama}</td>
       <td class="rasio-cell">${parseFloat(p.indeks||0).toFixed(2)}</td>
@@ -3970,10 +2666,8 @@ function renderPKMTable(pkm) {
         <button class="btn-icon del" onclick="deletePKM('${p.kode}')"><span class="material-icons">delete</span></button>
       </td>
     </tr>`).join('')}</tbody>
-  </table></div><div id="pg-pkm"></div>`;
-  renderPagination('pg-pkm', pkm.length, page, ps, 'pgPKM');
+  </table></div>`;
 }
-function pgPKM(p) { _pgState['pkm'] = p; renderPKMTable(allPKM); }
 
 function openPKMModal(editKode = null) {
   document.getElementById('pkmModalTitle').textContent = editKode ? 'Edit Puskesmas' : 'Tambah Puskesmas';
@@ -4035,7 +2729,7 @@ async function deletePKM(kode) {
 let _ttPKM = [], _ttIndikator = [], _ttCurrentKode = null, _ttCurrentTahun = null;
 
 async function renderTargetTahunan() {
-  const tahunOpts = yearOptions(CURRENT_YEAR);
+  const tahunOpts = Array.from({length:5},(_,i)=>2024+i).map(y=>`<option value="${y}" ${y===CURRENT_YEAR?'selected':''}>${y}</option>`).join('');
   document.getElementById('mainContent').innerHTML = `
     <div class="page-header">
       <h1><span class="material-icons">track_changes</span>Target Tahunan per Puskesmas</h1>
@@ -4105,7 +2799,7 @@ async function loadTargetTahunan() {
         </div>
         <div class="table-container">
           <table>
-            <thead><tr><th style="width:40px">No</th><th>Nama Indikator</th><th style="width:160px;text-align:center">Jumlah Sasaran (Tahun)</th></tr></thead>
+            <thead><tr><th style="width:40px">No</th><th>Nama Indikator</th><th style="width:160px;text-align:center">Jumlah Sasaran (Satu Tahun)</th></tr></thead>
             <tbody>
               ${_ttIndikator.map(ind => `<tr>
                 <td><span style="font-family:'JetBrains Mono';font-weight:700">${ind.noIndikator}</span></td>
@@ -4149,7 +2843,7 @@ async function saveTargetTahunan() {
 // ============== ADMIN - INDIKATOR ==============
 let allIndikator = [];
 
-async function _renderIndikator_LEGACY() {
+async function renderIndikator() {
   document.getElementById('mainContent').innerHTML = `
     <div class="page-header">
       <h1><span class="material-icons">monitor_heart</span>Kelola Indikator</h1>
@@ -4203,12 +2897,9 @@ function renderIndTable(inds) {
   const totalBobot = allIndikator.filter(i => i.aktif).reduce((s, i) => s + (parseInt(i.bobot) || 0), 0);
   const tbEl = document.getElementById('totalBobot');
   if (tbEl) tbEl.textContent = totalBobot;
-  const page = _pgState['ind'] || 1;
-  const ps = PAGINATION_SIZE;
-  const sliced = inds.slice((page-1)*ps, page*ps);
   el.innerHTML = `<div class="table-container"><table>
     <thead><tr><th>No</th><th>Nama Indikator</th><th>Bobot</th><th>Status</th><th>Aksi</th></tr></thead>
-    <tbody>${sliced.map(i => `<tr>
+    <tbody>${inds.map(i => `<tr>
       <td><span style="font-family:'JetBrains Mono';font-weight:700">${i.no}</span></td>
       <td>${i.nama}</td>
       <td style="text-align:center"><span style="font-family:'JetBrains Mono'">${i.bobot}</span></td>
@@ -4218,10 +2909,8 @@ function renderIndTable(inds) {
         <button class="btn-icon del" onclick="deleteInd(${i.no})"><span class="material-icons">delete</span></button>
       </td>
     </tr>`).join('')}</tbody>
-  </table></div><div id="pg-ind"></div>`;
-  renderPagination('pg-ind', inds.length, page, ps, 'pgInd');
+  </table></div>`;
 }
-function pgInd(p) { _pgState['ind'] = p; renderIndTable(allIndikator); }
 
 function openIndModal(editNo = null) {
   document.getElementById('indModalTitle').textContent = editNo ? 'Edit Indikator' : 'Tambah Indikator';
@@ -4291,7 +2980,7 @@ async function renderPeriode() {
     <div class="card">
       <div class="card-body" style="padding:12px 16px">
         <select class="form-control" id="filterTahunPeriode" style="width:150px" onchange="loadPeriodeGrid()">
-          ${yearOptions(currentTahun, window._maxPeriodeTahun || CURRENT_YEAR + 10)}
+          ${yearOptions(currentTahun, CURRENT_YEAR + 10)}
         </select>
       </div>
       <div class="card-body">
@@ -4305,7 +2994,7 @@ async function renderPeriode() {
           <button class="btn-icon" onclick="closeModal('periodeModal')"><span class="material-icons">close</span></button></div>
         <div class="modal-body">
           <div class="form-row">
-            <div class="form-group"><label>Tahun</label><select class="form-control" id="pTahun">${yearOptions(currentTahun, window._maxPeriodeTahun || CURRENT_YEAR + 10)}</select></div>
+            <div class="form-group"><label>Tahun</label><select class="form-control" id="pTahun">${yearOptions(currentTahun, CURRENT_YEAR + 10)}</select></div>
             <div class="form-group"><label>Bulan</label><select class="form-control" id="pBulan">${bulanOptions(CURRENT_BULAN)}</select></div>
           </div>
           <div class="form-row">
@@ -4354,15 +3043,12 @@ async function loadPeriodeGrid() {
         : isTidakAktif
           ? '<span class="badge badge-default" style="color:#94a3b8">Tidak Aktif</span>'
           : '<span class="badge badge-info">Aktif</span>';
-      return `<div style="border:2px solid ${borderColor};border-radius:12px;padding:16px;background:${bg};opacity:${isTidakAktif?'0.65':'1'}">
+      return `<div style="border:2px solid ${borderColor};border-radius:12px;padding:16px;background:${bg};cursor:pointer;opacity:${isTidakAktif?'0.65':'1'}" onclick="editPeriode(${p.tahun},${p.bulan})">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-          <span style="font-weight:700;font-size:15px;cursor:pointer" onclick="editPeriode(${p.tahun},${p.bulan})">${p.namaBulan} ${p.tahun}</span>
-          <div style="display:flex;align-items:center;gap:6px">
-            ${badgeHtml}
-            <button onclick="hapusPeriode(${p.tahun},${p.bulan},'${p.namaBulan}')" title="Hapus" style="background:none;border:none;cursor:pointer;padding:2px 4px;border-radius:5px;display:flex;align-items:center;color:#ef4444" onmouseover="this.style.background='rgba(239,68,68,0.08)'" onmouseout="this.style.background='none'"><span class="material-icons" style="font-size:16px">delete</span></button>
-          </div>
+          <span style="font-weight:700;font-size:15px">${p.namaBulan} ${p.tahun}</span>
+          ${badgeHtml}
         </div>
-        <div style="font-size:12px;color:var(--text-light);display:flex;flex-direction:column;gap:3px;cursor:pointer" onclick="editPeriode(${p.tahun},${p.bulan})">
+        <div style="font-size:12px;color:var(--text-light);display:flex;flex-direction:column;gap:3px">
           <div>Mulai: ${formatDate(p.tanggalMulai)}${p.jamMulai ? ` pukul ${p.jamMulai}` : ''}</div>
           <div>Selesai: ${formatDate(p.tanggalSelesai)}${p.jamSelesai ? ` pukul ${p.jamSelesai}` : ''}</div>
           ${p.notifOperator ? `<div style="margin-top:6px;padding:5px 8px;background:rgba(13,148,136,0.08);border-radius:6px;color:var(--text-md);font-size:11px;border-left:3px solid var(--primary)"><span style="font-weight:600">Notif:</span> ${p.notifOperator}</div>` : ''}
@@ -4370,24 +3056,6 @@ async function loadPeriodeGrid() {
       </div>`;
     }).join('');
   } catch (e) { toast(e.message, 'error'); }
-}
-
-async function hapusPeriode(tahun, bulan, namaBulan) {
-  showConfirm({
-    title: 'Hapus Periode',
-    message: `Hapus periode <b>${namaBulan} ${tahun}</b>? Tindakan ini tidak bisa dibatalkan.`,
-    onConfirm: async () => {
-      setLoading(true);
-      try {
-        const res = await fetch(`/api/periode?tahun=${tahun}&bulan=${bulan}`, { method: 'DELETE' });
-        const data = await res.json();
-        if (!data.success) throw new Error(data.message || 'Gagal menghapus');
-        toast(`Periode ${namaBulan} ${tahun} berhasil dihapus`, 'success');
-        loadPeriodeGrid();
-      } catch (e) { toast(e.message, 'error'); }
-      finally { setLoading(false); }
-    }
-  });
 }
 
 async function openPeriodeModal() {
@@ -4459,7 +3127,6 @@ function resetIdleTimer() {
     if (currentUser) {
       currentUser = null;
       localStorage.removeItem('spm_user');
-      sessionStorage.removeItem('spm_lastPage');
       toast('Sesi berakhir karena tidak ada aktivitas. Silakan login kembali.', 'warning');
       setTimeout(() => location.reload(), 2000);
     }
@@ -4474,7 +3141,6 @@ function startIdleWatcher() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  initTheme();
   document.getElementById('authEmail').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') doLogin();
   });
@@ -4495,7 +3161,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   } catch(e) {
     localStorage.removeItem('spm_user');
-    sessionStorage.removeItem('spm_lastPage');
   }
 });
 

@@ -2111,10 +2111,6 @@ async function openVerifikasi(idUsulan) {
   if (btnA) { btnA.disabled = true; btnA.style.background = ''; btnA.innerHTML = '<span class="material-icons">check_circle</span> Setujui'; }
   if (btnR) { btnR.disabled = true; btnR.style.background = ''; btnR.style.borderColor = ''; btnR.innerHTML = '<span class="material-icons">cancel</span> Tolak'; }
 
-  // Reset tolakKe dropdown
-  const tolakKeContainer = document.getElementById('tolakKeContainer');
-  if (tolakKeContainer) tolakKeContainer.style.display = 'none';
-
   showModal('verifikasiModal');
   document.getElementById('verifIndikatorBody').innerHTML = `<tr><td colspan="4"><div class="empty-state" style="padding:20px"><p>Memuat...</p></div></td></tr>`;
 
@@ -2134,7 +2130,24 @@ async function openVerifikasi(idUsulan) {
       </div>
       <div class="detail-item"><label>Indeks Beban Kerja</label><span style="font-family:'JetBrains Mono'">${parseFloat(detail.indeksBeban||0).toFixed(2)}</span></div>
       <div class="detail-item"><label>Indeks Kesulitan Wilayah</label><span style="font-family:'JetBrains Mono'">${parseFloat(detail.indeksKesulitan||0).toFixed(2)}</span></div>
-      <div class="detail-item"><label>Indeks SPM</label><span style="font-family:'JetBrains Mono';font-size:16px;font-weight:800;color:var(--primary)">${parseFloat(detail.indeksSPM).toFixed(2)}</span></div>`;
+      <div class="detail-item"><label>Indeks SPM</label><span style="font-family:'JetBrains Mono';font-size:16px;font-weight:800;color:var(--primary)">${parseFloat(detail.indeksSPM).toFixed(2)}</span></div>
+      ${detail.alasanTolak ? `
+        <div class="detail-item" style="grid-column:1/-1">
+          <label>Alasan Penolakan (${detail.ditolakOleh||'Verifikator'})</label>
+          <span style="color:#dc2626;font-style:italic">"${detail.alasanTolak}"</span>
+        </div>` : ''}
+      ${(detail.verifikasiProgram||[]).some(v=>v.sanggahan) && currentUser.role === 'Admin' ? `
+        <div class="detail-item" style="grid-column:1/-1">
+          <label>Sanggahan Pengelola Program</label>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            ${(detail.verifikasiProgram||[]).filter(v=>v.sanggahan).map(v=>`
+              <div style="background:#fef9c3;border:1.5px solid #f59e0b;border-radius:8px;padding:8px 12px;font-size:12.5px">
+                <span style="font-weight:700;color:#92400e">${v.nama_program||v.email_program}</span>
+                <span style="color:#78350f;margin-left:8px;font-style:italic">"${v.sanggahan}"</span>
+              </div>`).join('')}
+          </div>
+        </div>` : ''}
+      `;
 
     // Filter inds for program role
     let displayInds = inds;
@@ -2178,8 +2191,11 @@ async function openVerifikasi(idUsulan) {
     // Adjust buttons based on status & sudah verifikasi
     const canApprove = !sudahVerifUser && (
       (currentUser.role === 'Kepala Puskesmas' && detail.statusGlobal === 'Menunggu Kepala Puskesmas') ||
-      (currentUser.role === 'Pengelola Program' && (detail.statusGlobal === 'Menunggu Pengelola Program' || detail.statusGlobal === 'Ditolak')) ||
-      (currentUser.role === 'Admin' && detail.statusGlobal === 'Menunggu Admin')
+      (currentUser.role === 'Pengelola Program' && (
+        detail.statusGlobal === 'Menunggu Pengelola Program' ||
+        (detail.statusGlobal === 'Ditolak' && detail.ditolakOleh === 'Admin') // sanggah atau tolak ke operator
+      )) ||
+      (currentUser.role === 'Admin' && (detail.statusGlobal === 'Menunggu Admin'))
     );
 
     // Cek tanda tangan — blok verifikasi jika belum ada
@@ -2220,7 +2236,6 @@ async function openVerifikasi(idUsulan) {
           document.getElementById('verifCatatan')?.closest('.modal-body')?.appendChild(w);
         }
       }
-      if (tolakKeContainer) tolakKeContainer.style.display = 'none';
     } else {
       document.getElementById('ttWarning')?.remove();
       if (sudahVerifUser) {
@@ -2228,26 +2243,21 @@ async function openVerifikasi(idUsulan) {
         btnApprove.innerHTML = '<span class="material-icons">check_circle</span> Sudah Diverifikasi';
         btnApprove.disabled = true;
         btnReject.disabled = true;
-        if (tolakKeContainer) tolakKeContainer.style.display = 'none';
+        const btnSanggahDone = document.getElementById('btnSanggah');
+        if (btnSanggahDone) btnSanggahDone.style.display = 'none';
       } else {
         btnApprove.disabled = !canApprove;
         btnReject.disabled = !canApprove;
-        if (canApprove && tolakKeContainer) {
-          const sel = document.getElementById('verifTolakKe');
-          if (currentUser.role === 'Admin') {
-            tolakKeContainer.style.display = 'block';
-            sel.innerHTML = `
-              <option value="Pengelola Program">Pengelola Program</option>
-              <option value="Kepala Puskesmas">Kepala Puskesmas</option>
-              <option value="Operator">Operator</option>`;
-          } else if (currentUser.role === 'Pengelola Program') {
-            tolakKeContainer.style.display = 'block';
-            sel.innerHTML = `
-              <option value="Kepala Puskesmas">Kepala Puskesmas</option>
-              <option value="Operator">Operator</option>`;
-          } else {
-            tolakKeContainer.style.display = 'none';
-          }
+
+        // Tombol Sanggah: hanya Pengelola Program saat statusGlobal=Ditolak karena Admin
+        const btnSanggah = document.getElementById('btnSanggah');
+        if (btnSanggah) {
+          const isProgramDitolakAdmin = canApprove &&
+            currentUser.role === 'Pengelola Program' &&
+            detail.statusGlobal === 'Ditolak' &&
+            detail.statusKapus === 'Selesai'; // sudah lewat Kapus = ditolak Admin
+          btnSanggah.style.display = isProgramDitolakAdmin ? '' : 'none';
+          btnSanggah.disabled = !canApprove;
         }
       }
     } // end else hasTandaTangan
@@ -2286,40 +2296,41 @@ async function doApprove() {
 }
 
 async function doReject() {
-  const catatan = document.getElementById('verifCatatan').value;
+  const catatan = document.getElementById('verifCatatan').value.trim();
   if (!catatan) return toast('Isi alasan penolakan', 'warning');
-
-  const role = currentUser.role;
-  let tolakKe = null;
-  if (role === 'Admin' || role === 'Pengelola Program') {
-    tolakKe = document.getElementById('verifTolakKe')?.value;
-    if (!tolakKe) return toast('Pilih tujuan penolakan', 'warning');
-  }
 
   setLoading(true);
   try {
-    await API.rejectUsulan({ idUsulan: verifCurrentUsulan, email: currentUser.email, role, alasan: catatan, tolakKe });
-    const targetLabel = tolakKe ? ` → ${tolakKe}` : ' → Operator';
-    toast(`Usulan ditolak${targetLabel}`, 'warning');
-
+    await API.rejectUsulan({ idUsulan: verifCurrentUsulan, email: currentUser.email, role: currentUser.role, alasan: catatan });
+    toast('Usulan ditolak', 'warning');
     const btnApprove = document.getElementById('btnApprove');
-    const btnReject = document.getElementById('btnReject');
-    if (btnApprove) { btnApprove.disabled = true; }
+    const btnReject  = document.getElementById('btnReject');
+    const btnSanggah = document.getElementById('btnSanggah');
+    if (btnApprove) btnApprove.disabled = true;
+    if (btnSanggah) btnSanggah.style.display = 'none';
     if (btnReject) {
-      btnReject.style.background = '#16a34a';
-      btnReject.style.borderColor = '#16a34a';
-      btnReject.innerHTML = '<span class="material-icons">check_circle</span> Sudah Diverifikasi';
+      btnReject.style.background = '#dc2626';
+      btnReject.innerHTML = '<span class="material-icons">cancel</span> Ditolak';
       btnReject.disabled = true;
     }
-    document.getElementById('tolakKeContainer').style.display = 'none';
-
-    setTimeout(() => {
-      closeModal('verifikasiModal');
-      renderVerifikasi();
-    }, 800);
+    setTimeout(() => { closeModal('verifikasiModal'); renderVerifikasi(); }, 800);
   } catch (e) { toast(e.message, 'error'); }
   finally { setLoading(false); }
 }
+
+async function doSanggah() {
+  const catatan = document.getElementById('verifCatatan').value.trim();
+  if (!catatan) return toast('Isi alasan sanggahan Anda', 'warning');
+
+  setLoading(true);
+  try {
+    await API.rejectUsulan({ idUsulan: verifCurrentUsulan, email: currentUser.email, role: currentUser.role, alasan: catatan, aksi: 'sanggah' });
+    toast('Sanggahan terkirim ke Admin', 'info');
+    setTimeout(() => { closeModal('verifikasiModal'); renderVerifikasi(); }, 800);
+  } catch (e) { toast(e.message, 'error'); }
+  finally { setLoading(false); }
+}
+
 
 // ===== UBAH PASSWORD =====
 function showChangePassword() {

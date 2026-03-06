@@ -2,6 +2,12 @@
 
 // ============== PAGINATION UTILITY ==============
 const PAGINATION_SIZE = 12; // baris per halaman default
+function fmtPct(pct) {
+  const p = parseFloat(pct);
+  if (isNaN(p)) return '-';
+  return p >= 100 ? '100%' : p.toFixed(1) + '%';
+}
+
 const _pgState = {}; // { tableId: currentPage }
 
 function renderPagination(containerId, totalItems, currentPage, pageSize, onPageChange) {
@@ -147,7 +153,8 @@ function startApp() {
   if (tMeta) tMeta.textContent = currentUser.role + (currentUser.namaPKM ? ' — ' + currentUser.namaPKM : '');
 
   buildSidebar();
-  loadPage('dashboard');
+  const _lastPage = sessionStorage.getItem('spm_lastPage');
+  loadPage(_lastPage || 'dashboard');
 
   // Load app settings (tahun range, dll)
   API.getSettings().then(s => {
@@ -300,6 +307,23 @@ document.addEventListener('click', e => {
   if (wrap && !wrap.contains(e.target)) closeTopbarDropdown();
 });
 
+
+// ============== THEME (DARK/LIGHT MODE) ==============
+function initTheme() {
+  const saved = localStorage.getItem('spm_theme') || 'light';
+  applyTheme(saved);
+}
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('spm_theme', theme);
+  const btn = document.getElementById('themeToggleBtn');
+  if (btn) btn.textContent = theme === 'dark' ? '🌞' : '🌙';
+}
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme') || 'light';
+  applyTheme(current === 'dark' ? 'light' : 'dark');
+}
+
 // ============== ROUTING ==============
 const PAGE_TITLES = {
   dashboard: 'Dashboard', verifikasi: 'Verifikasi', laporan: 'Laporan',
@@ -311,6 +335,7 @@ const PAGE_TITLES = {
 
 function loadPage(page) {
   currentPage = page;
+  sessionStorage.setItem('spm_lastPage', page);
   closeSidebar();
   setActiveNav(page);
   document.getElementById('topbarTitle').textContent = PAGE_TITLES[page] || page;
@@ -825,10 +850,30 @@ async function createUsulan() {
 }
 
 async function deleteUsulan(idUsulan) {
-  showConfirm({ title: 'Hapus Usulan', message: `Hapus usulan ${idUsulan}? Data tidak dapat dikembalikan.`,
+  showConfirm({ title: 'Hapus Usulan', message: `Hapus usulan ${idUsulan}? Semua data dukung di Cloudinary juga akan dihapus.`,
+    type: 'danger',
     onConfirm: async () => {
       try {
+        // Ambil semua file terkait usulan ini dulu
+        const inds = await API.getIndikatorUsulan(idUsulan).catch(() => []);
+        // Hapus dari DB
         await API.del('usulan', { idUsulan });
+        // Hapus semua file dari Cloudinary (background, silent)
+        for (const ind of (inds || [])) {
+          if (!ind.linkFile) continue;
+          try {
+            const links = JSON.parse(ind.linkFile);
+            for (const f of (Array.isArray(links) ? links : [])) {
+              if (f?.id) {
+                fetch('/.netlify/functions/delete-file', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ publicId: f.id })
+                }).catch(() => {});
+              }
+            }
+          } catch(e) {}
+        }
         toast('Usulan berhasil dihapus');
         loadMyUsulan();
       } catch (e) { toast(e.message, 'error'); }
@@ -937,7 +982,7 @@ async function openIndikatorModal(idUsulan) {
             <input type="number" id="c-${ind.no}" value="${ind.capaian}" min="0" step="0.01"
               style="width:72px;border:1.5px solid var(--border);border-radius:6px;padding:3px 6px;font-size:13px"
               onchange="saveIndikator(${ind.no})" oninput="validateRealisasi(${ind.no})">
-            <span id="c-warn-${ind.no}" style="display:none;font-size:10px;color:#ef4444;font-weight:600;white-space:nowrap">≤ target</span>
+            <span id="c-warn-${ind.no}" style="display:none;font-size:10px;color:#ef4444;font-weight:600;white-space:nowrap">Nilai tidak bisa melebihi target</span>
           </div>`}</td>
         <td id="cap-${ind.no}" style="text-align:center;font-weight:700;font-size:13px;color:${ind.target>0?(ind.capaian/ind.target*100)>=100?'#16a34a':'#0d9488':'#64748b'}">${ind.target > 0 ? (ind.capaian / ind.target * 100).toFixed(1) + '%' : '-'}</td>
         <td style="min-width:100px;text-align:center">
@@ -1486,12 +1531,7 @@ function validateRealisasi(no) {
   if (t > 0 && c > t) {
     cEl.value = t; // paksa sama dengan target
     cEl.style.borderColor = '#ef4444';
-    if (warnEl) warnEl.style.display = 'block';
-    // Toast sekali per indikator (debounce)
-    clearTimeout(cEl._warnTimeout);
-    cEl._warnTimeout = setTimeout(() => {
-      toast(`Indikator ${no}: Realisasi tidak boleh melebihi Target (${t})`, 'warning');
-    }, 300);
+    if (warnEl) { warnEl.style.display = 'block'; clearTimeout(warnEl._hideT); warnEl._hideT = setTimeout(() => { warnEl.style.display = 'none'; }, 2000); }
   } else {
     cEl.style.borderColor = '';
     if (warnEl) warnEl.style.display = 'none';
@@ -1519,9 +1559,9 @@ function previewSPM(changedNo) {
     const capEl = document.getElementById(`cap-${no}`);
     if (capEl) {
       if (t > 0) {
-        const pct = (c / t * 100).toFixed(1);
-        capEl.textContent = pct + '%';
-        capEl.style.color = parseFloat(pct) >= 100 ? '#16a34a' : '#0d9488';
+        const pct = fmtPct(c / t * 100);
+        capEl.textContent = pct;
+        capEl.style.color = pct === '100%' || parseFloat(pct) >= 100 ? '#16a34a' : '#0d9488';
       } else {
         capEl.textContent = '-';
         capEl.style.color = '#64748b';
@@ -1550,9 +1590,11 @@ async function viewDetail(idUsulan) {
         <div style="font-weight:700;font-size:13px;margin-bottom:8px;display:flex;align-items:center;gap:6px">
           <span class="material-icons" style="font-size:16px;color:var(--primary)">groups</span>
           Progress Verifikasi Pengelola Program
-          (${vp.filter(v=>v.status==='Selesai').length} selesai
-          ${vp.filter(v=>v.status==='Ditolak').length ? `· <span style="color:#ef4444">${vp.filter(v=>v.status==='Ditolak').length} menolak</span>` : ''}
-          · ${vp.filter(v=>v.status==='Menunggu').length} menunggu dari ${vp.length})
+          &nbsp;
+          <span style="display:inline-flex;align-items:center;gap:3px;font-size:12px;font-weight:700;color:#16a34a;background:#dcfce7;padding:2px 8px;border-radius:20px">✅ ${vp.filter(v=>v.status==='Selesai').length} selesai</span>
+          ${vp.filter(v=>v.status==='Ditolak').length ? `<span style="display:inline-flex;align-items:center;gap:3px;font-size:12px;font-weight:700;color:#dc2626;background:#fee2e2;padding:2px 8px;border-radius:20px">❌ ${vp.filter(v=>v.status==='Ditolak').length} menolak</span>` : ''}
+          <span style="display:inline-flex;align-items:center;gap:3px;font-size:12px;font-weight:700;color:#d97706;background:#fef3c7;padding:2px 8px;border-radius:20px">⏳ ${vp.filter(v=>v.status==='Menunggu').length} menunggu</span>
+          <span style="display:inline-flex;align-items:center;gap:3px;font-size:12px;font-weight:600;color:#64748b;background:#f1f5f9;padding:2px 8px;border-radius:20px">📁 Total: ${vp.length}</span>
         </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px">
           ${vp.map(v => {
@@ -1634,7 +1676,7 @@ async function viewDetail(idUsulan) {
           <thead><tr><th>No</th><th>Indikator</th><th>Target</th><th>Realisasi</th><th style="text-align:center">Capaian (%)</th><th>Data Dukung</th></tr></thead>
           <tbody>${inds.map(i => `<tr>
             <td>${i.no}</td><td style="max-width:220px;font-size:12.5px">${i.nama}</td>
-            <td>${i.target}</td><td>${i.capaian}</td><td style="text-align:center;font-weight:600;color:${i.target>0?(i.capaian/i.target*100)>=100?'#16a34a':'#0d9488':'#64748b'}">${i.target > 0 ? (i.capaian/i.target*100).toFixed(1)+'%' : '-'}</td>
+            <td>${i.target}</td><td>${i.capaian}</td><td style="text-align:center;font-weight:600;color:${i.target>0?(i.capaian/i.target*100)>=100?'#16a34a':'#0d9488':'#64748b'}">${i.target > 0 ? fmtPct(i.capaian/i.target*100) : '-'}</td>
             
             <td>${i.linkFile ? (() => { try { const ls = JSON.parse(i.linkFile); const arr = Array.isArray(ls) ? ls.map(f=>typeof f==='string'?{id:null,url:f,name:'File'}:f) : [{id:null,url:i.linkFile,name:'File'}]; window[`_buktiLinks_${i.no}`]={links:arr,idUsulan:i.idUsulan||''}; return `<button onclick="openBuktiModal(${i.no},0)" style="background:none;border:none;cursor:pointer;color:#0d9488;display:inline-flex;align-items:center;gap:3px;font-size:12px;padding:2px 6px;border-radius:5px" onmouseover="this.style.background='rgba(13,148,136,0.08)'" onmouseout="this.style.background='none'"><span class="material-icons" style="font-size:14px">visibility</span></button>`; } catch(e){ return `<a href="${i.linkFile}" target="_blank" style="color:#0d9488"><span class="material-icons" style="font-size:13px">visibility</span></a>`; } })() : '-'}</td>
           </tr>`).join('')}</tbody>
@@ -1829,7 +1871,7 @@ async function openVerifikasi(idUsulan) {
       }
       return `<tr>
         <td>${i.no}</td><td style="font-size:13px">${i.nama}</td>
-        <td>${i.target}</td><td>${i.capaian}</td><td style="text-align:center;font-weight:600;color:${i.target>0?(i.capaian/i.target*100)>=100?'#16a34a':'#0d9488':'#64748b'}">${i.target > 0 ? (i.capaian/i.target*100).toFixed(1)+'%' : '-'}</td>
+        <td>${i.target}</td><td>${i.capaian}</td><td style="text-align:center;font-weight:600;color:${i.target>0?(i.capaian/i.target*100)>=100?'#16a34a':'#0d9488':'#64748b'}">${i.target > 0 ? fmtPct(i.capaian/i.target*100) : '-'}</td>
         <td>${buktiHtml}</td>
       </tr>`;
     }).join('');
@@ -1869,8 +1911,23 @@ async function openVerifikasi(idUsulan) {
         const w = document.createElement('div');
         w.id = 'ttWarning';
         w.style.cssText = 'background:#fef3c7;border:1.5px solid #f59e0b;border-radius:8px;padding:10px 14px;font-size:12px;color:#92400e;display:flex;align-items:center;gap:8px;margin-top:12px';
-        w.innerHTML = `<span class="material-icons" style="font-size:16px;color:#f59e0b">warning</span>
-          Anda belum mengupload tanda tangan. <a href="#" onclick="event.preventDefault();closeModal('verifikasiModal');setTimeout(()=>openUserModal('${currentUser.email}'),200)" style="color:#92400e;font-weight:700;text-decoration:underline">Upload sekarang</a>`;
+        w.style.cssText = 'background:#fef3c7;border:1.5px solid #f59e0b;border-radius:10px;padding:12px 14px;font-size:12px;color:#92400e;margin-top:12px';
+        w.innerHTML = `
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-weight:700;font-size:13px">
+            <span class="material-icons" style="font-size:17px;color:#f59e0b">warning</span>
+            ⚠️ Anda belum mengupload tanda tangan
+          </div>
+          <div style="margin-bottom:8px">
+            Upload melalui menu: <span style="background:#fff8e1;padding:1px 6px;border-radius:4px;font-weight:700">Avatar Profil › Edit Profil & Tanda Tangan</span>
+          </div>
+          <div style="font-size:11.5px;color:#a16207;line-height:1.7;border-top:1px solid rgba(245,158,11,0.25);padding-top:8px;margin-top:4px">
+            <b>Spesifikasi file:</b> PNG / JPG · Latar belakang putih · Resolusi jelas · Tinta hitam/biru tua
+          </div>
+          <div style="margin-top:8px">
+            <a href="#" onclick="event.preventDefault();closeModal('verifikasiModal');setTimeout(()=>openEditProfil(),200)" style="display:inline-flex;align-items:center;gap:5px;background:#f59e0b;color:white;padding:6px 14px;border-radius:7px;font-weight:700;font-size:12px;text-decoration:none">
+              <span class="material-icons" style="font-size:14px">upload</span>Upload Sekarang
+            </a>
+          </div>`;
         document.getElementById('verifCatatan')?.closest('.modal-body')?.appendChild(w);
       }
       if (tolakKeContainer) tolakKeContainer.style.display = 'none';
@@ -2019,7 +2076,6 @@ async function renderLaporan() {
   document.getElementById('mainContent').innerHTML = `
     <div class="page-header">
       <h1><span class="material-icons">bar_chart</span>Laporan</h1>
-      <button class="btn btn-primary" onclick="exportLaporan()"><span class="material-icons">download</span>Export CSV</button>
     </div>
     <div class="card">
       <div class="card-header-bar"><span class="card-title"><span class="material-icons">filter_list</span>Filter</span></div>
@@ -3048,6 +3104,7 @@ async function saveEditProfil() {
     currentUser.nama = nama;
     currentUser.nip  = nip;
     if (tt !== undefined) currentUser.tandaTangan = tt || '';
+    localStorage.setItem('spm_user', JSON.stringify(currentUser));
     // Refresh sidebar & topbar
     document.getElementById('sidebarName').textContent = nama;
     document.getElementById('sidebarAvatar').textContent = nama[0].toUpperCase();
@@ -3082,6 +3139,13 @@ async function saveUser() {
       await API.updateUser({ email, nama, nip, role, kodePKM, indikatorAkses, jabatan, aktif, tandaTangan: _ttBase64 || undefined });
     } else {
       await API.saveUser({ email, nama, nip, role, kodePKM, indikatorAkses, jabatan });
+    }
+    if (editEmail && editEmail === currentUser.email) {
+      // Update currentUser jika edit diri sendiri
+      currentUser.nama = document.getElementById('uNama').value.trim();
+      currentUser.nip  = document.getElementById('uNIP')?.value.trim() || '';
+      if (_ttBase64 !== null && _ttBase64 !== undefined) currentUser.tandaTangan = _ttBase64 || '';
+      localStorage.setItem('spm_user', JSON.stringify(currentUser));
     }
     toast(`User berhasil ${editEmail ? 'diupdate' : 'ditambahkan'}`);
     closeModal('userModal');
@@ -3823,6 +3887,7 @@ function startIdleWatcher() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  initTheme();
   document.getElementById('authEmail').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') doLogin();
   });

@@ -65,20 +65,22 @@ async function operatorStats(pool, email) {
   );
   const s = result.rows[0];
 
-  // Periode aktif
+  // Periode aktif — ambil semua
   const periodeResult = await pool.query(
     `SELECT tahun, bulan, nama_bulan, tanggal_mulai, tanggal_selesai, jam_mulai, jam_selesai, notif_operator
      FROM periode_input
      WHERE status='Aktif' AND tanggal_mulai <= CURRENT_DATE AND tanggal_selesai >= CURRENT_DATE
-     LIMIT 1`
+     ORDER BY tahun, bulan`
   );
   const periodeAktif = periodeResult.rows.length > 0 ? periodeResult.rows[0] : null;
+  const periodeAktifList = periodeResult.rows;
 
   return ok({
     totalUsulan: parseInt(s.total) || 0,
     disetujui: parseInt(s.selesai) || 0,
     menunggu: parseInt(s.menunggu) || 0,
-    periodeAktif
+    periodeAktif,
+    periodeAktifList
   });
 }
 

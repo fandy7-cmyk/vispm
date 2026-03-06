@@ -19,6 +19,8 @@ exports.handler = async (event) => {
     if (method === 'POST' && path === 'approve-program') return await approveProgram(pool, body);
     if (method === 'POST' && path === 'approve-admin') return await approveAdmin(pool, body);
     if (method === 'POST' && path === 'reject') return await rejectUsulan(pool, body);
+  if (method === 'GET'  && path === 'penolakan') return await getPenolakanIndikator(pool, params);
+  if (method === 'POST' && path === 'respond-penolakan') return await respondPenolakan(pool, body);
     if (method === 'PUT' && path === 'drive-folder') return await saveDriveFolder(pool, body);
     if (method === 'POST' && path === 'admin-reset') return await adminResetUsulan(pool, body);
     if (method === 'POST' && path === 'restore-verif') return await restoreVerifStatus(pool, body);
@@ -109,8 +111,13 @@ async function getUsulanDetail(pool, idUsulan) {
     `SELECT email_program, nama_program, nip_program, jabatan_program, indikator_akses, status, catatan, sanggahan, verified_at FROM verifikasi_program WHERE id_usulan=$1 ORDER BY created_at`,
     [idUsulan]
   );
+  const piResult = await pool.query(
+    `SELECT * FROM penolakan_indikator WHERE id_usulan=$1 ORDER BY no_indikator`,
+    [idUsulan]
+  ).catch(() => ({ rows: [] }));
   const detail = mapHeader(result.rows[0]);
   detail.verifikasiProgram = vpResult.rows;
+  detail.penolakanIndikator = piResult.rows;
   return ok(detail);
 }
 
@@ -133,7 +140,7 @@ async function getIndikatorUsulan(pool, idUsulan) {
 async function getProgramVerifStatus(pool, idUsulan) {
   if (!idUsulan) return err('ID usulan diperlukan');
   const result = await pool.query(
-    `SELECT email_program, nama_program, nip_program, jabatan_program, indikator_akses, status, catatan, sanggahan, verified_at FROM verifikasi_program WHERE id_usulan=$1 ORDER BY created_at`,
+    `SELECT email_program, nama_program, nip_program, jabatan_program, indikator_akses, status, catatan, verified_at FROM verifikasi_program WHERE id_usulan=$1 ORDER BY created_at`,
     [idUsulan]
   );
   return ok(result.rows);
@@ -184,6 +191,21 @@ async function buatUsulan(pool, body) {
     await client.query(`ALTER TABLE verifikasi_program ADD COLUMN IF NOT EXISTS nip_program VARCHAR(50)`).catch(()=>{});
     await client.query(`ALTER TABLE verifikasi_program ADD COLUMN IF NOT EXISTS sanggahan TEXT`).catch(()=>{});
     await client.query(`ALTER TABLE usulan_header ADD COLUMN IF NOT EXISTS ditolak_oleh VARCHAR(50)`).catch(()=>{});
+    // Tabel penolakan per indikator oleh Admin
+    await client.query(`CREATE TABLE IF NOT EXISTS penolakan_indikator (
+      id SERIAL PRIMARY KEY,
+      id_usulan VARCHAR(50) NOT NULL,
+      no_indikator INT NOT NULL,
+      alasan TEXT NOT NULL,
+      email_admin VARCHAR(200) NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      -- Respon Pengelola Program
+      email_program VARCHAR(200),
+      aksi VARCHAR(20), -- 'sanggah' atau 'tolak'
+      catatan_program TEXT,
+      responded_at TIMESTAMPTZ,
+      UNIQUE(id_usulan, no_indikator)
+    )`).catch(()=>{});
     await client.query(`ALTER TABLE verifikasi_program ADD COLUMN IF NOT EXISTS jabatan_program TEXT`).catch(()=>{});
     await client.query(
       `INSERT INTO usulan_header (id_usulan,tahun,bulan,periode_key,kode_pkm,total_nilai,total_bobot,indeks_kinerja_spm,indeks_beban_kerja,indeks_spm,status_kapus,status_program,status_final,status_global,is_locked,created_by,created_at)
@@ -475,213 +497,195 @@ async function approveAdmin(pool, body) {
 }
 
 async function rejectUsulan(pool, body) {
-  const { idUsulan, email, role, alasan, aksi } = body;
-  if (!alasan || !alasan.trim()) return err('Alasan penolakan wajib diisi');
+  const { idUsulan, email, role, alasan, indikatorList } = body;
+  // indikatorList: array { noIndikator, alasan } — hanya untuk Admin
+  if (!alasan && !indikatorList) return err('Alasan penolakan wajib diisi');
 
-  // === SANGGAH: Pengelola Program sanggah penolakan Admin ===
-  if (role === 'Pengelola Program' && aksi === 'sanggah') {
-    const check = await pool.query('SELECT status_global FROM usulan_header WHERE id_usulan=$1', [idUsulan]);
-    if (!check.rows.length) return err('Usulan tidak ditemukan');
-    if (check.rows[0].status_global !== 'Ditolak') return err('Hanya bisa sanggah pada usulan yang ditolak');
-    // Simpan sanggahan di record VP user ini
+  if (role === 'Kepala Puskesmas') {
+    // Kepala Puskesmas tolak → reset total ke Operator
+    await pool.query(`UPDATE verifikasi_program SET status='Menunggu', catatan=NULL, verified_at=NULL WHERE id_usulan=$1`, [idUsulan]);
+    await pool.query(`DELETE FROM penolakan_indikator WHERE id_usulan=$1`, [idUsulan]);
     await pool.query(
-      `UPDATE verifikasi_program SET sanggahan=$1, status='Menunggu', verified_at=NULL WHERE id_usulan=$2 AND LOWER(email_program)=LOWER($3)`,
-      [alasan.trim(), idUsulan, email]
+      `UPDATE usulan_header SET status_global='Ditolak', is_locked=false,
+       status_kapus='Ditolak', status_program='Menunggu',
+       kapus_approved_by=NULL, kapus_catatan=$1 WHERE id_usulan=$2`,
+      [alasan.trim(), idUsulan]
     );
-    // Kembalikan status ke Menunggu Admin agar Admin bisa review ulang
-    await pool.query(
-      `UPDATE usulan_header SET status_global='Menunggu Admin', status_final='Menunggu', ditolak_oleh='Pengelola Program' WHERE id_usulan=$1`,
-      [idUsulan]
-    );
-    await logAktivitas(pool, email, role, 'Sanggah', idUsulan, alasan.trim());
-    return ok({ message: 'Sanggahan terkirim ke Admin untuk dipertimbangkan kembali.' });
+    await logAktivitas(pool, email, role, 'Tolak', idUsulan, alasan.trim());
+    return ok({ message: 'Usulan ditolak oleh Kepala Puskesmas. Operator dapat memperbaiki.' });
   }
 
-  if (role === 'Pengelola Program') {
-    // Cek duplikasi
-    const vpCheck = await pool.query('SELECT status FROM verifikasi_program WHERE id_usulan=$1 AND LOWER(email_program)=LOWER($2)', [idUsulan, email]);
-    if (vpCheck.rows.length === 0) return err('Anda tidak terdaftar sebagai pengelola program untuk usulan ini');
-    if (vpCheck.rows[0].status === 'Selesai') return err('Anda sudah menyetujui usulan ini');
-    if (vpCheck.rows[0].status === 'Ditolak') return err('Anda sudah menolak usulan ini');
+  if (role === 'Admin') {
+    // Admin tolak per indikator
+    if (!indikatorList || !indikatorList.length) return err('Pilih minimal 1 indikator yang bermasalah');
 
-    // Simpan penolakan
-    await pool.query(
-      `UPDATE verifikasi_program SET status='Ditolak', catatan=$1, verified_at=NOW()
-       WHERE id_usulan=$2 AND LOWER(email_program)=LOWER($3)`,
-      [alasan.trim(), idUsulan, email]
-    );
-
-    // Ambil nama pengelola yang menolak
-    const vpRow = await pool.query(
-      'SELECT nama_program FROM verifikasi_program WHERE id_usulan=$1 AND LOWER(email_program)=LOWER($2)',
-      [idUsulan, email]
-    );
-    const namaPengelola = vpRow.rows[0]?.nama_program || email;
-
-    // Cek apakah semua pengelola sudah verifikasi (tidak ada yang Menunggu)
-    const allVP = await pool.query('SELECT status FROM verifikasi_program WHERE id_usulan=$1', [idUsulan]);
-    const stillWaiting = allVP.rows.filter(r => r.status === 'Menunggu').length;
-
-    if (stillWaiting === 0) {
-      // Semua sudah verifikasi → otomatis Ditolak, operator bisa revisi
+    // Simpan penolakan per indikator (upsert)
+    for (const item of indikatorList) {
       await pool.query(
-        `UPDATE usulan_header SET
-          status_global='Ditolak', is_locked=false,
-          status_program='Ditolak',
-          admin_catatan=$1
-         WHERE id_usulan=$2`,
-        [`Ditolak oleh ${namaPengelola}: ${alasan.trim()}`, idUsulan]
-      );
-    } else {
-      // Masih ada yang belum verifikasi → status_global TETAP Menunggu Pengelola Program
-      await pool.query(
-        `UPDATE usulan_header SET status_program='Ditolak', admin_catatan=$1 WHERE id_usulan=$2`,
-        [`Ditolak oleh ${namaPengelola}: ${alasan.trim()}`, idUsulan]
+        `INSERT INTO penolakan_indikator (id_usulan, no_indikator, alasan, email_admin, created_at, aksi, catatan_program, responded_at, email_program)
+         VALUES ($1,$2,$3,$4,NOW(),NULL,NULL,NULL,NULL)
+         ON CONFLICT (id_usulan, no_indikator) DO UPDATE SET alasan=$3, email_admin=$4, created_at=NOW(), aksi=NULL, catatan_program=NULL, responded_at=NULL, email_program=NULL`,
+        [idUsulan, item.noIndikator, item.alasan.trim(), email]
       );
     }
 
-  } else if (role === 'Kepala Puskesmas') {
-    // Kepala Puskesmas tolak → reset semua, operator mulai dari awal
-    await pool.query(
-      `UPDATE verifikasi_program SET status='Menunggu', catatan=NULL, verified_at=NULL WHERE id_usulan=$1`,
+    // Cari Pengelola Program yang pegang indikator bermasalah → reset VP mereka saja
+    const nomorList = indikatorList.map(i => i.noIndikator);
+    const allVP = await pool.query(
+      `SELECT email_program, indikator_akses FROM verifikasi_program WHERE id_usulan=$1`,
       [idUsulan]
     );
-    await pool.query(
-      `UPDATE usulan_header SET
-        status_global='Ditolak', is_locked=false,
-        status_kapus='Ditolak', status_program='Menunggu',
-        kapus_approved_by=NULL, kapus_catatan=$1
-       WHERE id_usulan=$2`,
-      [alasan.trim(), idUsulan]
-    );
-
-  } else {
-    // Admin tolak → kembalikan ke Pengelola Program (Kapus tidak perlu verif ulang)
-    // Reset status VP semua program ke Menunggu agar bisa verif ulang
-    await pool.query(
-      `UPDATE verifikasi_program SET status='Menunggu', catatan=NULL, sanggahan=NULL, verified_at=NULL WHERE id_usulan=$1`,
-      [idUsulan]
-    );
-    await pool.query(
-      `UPDATE usulan_header SET
-        status_global='Ditolak', is_locked=false,
-        status_program='Menunggu',
-        ditolak_oleh='Admin',
-        admin_catatan=$1
-       WHERE id_usulan=$2`,
-      [alasan.trim(), idUsulan]
-    );
-  }
-
-  await logAktivitas(pool, email, role, 'Tolak', idUsulan, alasan.trim());
-  return ok({ message: 'Usulan ditolak. Operator dapat memperbaiki dan mengajukan ulang.' });
-}
-
-async function logAktivitas(pool, email, role, aksi, idUsulan, detail) {
-  try { await pool.query(`INSERT INTO log_aktivitas (timestamp,user_email,role,aksi,id_usulan,detail) VALUES (NOW(),$1,$2,$3,$4,$5)`, [email,role,aksi,idUsulan,detail]); }
-  catch(e) { console.error('Log error:', e); }
-}
-
-function mapHeader(r) {
-  const bn = ['','Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
-  const isDitolak = (r.status_global||'') === 'Ditolak';
-
-  let alasanTolak = '', ditolakOleh = '';
-  if (isDitolak) {
-    if ((r.status_kapus||'') === 'Ditolak') {
-      // Ditolak Kapus
-      ditolakOleh = 'Kepala Puskesmas';
-      alasanTolak = r.kapus_catatan || '';
-    } else if ((r.status_program||'') === 'Ditolak') {
-      // Ditolak Pengelola Program — nama spesifik ada di admin_catatan (format: "Ditolak oleh X: alasan")
-      const raw = r.admin_catatan || '';
-      ditolakOleh = raw.startsWith('Ditolak oleh ')
-        ? raw.split(':')[0].replace('Ditolak oleh ', '').trim()
-        : 'Pengelola Program';
-      alasanTolak = raw.includes(':') ? raw.split(':').slice(1).join(':').trim() : raw;
-    } else {
-      // Ditolak Admin
-      ditolakOleh = 'Admin';
-      alasanTolak = r.admin_catatan || '';
+    const terkenaEmails = new Set();
+    for (const vp of allVP.rows) {
+      const aksesArr = (vp.indikator_akses || '').toString().split(',').map(x => parseInt(x.trim())).filter(Boolean);
+      if (aksesArr.some(n => nomorList.includes(n))) terkenaEmails.add(vp.email_program);
     }
+    if (terkenaEmails.size === 0) return err('Tidak ada Pengelola Program yang bertanggung jawab atas indikator tersebut');
+
+    // Reset hanya VP yang terkena
+    for (const epg of terkenaEmails) {
+      await pool.query(
+        `UPDATE verifikasi_program SET status='Menunggu', catatan=NULL, sanggahan=NULL, verified_at=NULL
+         WHERE id_usulan=$1 AND LOWER(email_program)=LOWER($2)`,
+        [idUsulan, epg]
+      );
+    }
+
+    await pool.query(
+      `UPDATE usulan_header SET status_global='Ditolak', is_locked=false,
+       status_program='Menunggu', ditolak_oleh='Admin',
+       admin_catatan=$1 WHERE id_usulan=$2`,
+      [`Ditolak Admin: ${nomorList.join(',')}`, idUsulan]
+    );
+    await logAktivitas(pool, email, 'Admin', 'Tolak', idUsulan,
+      `Indikator bermasalah: ${nomorList.join(', ')} — ${indikatorList.map(i=>i.alasan).join(' | ')}`);
+    return ok({ message: 'Usulan dikembalikan ke Pengelola Program terkait.', terkena: [...terkenaEmails] });
   }
-  return {
-    idUsulan:r.id_usulan, tahun:r.tahun, bulan:r.bulan, namaBulan:bn[r.bulan]||'',
-    periodeKey:r.periode_key, kodePKM:r.kode_pkm, namaPKM:r.nama_puskesmas||r.kode_pkm,
-    totalNilai:parseFloat(r.total_nilai)||0, totalBobot:parseFloat(r.total_bobot)||0,
-    indeksKinerja:parseFloat(r.indeks_kinerja_spm)||0, indeksBeban:parseFloat(r.indeks_beban_kerja)||0,
-    indeksKesulitan:parseFloat(r.indeks_kesulitan_wilayah)||0,
-    indeksSPM:parseFloat(r.indeks_spm)||0,
-    statusKapus:r.status_kapus||'Menunggu', statusProgram:r.status_program||'Menunggu',
-    statusFinal:r.status_final||'Menunggu', statusGlobal:r.status_global||'Draft',
-    isLocked:r.is_locked||false, createdBy:r.created_by||'', createdAt:r.created_at,
-    namaPembuat:r.nama_pembuat||'',
-    kapusApprovedBy:r.kapus_approved_by||'', kapusApprovedAt:r.kapus_approved_at,
-    kapusCatatan:r.kapus_catatan||'', adminApprovedBy:r.admin_approved_by||'',
-    adminApprovedAt:r.admin_approved_at, adminCatatan:r.admin_catatan||'',
-    finalApprovedBy:r.final_approved_by||'', finalApprovedAt:r.final_approved_at,
-    driveFolderUrl:r.drive_folder_url||'', driveFolderId:r.drive_folder_id||'',
-    alasanTolak, ditolakOleh
-  };
+
+  return err('Role tidak diizinkan untuk reject', 403);
 }
 
-// ===== ADMIN: FORCE UNLOCK & EDIT USULAN =====
-// Endpoint: POST /api/usulan?action=admin-unlock  { idUsulan, email }
-// Endpoint: POST /api/usulan?action=admin-reset   { idUsulan, email }
-
-async function adminResetUsulan(pool, body) {
-  const { idUsulan, email } = body;
+async function getPenolakanIndikator(pool, params) {
+  const { idUsulan } = params;
   if (!idUsulan) return err('idUsulan diperlukan');
-  // Admin reset: unlock dan kembalikan ke Draft
-  await pool.query(
-    `UPDATE usulan_header SET is_locked=false, status_global='Draft',
-     status_kapus='Menunggu', status_program='Menunggu', status_final='Menunggu',
-     kapus_approved_by=NULL, admin_approved_by=NULL
-     WHERE id_usulan=$1`,
-    [idUsulan]
-  );
-  await pool.query(
-    `UPDATE verifikasi_program SET status='Menunggu', verified_at=NULL WHERE id_usulan=$1`,
-    [idUsulan]
-  );
-  await logAktivitas(pool, email, 'Admin', 'Reset', idUsulan, 'Direset oleh Admin');
-  return ok({ message: 'Usulan berhasil direset ke Draft' });
+  const r = await pool.query(`SELECT * FROM penolakan_indikator WHERE id_usulan=$1 ORDER BY no_indikator`, [idUsulan]);
+  return ok(r.rows);
 }
 
-// Restore verifikasi yang terhapus akibat bug resubmit
-// Hanya bisa dipakai Admin. Set status_kapus=Selesai dan semua verif_program=Selesai
-async function restoreVerifStatus(pool, body) {
-  const { idUsulan, emailAdmin, kapusBy, kapusAt } = body;
-  if (!idUsulan) return err('idUsulan diperlukan');
+async function respondPenolakan(pool, body) {
+  // Pengelola Program respond per indikator: aksi = 'sanggah' atau 'tolak'
+  const { idUsulan, email, responList } = body;
+  // responList: array { noIndikator, aksi, catatan }
+  if (!responList || !responList.length) return err('Respon diperlukan');
 
-  // Cek hanya admin
-  const adminCheck = await pool.query(`SELECT role FROM users WHERE LOWER(email)=LOWER($1)`, [emailAdmin]);
-  if (!adminCheck.rows.length || adminCheck.rows[0].role !== 'Admin') return err('Hanya Admin yang bisa restore');
+  const check = await pool.query(`SELECT status_global FROM usulan_header WHERE id_usulan=$1`, [idUsulan]);
+  if (!check.rows.length) return err('Usulan tidak ditemukan');
+  if (check.rows[0].status_global !== 'Ditolak') return err('Usulan tidak dalam status ditolak');
 
-  const hdr = await pool.query(`SELECT status_global, status_kapus, status_program FROM usulan_header WHERE id_usulan=$1`, [idUsulan]);
-  if (!hdr.rows.length) return err('Usulan tidak ditemukan');
+  // Simpan respon per indikator
+  for (const item of responList) {
+    if (!item.catatan || !item.catatan.trim()) return err(`Catatan wajib diisi untuk indikator ${item.noIndikator}`);
+    await pool.query(
+      `UPDATE penolakan_indikator SET aksi=$1, catatan_program=$2, email_program=$3, responded_at=NOW()
+       WHERE id_usulan=$4 AND no_indikator=$5`,
+      [item.aksi, item.catatan.trim(), email, idUsulan, item.noIndikator]
+    );
+    await logAktivitas(pool, email, 'Pengelola Program', item.aksi === 'sanggah' ? 'Sanggah' : 'Tolak Indikator',
+      idUsulan, `Indikator ${item.noIndikator}: ${item.catatan.trim()}`);
+  }
 
-  // Restore status_kapus = Selesai
+  // Update status VP user ini sudah respond
+  await pool.query(
+    `UPDATE verifikasi_program SET status='Selesai', verified_at=NOW()
+     WHERE id_usulan=$1 AND LOWER(email_program)=LOWER($2)`,
+    [idUsulan, email]
+  );
+
+  // Cek apakah semua VP yang terkena (status='Menunggu' sebelumnya) sudah respond
+  const allPenolakan = await pool.query(
+    `SELECT pi.no_indikator, pi.aksi, vp.email_program, vp.indikator_akses
+     FROM penolakan_indikator pi
+     LEFT JOIN verifikasi_program vp ON vp.id_usulan=pi.id_usulan
+       AND $1=ANY(string_to_array(vp.indikator_akses::text,',')::int[])
+     WHERE pi.id_usulan=$2`,
+    [1, idUsulan] // placeholder, query di bawah yang benar
+  ).catch(() => ({ rows: [] }));
+
+  // Query lebih akurat: cek VP yang terkena dan belum respond
+  const terkenaVP = await pool.query(
+    `SELECT vp.email_program, vp.status FROM verifikasi_program vp
+     WHERE vp.id_usulan=$1
+     AND EXISTS (
+       SELECT 1 FROM penolakan_indikator pi
+       WHERE pi.id_usulan=vp.id_usulan
+       AND pi.aksi IS NULL -- belum direspond
+       AND pi.no_indikator = ANY(
+         SELECT unnest(string_to_array(vp.indikator_akses::text, ','))::int
+       )
+     )`,
+    [idUsulan]
+  );
+
+  const masihMenunggu = terkenaVP.rows.length;
+
+  if (masihMenunggu > 0) {
+    // Masih ada VP lain yang belum respond
+    return ok({ message: 'Respon tersimpan. Menunggu Pengelola Program lain.', selesai: false });
+  }
+
+  // Semua sudah respond — cek ada yang 'tolak' tidak
+  const adaTolak = await pool.query(
+    `SELECT COUNT(*) as ct FROM penolakan_indikator WHERE id_usulan=$1 AND aksi='tolak'`,
+    [idUsulan]
+  );
+  const jumlahTolak = parseInt(adaTolak.rows[0].ct);
+
+  if (jumlahTolak === 0) {
+    // Semua sanggah → langsung ke Admin
+    await pool.query(
+      `UPDATE usulan_header SET status_global='Menunggu Admin', status_program='Selesai', status_final='Menunggu'
+       WHERE id_usulan=$1`,
+      [idUsulan]
+    );
+    await logAktivitas(pool, email, 'Pengelola Program', 'Sanggah Selesai', idUsulan, 'Semua pengelola sanggah → ke Admin');
+    return ok({ message: 'Semua pengelola program menyampaikan sanggahan. Diteruskan ke Admin.', selesai: true, aksi: 'sanggah' });
+  }
+
+  // Ada yang tolak → reset indikator yang ditolak, kembalikan ke Operator
+  const ditolakRows = await pool.query(
+    `SELECT no_indikator FROM penolakan_indikator WHERE id_usulan=$1 AND aksi='tolak'`,
+    [idUsulan]
+  );
+  const nomorDitolak = ditolakRows.rows.map(r => r.no_indikator);
+
+  // Reset hanya indikator yang ditolak di usulan_indikator
+  for (const no of nomorDitolak) {
+    await pool.query(
+      `UPDATE usulan_indikator SET status='Draft', approved_by=NULL, approved_role=NULL, approved_at=NULL, catatan=NULL
+       WHERE id_usulan=$1 AND no_indikator=$2`,
+      [idUsulan, no]
+    );
+  }
+
+  // Reset status_kapus hanya untuk indikator bermasalah (tandai di usulan_header)
+  // Status kembali ke Menunggu Kepala Puskesmas untuk indikator bermasalah
   await pool.query(
     `UPDATE usulan_header SET
-      status_kapus = 'Selesai',
-      status_program = 'Selesai',
-      kapus_approved_by = COALESCE(kapus_approved_by, $2),
-      kapus_approved_at = COALESCE(kapus_approved_at, $3)
-     WHERE id_usulan = $1`,
-    [idUsulan, kapusBy || 'restored', kapusAt || new Date().toISOString()]
+       status_global='Ditolak', is_locked=false,
+       status_kapus='Menunggu', status_program='Menunggu',
+       ditolak_oleh='Pengelola Program',
+       admin_catatan=$1
+     WHERE id_usulan=$2`,
+    [`Indikator direset: ${nomorDitolak.join(',')}`, idUsulan]
   );
 
-  // Restore semua verifikasi_program yang Menunggu → Selesai
+  // Catat nomor indikator yang perlu diverif ulang
   await pool.query(
-    `UPDATE verifikasi_program SET
-      status = 'Selesai',
-      verified_at = COALESCE(verified_at, NOW()),
-      catatan = COALESCE(catatan, 'Dipulihkan oleh Admin')
-     WHERE id_usulan = $1 AND status = 'Menunggu'`,
-    [idUsulan]
+    `UPDATE penolakan_indikator SET aksi='reset' WHERE id_usulan=$1 AND no_indikator=ANY($2)`,
+    [idUsulan, nomorDitolak]
   );
 
-  await logAktivitas(pool, emailAdmin, 'Admin', 'Restore Verif', idUsulan, 'Status verifikasi dipulihkan');
-  return ok({ message: 'Status verifikasi berhasil dipulihkan' });
+  await logAktivitas(pool, email, 'Pengelola Program', 'Tolak Ke Operator', idUsulan,
+    `Indikator ${nomorDitolak.join(',')} dikembalikan ke operator`);
+  return ok({ message: 'Usulan dikembalikan ke Operator untuk perbaikan indikator yang bermasalah.', selesai: true, aksi: 'tolak', nomorDitolak });
 }

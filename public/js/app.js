@@ -171,8 +171,28 @@ function startApp() {
 async function showPeriodeLoginPopup() {
   try {
     const periodeList = await API.get('periode');
-    const aktif = (periodeList || []).find(p => p.isAktifToday);
-    if (!aktif) return;
+    const aktifList = (periodeList || []).filter(p => p.isAktifToday);
+    if (!aktifList.length) return;
+
+    const periodeCards = aktifList.map(aktif => `
+      <div style="border:1.5px solid #0d9488;border-radius:10px;overflow:hidden;margin-bottom:10px">
+        <div style="background:linear-gradient(135deg,#0d9488,#06b6d4);padding:10px 14px;color:white;font-weight:800;font-size:15px">
+          📅 ${aktif.namaBulan} ${aktif.tahun}
+        </div>
+        <div style="padding:10px 14px;display:flex;flex-direction:column;gap:8px;background:#f0fdf9">
+          <div style="display:flex;align-items:center;gap:8px;font-size:13px">
+            <span class="material-icons" style="color:#0d9488;font-size:16px">login</span>
+            <span style="color:#64748b;font-weight:600">Dibuka:</span>
+            <span style="font-weight:700;color:#0f172a">${formatDate(aktif.tanggalMulai)} pukul ${aktif.jamMulai||'08:00'} WITA</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;font-size:13px">
+            <span class="material-icons" style="color:#ef4444;font-size:16px">logout</span>
+            <span style="color:#64748b;font-weight:600">Ditutup:</span>
+            <span style="font-weight:700;color:#0f172a">${formatDate(aktif.tanggalSelesai)} pukul ${aktif.jamSelesai||'17:00'} WITA</span>
+          </div>
+          ${aktif.notifOperator ? `<div style="display:flex;align-items:flex-start;gap:8px;padding:8px 10px;background:#fffbeb;border-radius:7px;border:1px solid #fcd34d;font-size:12.5px;color:#0f172a;line-height:1.5"><span style="flex-shrink:0">📢</span>${aktif.notifOperator}</div>` : ''}
+        </div>
+      </div>`).join('');
 
     // Buat popup element
     const popup = document.createElement('div');
@@ -184,37 +204,17 @@ async function showPeriodeLoginPopup() {
       backdrop-filter:blur(3px);animation:fadeIn 0.3s ease
     `;
     popup.innerHTML = `
-      <div style="background:white;border-radius:16px;width:440px;max-width:calc(100vw - 32px);overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,0.3);animation:authIn 0.3s ease">
-        <div style="background:linear-gradient(135deg,#0d9488,#06b6d4);padding:20px 24px;color:white">
+      <div style="background:white;border-radius:16px;width:460px;max-width:calc(100vw - 32px);overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,0.3);animation:authIn 0.3s ease;max-height:calc(100vh - 64px);display:flex;flex-direction:column">
+        <div style="background:linear-gradient(135deg,#0d9488,#06b6d4);padding:20px 24px;color:white;flex-shrink:0">
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
             <span class="material-icons" style="font-size:24px">notifications_active</span>
             <span style="font-size:13px;font-weight:600;opacity:0.85;text-transform:uppercase;letter-spacing:0.5px">Informasi Periode Input</span>
           </div>
-          <div style="font-size:20px;font-weight:800">${aktif.namaBulan} ${aktif.tahun}</div>
+          <div style="font-size:18px;font-weight:800">${aktifList.length} Periode Sedang Aktif</div>
         </div>
-        <div style="padding:20px 24px">
-          <div style="display:flex;flex-direction:column;gap:10px">
-            <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#f0fdf9;border-radius:8px;border:1px solid #0d9488">
-              <span class="material-icons" style="color:#0d9488;font-size:20px">login</span>
-              <div>
-                <div style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase">Dibuka</div>
-                <div style="font-size:14px;font-weight:700;color:#0f172a">${formatDate(aktif.tanggalMulai)} pukul ${aktif.jamMulai||'08:00'} WITA</div>
-              </div>
-            </div>
-            <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#fef2f2;border-radius:8px;border:1px solid #fca5a5">
-              <span class="material-icons" style="color:#ef4444;font-size:20px">logout</span>
-              <div>
-                <div style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase">Ditutup</div>
-                <div style="font-size:14px;font-weight:700;color:#0f172a">${formatDate(aktif.tanggalSelesai)} pukul ${aktif.jamSelesai||'17:00'} WITA</div>
-              </div>
-            </div>
-            ${aktif.notifOperator ? `
-            <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 14px;background:#fffbeb;border-radius:8px;border:1px solid #fcd34d">
-              <span style="font-size:18px;flex-shrink:0;margin-top:1px">📢</span>
-              <div style="font-size:13px;color:#0f172a;line-height:1.5">${aktif.notifOperator}</div>
-            </div>` : ''}
-          </div>
-          <button onclick="document.getElementById('periodePopup').remove()" style="width:100%;margin-top:16px;height:44px;background:linear-gradient(135deg,#0d9488,#06b6d4);border:none;border-radius:10px;color:white;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">
+        <div style="padding:20px 24px;overflow-y:auto;flex:1">
+          ${periodeCards}
+          <button onclick="document.getElementById('periodePopup').remove()" style="width:100%;margin-top:6px;height:44px;background:linear-gradient(135deg,#0d9488,#06b6d4);border:none;border-radius:10px;color:white;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">
             <span style="display:flex;align-items:center;justify-content:center;gap:6px"><span class="material-icons" style="font-size:18px">check</span>Mengerti, Tutup</span>
           </button>
         </div>
@@ -448,6 +448,8 @@ function renderAdminDashboard(el, d) {
 
 function renderOperatorDashboard(el, d) {
   const p = d.periodeAktif;
+  const periodeAktifList = d.periodeAktifList || (p ? [p] : []);
+  // Build banner untuk semua periode aktif
 
   // Banner periode + notifikasi
   let periodeBanner = '';
@@ -473,7 +475,7 @@ function renderOperatorDashboard(el, d) {
       ${statCard('blue','assignment','Total Usulan Saya', d.totalUsulan)}
       ${statCard('green','check_circle','Selesai/Disetujui', d.disetujui)}
       ${statCard('orange','pending','Dalam Proses', d.menunggu)}
-      ${statCard('cyan','event_available','Periode Aktif', p ? `${p.nama_bulan} ${p.tahun}` : '-')}
+      ${statCard('cyan','event_available','Periode Aktif', periodeAktifList.length > 0 ? periodeAktifList.length + ' Periode' : '-')}
     </div>
     ${periodeBanner}
     <div class="card">

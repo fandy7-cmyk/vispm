@@ -453,6 +453,7 @@ function renderKepalasDashboard(el, d) {
       ${statCard('orange','pending','Menunggu Verifikasi', d.menunggu)}
       ${statCard('green','check_circle','Sudah Diverifikasi', d.terverifikasi)}
       ${statCard('blue','assignment','Total Usulan', d.total)}
+      ${statCard('cyan','event_available','Periode Aktif', periodeList.length > 1 ? `${periodeList.length} Periode Aktif` : (periodeList[0] ? `${periodeList[0].nama_bulan} ${periodeList[0].tahun}` : '-'))}
     </div>
     ${periodeBanner}
     <div class="card">
@@ -474,6 +475,7 @@ function renderProgramDashboard(el, d) {
       ${statCard('orange','pending','Menunggu Verifikasi', d.menunggu)}
       ${statCard('green','check_circle','Sudah Diverifikasi', d.terverifikasi)}
       ${statCard('blue','assignment','Total Usulan', d.total)}
+      ${statCard('cyan','event_available','Periode Aktif', periodeList.length > 1 ? `${periodeList.length} Periode Aktif` : (periodeList[0] ? `${periodeList[0].nama_bulan} ${periodeList[0].tahun}` : '-'))}
     </div>
     <div class="card">
       <div class="card-header-bar">

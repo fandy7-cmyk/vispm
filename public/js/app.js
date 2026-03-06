@@ -730,12 +730,11 @@ function renderUsulanTable(rows, role) {
       verifBtn = `<button class="btn-icon" title="Menunggu tahap sebelumnya" style="opacity:0.35;cursor:not-allowed" disabled><span class="material-icons">lock</span></button>`;
     }
 
-    // Tombol download PDF — samping viewBtn
-    // Laporan final: statusGlobal === 'Selesai'
-    // Laporan sementara: kapus sudah approve (statusKapus === 'Selesai'), untuk operator & admin
+    // Tombol download PDF
+    // Laporan final: statusGlobal === 'Selesai'; Laporan sementara: kapus sudah approve, semua role
     const kapusApproved = u.statusKapus === 'Selesai';
     const isFinished = u.statusGlobal === 'Selesai';
-    const canDlSementara = kapusApproved && !isFinished && ['operator', 'admin'].includes(role);
+    const canDlSementara = kapusApproved && !isFinished; // semua role bisa download laporan sementara
 
     const pdfBtn = isFinished
       ? `<button class="btn-icon" onclick="downloadLaporanPDF('${u.idUsulan}')" title="Download Laporan PDF" style="background:transparent;border:none;color:#64748b"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10"/><path d="m8 9 4 4 4-4"/><path d="M4 17c0 2.2 1.8 4 4 4h8c2.2 0 4-1.8 4-4"/></svg></button>`
@@ -1836,7 +1835,12 @@ async function downloadLaporanPDF(idUsulan) {
     const res = await fetch(`/api/laporan-pdf?id=${idUsulan}`);
     if (!res.ok) { toast('Gagal memuat laporan', 'error'); return; }
     const html = await res.text();
-    await generateAndDownloadPDF(html, `Laporan-SPM-${idUsulan}.pdf`);
+    // Inject auto-print saat halaman load
+    const printHtml = html.replace('</head>', `<script>window.onload=function(){setTimeout(function(){window.print();},800);};<\/script></head>`);
+    const blob = new Blob([printHtml], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
   } catch(e) {
     toast('Gagal: ' + e.message, 'error');
   }
@@ -1848,15 +1852,19 @@ async function downloadLaporanSementara(idUsulan) {
     const res = await fetch(`/api/laporan-pdf?id=${idUsulan}&mode=sementara`);
     if (!res.ok) { toast('Gagal memuat laporan', 'error'); return; }
     const html = await res.text();
-    await generateAndDownloadPDF(html, `Laporan-Sementara-${idUsulan}.pdf`);
+    const printHtml = html.replace('</head>', `<script>window.onload=function(){setTimeout(function(){window.print();},800);};<\/script></head>`);
+    const blob = new Blob([printHtml], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
   } catch(e) {
     toast('Gagal: ' + e.message, 'error');
   }
 }
 
 async function generateAndDownloadPDF(htmlContent, fileName) {
-  // Load html2pdf jika belum ada
   if (!window.html2pdf) {
+    toast('Memuat library PDF...', 'success');
     await new Promise((resolve, reject) => {
       const s = document.createElement('script');
       s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
@@ -1872,28 +1880,30 @@ async function generateAndDownloadPDF(htmlContent, fileName) {
     });
   }
 
-  // Parse HTML
   const parser = new DOMParser();
   const doc = parser.parseFromString(htmlContent, 'text/html');
 
-  // Buat container — HARUS position:absolute dan visible agar html2canvas bisa render
-  const container = document.createElement('div');
-  container.style.cssText = 'position:absolute;top:0;left:0;width:794px;background:white;z-index:99999;opacity:0.01;pointer-events:none';
-  container.innerHTML = doc.body.innerHTML;
-  document.body.appendChild(container);
+  const wrapper = document.createElement('div');
+  wrapper.style.cssText = 'position:absolute;top:-99999px;left:0;width:794px;background:white;z-index:-9999';
 
-  // Tunggu gambar load
+  const container = document.createElement('div');
+  container.style.cssText = 'width:794px;background:white;font-family:Arial,sans-serif;color:#1e293b;font-size:12px';
+  container.innerHTML = doc.body.innerHTML;
+
+  wrapper.appendChild(container);
+  document.body.appendChild(wrapper);
+
   const images = container.querySelectorAll('img');
   await Promise.all(Array.from(images).map(img =>
     img.complete ? Promise.resolve() : new Promise(r => { img.onload = r; img.onerror = r; })
   ));
-  await new Promise(r => setTimeout(r, 1000));
+  await new Promise(r => setTimeout(r, 600));
 
   const opt = {
     margin:      [10, 15, 10, 15],
     filename:    fileName,
     image:       { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true, allowTaint: true, logging: false, width: 794, windowWidth: 794, scrollY: 0 },
+    html2canvas: { scale: 2, useCORS: true, allowTaint: true, logging: false, width: 794, windowWidth: 794, scrollX: 0, scrollY: 0 },
     jsPDF:       { unit: 'mm', format: 'a4', orientation: 'portrait' },
     pagebreak:   { mode: ['css', 'legacy'], before: '.page-break' }
   };
@@ -1901,10 +1911,14 @@ async function generateAndDownloadPDF(htmlContent, fileName) {
   try {
     await html2pdf().set(opt).from(container).save();
     toast('PDF berhasil didownload ✓', 'success');
+  } catch(err) {
+    toast('Gagal generate PDF: ' + err.message, 'error');
+    console.error('html2pdf error:', err);
   } finally {
-    container.remove();
+    wrapper.remove();
   }
 }
+
 // ============== LOG AKTIVITAS ==============
 async function openLogAktivitas(idUsulan) {
   // Buat modal dahulu dengan loading state
@@ -2709,6 +2723,7 @@ async function loadLaporan() {
               : r.statusKapus === 'Selesai'
                 ? `<button class="btn-icon" onclick="downloadLaporanSementara('${r.idUsulan}')" title="Download Laporan Sementara" style="background:transparent;border:none;color:#f59e0b"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10"/><path d="m8 9 4 4 4-4"/><path d="M4 17c0 2.2 1.8 4 4 4h8c2.2 0 4-1.8 4-4"/></svg></button>`
               : ''}
+            <button class="btn-icon" onclick="openLogAktivitas('${r.idUsulan}')" title="Riwayat Aktivitas" style="background:transparent;border:none;color:#64748b"><span class="material-icons" style="font-size:18px">history</span></button>
           </td>
         </tr>`).join('')}
         </tbody>

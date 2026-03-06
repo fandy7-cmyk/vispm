@@ -583,7 +583,14 @@ textarea.form-control { resize: vertical; }
 .theme-toggle-btn:hover { background: var(--border-light); }
 
 
-input[type="number"]:invalid { box-shadow: none !important; outline: none !important; border-color: var(--border) !important; }
+input[type="number"]:invalid,
+input[type="number"]:out-of-range {
+  box-shadow: none !important;
+  outline: none !important;
+  border-color: var(--border) !important;
+  background-color: inherit !important;
+  color: inherit !important;
+}
 input[type="number"] { -moz-appearance: textfield; }
 input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-outer-spin-button { opacity: 1; }
 </style>
@@ -933,5 +940,16 @@ input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-o
 
 <script src="/js/api.js"></script>
 <script src="/js/app.js"></script>
+<script>
+// Disable browser native validation styling pada semua input number
+document.addEventListener('DOMContentLoaded', function() {
+  document.addEventListener('invalid', function(e) {
+    e.preventDefault();
+    e.target.style.borderColor = '';
+    e.target.style.boxShadow = 'none';
+    e.target.style.outline = 'none';
+  }, true);
+});
+</script>
 </body>
 </html>

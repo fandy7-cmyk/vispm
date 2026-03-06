@@ -1134,12 +1134,12 @@ async function openIndikatorModal(idUsulan) {
                 </div>`
               : '';
             return `<div id="uploadCell-${ind.no}" style="display:flex;align-items:center;gap:6px;justify-content:center">
-                <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+                <div style="display:flex;flex-direction:column;align-items:flex-start;gap:2px">
                   <label id="uploadLabel-${ind.no}" style="${btnStyle}">
                     ${hasFiles ? 'Uploaded' : 'Upload'}
                     <input type="file" multiple accept="application/pdf,image/png,image/jpeg,image/jpg,image/gif,image/webp" style="display:none" onchange="uploadBuktiIndikator(event,${ind.no},'${idUsulan}','${detail.kodePKM}',${detail.tahun},${detail.bulan},'${namaBulan}')">
                   </label>
-                  <span style="font-size:9px;color:#94a3b8">PDF / Gambar</span>
+                  <span style="font-size:9px;color:#94a3b8;padding-left:2px">PDF / Gambar</span>
                 </div>
                 <div id="fileControls-${ind.no}">${fileControlHtml}</div>
               </div>`;

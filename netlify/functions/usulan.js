@@ -387,21 +387,13 @@ async function submitUsulan(pool, body) {
     }
   }
 
-  // Kalau Admin yang menolak → status_kapus dan status_program TIDAK direset (tetap Selesai)
-  // Kalau Kapus/Program yang menolak → status_program di-reset sesuai branch di atas
-  if (!wasKapusDitolak && !wasProgramDitolak && statusSaatIni === 'Ditolak') {
-    // Admin ditolak: hanya update status_global, jangan sentuh status_kapus/program
-    await pool.query(
-      `UPDATE usulan_header SET status_global=$1, is_locked=true WHERE id_usulan=$2`,
-      [targetStatus, idUsulan]
-    );
-  } else {
-    // Draft / Kapus ditolak / Program ditolak: reset status_program juga
-    await pool.query(
-      `UPDATE usulan_header SET status_global=$1, status_program='Menunggu', is_locked=true WHERE id_usulan=$2`,
-      [targetStatus, idUsulan]
-    );
-  }
+  // Update status_global dan is_locked
+  // Catatan: reset status_program sudah dilakukan per-branch di atas (wasKapusDitolak / wasProgramDitolak)
+  // Di sini hanya update status_global dan is_locked
+  await pool.query(
+    `UPDATE usulan_header SET status_global=$1, is_locked=true WHERE id_usulan=$2`,
+    [targetStatus, idUsulan]
+  );
 
   const isResubmit = statusSaatIni === 'Ditolak';
   await logAktivitas(pool, email, 'Operator', isResubmit ? 'Ajukan Ulang' : 'Submit', idUsulan,
@@ -537,7 +529,7 @@ async function rejectUsulan(pool, body) {
     );
     const terkenaEmails = new Set();
     for (const vp of allVP.rows) {
-      const aksesArr = (vp.indikator_akses || '').toString().split(',').map(x => parseInt(x.trim())).filter(Boolean);
+      const aksesArr = parseIndikatorAkses(vp.indikator_akses || '');
       if (aksesArr.some(n => nomorList.includes(n))) terkenaEmails.add(vp.email_program);
     }
     if (terkenaEmails.size === 0) return err('Tidak ada Pengelola Program yang bertanggung jawab atas indikator tersebut');
@@ -602,14 +594,6 @@ async function respondPenolakan(pool, body) {
   );
 
   // Cek apakah semua VP yang terkena (status='Menunggu' sebelumnya) sudah respond
-  const allPenolakan = await pool.query(
-    `SELECT pi.no_indikator, pi.aksi, vp.email_program, vp.indikator_akses
-     FROM penolakan_indikator pi
-     LEFT JOIN verifikasi_program vp ON vp.id_usulan=pi.id_usulan
-       AND $1=ANY(string_to_array(vp.indikator_akses::text,',')::int[])
-     WHERE pi.id_usulan=$2`,
-    [1, idUsulan] // placeholder, query di bawah yang benar
-  ).catch(() => ({ rows: [] }));
 
   // Query lebih akurat: cek VP yang terkena dan belum respond
   const terkenaVP = await pool.query(
@@ -692,6 +676,22 @@ async function respondPenolakan(pool, body) {
 
 
 
+// Helper: parse indikator_akses string yang bisa berformat "1,3,5" atau "1-5" atau gabungan
+function parseIndikatorAkses(str) {
+  if (!str) return [];
+  const result = [];
+  str.replace(/\s/g,'').split(',').forEach(part => {
+    if (part.includes('-')) {
+      const [s, e] = part.split('-').map(Number);
+      if (!isNaN(s) && !isNaN(e)) for (let i = s; i <= e; i++) result.push(i);
+    } else {
+      const n = Number(part);
+      if (!isNaN(n) && n > 0) result.push(n);
+    }
+  });
+  return [...new Set(result)];
+}
+
 async function logAktivitas(pool, email, role, aksi, idUsulan, detail) {
   try { await pool.query(`INSERT INTO log_aktivitas (timestamp,user_email,role,aksi,id_usulan,detail) VALUES (NOW(),$1,$2,$3,$4,$5)`, [email,role,aksi,idUsulan,detail]); }
   catch(e) { console.error('Log error:', e); }
@@ -731,7 +731,7 @@ function mapHeader(r) {
     finalApprovedBy:r.final_approved_by||'', finalApprovedAt:r.final_approved_at,
     driveFolderUrl:r.drive_folder_url||'', driveFolderId:r.drive_folder_id||'',
     ditolakOleh: r.ditolak_oleh || ditolakOleh,
-    alasanTolak, ditolakOleh
+    alasanTolak
   };
 }
 

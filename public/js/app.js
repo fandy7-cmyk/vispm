@@ -1067,11 +1067,11 @@ async function openIndikatorModal(idUsulan) {
         <td><span style="font-family:'JetBrains Mono';font-weight:700">${ind.no}</span></td>
         <td style="max-width:220px;font-size:12.5px">${ind.nama}</td>
         <input type="hidden" id="bobot-${ind.no}" value="${ind.bobot}">
-        <td>${isLocked ? `<span>${ind.target}</span>` : `<input type="number" id="t-${ind.no}" value="${Math.round(ind.target||0)}" min="0" step="1"
+        <td>${isLocked ? `<span>${ind.target}</span>` : `<input type="number" id="t-${ind.no}" value="${Math.round(ind.target||0)}" step="1"
             style="width:72px;border:1.5px solid var(--border);border-radius:6px;padding:3px 6px;font-size:13px"
             onchange="saveIndikator(${ind.no})" oninput="previewSPM(${ind.no})">`}</td>
         <td>${isLocked ? `<span>${ind.capaian}</span>` : `<div style="display:flex;flex-direction:column;gap:2px">
-            <input type="number" id="c-${ind.no}" value="${Math.round(ind.capaian||0)}" min="0" step="1"
+            <input type="number" id="c-${ind.no}" value="${Math.round(ind.capaian||0)}" step="1"
               style="width:72px;border:1.5px solid var(--border);border-radius:6px;padding:3px 6px;font-size:13px"
               onchange="saveIndikator(${ind.no})" oninput="validateRealisasi(${ind.no})">
             <span id="c-warn-${ind.no}" style="display:none;font-size:10px;color:#ef4444;font-weight:600;white-space:nowrap">Nilai tidak bisa melebihi target</span>

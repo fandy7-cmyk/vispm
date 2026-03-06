@@ -88,7 +88,7 @@ async function kapusStats(pool, kodePKM) {
   const result = await pool.query(
     `SELECT
       COUNT(*) FILTER(WHERE status_global='Menunggu Kepala Puskesmas') as menunggu,
-      COUNT(*) FILTER(WHERE status_program='Disetujui') as terverifikasi,
+      COUNT(*) FILTER(WHERE status_program='Selesai') as terverifikasi,
       COUNT(*) as total
      FROM usulan_header WHERE kode_pkm=$1`,
     [kodePKM]
@@ -105,7 +105,7 @@ async function programStats(pool) {
   const result = await pool.query(
     `SELECT
       COUNT(*) FILTER(WHERE status_global='Menunggu Pengelola Program') as menunggu,
-      COUNT(*) FILTER(WHERE status_final='Disetujui') as terverifikasi,
+      COUNT(*) FILTER(WHERE status_final='Selesai') as terverifikasi,
       COUNT(*) as total
      FROM usulan_header`
   );

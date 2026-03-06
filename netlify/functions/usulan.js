@@ -7,7 +7,6 @@ exports.handler = async (event) => {
   const params = event.queryStringParameters || {};
   const path = params.action || '';
   try {
-    if (method === 'GET' && path === 'log') return await getLogAktivitas(pool, params.id);
     if (method === 'GET' && !path) return await getUsulanList(pool, params);
     if (method === 'GET' && path === 'detail') return await getUsulanDetail(pool, params.id);
     if (method === 'GET' && path === 'indikator') return await getIndikatorUsulan(pool, params.id);
@@ -107,7 +106,7 @@ async function getUsulanDetail(pool, idUsulan) {
   );
   if (result.rows.length === 0) return err('Usulan tidak ditemukan', 404);
   const vpResult = await pool.query(
-    `SELECT email_program, nama_program, nip_program, jabatan_program, indikator_akses, status, catatan, verified_at FROM verifikasi_program WHERE id_usulan=$1 ORDER BY created_at`,
+    `SELECT email_program, nama_program, nip_program, jabatan_program, indikator_akses, status, catatan, sanggahan, verified_at FROM verifikasi_program WHERE id_usulan=$1 ORDER BY created_at`,
     [idUsulan]
   );
   const detail = mapHeader(result.rows[0]);
@@ -134,7 +133,7 @@ async function getIndikatorUsulan(pool, idUsulan) {
 async function getProgramVerifStatus(pool, idUsulan) {
   if (!idUsulan) return err('ID usulan diperlukan');
   const result = await pool.query(
-    `SELECT email_program, nama_program, nip_program, jabatan_program, indikator_akses, status, catatan, verified_at FROM verifikasi_program WHERE id_usulan=$1 ORDER BY created_at`,
+    `SELECT email_program, nama_program, nip_program, jabatan_program, indikator_akses, status, catatan, sanggahan, verified_at FROM verifikasi_program WHERE id_usulan=$1 ORDER BY created_at`,
     [idUsulan]
   );
   return ok(result.rows);
@@ -183,6 +182,8 @@ async function buatUsulan(pool, body) {
     await client.query('BEGIN');
     // Auto-migrate kolom nip_program dan jabatan_program
     await client.query(`ALTER TABLE verifikasi_program ADD COLUMN IF NOT EXISTS nip_program VARCHAR(50)`).catch(()=>{});
+    await client.query(`ALTER TABLE verifikasi_program ADD COLUMN IF NOT EXISTS sanggahan TEXT`).catch(()=>{});
+    await client.query(`ALTER TABLE usulan_header ADD COLUMN IF NOT EXISTS ditolak_oleh VARCHAR(50)`).catch(()=>{});
     await client.query(`ALTER TABLE verifikasi_program ADD COLUMN IF NOT EXISTS jabatan_program TEXT`).catch(()=>{});
     await client.query(
       `INSERT INTO usulan_header (id_usulan,tahun,bulan,periode_key,kode_pkm,total_nilai,total_bobot,indeks_kinerja_spm,indeks_beban_kerja,indeks_spm,status_kapus,status_program,status_final,status_global,is_locked,created_by,created_at)
@@ -474,8 +475,27 @@ async function approveAdmin(pool, body) {
 }
 
 async function rejectUsulan(pool, body) {
-  const { idUsulan, email, role, alasan } = body;
+  const { idUsulan, email, role, alasan, aksi } = body;
   if (!alasan || !alasan.trim()) return err('Alasan penolakan wajib diisi');
+
+  // === SANGGAH: Pengelola Program sanggah penolakan Admin ===
+  if (role === 'Pengelola Program' && aksi === 'sanggah') {
+    const check = await pool.query('SELECT status_global FROM usulan_header WHERE id_usulan=$1', [idUsulan]);
+    if (!check.rows.length) return err('Usulan tidak ditemukan');
+    if (check.rows[0].status_global !== 'Ditolak') return err('Hanya bisa sanggah pada usulan yang ditolak');
+    // Simpan sanggahan di record VP user ini
+    await pool.query(
+      `UPDATE verifikasi_program SET sanggahan=$1, status='Menunggu', verified_at=NULL WHERE id_usulan=$2 AND LOWER(email_program)=LOWER($3)`,
+      [alasan.trim(), idUsulan, email]
+    );
+    // Kembalikan status ke Menunggu Admin agar Admin bisa review ulang
+    await pool.query(
+      `UPDATE usulan_header SET status_global='Menunggu Admin', status_final='Menunggu', ditolak_oleh='Pengelola Program' WHERE id_usulan=$1`,
+      [idUsulan]
+    );
+    await logAktivitas(pool, email, role, 'Sanggah', idUsulan, alasan.trim());
+    return ok({ message: 'Sanggahan terkirim ke Admin untuk dipertimbangkan kembali.' });
+  }
 
   if (role === 'Pengelola Program') {
     // Cek duplikasi
@@ -536,15 +556,17 @@ async function rejectUsulan(pool, body) {
     );
 
   } else {
-    // Admin tolak → reset semua verifikasi program
+    // Admin tolak → kembalikan ke Pengelola Program (Kapus tidak perlu verif ulang)
+    // Reset status VP semua program ke Menunggu agar bisa verif ulang
     await pool.query(
-      `UPDATE verifikasi_program SET status='Menunggu', catatan=NULL, verified_at=NULL WHERE id_usulan=$1`,
+      `UPDATE verifikasi_program SET status='Menunggu', catatan=NULL, sanggahan=NULL, verified_at=NULL WHERE id_usulan=$1`,
       [idUsulan]
     );
     await pool.query(
       `UPDATE usulan_header SET
         status_global='Ditolak', is_locked=false,
-        status_kapus='Menunggu', status_program='Menunggu',
+        status_program='Menunggu',
+        ditolak_oleh='Admin',
         admin_catatan=$1
        WHERE id_usulan=$2`,
       [alasan.trim(), idUsulan]
@@ -553,52 +575,6 @@ async function rejectUsulan(pool, body) {
 
   await logAktivitas(pool, email, role, 'Tolak', idUsulan, alasan.trim());
   return ok({ message: 'Usulan ditolak. Operator dapat memperbaiki dan mengajukan ulang.' });
-}
-
-async function getLogAktivitas(pool, idUsulan) {
-  if (!idUsulan) return err('ID usulan diperlukan');
-  await pool.query(`CREATE TABLE IF NOT EXISTS log_aktivitas (
-    id SERIAL PRIMARY KEY, timestamp TIMESTAMPTZ DEFAULT NOW(),
-    user_email VARCHAR(255), role VARCHAR(100), aksi VARCHAR(100),
-    id_usulan VARCHAR(100), detail TEXT
-  )`).catch(()=>{});
-  // Ambil log + nama user dari tabel users
-  const result = await pool.query(
-    `SELECT l.*, u.nama as user_nama
-     FROM log_aktivitas l
-     LEFT JOIN users u ON LOWER(u.email) = LOWER(l.user_email)
-     WHERE l.id_usulan = $1
-     ORDER BY l.timestamp ASC`,
-    [idUsulan]
-  );
-  // Ambil info header usulan untuk PDF
-  const hdr = await pool.query(
-    `SELECT uh.id_usulan, uh.tahun, uh.bulan, p.nama_puskesmas,
-            uh.status_global, uh.created_by, uh.created_at
-     FROM usulan_header uh
-     LEFT JOIN master_puskesmas p ON uh.kode_pkm = p.kode_pkm
-     WHERE uh.id_usulan = $1`, [idUsulan]
-  );
-  const bulanNama = ['','Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
-  const h = hdr.rows[0] || {};
-  return ok({
-    logs: result.rows.map(r => ({
-      id: r.id,
-      timestamp: r.timestamp,
-      userEmail: r.user_email,
-      userNama: r.user_nama || r.user_email,
-      role: r.role,
-      aksi: r.aksi,
-      detail: r.detail
-    })),
-    usulan: {
-      idUsulan: h.id_usulan,
-      tahun: h.tahun,
-      bulan: bulanNama[h.bulan] || h.bulan,
-      namaPuskesmas: h.nama_puskesmas || '',
-      statusGlobal: h.status_global
-    }
-  });
 }
 
 async function logAktivitas(pool, email, role, aksi, idUsulan, detail) {

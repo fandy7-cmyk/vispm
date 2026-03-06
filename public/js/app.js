@@ -496,7 +496,7 @@ function renderPeriodeBanner(periodeList) {
       <div style="flex:1;min-width:0">
         <div style="font-weight:800;font-size:14px;margin-bottom:2px">Periode Aktif: \${namaBulan} \${pr.tahun}</div>
         <div style="font-size:12px;opacity:0.9">Dibuka: \${formatDate(tglMulai)} \${jamMulai} — Ditutup: \${formatDate(tglSelesai)} \${jamSelesai} WITA</div>
-        \${notif ? `<div style="margin-top:6px;padding:6px 10px;background:rgba(255,255,255,0.15);border-radius:6px;font-size:12px">📢 \${notif}</div>` : ''}
+        \${notif ? '<div style="margin-top:6px;padding:6px 10px;background:rgba(255,255,255,0.15);border-radius:6px;font-size:12px">📢 ' + notif + '</div>' : ''}
       </div>
     </div>`;
   }).join('');

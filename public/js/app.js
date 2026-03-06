@@ -375,19 +375,18 @@ function renderOperatorDashboard(el, d) {
 
   let periodeBanner = "";
   if (periodeList.length > 0) {
-    periodeBanner = periodeList.map(pr => {
+    const items = periodeList.map(pr => {
       const jamMulai = pr.jam_mulai || "08:00";
       const jamSelesai = pr.jam_selesai || "17:00";
-      return `
-        <div style="background:linear-gradient(135deg,#0d9488,#06b6d4);border-radius:12px;padding:16px 20px;color:white;margin-bottom:10px;display:flex;align-items:flex-start;gap:14px">
-          <span class="material-icons" style="font-size:28px;opacity:0.9;flex-shrink:0;margin-top:2px">event_available</span>
-          <div style="flex:1">
-            <div style="font-weight:800;font-size:16px;margin-bottom:2px">Periode Input Aktif: ${pr.nama_bulan} ${pr.tahun}</div>
-            <div style="font-size:13px;opacity:0.9">Dibuka: ${formatDate(pr.tanggal_mulai)} pukul ${jamMulai} — Ditutup: ${formatDate(pr.tanggal_selesai)} pukul ${jamSelesai} WITA</div>
-            ${pr.notif_operator ? `<div style="margin-top:8px;padding:8px 12px;background:rgba(255,255,255,0.15);border-radius:8px;font-size:13px;border-left:3px solid rgba(255,255,255,0.6)">📢 ${pr.notif_operator}</div>` : ""}
-          </div>
-        </div>`;
+      return '<div style="background:linear-gradient(135deg,#0d9488,#06b6d4);border-radius:12px;padding:14px 16px;color:white;display:flex;align-items:flex-start;gap:12px">'
+        + '<span class="material-icons" style="font-size:22px;opacity:0.9;flex-shrink:0;margin-top:2px">event_available</span>'
+        + '<div style="flex:1;min-width:0">'
+        + '<div style="font-weight:800;font-size:14px;margin-bottom:2px">Periode Aktif: ' + pr.nama_bulan + ' ' + pr.tahun + '</div>'
+        + '<div style="font-size:12px;opacity:0.9">Dibuka: ' + formatDate(pr.tanggal_mulai) + ' ' + jamMulai + ' — Ditutup: ' + formatDate(pr.tanggal_selesai) + ' ' + jamSelesai + ' WITA</div>'
+        + (pr.notif_operator ? '<div style="margin-top:6px;padding:6px 10px;background:rgba(255,255,255,0.15);border-radius:6px;font-size:12px">📢 ' + pr.notif_operator + '</div>' : '')
+        + '</div></div>';
     }).join("");
+    periodeBanner = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px">' + items + '</div>';
   } else {
     periodeBanner = `<div class="info-card warning"><span class="material-icons">warning</span><div class="info-card-text">Tidak ada periode input yang aktif saat ini. Hubungi Admin.</div></div>`;
   }

@@ -1862,7 +1862,6 @@ async function generateAndDownloadPDF(htmlContent, fileName) {
       s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
       s.onload = resolve;
       s.onerror = () => {
-        // Fallback: coba unpkg
         const s2 = document.createElement('script');
         s2.src = 'https://unpkg.com/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js';
         s2.onload = resolve;
@@ -1873,35 +1872,42 @@ async function generateAndDownloadPDF(htmlContent, fileName) {
     });
   }
 
-  // Render HTML ke div hidden
-  const container = document.createElement('div');
-  container.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:210mm;background:white;visibility:hidden';
-  container.innerHTML = htmlContent
-    .replace(/<script[\s\S]*?<\/script>/gi, '') // hapus semua script (termasuk window.print)
-    .replace(/<html[^>]*>|<\/html>|<head[\s\S]*?<\/head>/gi, ''); // ambil body saja
-  document.body.appendChild(container);
+  // Render ke iframe hidden - lebih aman untuk preserve CSS dari <head>
+  const iframe = document.createElement('iframe');
+  iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:210mm;border:none;visibility:hidden;height:0';
+  document.body.appendChild(iframe);
 
-  // Tunggu gambar load
-  const images = container.querySelectorAll('img');
+  // Hapus hanya script tags (window.print dll), biarkan CSS tetap
+  const cleanHtml = htmlContent.replace(/<script[\s\S]*?<\/script>/gi, '');
+
+  await new Promise(resolve => {
+    iframe.onload = resolve;
+    iframe.srcdoc = cleanHtml;
+  });
+
+  // Tunggu gambar (tanda tangan) selesai load
+  const images = iframe.contentDocument.querySelectorAll('img');
   await Promise.all(Array.from(images).map(img =>
     img.complete ? Promise.resolve() : new Promise(r => { img.onload = r; img.onerror = r; })
   ));
   await new Promise(r => setTimeout(r, 800));
 
+  const element = iframe.contentDocument.body;
+
   const opt = {
-    margin:      [10, 10, 10, 10],
+    margin:      [0, 0, 0, 0],
     filename:    fileName,
     image:       { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true, allowTaint: true, logging: false },
+    html2canvas: { scale: 2, useCORS: true, allowTaint: true, logging: false, windowWidth: 794 },
     jsPDF:       { unit: 'mm', format: 'a4', orientation: 'portrait' },
-    pagebreak:   { mode: ['avoid-all', 'css', 'legacy'] }
+    pagebreak:   { mode: ['css', 'legacy'], before: '.page-break' }
   };
 
   try {
-    await html2pdf().set(opt).from(container).save();
+    await html2pdf().set(opt).from(element).save();
     toast('PDF berhasil didownload ✓', 'success');
   } finally {
-    document.body.removeChild(container);
+    document.body.removeChild(iframe);
   }
 }
 // ============== LOG AKTIVITAS ==============

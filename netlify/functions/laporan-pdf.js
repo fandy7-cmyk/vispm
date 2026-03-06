@@ -46,6 +46,14 @@ exports.handler = async (event) => {
     if (hdrResult.rows.length === 0) return { statusCode: 404, body: 'Tidak ditemukan' };
     const h = hdrResult.rows[0];
 
+    // Ambil pejabat penandatangan (Kasubag & Kepala Dinas)
+    const pjResult = await pool.query(
+      `SELECT jabatan, nama, nip, tanda_tangan FROM pejabat_penandatangan ORDER BY id`
+    ).catch(() => ({ rows: [] }));
+    const pjList = pjResult.rows;
+    const kasubag = pjList.find(p => p.jabatan === 'Kepala Sub Bagian Perencanaan') || {};
+    const kadis   = pjList.find(p => p.jabatan === 'Kepala Dinas Kesehatan PPKB') || {};
+
     const indResult = await pool.query(
       `SELECT ui.*, mi.nama_indikator, mi.catatan as catatan_indikator,
               COALESCE(tt.sasaran, 0) as sasaran_tahunan
@@ -116,6 +124,26 @@ exports.handler = async (event) => {
       </div>`;
     }
 
+    // Blok tanda tangan pejabat dinas (Kasubag & Kadis) - pakai TT image jika ada
+    function pejabatSignBlock(pj, jabatanLabel) {
+      const nama = pj.nama || '-';
+      const nip  = pj.nip  || '';
+      const tt   = pj.tanda_tangan || '';
+      const ttValid = tt && (tt.startsWith('data:image') || tt.startsWith('http'));
+      return `<div style="text-align:center;min-width:180px;max-width:220px">
+        <div style="font-size:10px;color:#334155;margin-bottom:10px;font-weight:600">${jabatanLabel}</div>
+        ${ttValid
+          ? `<div style="height:80px;display:flex;align-items:center;justify-content:center;margin-bottom:6px">
+               <img src="${tt}" style="max-height:72px;max-width:160px;object-fit:contain">
+             </div>`
+          : `<div style="width:80px;height:80px;border:2px dashed #cbd5e1;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:#94a3b8;font-size:10px;margin-bottom:6px">TT</div>`}
+        <div style="margin-top:4px;border-top:1px solid #334155;padding-top:4px;display:inline-block;min-width:150px">
+          <div style="font-size:10.5px;font-weight:700">${nama}</div>
+          ${nip ? `<div style="font-size:9.5px">NIP. ${nip}</div>` : ''}
+        </div>
+      </div>`;
+    }
+
     // Layout tanda tangan: piramida terbalik
     // Kapus selalu kanan atas, pengelola di kiri; baris berikutnya tengah
     function buildSignLayout(verifiers) {
@@ -124,15 +152,21 @@ exports.handler = async (event) => {
       if (isSementara) {
         return `<div style="display:flex;justify-content:flex-end">${kapus}</div>`;
       }
+      // Baris pejabat dinas di bagian bawah (Kasubag kiri, Kadis kanan)
+      const pejabatRow = (kasubag.nama || kadis.nama) ? `
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:20px;margin-top:28px;padding-top:20px;border-top:1px dashed #e2e8f0">
+          ${kasubag.nama ? pejabatSignBlock(kasubag, 'Kepala Sub Bagian Perencanaan') : ''}
+          ${kadis.nama   ? pejabatSignBlock(kadis,   'Kepala Dinas Kesehatan PPKB')    : ''}
+        </div>` : '';
+
       if (verifiers.length === 0) {
-        return `<div style="display:flex;justify-content:flex-end">${kapus}</div>`;
+        return `<div style="display:flex;justify-content:flex-end">${kapus}</div>${pejabatRow}`;
       }
       if (verifiers.length === 1) {
-        // Baris 1: [pgm kiri] [kapus kanan]
         return `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:20px">
           ${signBlock(verifiers[0])}
           ${kapus}
-        </div>`;
+        </div>${pejabatRow}`;
       }
       // Baris 1: [pgm[0] kiri] [kapus kanan], baris berikut: pgm[1..] tengah
       const firstRow = `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:20px">
@@ -142,7 +176,7 @@ exports.handler = async (event) => {
       const restRows = verifiers.slice(1).map(v =>
         `<div style="display:flex;justify-content:center;margin-top:24px">${signBlock(v)}</div>`
       ).join('');
-      return firstRow + restRows;
+      return firstRow + restRows + pejabatRow;
     }
 
     const pagesHtml = indResult.rows.map((ind) => {

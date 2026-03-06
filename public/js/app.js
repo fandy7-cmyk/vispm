@@ -373,33 +373,38 @@ function renderAdminDashboard(el, d) {
 }
 
 function renderOperatorDashboard(el, d) {
-  const p = d.periodeAktif;
+  const periodeList = d.periodeAktifList || (d.periodeAktif ? [d.periodeAktif] : []);
+  const p = periodeList[0] || null;
 
-  // Banner periode + notifikasi
-  let periodeBanner = '';
-  if (p) {
-    const jamMulai = p.jam_mulai || '08:00';
-    const jamSelesai = p.jam_selesai || '17:00';
-    const tglSelesai = formatDate(p.tanggal_selesai);
-    periodeBanner = `
-      <div style="background:linear-gradient(135deg,#0d9488,#06b6d4);border-radius:12px;padding:16px 20px;color:white;margin-bottom:16px;display:flex;align-items:flex-start;gap:14px">
-        <span class="material-icons" style="font-size:28px;opacity:0.9;flex-shrink:0;margin-top:2px">event_available</span>
-        <div style="flex:1">
-          <div style="font-weight:800;font-size:16px;margin-bottom:2px">Periode Input Aktif: ${p.nama_bulan} ${p.tahun}</div>
-          <div style="font-size:13px;opacity:0.9">Dibuka: ${formatDate(p.tanggal_mulai)} pukul ${jamMulai} — Ditutup: ${tglSelesai} pukul ${jamSelesai} WITA</div>
-          ${p.notif_operator ? `<div style="margin-top:8px;padding:8px 12px;background:rgba(255,255,255,0.15);border-radius:8px;font-size:13px;border-left:3px solid rgba(255,255,255,0.6)">📢 ${p.notif_operator}</div>` : ''}
-        </div>
-      </div>`;
+  let periodeBanner = "";
+  if (periodeList.length > 0) {
+    periodeBanner = periodeList.map(pr => {
+      const jamMulai = pr.jam_mulai || "08:00";
+      const jamSelesai = pr.jam_selesai || "17:00";
+      return `
+        <div style="background:linear-gradient(135deg,#0d9488,#06b6d4);border-radius:12px;padding:16px 20px;color:white;margin-bottom:10px;display:flex;align-items:flex-start;gap:14px">
+          <span class="material-icons" style="font-size:28px;opacity:0.9;flex-shrink:0;margin-top:2px">event_available</span>
+          <div style="flex:1">
+            <div style="font-weight:800;font-size:16px;margin-bottom:2px">Periode Input Aktif: ${pr.nama_bulan} ${pr.tahun}</div>
+            <div style="font-size:13px;opacity:0.9">Dibuka: ${formatDate(pr.tanggal_mulai)} pukul ${jamMulai} — Ditutup: ${formatDate(pr.tanggal_selesai)} pukul ${jamSelesai} WITA</div>
+            ${pr.notif_operator ? `<div style="margin-top:8px;padding:8px 12px;background:rgba(255,255,255,0.15);border-radius:8px;font-size:13px;border-left:3px solid rgba(255,255,255,0.6)">📢 ${pr.notif_operator}</div>` : ""}
+          </div>
+        </div>`;
+    }).join("");
   } else {
     periodeBanner = `<div class="info-card warning"><span class="material-icons">warning</span><div class="info-card-text">Tidak ada periode input yang aktif saat ini. Hubungi Admin.</div></div>`;
   }
 
+  const periodeLabel = periodeList.length > 1
+    ? `${periodeList.length} Periode Aktif`
+    : (p ? `${p.nama_bulan} ${p.tahun}` : "-");
+
   el.innerHTML = `
     <div class="stats-grid">
-      ${statCard('blue','assignment','Total Usulan Saya', d.totalUsulan)}
-      ${statCard('green','check_circle','Selesai/Disetujui', d.disetujui)}
-      ${statCard('orange','pending','Dalam Proses', d.menunggu)}
-      ${statCard('cyan','event_available','Periode Aktif', p ? `${p.nama_bulan} ${p.tahun}` : '-')}
+      ${statCard("blue","assignment","Total Usulan Saya", d.totalUsulan)}
+      ${statCard("green","check_circle","Selesai/Disetujui", d.disetujui)}
+      ${statCard("orange","pending","Dalam Proses", d.menunggu)}
+      ${statCard("cyan","event_available","Periode Aktif", periodeLabel)}
     </div>
     ${periodeBanner}
     <div class="card">
@@ -409,6 +414,7 @@ function renderOperatorDashboard(el, d) {
       <div class="card-body" style="display:flex;gap:10px;flex-wrap:wrap;">
         <button class="btn btn-primary" onclick="loadPage('input')"><span class="material-icons">add</span>Buat Usulan Baru</button>
         <button class="btn btn-secondary" onclick="loadPage('laporan')"><span class="material-icons">bar_chart</span>Lihat Laporan</button>
+        <button class="btn btn-secondary" onclick="downloadLaporanDashboardOperator()"><span class="material-icons">picture_as_pdf</span>Download Laporan PDF</button>
       </div>
     </div>
     <div class="card">
@@ -417,8 +423,19 @@ function renderOperatorDashboard(el, d) {
     </div>`;
 
   API.getUsulan({ email_operator: currentUser.email, tahun: CURRENT_YEAR }).then(rows => {
-    document.getElementById('recentTable').innerHTML = renderUsulanTable(rows.slice(0, 5), 'operator');
-  }).catch(() => {});
+    document.getElementById("recentTable").innerHTML = renderUsulanTable(rows.slice(0, 5), "operator");
+  }).catch(() => {
+    const el2 = document.getElementById("recentTable");
+    if (el2) el2.innerHTML = `<div class="empty-state" style="padding:32px"><span class="material-icons">inbox</span><p>Belum ada data usulan</p></div>`;
+  });
+}
+
+async function downloadLaporanDashboardOperator() {
+  try {
+    const rows = await API.getUsulan({ email_operator: currentUser.email, status: "Selesai" });
+    if (!rows || !rows.length) { toast("Belum ada laporan yang selesai diverifikasi", "warning"); return; }
+    await downloadLaporanPDF(rows[0].idUsulan);
+  } catch(e) { toast(e.message, "error"); }
 }
 
 function renderKepalasDashboard(el, d) {
@@ -1617,6 +1634,11 @@ async function openLogAktivitas(idUsulan) {
       </div>
       <div class="modal-footer">
         <button class="btn btn-secondary" onclick="closeModal('logAktivitasModal')">Tutup</button>
+        <button class="btn btn-primary" id="btnLogDownloadPDF" disabled
+          style="opacity:0.4;cursor:not-allowed"
+          title="Laporan PDF hanya tersedia setelah semua verifikasi selesai">
+          <span class="material-icons">picture_as_pdf</span>Download Laporan PDF
+        </button>
       </div>
     </div>`;
   showModal('logAktivitasModal');
@@ -1666,6 +1688,19 @@ async function openLogAktivitas(idUsulan) {
         <div>${usulan.namaPKM} · ${usulan.namaBulan} ${usulan.tahun}</div>
       </div>
       <div style="max-height:500px;overflow-y:auto;padding-right:4px">${timelineHtml}</div>`;
+    // Aktifkan tombol download kalau status Selesai
+    const btnDl = document.getElementById("btnLogDownloadPDF");
+    if (btnDl) {
+      if (usulan.statusGlobal === "Selesai") {
+        btnDl.disabled = false;
+        btnDl.style.opacity = "1";
+        btnDl.style.cursor = "pointer";
+        btnDl.title = "Download Laporan PDF";
+        btnDl.onclick = () => { closeModal("logAktivitasModal"); downloadLaporanPDF(idUsulan); };
+      } else {
+        btnDl.title = `Laporan PDF hanya tersedia setelah Selesai. Status: ${usulan.statusGlobal || "belum selesai"}`;
+      }
+    }
   } catch(e) {
     const b = document.getElementById('logAktivitasBody');
     if(b) b.innerHTML = `<div class="empty-state"><span class="material-icons" style="color:#ef4444">error</span><p>Gagal memuat: ${e.message}</p></div>`;
@@ -2021,7 +2056,6 @@ async function renderLaporan() {
   document.getElementById('mainContent').innerHTML = `
     <div class="page-header">
       <h1><span class="material-icons">bar_chart</span>Laporan</h1>
-      <button class="btn btn-primary" onclick="exportLaporan()"><span class="material-icons">download</span>Export CSV</button>
     </div>
     <div class="card">
       <div class="card-header-bar"><span class="card-title"><span class="material-icons">filter_list</span>Filter</span></div>

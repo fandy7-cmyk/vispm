@@ -105,7 +105,10 @@ function startApp() {
     }
   }
   document.getElementById('sidebarAvatar').textContent = (currentUser.nama || 'U')[0].toUpperCase();
-  document.getElementById('topbarUser').textContent = currentUser.nama || currentUser.email;
+  const dropNameEl = document.getElementById('topbarDropName');
+  if (dropNameEl) dropNameEl.textContent = currentUser.nama || currentUser.email;
+  const dropMetaEl = document.getElementById('topbarDropMeta');
+  if (dropMetaEl) dropMetaEl.textContent = currentUser.role + (currentUser.namaPKM ? ` · ${currentUser.namaPKM}` : '');
 
   buildSidebar();
   loadPage('dashboard');
@@ -1872,7 +1875,115 @@ async function doReject() {
   finally { setLoading(false); }
 }
 
-// ===== UBAH PASSWORD =====
+// ============== TOPBAR DROPDOWN ==============
+function toggleTopbarDropdown() {
+  const dd = document.getElementById('topbarDropdown');
+  if (!dd) return;
+  const isOpen = dd.classList.contains('open');
+  // Tutup dulu semua, lalu toggle
+  document.querySelectorAll('.topbar-dropdown.open').forEach(el => el.classList.remove('open'));
+  if (!isOpen) dd.classList.add('open');
+}
+
+function closeTopbarDropdown() {
+  const dd = document.getElementById('topbarDropdown');
+  if (dd) dd.classList.remove('open');
+}
+
+// Tutup dropdown kalau klik di luar
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('#topbarAvatarWrap')) {
+    closeTopbarDropdown();
+  }
+});
+
+// ============== EDIT PROFIL ==============
+function openEditProfil() {
+  // Buat modal kalau belum ada
+  let modal = document.getElementById('editProfilModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'editProfilModal';
+    modal.className = 'modal';
+    modal.style.zIndex = '3000';
+    modal.addEventListener('click', e => { if (e.target === modal) closeModal('editProfilModal'); });
+    modal.innerHTML = `
+      <div class="modal-card" style="max-width:420px;width:100%">
+        <div class="modal-header">
+          <span class="material-icons" style="color:#0d9488">account_circle</span>
+          <h3>Edit Profil</h3>
+          <button class="btn-icon" onclick="closeModal('editProfilModal')"><span class="material-icons">close</span></button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Nama Lengkap</label>
+            <input class="form-control" id="epNama" placeholder="Nama lengkap">
+          </div>
+          <div class="form-group">
+            <label>NIP</label>
+            <input class="form-control" id="epNIP" placeholder="Nomor Induk Pegawai (opsional)" maxlength="30">
+          </div>
+          <div class="form-group">
+            <label>Email</label>
+            <input class="form-control" id="epEmail" disabled style="background:#f8fafc;color:var(--text-light)">
+          </div>
+          <div class="form-group">
+            <label>Role</label>
+            <input class="form-control" id="epRole" disabled style="background:#f8fafc;color:var(--text-light)">
+          </div>
+          <div id="epStatus" style="font-size:12.5px;color:#ef4444;min-height:18px"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" onclick="closeModal('editProfilModal')">Batal</button>
+          <button class="btn btn-primary" onclick="saveEditProfil()"><span class="material-icons">save</span>Simpan</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+  }
+  // Isi data user saat ini
+  document.getElementById('epNama').value = currentUser.nama || '';
+  document.getElementById('epNIP').value = currentUser.nip || '';
+  document.getElementById('epEmail').value = currentUser.email || '';
+  document.getElementById('epRole').value = currentUser.role || '';
+  document.getElementById('epStatus').textContent = '';
+  showModal('editProfilModal');
+  setTimeout(() => document.getElementById('epNama').focus(), 100);
+}
+
+async function saveEditProfil() {
+  const nama = document.getElementById('epNama').value.trim();
+  const nip = document.getElementById('epNIP').value.trim();
+  const statusEl = document.getElementById('epStatus');
+  if (!nama) { statusEl.textContent = 'Nama tidak boleh kosong'; return; }
+  setLoading(true);
+  try {
+    await API.updateUser({
+      email: currentUser.email,
+      nama,
+      nip,
+      role: currentUser.role,
+      kodePKM: currentUser.kodePKM || '',
+      indikatorAkses: currentUser.indikatorAkses || '',
+      jabatan: currentUser.jabatan || '',
+      aktif: true
+    });
+    // Update state lokal
+    currentUser.nama = nama;
+    currentUser.nip = nip;
+    localStorage.setItem('spm_user', JSON.stringify(currentUser));
+    // Update tampilan
+    document.getElementById('sidebarName').textContent = nama;
+    document.getElementById('sidebarAvatar').textContent = nama[0].toUpperCase();
+    const dropNameEl = document.getElementById('topbarDropName');
+    if (dropNameEl) dropNameEl.textContent = nama;
+    toast('Profil berhasil diperbarui!', 'success');
+    closeModal('editProfilModal');
+  } catch(e) {
+    statusEl.textContent = e.message;
+  } finally { setLoading(false); }
+}
+
+
 function showChangePassword() {
   document.getElementById('cpOld').value = '';
   document.getElementById('cpNew').value = '';

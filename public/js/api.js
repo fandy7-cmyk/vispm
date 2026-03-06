@@ -172,15 +172,7 @@ function closeToast() {
   document.getElementById('toastNotification').style.display = 'none';
 }
 
-function showModal(id) {
-  const m = document.getElementById(id);
-  if (m) m.style.display = 'flex';
-}
-
-function closeModal(id) {
-  const m = document.getElementById(id);
-  if (m) { m.classList.remove('show'); m.style.display = ''; }
-}
+// showModal dan closeModal didefinisikan di app.js
 
 function showConfirm({ title, message, onConfirm, type = 'danger' }) {
   window._confirmCallback = onConfirm;
@@ -212,11 +204,7 @@ function executeConfirm() {
   if (window._confirmCallback) window._confirmCallback();
 }
 
-// Loading state
-function setLoading(show) {
-  const el = document.getElementById('globalLoader');
-  if (el) el.style.display = show ? 'flex' : 'none';
-}
+// setLoading didefinisikan di app.js
 
 // Current year for select defaults
 const CURRENT_YEAR = new Date().getFullYear();

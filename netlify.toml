@@ -7,6 +7,11 @@
   external_node_modules = ["pg", "bcryptjs", "pg-native"]
 
 [[redirects]]
+  from = "/api/settings"
+  to = "/.netlify/functions/settings"
+  status = 200
+
+[[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"
   status = 200
@@ -14,9 +19,4 @@
 [[redirects]]
   from = "/*"
   to = "/index.html"
-  status = 200
-
-  [[redirects]]
-  from = "/api/settings"
-  to = "/.netlify/functions/settings"
   status = 200

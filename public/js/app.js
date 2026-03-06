@@ -1968,8 +1968,9 @@ async function openVerifikasi(idUsulan) {
     );
 
     // Cek tanda tangan — blok verifikasi jika belum ada
+    // Prioritas: currentUser (sudah diupdate saat saveEditProfil), fallback allUsers untuk Admin
     const myUserData = allUsers?.find(u => u.email?.toLowerCase() === currentUser.email?.toLowerCase());
-    const hasTandaTangan = !!myUserData?.tandaTangan;
+    const hasTandaTangan = !!(currentUser.tandaTangan || myUserData?.tandaTangan);
     const needsTandaTangan = ['Kepala Puskesmas', 'Pengelola Program', 'Admin'].includes(currentUser.role);
 
     const btnApprove = document.getElementById('btnApprove');
@@ -1997,7 +1998,7 @@ async function openVerifikasi(idUsulan) {
             <b>Spesifikasi file:</b> PNG / JPG · Latar belakang putih · Resolusi jelas · Tinta hitam/biru tua
           </div>
           <div style="margin-top:8px">
-            <a href="#" onclick="event.preventDefault();closeModal('verifikasiModal');setTimeout(()=>openEditProfil(),200)" style="display:inline-flex;align-items:center;gap:5px;background:#f59e0b;color:white;padding:6px 14px;border-radius:7px;font-weight:700;font-size:12px;text-decoration:none">
+            <a href="#" onclick="event.preventDefault();window._reopenVerifikasiId='${idUsulan}';closeModal('verifikasiModal');setTimeout(()=>openEditProfil(),200)" style="display:inline-flex;align-items:center;gap:5px;background:#f59e0b;color:white;padding:6px 14px;border-radius:7px;font-weight:700;font-size:12px;text-decoration:none">
               <span class="material-icons" style="font-size:14px">upload</span>Upload Sekarang
             </a>
           </div>`;
@@ -3204,6 +3205,12 @@ async function saveEditProfil() {
     if (tName) tName.textContent = nama;
     closeModal('editProfilModal');
     toast('Profil berhasil disimpan ✓', 'success');
+    // Jika sebelumnya dari modal verifikasi, buka kembali agar tombol verifikasi aktif
+    if (window._reopenVerifikasiId) {
+      const idToReopen = window._reopenVerifikasiId;
+      delete window._reopenVerifikasiId;
+      setTimeout(() => openVerifikasiModal(idToReopen), 300);
+    }
   } catch(e) { toast(e.message, 'error'); }
   finally { setLoading(false); }
 }

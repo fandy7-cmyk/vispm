@@ -43,7 +43,7 @@ exports.handler = async (event) => {
 
     const result = await pool.query(
       `SELECT u.email, u.nama, u.nip, u.role, u.kode_pkm, u.indikator_akses,
-              u.jabatan, u.aktif, u.password_hash, p.nama_puskesmas
+              u.jabatan, u.aktif, u.password_hash, u.tanda_tangan, p.nama_puskesmas
        FROM users u
        LEFT JOIN master_puskesmas p ON u.kode_pkm = p.kode_pkm
        WHERE LOWER(u.email) = LOWER($1) AND u.aktif = true`,
@@ -90,9 +90,10 @@ exports.handler = async (event) => {
       kodePKM: user.kode_pkm || '',
       namaPKM: user.nama_puskesmas || '',
       jabatan: user.jabatan || '',
+      tandaTangan: user.tanda_tangan || '',
       indikatorAkses: indikatorList,
       indikatorAksesString: user.indikator_akses ? user.indikator_akses.toString() : '',
-      needsPassword: !hash // flag untuk minta set password
+      needsPassword: !hash
     });
 
   } catch (e) {

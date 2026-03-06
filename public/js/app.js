@@ -2249,15 +2249,24 @@ async function openVerifikasi(idUsulan) {
         btnApprove.disabled = !canApprove;
         btnReject.disabled = !canApprove;
 
-        // Tombol Sanggah: hanya Pengelola Program saat statusGlobal=Ditolak karena Admin
+        // Tombol Sanggah/Respond: untuk Pengelola Program saat ada penolakan indikator miliknya
         const btnSanggah = document.getElementById('btnSanggah');
         if (btnSanggah) {
-          const isProgramDitolakAdmin = canApprove &&
-            currentUser.role === 'Pengelola Program' &&
+          const myVP = (detail.verifikasiProgram||[]).find(v =>
+            v.email_program?.toLowerCase() === currentUser.email?.toLowerCase()
+          );
+          const myAkses = myVP ? (myVP.indikator_akses||'').toString().split(',').map(x=>parseInt(x.trim())).filter(Boolean) : [];
+          const adaPenolakanSaya = (detail.penolakanIndikator||[]).some(pi =>
+            pi.aksi === null && myAkses.includes(pi.no_indikator)
+          );
+          const showSanggah = currentUser.role === 'Pengelola Program' &&
             detail.statusGlobal === 'Ditolak' &&
-            detail.statusKapus === 'Selesai'; // sudah lewat Kapus = ditolak Admin
-          btnSanggah.style.display = isProgramDitolakAdmin ? '' : 'none';
-          btnSanggah.disabled = !canApprove;
+            detail.ditolakOleh === 'Admin' &&
+            adaPenolakanSaya;
+          btnSanggah.style.display = showSanggah ? '' : 'none';
+          btnSanggah.disabled = false;
+          if (showSanggah) btnSanggah.textContent = '';
+          if (showSanggah) btnSanggah.innerHTML = '<span class="material-icons">gavel</span> Respon Penolakan';
         }
       }
     } // end else hasTandaTangan
@@ -2296,40 +2305,242 @@ async function doApprove() {
 }
 
 async function doReject() {
+  const role = currentUser.role;
+
+  if (role === 'Admin') {
+    // Admin: buka modal pilih indikator
+    await openAdminTolakModal(verifCurrentUsulan);
+    return;
+  }
+
+  // Kepala Puskesmas
   const catatan = document.getElementById('verifCatatan').value.trim();
   if (!catatan) return toast('Isi alasan penolakan', 'warning');
-
   setLoading(true);
   try {
-    await API.rejectUsulan({ idUsulan: verifCurrentUsulan, email: currentUser.email, role: currentUser.role, alasan: catatan });
+    await API.rejectUsulan({ idUsulan: verifCurrentUsulan, email: currentUser.email, role, alasan: catatan });
     toast('Usulan ditolak', 'warning');
     const btnApprove = document.getElementById('btnApprove');
     const btnReject  = document.getElementById('btnReject');
-    const btnSanggah = document.getElementById('btnSanggah');
     if (btnApprove) btnApprove.disabled = true;
-    if (btnSanggah) btnSanggah.style.display = 'none';
-    if (btnReject) {
-      btnReject.style.background = '#dc2626';
-      btnReject.innerHTML = '<span class="material-icons">cancel</span> Ditolak';
-      btnReject.disabled = true;
-    }
+    if (btnReject) { btnReject.style.background = '#dc2626'; btnReject.innerHTML = '<span class="material-icons">cancel</span> Ditolak'; btnReject.disabled = true; }
     setTimeout(() => { closeModal('verifikasiModal'); renderVerifikasi(); }, 800);
   } catch (e) { toast(e.message, 'error'); }
   finally { setLoading(false); }
 }
 
-async function doSanggah() {
-  const catatan = document.getElementById('verifCatatan').value.trim();
-  if (!catatan) return toast('Isi alasan sanggahan Anda', 'warning');
+async function openAdminTolakModal(idUsulan) {
+  const inds = await API.getIndikatorUsulan(idUsulan).catch(() => []);
+  if (!inds.length) return toast('Gagal memuat indikator', 'error');
+
+  let modal = document.getElementById('adminTolakModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'adminTolakModal';
+    modal.className = 'modal';
+    modal.style.zIndex = '4000';
+    modal.addEventListener('click', e => { if (e.target === modal) closeModal('adminTolakModal'); });
+    document.body.appendChild(modal);
+  }
+
+  const rowsHtml = inds.map(i => {
+    return `<div style="border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;transition:border-color .15s" id="atRow-${i.no}">
+      <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer">
+        <input type="checkbox" id="atChk-${i.no}" onchange="toggleAdminTolakRow(${i.no})"
+          style="width:16px;height:16px;margin-top:2px;accent-color:#ef4444;flex-shrink:0">
+        <span>
+          <span style="font-weight:700;font-size:13px">Indikator ${i.no}</span>
+          <span style="font-size:12.5px;color:var(--text-light);margin-left:6px">${i.nama||''}</span>
+        </span>
+      </label>
+      <div id="atAlasan-${i.no}" style="display:none;margin-top:10px">
+        <textarea class="form-control" id="atText-${i.no}" rows="2"
+          placeholder="Alasan penolakan indikator ${i.no}..."
+          style="font-size:12.5px;resize:vertical"></textarea>
+      </div>
+    </div>`;
+  }).join('');
+
+  modal.innerHTML = `
+    <div class="modal-card" style="max-width:680px;width:100%">
+      <div class="modal-header">
+        <span class="material-icons" style="color:#ef4444">cancel</span>
+        <h3>Tolak Usulan — Pilih Indikator Bermasalah</h3>
+        <button class="btn-icon" onclick="closeModal('adminTolakModal')"><span class="material-icons">close</span></button>
+      </div>
+      <div class="modal-body" style="padding:16px 20px;max-height:60vh;overflow-y:auto">
+        <p style="font-size:13px;color:var(--text-light);margin-bottom:14px">Centang indikator yang bermasalah dan isi alasan per indikator.</p>
+        <div style="display:flex;flex-direction:column;gap:10px" id="adminTolakList">${rowsHtml}</div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('adminTolakModal')">Batal</button>
+        <button class="btn btn-danger" onclick="submitAdminTolak('${idUsulan}')">
+          <span class="material-icons">send</span>Kirim Penolakan
+        </button>
+      </div>
+    </div>`;
+  showModal('adminTolakModal');
+}
+
+function toggleAdminTolakRow(no) {
+  const chk = document.getElementById(`atChk-${no}`);
+  const row = document.getElementById(`atRow-${no}`);
+  const alasan = document.getElementById(`atAlasan-${no}`);
+  if (chk.checked) {
+    row.style.borderColor = '#ef4444';
+    alasan.style.display = 'block';
+    document.getElementById(`atText-${no}`)?.focus();
+  } else {
+    row.style.borderColor = '';
+    alasan.style.display = 'none';
+  }
+}
+
+async function submitAdminTolak(idUsulan) {
+  const checkboxes = document.querySelectorAll('#adminTolakList input[type=checkbox]:checked');
+  if (!checkboxes.length) return toast('Pilih minimal 1 indikator yang bermasalah', 'warning');
+
+  const indikatorList = [];
+  for (const chk of checkboxes) {
+    const no = parseInt(chk.id.replace('atChk-', ''));
+    const alasan = document.getElementById(`atText-${no}`)?.value.trim();
+    if (!alasan) return toast(`Isi alasan untuk indikator ${no}`, 'warning');
+    indikatorList.push({ noIndikator: no, alasan });
+  }
 
   setLoading(true);
   try {
-    await API.rejectUsulan({ idUsulan: verifCurrentUsulan, email: currentUser.email, role: currentUser.role, alasan: catatan, aksi: 'sanggah' });
-    toast('Sanggahan terkirim ke Admin', 'info');
-    setTimeout(() => { closeModal('verifikasiModal'); renderVerifikasi(); }, 800);
+    await API.rejectUsulan({ idUsulan, email: currentUser.email, role: 'Admin', alasan: '-', indikatorList });
+    toast(`Usulan ditolak — ${indikatorList.length} indikator dikembalikan ke Pengelola Program`, 'warning');
+    closeModal('adminTolakModal');
+    setTimeout(() => { closeModal('verifikasiModal'); renderVerifikasi(); }, 600);
   } catch (e) { toast(e.message, 'error'); }
   finally { setLoading(false); }
 }
+
+
+async function doSanggah() {
+  // Untuk Pengelola Program — buka modal respond per indikator
+  await openProgramRespondModal(verifCurrentUsulan);
+}
+
+async function openProgramRespondModal(idUsulan) {
+  const [detail, inds] = await Promise.all([
+    API.getDetailUsulan(idUsulan),
+    API.getIndikatorUsulan(idUsulan)
+  ]).catch(() => [null, []]);
+  if (!detail) return toast('Gagal memuat data', 'error');
+
+  const myVP = (detail.verifikasiProgram||[]).find(v =>
+    v.email_program?.toLowerCase() === currentUser.email?.toLowerCase()
+  );
+  const myAkses = myVP ? (myVP.indikator_akses||'').toString().split(',').map(x=>parseInt(x.trim())).filter(Boolean) : [];
+  const penolakanSaya = (detail.penolakanIndikator||[]).filter(pi =>
+    pi.aksi === null && myAkses.includes(pi.no_indikator)
+  );
+  if (!penolakanSaya.length) return toast('Tidak ada indikator yang perlu direspons', 'info');
+
+  let modal = document.getElementById('programRespondModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'programRespondModal';
+    modal.className = 'modal';
+    modal.style.zIndex = '4000';
+    modal.addEventListener('click', e => { if (e.target === modal) closeModal('programRespondModal'); });
+    document.body.appendChild(modal);
+  }
+
+  const rowsHtml = penolakanSaya.map(pi => {
+    const ind = inds.find(i => i.no === pi.no_indikator) || {};
+    return `<div style="border:1.5px solid var(--border);border-radius:10px;padding:14px 16px" id="prRow-${pi.no_indikator}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px">
+        <div>
+          <span style="font-weight:700;font-size:13.5px">Indikator ${pi.no_indikator}</span>
+          <span style="font-size:12px;color:var(--text-light);margin-left:6px">${ind.nama||''}</span>
+        </div>
+        <div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:6px;padding:4px 10px;font-size:11.5px;color:#dc2626;max-width:250px">
+          Admin: "${pi.alasan}"
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <button onclick="setProgramAksi(${pi.no_indikator},'sanggah')" id="prBtnSanggah-${pi.no_indikator}"
+          class="btn btn-sm" style="background:#f59e0b;color:white;border:2px solid #f59e0b;flex:1">
+          <span class="material-icons" style="font-size:14px">gavel</span> Sanggah (Data Sudah Benar)
+        </button>
+        <button onclick="setProgramAksi(${pi.no_indikator},'tolak')" id="prBtnTolak-${pi.no_indikator}"
+          class="btn btn-sm btn-danger" style="border:2px solid #ef4444;flex:1">
+          <span class="material-icons" style="font-size:14px">cancel</span> Tolak (Kembalikan Operator)
+        </button>
+      </div>
+      <textarea class="form-control" id="prText-${pi.no_indikator}" rows="2"
+        placeholder="Catatan / alasan..."
+        style="font-size:12.5px;resize:vertical"></textarea>
+      <input type="hidden" id="prAksi-${pi.no_indikator}" value="">
+    </div>`;
+  }).join('');
+
+  modal.innerHTML = `
+    <div class="modal-card" style="max-width:700px;width:100%">
+      <div class="modal-header">
+        <span class="material-icons" style="color:#f59e0b">gavel</span>
+        <h3>Respon Penolakan Admin — Per Indikator</h3>
+        <button class="btn-icon" onclick="closeModal('programRespondModal')"><span class="material-icons">close</span></button>
+      </div>
+      <div class="modal-body" style="padding:16px 20px;max-height:65vh;overflow-y:auto">
+        <div style="background:#fef3c7;border:1.5px solid #f59e0b;border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:12.5px;color:#92400e">
+          <b>Sanggah</b> = data sudah benar, kirim alasan ke Admin. &nbsp;|&nbsp;
+          <b>Tolak</b> = akui ada kesalahan, kembalikan ke Operator untuk perbaikan.
+        </div>
+        <div style="display:flex;flex-direction:column;gap:14px">${rowsHtml}</div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('programRespondModal')">Batal</button>
+        <button class="btn btn-primary" onclick="submitProgramRespond('${idUsulan}')">
+          <span class="material-icons">send</span>Kirim Respon
+        </button>
+      </div>
+    </div>`;
+  showModal('programRespondModal');
+}
+
+function setProgramAksi(no, aksi) {
+  document.getElementById(`prAksi-${no}`).value = aksi;
+  const row = document.getElementById(`prRow-${no}`);
+  const btnS = document.getElementById(`prBtnSanggah-${no}`);
+  const btnT = document.getElementById(`prBtnTolak-${no}`);
+  if (aksi === 'sanggah') {
+    row.style.borderColor = '#f59e0b';
+    btnS.style.opacity = '1'; btnS.style.fontWeight = '800';
+    btnT.style.opacity = '0.4'; btnT.style.fontWeight = '';
+  } else {
+    row.style.borderColor = '#ef4444';
+    btnT.style.opacity = '1'; btnT.style.fontWeight = '800';
+    btnS.style.opacity = '0.4'; btnS.style.fontWeight = '';
+  }
+}
+
+async function submitProgramRespond(idUsulan) {
+  const hiddenInputs = document.querySelectorAll('[id^="prAksi-"]');
+  const responList = [];
+  for (const el of hiddenInputs) {
+    const no = parseInt(el.id.replace('prAksi-', ''));
+    const aksi = el.value;
+    if (!aksi) return toast(`Pilih Sanggah atau Tolak untuk indikator ${no}`, 'warning');
+    const catatan = document.getElementById(`prText-${no}`)?.value.trim();
+    if (!catatan) return toast(`Isi catatan untuk indikator ${no}`, 'warning');
+    responList.push({ noIndikator: no, aksi, catatan });
+  }
+
+  setLoading(true);
+  try {
+    const res = await API.respondPenolakan({ idUsulan, email: currentUser.email, responList });
+    toast(res.message || 'Respon tersimpan', 'success');
+    closeModal('programRespondModal');
+    setTimeout(() => { closeModal('verifikasiModal'); renderVerifikasi(); }, 600);
+  } catch (e) { toast(e.message, 'error'); }
+  finally { setLoading(false); }
+}
+
 
 
 // ===== UBAH PASSWORD =====

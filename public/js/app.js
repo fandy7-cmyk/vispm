@@ -568,7 +568,7 @@ function renderUsulanTable(rows, role) {
 async function renderInput() {
   // Guard: hanya Operator yang bisa input usulan
   if (currentUser && currentUser.role === 'Kepala Puskesmas') {
-    document.getElementById('content').innerHTML = `<div class="empty-state"><span class="material-icons" style="font-size:48px;color:var(--text-xlight)">block</span><p>Kepala Puskesmas tidak memiliki akses untuk input usulan.</p></div>`;
+    document.getElementById('mainContent').innerHTML = `<div class="empty-state"><span class="material-icons" style="font-size:48px;color:var(--text-xlight)">block</span><p>Kepala Puskesmas tidak memiliki akses untuk input usulan.</p></div>`;
     return;
   }
   let pkmList = [], periodeAktif = null, allPeriode = [], periodeOptions = [];
@@ -730,7 +730,7 @@ async function createUsulan() {
 
   // Cek duplikat di sisi client
   const existingList = await API.getUsulan({ email_operator: currentUser.email }).catch(() => []);
-  const duplikat = existingList.find(u => u.tahun == tahun && u.bulan == bulan);
+  const duplikat = existingList.find(u => u.tahun == tahun && u.bulan == bulan && u.kodePKM === kodePKM);
   if (duplikat) {
     toast(`❌ Tidak dapat membuat usulan! Anda sudah memiliki usulan untuk ${namaBulanTxt} ${tahun} (ID: ${duplikat.idUsulan}). Hanya boleh 1 usulan per periode aktif.`, 'error');
     return;
@@ -1025,6 +1025,10 @@ async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, tahun
 
 // Hapus satu file data dukung berdasarkan index
 async function hapusBukti(idUsulan, noIndikator, fileIndex) {
+  // Tutup modal preview jika sedang terbuka
+  const previewModal = document.getElementById('previewBuktiModal');
+  if (previewModal) previewModal.classList.remove('show');
+
   showConfirm({
     title: 'Hapus Data Dukung',
     message: `Hapus <strong>File ${fileIndex + 1}</strong> dari indikator ${noIndikator}?`,
@@ -1672,14 +1676,14 @@ async function renderVerifikasi() {
       <h1><span class="material-icons">verified</span>Verifikasi Usulan${role === 'Pengelola Program' ? ` — Indikator: ${currentUser.indikatorAksesString || 'Semua'}` : ''}</h1>
     </div>
     ${role === 'Admin' ? `<div class="tabs" id="verifTabs">
-      <div class="tab active" onclick="loadVerifTab('semua')">Semua</div>
-      <div class="tab" onclick="loadVerifTab('Menunggu Admin')">Menunggu Admin</div>
-      <div class="tab" onclick="loadVerifTab('Selesai')">Selesai</div>
-      <div class="tab" onclick="loadVerifTab('Ditolak')">Ditolak</div>
+      <div class="tab active" onclick="loadVerifTab('semua',this)">Semua</div>
+      <div class="tab" onclick="loadVerifTab('Menunggu Admin',this)">Menunggu Admin</div>
+      <div class="tab" onclick="loadVerifTab('Selesai',this)">Selesai</div>
+      <div class="tab" onclick="loadVerifTab('Ditolak',this)">Ditolak</div>
     </div>` : ''}
     ${role === 'Kepala Puskesmas' ? `<div class="tabs" id="verifTabs">
-      <div class="tab active" onclick="loadVerifTab('semua')">Semua Usulan</div>
-      <div class="tab" onclick="loadVerifTab('Menunggu Kepala Puskesmas')">Menunggu Verifikasi</div>
+      <div class="tab active" onclick="loadVerifTab('semua',this)">Semua Usulan</div>
+      <div class="tab" onclick="loadVerifTab('Menunggu Kepala Puskesmas',this)">Menunggu Verifikasi</div>
     </div>` : ''}
     <div class="card">
       <div class="card-body" style="padding:0" id="verifTable">
@@ -1690,9 +1694,9 @@ async function renderVerifikasi() {
   loadVerifData(statusFilter);
 }
 
-async function loadVerifTab(status) {
+async function loadVerifTab(status, el) {
   document.querySelectorAll('#verifTabs .tab').forEach(t => t.classList.remove('active'));
-  event.target.classList.add('active');
+  if (el) el.classList.add('active');
   loadVerifData(status);
 }
 

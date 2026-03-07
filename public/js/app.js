@@ -923,8 +923,8 @@ async function openIndikatorModal(idUsulan) {
             onkeypress="return event.charCode>=48&&event.charCode<=57">`}
         </td>
         <td style="width:90px;text-align:center">
-          <span id="cap-${ind.no}" style="font-weight:700;font-size:13px;color:var(--primary)">
-            ${ind.target > 0 ? Math.min((ind.capaian / ind.target) * 100, 100).toFixed(1) : '0.0'}%
+          <span id="cap-${ind.no}" style="font-weight:700;font-size:13px;color:#1e293b">
+            ${ind.target > 0 ? (Math.min((ind.capaian / ind.target) * 100, 100) === 100 ? '100%' : Math.min((ind.capaian / ind.target) * 100, 100).toFixed(1) + '%') : '0.0%'}
           </span>
         </td>
         <td style="min-width:100px;text-align:center">
@@ -1458,7 +1458,7 @@ function previewSPM(changedNo) {
   if (tEl && cEl && capEl) {
     const t = parseInt(tEl.value) || 0;
     const c = parseInt(cEl.value) || 0;
-    capEl.textContent = (t > 0 ? Math.min((c / t) * 100, 100).toFixed(1) : '0.0') + '%';
+    const pct = t > 0 ? Math.min((c / t) * 100, 100) : 0; capEl.textContent = pct === 100 ? '100%' : (t > 0 ? pct.toFixed(1) : '0.0') + '%';
   }
   // Hitung SPM preview dari semua input yang ada di DOM
   const rows = document.querySelectorAll('[id^="t-"]');

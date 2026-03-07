@@ -64,14 +64,36 @@ exports.handler = async (event) => {
     let result = null;
     let finalUrl = url;
 
-    // Strategy 1: Direct access (works if access_mode=public)
+    // Untuk raw file yang URL-nya di-append ekstensi manual,
+    // Cloudinary perlu di-fetch tanpa ekstensi atau dengan basic auth
+    const urlWithoutExt = url.replace(/\.[^./]+$/, '');
+
+    // Strategy 1: Direct access dengan URL asli
     result = await httpsGet(url, {});
     console.log('[sign-url] Strategy 1 direct:', result.status, url);
 
-    // Strategy 2: Basic Auth
+    // Strategy 2: Coba URL tanpa ekstensi (untuk raw yang di-append manual)
+    if (result.status === 401 || result.status === 403 || result.status === 404) {
+      if (urlWithoutExt !== url) {
+        result = await httpsGet(urlWithoutExt, {});
+        console.log('[sign-url] Strategy 2 no-ext:', result.status, urlWithoutExt);
+        if (result.status === 200) finalUrl = urlWithoutExt;
+      }
+    }
+
+    // Strategy 3: Basic Auth dengan URL asli
     if (result.status === 401 || result.status === 403 || result.status === 404) {
       result = await httpsGet(url, { 'Authorization': `Basic ${basicAuth}` });
-      console.log('[sign-url] Strategy 2 basic auth:', result.status);
+      console.log('[sign-url] Strategy 3 basic auth:', result.status);
+    }
+
+    // Strategy 4: Basic Auth tanpa ekstensi
+    if (result.status === 401 || result.status === 403 || result.status === 404) {
+      if (urlWithoutExt !== url) {
+        result = await httpsGet(urlWithoutExt, { 'Authorization': `Basic ${basicAuth}` });
+        console.log('[sign-url] Strategy 4 basic auth no-ext:', result.status);
+        if (result.status === 200) finalUrl = urlWithoutExt;
+      }
     }
 
     // Strategy 3: Cloudinary Search API — cari file berdasarkan public_id

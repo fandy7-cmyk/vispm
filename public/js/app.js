@@ -2049,6 +2049,18 @@ function openEditProfil() {
     modal.className = 'modal';
     modal.style.zIndex = '3000';
     modal.addEventListener('click', e => { if (e.target === modal) closeModal('editProfilModal'); });
+    const _ttSection = ['Kepala Puskesmas','Pengelola Program'].includes(currentUser.role) ? `
+          <div class="form-group">
+            <label>Tanda Tangan <span style="font-size:11px;color:#94a3b8">(upload gambar, maks 2MB)</span></label>
+            <div style="border:2px dashed #cbd5e1;border-radius:8px;padding:10px;text-align:center;cursor:pointer;position:relative" id="epTTWrap" onclick="document.getElementById('epTTInput').click()">
+              <img id="epTTPreview" style="max-height:80px;max-width:100%;display:none;margin:0 auto">
+              <div id="epTTPlaceholder" style="color:#94a3b8;font-size:13px;padding:8px"><span class="material-icons" style="font-size:28px;display:block;margin:0 auto 4px">draw</span>Klik untuk upload tanda tangan</div>
+              <input type="file" id="epTTInput" accept="image/*" style="display:none" onchange="previewTandaTangan(event)">
+            </div>
+            <button type="button" id="epTTHapus" style="display:none;margin-top:6px;font-size:12px;color:#ef4444;background:none;border:none;cursor:pointer;padding:0" onclick="hapusTandaTangan()">
+              <span class="material-icons" style="font-size:14px;vertical-align:middle">delete</span> Hapus tanda tangan
+            </button>
+          </div>` : '';
     modal.innerHTML = `
       <div class="modal-card" style="max-width:420px;width:100%">
         <div class="modal-header">
@@ -2073,18 +2085,7 @@ function openEditProfil() {
             <label>Role</label>
             <input class="form-control" id="epRole" disabled style="background:#f8fafc;color:var(--text-light)">
           </div>
-          \${['Kepala Puskesmas','Pengelola Program'].includes(currentUser.role) ? \`
-          <div class="form-group">
-            <label>Tanda Tangan <span style="font-size:11px;color:#94a3b8">(upload gambar, maks 2MB)</span></label>
-            <div style="border:2px dashed #cbd5e1;border-radius:8px;padding:10px;text-align:center;cursor:pointer;position:relative" id="epTTWrap" onclick="document.getElementById('epTTInput').click()">
-              <img id="epTTPreview" style="max-height:80px;max-width:100%;display:none;margin:0 auto">
-              <div id="epTTPlaceholder" style="color:#94a3b8;font-size:13px;padding:8px"><span class="material-icons" style="font-size:28px;display:block;margin:0 auto 4px">draw</span>Klik untuk upload tanda tangan</div>
-              <input type="file" id="epTTInput" accept="image/*" style="display:none" onchange="previewTandaTangan(event)">
-            </div>
-            <button type="button" id="epTTHapus" style="display:none;margin-top:6px;font-size:12px;color:#ef4444;background:none;border:none;cursor:pointer;padding:0" onclick="hapusTandaTangan()">
-              <span class="material-icons" style="font-size:14px;vertical-align:middle">delete</span> Hapus tanda tangan
-            </button>
-          </div>\` : ''}
+          ${_ttSection}
           <div id="epStatus" style="font-size:12.5px;color:#ef4444;min-height:18px"></div>
         </div>
         <div class="modal-footer">

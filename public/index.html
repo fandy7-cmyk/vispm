@@ -111,12 +111,12 @@ body { font-family: 'Plus Jakarta Sans', sans-serif; background: linear-gradient
   font-family: 'Outfit', sans-serif;
 }
 /* Features */
-.auth-left-features { display: flex; flex-direction: column; gap: 10px; flex: 1; align-items: center; width: 100%; }
+.auth-left-features { display: flex; flex-direction: column; gap: 10px; flex: 1; align-items: center; }
 .auth-left-feature {
   display: flex; align-items: center; gap: 11px;
   background: rgba(255,255,255,0.05); border-radius: 9px;
   padding: 11px 16px; border: 1px solid rgba(255,255,255,0.07);
-  width: 100%;
+  width: max-content; min-width: max-content;
 }
 .auth-left-feature .material-icons { font-size: 17px; color: #5eead4; flex-shrink: 0; }
 .auth-left-feature span {
@@ -619,9 +619,10 @@ input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-o
       </div>
       <!-- Fitur -->
       <div class="auth-left-features">
+        <div style="display:inline-flex;flex-direction:column;gap:10px">
         <div class="auth-left-feature">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#5eead4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/><path d="m9 10 2 2 4-4"/></svg>
-          <span>Digitalisasi Verifikasi Indeks Standard Pelayanan Minimal</span>
+          <span>Digitalisasi Verifikasi</span>
         </div>
         <div class="auth-left-feature">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#5eead4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/><circle cx="12" cy="12" r="3"/></svg>
@@ -630,6 +631,7 @@ input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-o
         <div class="auth-left-feature">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#5eead4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
           <span>Monitoring Indeks SPM Real-Time</span>
+        </div>
         </div>
       </div>
       <!-- Copyright -->

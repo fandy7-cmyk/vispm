@@ -122,7 +122,7 @@ function startApp() {
   // Sembunyikan menu Edit Profil & Tanda Tangan untuk Operator
   const btnEPTT = document.getElementById('btnEditProfilTT');
   if (btnEPTT) {
-    const rolesBolehTT = ['Kepala Puskesmas','Pengelola Program','Kadis'];
+    const rolesBolehTT = ['Kepala Puskesmas','Pengelola Program'];
     btnEPTT.style.display = rolesBolehTT.includes(currentUser.role) ? '' : 'none';
   }
 
@@ -220,12 +220,6 @@ function buildSidebar() {
       { label: 'Menu', items: [
         { id: 'dashboard', icon: 'dashboard', label: 'Dashboard' },
         { id: 'verifikasi', icon: 'verified', label: 'Verifikasi' },
-        { id: 'laporan', icon: 'bar_chart', label: 'Laporan' }
-      ]}
-    ],
-    'Kadis': [
-      { label: 'Menu', items: [
-        { id: 'dashboard', icon: 'dashboard', label: 'Dashboard' },
         { id: 'laporan', icon: 'bar_chart', label: 'Laporan' }
       ]}
     ]
@@ -376,7 +370,7 @@ async function renderDashboard() {
     else if (role === 'Operator') renderOperatorDashboard(content, data);
     else if (role === 'Kepala Puskesmas') renderKepalasDashboard(content, data);
     else if (role === 'Pengelola Program') renderProgramDashboard(content, data);
-    else if (role === 'Kadis') renderKadisDashboard(content, data);
+
   } catch(e) {
     console.error('renderDashboard error:', e);
     content.innerHTML = `<div class="empty-state"><span class="material-icons" style="color:#ef4444">error</span><p>Error: ${e.message}</p></div>`;
@@ -531,34 +525,6 @@ function renderProgramDashboard(el, d) {
   }).catch(() => {});
 }
 
-function renderKadisDashboard(el, d) {
-  el.innerHTML = `
-    <div class="stats-grid">
-      ${statCard('blue','assignment','Total Usulan', d.totalUsulan)}
-      ${statCard('green','check_circle','Selesai', d.selesai)}
-      ${statCard('orange','pending','Dalam Proses', d.proses)}
-      ${statCard('purple','trending_up','Rata-rata Indeks SPM', d.rataSPM)}
-    </div>
-    <div class="card">
-      <div class="card-header-bar"><span class="card-title"><span class="material-icons">timeline</span>Statistik per Bulan</span></div>
-      <div class="card-body">${renderChart(d.chartData)}</div>
-    </div>
-    <div class="card">
-      <div class="card-header-bar"><span class="card-title"><span class="material-icons">local_hospital</span>Statistik per Puskesmas</span></div>
-      <div class="card-body" style="padding:0">
-        <div class="table-container">
-          <table>
-            <thead><tr><th>Puskesmas</th><th>Total</th><th>Selesai</th><th>Proses</th><th>Rata-rata Indeks</th></tr></thead>
-            <tbody>${(d.statPerPKM || []).map(r => `<tr>
-              <td>${r.nama}</td><td>${r.total}</td><td><span class="badge badge-success">${r.selesai}</span></td>
-              <td>${r.proses}</td><td><span style="font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--primary)">${r.rataIndeks}</span></td>
-            </tr>`).join('') || `<tr><td colspan="5"><div class="empty-state" style="padding:24px"><p>Belum ada data</p></div></td></tr>`}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>`;
-}
 
 function statCard(color, icon, label, value) {
   return `<div class="stat-card">
@@ -2089,7 +2055,7 @@ function openEditProfil() {
             <label>Role</label>
             <input class="form-control" id="epRole" disabled style="background:#f8fafc;color:var(--text-light)">
           </div>
-          \${['Kepala Puskesmas','Pengelola Program','Kadis'].includes(currentUser.role) ? \`
+          \${['Kepala Puskesmas','Pengelola Program'].includes(currentUser.role) ? \`
           <div class="form-group">
             <label>Tanda Tangan <span style="font-size:11px;color:#94a3b8">(upload gambar, maks 2MB)</span></label>
             <div style="border:2px dashed #cbd5e1;border-radius:8px;padding:10px;text-align:center;cursor:pointer;position:relative" id="epTTWrap" onclick="document.getElementById('epTTInput').click()">
@@ -2240,7 +2206,7 @@ async function renderLaporan() {
         <div class="filter-row">
           <select class="form-control" id="lapTahun" onchange="loadLaporan()">${yearOptions(CURRENT_YEAR)}</select>
           <select class="form-control" id="lapBulan" onchange="loadLaporan()"><option value="semua">Semua Bulan</option>${bulanOptions('')}</select>
-          ${['Admin','Kadis'].includes(role) ? `<select class="form-control" id="lapPKM" onchange="loadLaporan()"><option value="semua">Semua Puskesmas</option></select>` : ''}
+          ${role === 'Admin' ? `<select class="form-control" id="lapPKM" onchange="loadLaporan()"><option value="semua">Semua Puskesmas</option></select>` : ''}
           <select class="form-control" id="lapStatus" onchange="loadLaporan()">
             <option value="semua">Semua Status</option>
             <option value="Selesai">Selesai</option>
@@ -2258,7 +2224,7 @@ async function renderLaporan() {
     </div>`;
 
   // Load PKM list for filter
-  if (['Admin','Kadis'].includes(role)) {
+  if (role === 'Admin') {
     API.getPKM().then(pkm => {
       const sel = document.getElementById('lapPKM');
       if (sel) pkm.forEach(p => sel.innerHTML += `<option value="${p.kode}">${p.nama}</option>`);
@@ -2535,7 +2501,7 @@ async function renderUsers(el) {
           <select class="form-control" id="filterRole" onchange="filterUsers()" style="width:160px">
             <option value="">Semua Role</option>
             <option>Admin</option><option>Operator</option><option>Kepala Puskesmas</option>
-            <option>Pengelola Program</option><option>Kadis</option>
+            <option>Pengelola Program</option>
           </select>
         </div>
       </div>
@@ -2557,7 +2523,7 @@ async function renderUsers(el) {
           <div class="form-group"><label>Role *</label>
             <select class="form-control" id="uRole" onchange="checkUserRole()">
               <option>Admin</option><option>Operator</option><option>Kepala Puskesmas</option>
-              <option>Pengelola Program</option><option>Kadis</option>
+              <option>Pengelola Program</option>
             </select></div>
           <div id="pkmContainer" style="display:none" class="form-group"><label>Puskesmas</label>
             <select class="form-control" id="uPKM"><option value="">Pilih Puskesmas</option></select></div>

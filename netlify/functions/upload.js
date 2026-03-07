@@ -55,14 +55,12 @@ exports.handler = async (event) => {
     const imageExts = ['jpg','jpeg','png','gif','webp','bmp','svg'];
     const resourceType = imageExts.includes(ext) ? 'image' : 'raw';
 
-    // Untuk raw: gunakan format parameter agar Cloudinary simpan dengan ekstensi yg benar
-    // Signature: parameter urut abjad — access_mode, format (jika ada), public_id, timestamp
+    // Untuk raw: access_mode=public saja (tanpa format parameter)
+    // Signature urut abjad: access_mode, public_id, timestamp
     let sigParts, extraParams;
     if (resourceType === 'raw') {
-      sigParts = ext
-        ? `access_mode=public&format=${ext}&public_id=${publicId}&timestamp=${timestamp}${apiSecret}`
-        : `access_mode=public&public_id=${publicId}&timestamp=${timestamp}${apiSecret}`;
-      extraParams = { access_mode: 'public', ...(ext ? { format: ext } : {}) };
+      sigParts = `access_mode=public&public_id=${publicId}&timestamp=${timestamp}${apiSecret}`;
+      extraParams = { access_mode: 'public' };
     } else {
       sigParts = `public_id=${publicId}&timestamp=${timestamp}${apiSecret}`;
       extraParams = {};
@@ -84,8 +82,11 @@ exports.handler = async (event) => {
       throw new Error((result.body?.error?.message) || `Cloudinary error ${result.status}`);
     }
 
-    // secure_url dari Cloudinary sudah include ekstensi karena pakai format parameter
-    const fileUrl = result.body.secure_url;
+    // Append ekstensi ke URL jika belum ada (raw files tidak auto-append)
+    let fileUrl = result.body.secure_url;
+    if (resourceType === 'raw' && ext && !fileUrl.endsWith('.' + ext)) {
+      fileUrl = fileUrl + '.' + ext;
+    }
 
     return {
       statusCode: 200,

@@ -1646,18 +1646,15 @@ async function openLogAktivitas(idUsulan) {
       <div class="modal-header">
         <span class="material-icons">history</span>
         <span>Riwayat Aktivitas</span>
+        <button id="btnLogDownloadPDF" disabled
+          style="opacity:0.4;cursor:not-allowed;background:#e0f2fe;color:#0369a1;border:1.5px solid #7dd3fc;width:34px;height:34px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;margin-left:auto;margin-right:8px;flex-shrink:0"
+          title="Laporan PDF hanya tersedia setelah semua verifikasi selesai">
+          <span class="material-icons" style="font-size:20px">picture_as_pdf</span>
+        </button>
         <button class="btn-icon" onclick="closeModal('logAktivitasModal')"><span class="material-icons">close</span></button>
       </div>
       <div class="modal-body" id="logAktivitasBody" style="padding:20px;flex:1;overflow-y:auto">
         <div class="empty-state"><span class="material-icons" style="animation:spin 1s linear infinite">refresh</span><p>Memuat riwayat...</p></div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-secondary" onclick="closeModal('logAktivitasModal')">Tutup</button>
-        <button class="btn-icon" id="btnLogDownloadPDF" disabled
-          style="opacity:0.4;cursor:not-allowed;background:#e0f2fe;color:#0369a1;border:1.5px solid #7dd3fc;width:36px;height:36px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center"
-          title="Laporan PDF hanya tersedia setelah semua verifikasi selesai">
-          <span class="material-icons" style="font-size:20px">picture_as_pdf</span>
-        </button>
       </div>
     </div>`;
   showModal('logAktivitasModal');

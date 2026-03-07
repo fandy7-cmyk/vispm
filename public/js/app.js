@@ -112,6 +112,13 @@ function startApp() {
   buildSidebar();
   loadPage('dashboard');
 
+  // Sembunyikan menu Edit Profil & Tanda Tangan untuk Operator
+  const btnEPTT = document.getElementById('btnEditProfilTT');
+  if (btnEPTT) {
+    const rolesBolehTT = ['Kepala Puskesmas','Pengelola Program','Admin','Kadis'];
+    btnEPTT.style.display = rolesBolehTT.includes(currentUser.role) ? '' : 'none';
+  }
+
   // Popup notifikasi periode untuk Operator saat login
   if (currentUser.role === 'Operator') {
     setTimeout(() => showPeriodeLoginPopup(), 800);
@@ -533,11 +540,18 @@ function renderUsulanTable(rows, role) {
   }
   const actionBtn = (u) => {
     const viewBtn = `<button class="btn-icon view" onclick="viewDetail('${u.idUsulan}')" title="Detail"><span class="material-icons">visibility</span></button>`;
+    const _svgDlEarly = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10"/><path d="m8 9 4 4 4-4"/><path d="M4 17c0 2.2 1.8 4 4 4h8c2.2 0 4-1.8 4-4"/></svg>`;
+    const pdfBtnEarly = u.statusGlobal === 'Selesai'
+      ? `<button class="btn-icon" onclick="downloadLaporanPDF('${u.idUsulan}')" title="Download Laporan PDF" style="background:transparent;border:none;color:#64748b">${_svgDlEarly}</button>`
+      : (u.statusKapus === 'Selesai' || ['Menunggu Pengelola Program','Menunggu Admin'].includes(u.statusGlobal))
+        ? `<button class="btn-icon" onclick="downloadLaporanSementara('${u.idUsulan}')" title="Download Laporan Sementara" style="background:transparent;border:none;color:#f59e0b">${_svgDlEarly}</button>`
+        : '';
+    const logBtnEarly = `<button class="btn-icon" onclick="openLogAktivitas('${u.idUsulan}')" title="Riwayat Aktivitas" style="background:transparent;border:none;color:#64748b"><span class="material-icons" style="font-size:18px">history</span></button>`;
     if (role === 'operator') {
       return viewBtn +
         (u.statusGlobal === 'Draft' ? `<button class="btn-icon edit" onclick="openIndikatorModal('${u.idUsulan}')" title="Input"><span class="material-icons">edit</span></button>` : '') +
         (u.statusGlobal === 'Ditolak' ? `<button class="btn-icon edit" onclick="openIndikatorModal('${u.idUsulan}')" title="Perbaiki"><span class="material-icons">restart_alt</span></button>` : '') +
-        pdfBtn + logBtn;
+        pdfBtnEarly + logBtnEarly;
     }
     // Tombol verifikasi hanya muncul kalau status SESUAI tahapan role
     const canVerif =

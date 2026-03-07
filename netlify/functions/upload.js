@@ -82,11 +82,9 @@ exports.handler = async (event) => {
       throw new Error((result.body?.error?.message) || `Cloudinary error ${result.status}`);
     }
 
-    // Append ekstensi ke URL jika belum ada (raw files tidak auto-append)
-    let fileUrl = result.body.secure_url;
-    if (resourceType === 'raw' && ext && !fileUrl.endsWith('.' + ext)) {
-      fileUrl = fileUrl + '.' + ext;
-    }
+    // Simpan URL apa adanya dari Cloudinary — jangan append ekstensi
+    // Ekstensi disimpan di originalName, akan dipakai saat preview/download
+    const fileUrl = result.body.secure_url;
 
     return {
       statusCode: 200,

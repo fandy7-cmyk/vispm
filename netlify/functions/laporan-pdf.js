@@ -37,7 +37,8 @@ exports.handler = async (event) => {
 
     const hdrResult = await pool.query(
       `SELECT uh.*, p.nama_puskesmas,
-              ku.nama as kapus_nama, ku.nip as kapus_nip, ku.jabatan as kapus_jabatan
+              ku.nama as kapus_nama, ku.nip as kapus_nip, ku.jabatan as kapus_jabatan,
+              ku.tanda_tangan as kapus_tt
        FROM usulan_header uh
        LEFT JOIN master_puskesmas p ON uh.kode_pkm = p.kode_pkm
        LEFT JOIN users ku ON LOWER(ku.email) = LOWER(uh.kapus_approved_by)
@@ -110,11 +111,18 @@ exports.handler = async (event) => {
       const approved = !!h.kapus_approved_by;
       const nama = h.kapus_nama || h.kapus_approved_by || '-';
       const nip = h.kapus_nip || '';
+      const tt = h.kapus_tt || '';
+      const ttValid = tt && (tt.startsWith('data:image') || tt.startsWith('http'));
       return `<div style="text-align:center;min-width:180px;max-width:220px">
         <div style="font-size:10px;color:#334155;margin-bottom:10px;font-weight:600">Kepala UPTD Puskesmas ${h.nama_puskesmas||h.kode_pkm}</div>
         ${approved
-          ? `<div style="display:inline-block;margin-bottom:6px">${approvedBadgeSVG()}</div>
-             <div style="font-size:9px;color:#2d7a47;font-weight:700;margin-bottom:2px">✓ Disetujui: ${fmtDT(h.kapus_approved_at)}</div>`
+          ? ttValid
+            ? `<div style="height:80px;display:flex;align-items:center;justify-content:center;margin-bottom:4px">
+                 <img src="${tt}" style="max-height:72px;max-width:160px;object-fit:contain">
+               </div>
+               <div style="font-size:9px;color:#2d7a47;font-weight:700;margin-bottom:2px">✓ Disetujui: ${fmtDT(h.kapus_approved_at)}</div>`
+            : `<div style="display:inline-block;margin-bottom:6px">${approvedBadgeSVG()}</div>
+               <div style="font-size:9px;color:#2d7a47;font-weight:700;margin-bottom:2px">✓ Disetujui: ${fmtDT(h.kapus_approved_at)}</div>`
           : `<div style="width:80px;height:80px;border:2px dashed #cbd5e1;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:#94a3b8;font-size:10px;margin-bottom:6px">Belum</div>
              <div style="font-size:9px;color:#94a3b8;margin-bottom:2px">Menunggu persetujuan</div>`}
         <div style="margin-top:4px;border-top:1px solid #334155;padding-top:4px;display:inline-block;min-width:150px">

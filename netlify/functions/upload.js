@@ -48,8 +48,10 @@ exports.handler = async (event) => {
     const indFolder = noIndikator ? 'Indikator-' + noIndikator : 'Lainnya';
     const folder    = 'VISPM/' + (kodePKM||'PKM') + '/' + (tahun||'') + '/' + (bulan||'') + '/' + indFolder;
     const safeBase  = (baseName + '_' + Math.floor(Date.now() / 1000)).replace(/[^a-zA-Z0-9_\-]/g, '_').substring(0, 60);
-    // publicId tanpa ekstensi untuk raw — Cloudinary raw tidak auto-append, kita tambah manual
-    const publicId  = folder + '/' + safeBase;
+    // Untuk raw: sertakan ekstensi di publicId agar URL Cloudinary langsung punya ekstensi
+    const publicId  = resourceType === 'raw' && ext
+      ? folder + '/' + safeBase + '.' + ext
+      : folder + '/' + safeBase;
     const timestamp = Math.floor(Date.now() / 1000);
 
     // Semua file pakai 'raw' + access_mode=public agar URL bisa diakses tanpa auth
@@ -78,11 +80,8 @@ exports.handler = async (event) => {
       throw new Error((result.body?.error?.message) || `Cloudinary error ${result.status}`);
     }
 
-    // Untuk raw: URL tidak punya ekstensi, append manual
-    let fileUrl = result.body.secure_url;
-    if (resourceType === 'raw' && ext && !fileUrl.split('/').pop().includes('.')) {
-      fileUrl = fileUrl + '.' + ext;
-    }
+    // URL langsung dari Cloudinary sudah benar karena ekstensi ada di publicId
+    const fileUrl = result.body.secure_url;
 
     return {
       statusCode: 200,

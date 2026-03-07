@@ -64,31 +64,14 @@ exports.handler = async (event) => {
     let result = null;
     let finalUrl = url;
 
-    // Strip ekstensi yang mungkin di-append manual (misal .pdf tapi file Cloudinary tanpa ekstensi)
-    const urlWithoutExt = url.replace(/\.[a-zA-Z0-9]+$/, '');
-
-    // Strategy 1: URL asli langsung
+    // Strategy 1: URL asli langsung (tanpa auth)
     result = await httpsGet(url, {});
     console.log('[sign-url] S1 direct:', result.status);
 
-    // Strategy 2: URL tanpa ekstensi (raw files di Cloudinary tidak punya ekstensi)
-    if (result.status !== 200 && urlWithoutExt !== url) {
-      result = await httpsGet(urlWithoutExt, {});
-      console.log('[sign-url] S2 no-ext:', result.status);
-      if (result.status === 200) finalUrl = urlWithoutExt;
-    }
-
-    // Strategy 3: Basic auth + URL asli
+    // Strategy 2: Basic auth + URL asli (untuk file private/restricted)
     if (result.status !== 200) {
       result = await httpsGet(url, { 'Authorization': `Basic ${basicAuth}` });
-      console.log('[sign-url] S3 auth:', result.status);
-    }
-
-    // Strategy 4: Basic auth + tanpa ekstensi
-    if (result.status !== 200 && urlWithoutExt !== url) {
-      result = await httpsGet(urlWithoutExt, { 'Authorization': `Basic ${basicAuth}` });
-      console.log('[sign-url] S4 auth no-ext:', result.status);
-      if (result.status === 200) finalUrl = urlWithoutExt;
+      console.log('[sign-url] S2 auth:', result.status);
     }
 
     if (!result || result.status !== 200) {

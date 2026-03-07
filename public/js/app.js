@@ -479,6 +479,24 @@ async function downloadLaporanDashboardOperator() {
   } catch(e) { toast(e.message, "error"); }
 }
 
+function renderPeriodeBanner(periodeList) {
+  if (periodeList && periodeList.length > 0) {
+    const items = periodeList.map(pr => {
+      const jamMulai = pr.jam_mulai || '08:00';
+      const jamSelesai = pr.jam_selesai || '17:00';
+      return '<div style="background:linear-gradient(135deg,#0d9488,#06b6d4);border-radius:12px;padding:14px 16px;color:white;display:flex;align-items:flex-start;gap:12px">'
+        + '<span class="material-icons" style="font-size:22px;opacity:0.9;flex-shrink:0;margin-top:2px">event_available</span>'
+        + '<div style="flex:1;min-width:0">'
+        + '<div style="font-weight:800;font-size:14px;margin-bottom:2px">Periode Aktif: ' + pr.nama_bulan + ' ' + pr.tahun + '</div>'
+        + '<div style="font-size:12px;opacity:0.9">Dibuka: ' + formatDate(pr.tanggal_mulai) + ' ' + jamMulai + ' — Ditutup: ' + formatDate(pr.tanggal_selesai) + ' ' + jamSelesai + ' WITA</div>'
+        + (pr.notif_operator ? '<div style="margin-top:6px;padding:6px 10px;background:rgba(255,255,255,0.15);border-radius:6px;font-size:12px">📢 ' + pr.notif_operator + '</div>' : '')
+        + '</div></div>';
+    }).join('');
+    return '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px">' + items + '</div>';
+  }
+  return '<div class="info-card warning"><span class="material-icons">warning</span><div class="info-card-text">Tidak ada periode input yang aktif saat ini. Hubungi Admin.</div></div>';
+}
+
 function renderKepalasDashboard(el, d) {
   const periodeList = d.periodeAktifList || (d.periodeAktif ? [d.periodeAktif] : []);
   const periodeBanner = renderPeriodeBanner(periodeList);

@@ -1201,9 +1201,11 @@ function _renderBuktiModal() {
   const isOffice = ['doc','docx','xls','xlsx','ppt','pptx'].includes(ext);
   const total = links.length;
 
-  // Gunakan URL asli dari Cloudinary — JANGAN append ekstensi
-  // File raw Cloudinary disimpan tanpa ekstensi, menambah ekstensi menyebabkan 404
-  const urlWithExt = f.url;
+  // Routing semua akses file melalui sign-url proxy (Netlify function)
+  // agar CORS dan Content-Type ditangani dengan benar
+  const _signBase = '/.netlify/functions/sign-url';
+  const proxyUrl = `${_signBase}?url=${encodeURIComponent(f.url)}&name=${encodeURIComponent(fileName)}&mode=preview`;
+  const proxyDownloadUrl = `${_signBase}?url=${encodeURIComponent(f.url)}&name=${encodeURIComponent(fileName)}&mode=download`;
 
   let modal = document.getElementById('previewBuktiModal');
   if (!modal) {
@@ -1237,7 +1239,7 @@ function _renderBuktiModal() {
       <div class="modal-body flex-col" style="position:relative;background:#0f172a;">
         <div id="${previewId}" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;">
           ${isImage
-            ? `<img src="${urlWithExt}" style="max-width:100%;max-height:100%;object-fit:contain;padding:16px">`
+            ? `<img src="${proxyUrl}" style="max-width:100%;max-height:100%;object-fit:contain;padding:16px">`
             : `<div style="color:#94a3b8;font-size:13px;display:flex;align-items:center;gap:8px">
                 <span class="material-icons" style="animation:spin 1s linear infinite">refresh</span> Memuat...
               </div>`
@@ -1259,15 +1261,15 @@ function _renderBuktiModal() {
       const el = document.getElementById(previewId);
       if (!el) return;
       try {
-        const res = await fetch(urlWithExt);
+        const res = await fetch(proxyUrl);
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const blob = await res.blob();
         const blobUrl = URL.createObjectURL(blob);
 
         if (isPDF) {
-          el.innerHTML = `<iframe src="${blobUrl}" style="width:100%;height:100%;border:none"></iframe>`;
+          el.innerHTML = `<object data="${blobUrl}" type="application/pdf" style="width:100%;height:100%;border:none"><iframe src="${blobUrl}" style="width:100%;height:100%;border:none"></iframe></object>`;
         } else if (isOffice) {
-          el.innerHTML = `<iframe src="https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(urlWithExt)}" style="width:100%;height:100%;border:none"></iframe>`;
+          el.innerHTML = `<iframe src="https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(proxyDownloadUrl)}" style="width:100%;height:100%;border:none"></iframe>`;
         } else {
           el.innerHTML = `<div style="text-align:center;color:white;padding:40px">
             <div style="font-size:64px;margin-bottom:16px">${fileIcon}</div>
@@ -1310,13 +1312,11 @@ async function downloadBukti(idx) {
   const ext2 = dotIdx2 > -1 ? fileName.substring(dotIdx2 + 1).toLowerCase() : '';
   if (ext2 && !fileName.toLowerCase().endsWith('.' + ext2)) fileName += '.' + ext2;
 
-  // Gunakan URL asli — JANGAN append ekstensi ke URL Cloudinary raw (menyebabkan 404)
-  let fetchUrl = f.url;
-  // urlHasExt tidak diperlukan lagi
-
+  // Routing download melalui sign-url proxy agar Content-Disposition dan CORS benar
+  const downloadProxyUrl = `/.netlify/functions/sign-url?url=${encodeURIComponent(f.url)}&name=${encodeURIComponent(fileName)}&mode=download`;
 
   try {
-    const res = await fetch(fetchUrl);
+    const res = await fetch(downloadProxyUrl);
     if (!res.ok) throw Object.assign(new Error('HTTP ' + res.status), { status: res.status });
     const blob = await res.blob();
     const blobUrl = URL.createObjectURL(blob);
@@ -1325,8 +1325,8 @@ async function downloadBukti(idx) {
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
   } catch (e) {
-    // Fallback: buka di tab baru
-    window.open(fetchUrl, '_blank');
+    // Fallback: buka via proxy di tab baru
+    window.open(downloadProxyUrl, '_blank');
   }
 }
 

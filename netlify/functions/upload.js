@@ -67,10 +67,11 @@ exports.handler = async (event) => {
     }
     const signature = crypto.createHash('sha1').update(sigParts).digest('hex');
 
-    // Build params manual — JANGAN pakai URLSearchParams karena akan encode '/' jadi '%2F'
-    // Cloudinary tidak decode %2F sehingga subfolder tidak terbentuk
+    // public_id HARUS di-encode (encode '/' jadi '%2F') dalam form body agar Cloudinary
+    // membuat subfolder dengan benar. Signature tetap dihitung dari nilai RAW (tanpa encode).
     const fileDataUri = 'data:application/octet-stream;base64,' + fileBase64;
-    let paramStr = `api_key=${apiKey}&file=${encodeURIComponent(fileDataUri)}&public_id=${publicId}&signature=${signature}&timestamp=${timestamp}`;
+    const encodedPublicId = publicId.split('/').map(encodeURIComponent).join('%2F');
+    let paramStr = `api_key=${apiKey}&file=${encodeURIComponent(fileDataUri)}&public_id=${encodedPublicId}&signature=${signature}&timestamp=${timestamp}`;
     if (resourceType === 'raw') paramStr += `&access_mode=public`;
 
     const result = await cloudinaryRequest(`/v1_1/${cloudName}/${resourceType}/upload`, paramStr);

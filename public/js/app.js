@@ -479,6 +479,37 @@ async function downloadLaporanDashboardOperator() {
   } catch(e) { toast(e.message, "error"); }
 }
 
+
+function renderPeriodeBanner(periodeList) {
+  if (!periodeList || !periodeList.length) return '';
+  const svgCal = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>';
+  const svgOpen = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>';
+  const svgClose = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>';
+  const items = periodeList.map(p => `
+    <div style="border:1px solid #a7f3d0;border-radius:8px;overflow:hidden;margin-bottom:8px">
+      <div style="background:linear-gradient(135deg,#0d9488,#06b6d4);padding:6px 12px;color:white;font-weight:700;font-size:13px;display:flex;align-items:center;gap:6px">
+        ${svgCal} ${p.namaBulan || ''} ${p.tahun || ''}
+      </div>
+      <div style="display:flex;gap:0">
+        <div style="flex:1;display:flex;align-items:center;gap:8px;padding:8px 12px;background:#f0fdf9;border-right:1px solid #d1fae5">
+          <span style="color:#0d9488;flex-shrink:0">${svgOpen}</span>
+          <div>
+            <div style="font-size:10px;color:#64748b;font-weight:600;text-transform:uppercase">Dibuka</div>
+            <div style="font-size:12px;font-weight:700;color:#0f172a">${formatDate(p.tanggalMulai)} ${p.jamMulai||'08:00'} WITA</div>
+          </div>
+        </div>
+        <div style="flex:1;display:flex;align-items:center;gap:8px;padding:8px 12px;background:#fef2f2">
+          <span style="color:#ef4444;flex-shrink:0">${svgClose}</span>
+          <div>
+            <div style="font-size:10px;color:#64748b;font-weight:600;text-transform:uppercase">Ditutup</div>
+            <div style="font-size:12px;font-weight:700;color:#0f172a">${formatDate(p.tanggalSelesai)} ${p.jamSelesai||'17:00'} WITA</div>
+          </div>
+        </div>
+      </div>
+    </div>`).join('');
+  return `<div class="card"><div class="card-header-bar"><span class="card-title" style="display:flex;align-items:center;gap:6px">${svgCal} Periode Input Aktif</span></div><div class="card-body">${items}</div></div>`;
+}
+
 function renderKepalasDashboard(el, d) {
   const periodeList = d.periodeAktifList || (d.periodeAktif ? [d.periodeAktif] : []);
   const periodeBanner = renderPeriodeBanner(periodeList);
@@ -505,17 +536,22 @@ function renderKepalasDashboard(el, d) {
 }
 
 function renderProgramDashboard(el, d) {
+  const periodeList = d.periodeAktifList || (d.periodeAktif ? [d.periodeAktif] : []);
+  const periodeBanner = renderPeriodeBanner(periodeList);
+  const svgPending = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
+  const svgArrow = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>';
   el.innerHTML = `
     <div class="stats-grid">
       ${statCard('orange','pending','Menunggu Verifikasi', d.menunggu)}
       ${statCard('green','check_circle','Sudah Diverifikasi', d.terverifikasi)}
       ${statCard('blue','assignment','Total Usulan', d.total)}
-      ${statCard('cyan','event_available','Periode Aktif', periodeList.length > 0 ? `${periodeList.length}` : '-')}
+      ${statCard('cyan','event_available','Periode Aktif', periodeList.length > 0 ? periodeList.length : '-')}
     </div>
+    ${periodeBanner}
     <div class="card">
       <div class="card-header-bar">
-        <span class="card-title"><span class="material-icons">pending_actions</span>Usulan Menunggu Verifikasi Pengelola Program</span>
-        <button class="btn btn-secondary btn-sm" onclick="loadPage('verifikasi')"><span class="material-icons">arrow_forward</span>Lihat Semua</button>
+        <span class="card-title" style="display:flex;align-items:center;gap:6px">${svgPending} Usulan Menunggu Verifikasi Pengelola Program</span>
+        <button class="btn btn-secondary btn-sm" onclick="loadPage('verifikasi')" style="display:inline-flex;align-items:center;gap:4px">${svgArrow} Lihat Semua</button>
       </div>
       <div class="card-body" style="padding:0" id="pendingTable"></div>
     </div>`;
@@ -1496,7 +1532,7 @@ async function viewDetail(idUsulan) {
     const vpHtml = vp.length ? `
       <div style="margin-top:16px">
         <div style="font-weight:700;font-size:13px;margin-bottom:8px;display:flex;align-items:center;gap:6px">
-          <span class="material-icons" style="font-size:16px;color:var(--primary)">groups</span>
+          <span style="color:var(--primary);display:flex;align-items:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
           Progress Verifikasi Pengelola Program
           (${vp.filter(v=>v.status==='Selesai').length} selesai
           ${vp.filter(v=>v.status==='Ditolak').length ? `· <span style="color:#ef4444">${vp.filter(v=>v.status==='Ditolak').length} menolak</span>` : ''}
@@ -1508,12 +1544,15 @@ async function viewDetail(idUsulan) {
             const isSelesai = v.status === 'Selesai';
             const bg = isDitolakVP ? '#fef2f2' : isSelesai ? '#e6fffa' : '#f8fafc';
             const border = isDitolakVP ? '#fca5a5' : isSelesai ? '#0d9488' : '#e2e8f0';
-            const icon = isDitolakVP ? 'cancel' : isSelesai ? 'check_circle' : 'hourglass_top';
+            const _svgCheck = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>';
+            const _svgCancel = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>';
+            const _svgHourglass = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 22h14"/><path d="M5 2h14"/><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"/><path d="M7 2v4.172a2 2 0 0 1 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"/></svg>';
+            const icon = isDitolakVP ? _svgCancel : isSelesai ? _svgCheck : _svgHourglass;
             const iconColor = isDitolakVP ? '#ef4444' : isSelesai ? '#0d9488' : '#94a3b8';
             const nameColor = isDitolakVP ? '#dc2626' : isSelesai ? '#0d9488' : '#64748b';
             return `<div style="background:${bg};border:1.5px solid ${border};border-radius:8px;padding:10px">
               <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
-                <span class="material-icons" style="font-size:15px;color:${iconColor}">${icon}</span>
+                <span style="color:${iconColor};display:flex;align-items:center">${icon}</span>
                 <span style="font-size:12.5px;font-weight:700;color:${nameColor}">${v.nama_program||v.email_program}</span>
               </div>
               <div style="font-size:11px;color:#94a3b8">Indikator: ${v.indikator_akses||'Semua'}</div>
@@ -1532,7 +1571,7 @@ async function viewDetail(idUsulan) {
   // Banner alasan penolakan — tampil paling atas kalau ditolak
   const rejectionBanner = detail.statusGlobal === 'Ditolak' ? `
     <div style="background:#fef2f2;border:2px solid #fca5a5;border-radius:10px;padding:14px 16px;margin-bottom:16px;display:flex;gap:12px;align-items:flex-start">
-      <span class="material-icons" style="color:#ef4444;font-size:22px;flex-shrink:0">cancel</span>
+      <span style="color:#ef4444;flex-shrink:0;display:flex;align-items:center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg></span>
       <div>
         <div style="font-weight:700;font-size:14px;color:#dc2626;margin-bottom:4px">
           Usulan Ditolak oleh ${detail.ditolakOleh || 'Verifikator'}

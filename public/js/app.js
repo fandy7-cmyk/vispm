@@ -479,6 +479,29 @@ async function downloadLaporanDashboardOperator() {
   } catch(e) { toast(e.message, "error"); }
 }
 
+function renderPeriodeBanner(periodeList) {
+  if (!periodeList || periodeList.length === 0)
+    return `<div class="info-card warning"><span class="material-icons">warning</span><div class="info-card-text">Tidak ada periode input yang aktif saat ini. Hubungi Admin.</div></div>`;
+  const items = periodeList.map(pr => {
+    const jamMulai = pr.jam_mulai || pr.jamMulai || '08:00';
+    const jamSelesai = pr.jam_selesai || pr.jamSelesai || '17:00';
+    const tglMulai = pr.tanggal_mulai || pr.tanggalMulai;
+    const tglSelesai = pr.tanggal_selesai || pr.tanggalSelesai;
+    const namaBulan = pr.nama_bulan || pr.namaBulan || '';
+    const notif = pr.notif_operator || pr.notifOperator || '';
+    return `<div style="background:linear-gradient(135deg,#0d9488,#06b6d4);border-radius:12px;padding:14px 16px;color:white;display:flex;align-items:flex-start;gap:12px">
+      <span class="material-icons" style="font-size:22px;opacity:0.9;flex-shrink:0;margin-top:2px">event_available</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:800;font-size:14px;margin-bottom:2px">Periode Aktif: ${namaBulan} ${pr.tahun}</div>
+        <div style="font-size:12px;opacity:0.9">Dibuka: ${formatDate(tglMulai)} ${jamMulai} — Ditutup: ${formatDate(tglSelesai)} ${jamSelesai} WITA</div>
+        ${notif ? `<div style="margin-top:6px;padding:6px 10px;background:rgba(255,255,255,0.15);border-radius:6px;font-size:12px">📢 ${notif}</div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+  return `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px">${items}</div>`;
+}
+
+
 function renderKepalasDashboard(el, d) {
   const periodeList = d.periodeAktifList || (d.periodeAktif ? [d.periodeAktif] : []);
   const periodeBanner = renderPeriodeBanner(periodeList);
@@ -908,25 +931,12 @@ async function openIndikatorModal(idUsulan) {
         <td><span style="font-family:'JetBrains Mono';font-weight:700">${ind.no}</span></td>
         <td style="max-width:220px;font-size:12.5px">${ind.nama}</td>
         <input type="hidden" id="bobot-${ind.no}" value="${ind.bobot}">
-        <td>
-          ${isLocked ? `<span>${ind.target}</span>` : `<input type="number" id="t-${ind.no}" value="${ind.target}" min="0" step="1"
-            style="width:72px;border:1.5px solid var(--border);border-radius:6px;padding:3px 6px;font-size:13px;text-align:center"
-            title="Target sasaran layanan (bilangan bulat)"
-            onchange="saveIndikator(${ind.no})" oninput="previewSPM(${ind.no})"
-            onkeypress="return event.charCode>=48&&event.charCode<=57">`}
-        </td>
-        <td>
-          ${isLocked ? `<span>${ind.capaian}</span>` : `<input type="number" id="c-${ind.no}" value="${ind.capaian}" min="0" step="1"
-            style="width:72px;border:1.5px solid var(--border);border-radius:6px;padding:3px 6px;font-size:13px;text-align:center"
-            title="Realisasi layanan (bilangan bulat, tidak boleh melebihi target)"
-            onchange="saveIndikator(${ind.no})" oninput="clampRealisasi(${ind.no})"
-            onkeypress="return event.charCode>=48&&event.charCode<=57">`}
-        </td>
-        <td style="width:90px;text-align:center">
-          <span id="cap-${ind.no}" style="font-weight:700;font-size:13px;color:#1e293b">
-            ${ind.target > 0 ? (Math.min((ind.capaian / ind.target) * 100, 100) === 100 ? '100%' : Math.min((ind.capaian / ind.target) * 100, 100).toFixed(1) + '%') : '0.0%'}
-          </span>
-        </td>
+        <td>${isLocked ? `<span>${ind.target}</span>` : `<input type="number" id="t-${ind.no}" value="${ind.target}" min="0" step="0.01"
+            style="width:72px;border:1.5px solid var(--border);border-radius:6px;padding:3px 6px;font-size:13px"
+            onchange="saveIndikator(${ind.no})" oninput="previewSPM(${ind.no})">`}</td>
+        <td>${isLocked ? `<span>${ind.capaian}</span>` : `<input type="number" id="c-${ind.no}" value="${ind.capaian}" min="0" step="0.01"
+            style="width:72px;border:1.5px solid var(--border);border-radius:6px;padding:3px 6px;font-size:13px"
+            onchange="saveIndikator(${ind.no})" oninput="previewSPM(${ind.no})">`}</td>
         <td style="min-width:100px;text-align:center">
           ${(() => {
             // Parse link_file: bisa string URL tunggal atau JSON array
@@ -1011,7 +1021,7 @@ async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, tahun
           fileBase64: base64,
           kodePKM,
           tahun,
-          bulan,
+          bulan: namaBulan,
           noIndikator
         })
       });
@@ -1259,15 +1269,17 @@ function _renderBuktiModal() {
       const el = document.getElementById(previewId);
       if (!el) return;
       try {
-        const res = await fetch(urlWithExt);
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        const blob = await res.blob();
+        // Untuk semua file (terutama PDF & raw Cloudinary): fetch via sign-url proxy
+        const signRes = await fetch(`/.netlify/functions/sign-url?url=${encodeURIComponent(urlWithExt)}&name=${encodeURIComponent(fileName)}&mode=preview`);
+        if (!signRes.ok) throw new Error('HTTP ' + signRes.status);
+        const blob = await signRes.blob();
         const blobUrl = URL.createObjectURL(blob);
 
         if (isPDF) {
           el.innerHTML = `<iframe src="${blobUrl}" style="width:100%;height:100%;border:none"></iframe>`;
         } else if (isOffice) {
-          el.innerHTML = `<iframe src="https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(urlWithExt)}" style="width:100%;height:100%;border:none"></iframe>`;
+          // Office: pakai blobUrl langsung atau office viewer
+          el.innerHTML = `<iframe src="${blobUrl}" style="width:100%;height:100%;border:none"></iframe>`;
         } else {
           el.innerHTML = `<div style="text-align:center;color:white;padding:40px">
             <div style="font-size:64px;margin-bottom:16px">${fileIcon}</div>
@@ -1431,35 +1443,7 @@ async function doSubmitUsulan(forceSubmit) {
 }
 
 // Preview SPM saat oninput (kalkulasi di client tanpa hit server)
-function clampRealisasi(no) {
-  const tEl = document.getElementById(`t-${no}`);
-  const cEl = document.getElementById(`c-${no}`);
-  if (!tEl || !cEl) return;
-  // Paksa integer — hapus desimal
-  if (cEl.value.includes('.')) cEl.value = Math.floor(parseFloat(cEl.value));
-  const t = parseInt(tEl.value) || 0;
-  let c = parseInt(cEl.value) || 0;
-  if (t > 0 && c > t) {
-    cEl.value = t;
-    c = t;
-    toast(`Realisasi Indikator ${no} disesuaikan ke nilai target (${t})`, 'warning');
-  }
-  previewSPM(no);
-}
-
 function previewSPM(changedNo) {
-  // Paksa integer pada target juga
-  const tEl2 = document.getElementById(`t-${changedNo}`);
-  if (tEl2 && tEl2.value.includes('.')) tEl2.value = Math.floor(parseFloat(tEl2.value));
-  // Update capaian % display untuk baris yang berubah
-  const tEl = document.getElementById(`t-${changedNo}`);
-  const cEl = document.getElementById(`c-${changedNo}`);
-  const capEl = document.getElementById(`cap-${changedNo}`);
-  if (tEl && cEl && capEl) {
-    const t = parseInt(tEl.value) || 0;
-    const c = parseInt(cEl.value) || 0;
-    const pct = t > 0 ? Math.min((c / t) * 100, 100) : 0; capEl.textContent = pct === 100 ? '100%' : (t > 0 ? pct.toFixed(1) : '0.0') + '%';
-  }
   // Hitung SPM preview dari semua input yang ada di DOM
   const rows = document.querySelectorAll('[id^="t-"]');
   let totalNilai = 0, totalBobot = 0;

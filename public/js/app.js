@@ -3123,7 +3123,7 @@ let _ttPKM = [], _ttIndikator = [], _ttCurrentKode = null, _ttCurrentTahun = nul
 
 async function renderTargetTahunan(el) {
   const _mc = el || document.getElementById('mainContent');
-  const tahunOpts = Array.from({length:5},(_,i)=>2024+i).map(y=>`<option value="${y}" ${y===CURRENT_YEAR?'selected':''}>${y}</option>`).join('');
+  const tahunOpts = yearOptions(CURRENT_YEAR);
   _mc.innerHTML = `
     <div class="page-header">
       <h1><span class="material-icons">track_changes</span>Target Tahunan per Puskesmas</h1>

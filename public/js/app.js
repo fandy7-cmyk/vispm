@@ -2252,32 +2252,29 @@ let _masterActiveTab = 'users';
 async function renderMasterData(tab) {
   if (tab) _masterActiveTab = tab;
   const activeTab = _masterActiveTab;
-  const el = document.getElementById('masterTabContent');
 
-  // Jika tab bar sudah ada (pindah antar tab), langsung render konten saja
-  if (el && document.getElementById('masterTabButtons')) {
-    _rebuildTabButtons();
-    setLoading(true);
-    try {
-      if (activeTab === 'users')          await renderUsersTab(el);
-      else if (activeTab === 'jabatan')   await renderJabatanTab(el);
-      else if (activeTab === 'pkm')       await renderPKMTab(el);
-      else if (activeTab === 'indikator') await renderIndikatorTab(el);
-      else if (activeTab === 'periode')   await renderPeriodeTab(el);
-      else if (activeTab === 'settings')  await renderSettingsTab(el);
-    } finally { setLoading(false); }
-    return;
+  // Selalu build shell dulu jika belum ada
+  if (!document.getElementById('masterTabContent')) {
+    _buildMasterShell();
   }
 
-  // First load: render tab pertama via _renderToTab (akan build seluruh UI)
+  _highlightMasterTab(activeTab);
+
+  const tc = document.getElementById('masterTabContent');
+  tc.innerHTML = '<div class="empty-state"><span class="material-icons" style="animation:spin 1s linear infinite">refresh</span><p>Memuat...</p></div>';
+
   setLoading(true);
   try {
-    if (activeTab === 'users')          await renderUsersTab(null);
-    else if (activeTab === 'jabatan')   await renderJabatanTab(null);
-    else if (activeTab === 'pkm')       await renderPKMTab(null);
-    else if (activeTab === 'indikator') await renderIndikatorTab(null);
-    else if (activeTab === 'periode')   await renderPeriodeTab(null);
-    else if (activeTab === 'settings')  await renderSettingsTab(document.getElementById('masterTabContent'));
+    if (activeTab === 'settings') {
+      await renderSettingsTab(tc);
+    } else {
+      const fnMap = {
+        users: renderUsers, jabatan: renderJabatan, pkm: renderPKM,
+        indikator: renderIndikator, periode: renderPeriode
+      };
+      const fn = fnMap[activeTab];
+      if (fn) await _renderIntoTab(fn);
+    }
   } finally { setLoading(false); }
 }
 
@@ -3523,55 +3520,70 @@ async function restoreVerifAdmin(idUsulan) {
 
 
 // ============== MASTER DATA TAB WRAPPERS ==============
-// Fungsi-fungsi tab memanfaatkan render asli dengan cara
-// sementara override target render ke masterTabContent
+const _masterTabs = [
+  { id: 'users',     icon: 'group',          label: 'Kelola User' },
+  { id: 'jabatan',   icon: 'badge',           label: 'Jabatan' },
+  { id: 'pkm',       icon: 'local_hospital',  label: 'Puskesmas' },
+  { id: 'indikator', icon: 'monitor_heart',   label: 'Indikator' },
+  { id: 'periode',   icon: 'event_available', label: 'Periode Input' },
+  { id: 'settings',  icon: 'settings',        label: 'Pengaturan' },
+];
 
-async function _renderToTab(renderFn) {
-  // Simpan innerHTML page-header dan tab bar dulu
-  const mc = document.getElementById('mainContent');
-  const savedHeader = mc.querySelector('.page-header') ? mc.querySelector('.page-header').outerHTML : '';
-  const savedTabBar = mc.querySelector('[id="masterTabBar"]') ? mc.querySelector('[id="masterTabBar"]').outerHTML : '';
+function _buildMasterShell() {
+  const tabsHtml = _masterTabs.map(t => `
+    <button id="masterTab_${t.id}" onclick="renderMasterData('${t.id}')"
+      style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border:none;
+             border-bottom:3px solid transparent;background:transparent;color:#64748b;
+             font-weight:500;font-size:13px;cursor:pointer;transition:all 0.15s;white-space:nowrap">
+      <span class="material-icons" style="font-size:16px">${t.icon}</span>${t.label}
+    </button>`).join('');
 
-  // Panggil fungsi render asli - dia akan overwrite mainContent
-  await renderFn();
-
-  // Ambil hasil render (seluruh mainContent sekarang berisi konten tab)
-  const newContent = mc.innerHTML;
-
-  // Rebuild: tab header + konten baru di masterTabContent
-  mc.innerHTML = `
+  document.getElementById('mainContent').innerHTML = `
     <div class="page-header">
       <h1><span class="material-icons">storage</span>Master Data</h1>
     </div>
-    <div id="masterTabBar" style="background:white;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,0.07);margin-bottom:16px">
-      <div style="display:flex;gap:0;padding:0 8px;overflow-x:auto;border-bottom:1px solid #e2e8f0" id="masterTabButtons"></div>
+    <div style="background:white;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,0.07);margin-bottom:16px">
+      <div style="display:flex;gap:0;padding:0 8px;overflow-x:auto;border-bottom:1px solid #e2e8f0">
+        ${tabsHtml}
+      </div>
     </div>
-    <div id="masterTabContent">${newContent}</div>`;
-
-  // Rebuild tab buttons
-  _rebuildTabButtons();
+    <div id="masterTabContent" style="min-height:200px"></div>`;
 }
 
-function _rebuildTabButtons() {
-  const btn = document.getElementById('masterTabButtons');
-  if (!btn) return;
-  const tabs = [
-    { id: 'users',    icon: 'group',           label: 'Kelola User' },
-    { id: 'jabatan',  icon: 'badge',            label: 'Jabatan' },
-    { id: 'pkm',      icon: 'local_hospital',   label: 'Puskesmas' },
-    { id: 'indikator',icon: 'monitor_heart',    label: 'Indikator' },
-    { id: 'periode',  icon: 'event_available',  label: 'Periode Input' },
-    { id: 'settings', icon: 'settings',         label: 'Pengaturan' },
-  ];
-  btn.innerHTML = tabs.map(t => `
-    <button onclick="renderMasterData('${t.id}')"
-      style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border:none;border-bottom:3px solid ${_masterActiveTab===t.id?'#0d9488':'transparent'};background:transparent;color:${_masterActiveTab===t.id?'#0d9488':'#64748b'};font-weight:${_masterActiveTab===t.id?'700':'500'};font-size:13px;cursor:pointer;transition:all 0.15s;white-space:nowrap">
-      <span class="material-icons" style="font-size:16px">${t.icon}</span>${t.label}
-    </button>`).join('');
+function _highlightMasterTab(activeId) {
+  _masterTabs.forEach(t => {
+    const btn = document.getElementById('masterTab_' + t.id);
+    if (!btn) return;
+    btn.style.borderBottomColor = t.id === activeId ? '#0d9488' : 'transparent';
+    btn.style.color = t.id === activeId ? '#0d9488' : '#64748b';
+    btn.style.fontWeight = t.id === activeId ? '700' : '500';
+  });
 }
 
-async function renderUsersTab(el)     { await _renderToTab(renderUsers); }
-async function renderJabatanTab(el)   { await _renderToTab(renderJabatan); }
-async function renderPKMTab(el)       { await _renderToTab(renderPKM); }
-async function renderIndikatorTab(el) { await _renderToTab(renderIndikator); }
-async function renderPeriodeTab(el)   { await _renderToTab(renderPeriode); }
+// Patch: fungsi render asli menulis ke mainContent, tapi kita butuh hasilnya di masterTabContent.
+// Solusi: sementara ganti innerHTML target, panggil render, ambil hasilnya, restore.
+async function _renderIntoTab(renderFn) {
+  const mc = document.getElementById('mainContent');
+  const tc = document.getElementById('masterTabContent');
+  if (!tc) return;
+
+  // Simpan shell master data
+  const shellHtml = mc.innerHTML;
+
+  // Kosongkan mainContent sementara agar renderFn bisa tulis ke sana
+  mc.innerHTML = '';
+  await renderFn();
+
+  // Ambil semua konten yang ditulis oleh renderFn (kecuali page-header)
+  const tmp = document.createElement('div');
+  tmp.innerHTML = mc.innerHTML;
+  const pageHeader = tmp.querySelector('.page-header');
+  if (pageHeader) pageHeader.remove();
+
+  // Restore shell
+  mc.innerHTML = shellHtml;
+
+  // Inject konten ke masterTabContent
+  const tc2 = document.getElementById('masterTabContent');
+  if (tc2) tc2.innerHTML = tmp.innerHTML;
+}

@@ -64,82 +64,31 @@ exports.handler = async (event) => {
     let result = null;
     let finalUrl = url;
 
-    // Untuk raw file yang URL-nya di-append ekstensi manual,
-    // Cloudinary perlu di-fetch tanpa ekstensi atau dengan basic auth
-    const urlWithoutExt = url.replace(/\.[^./]+$/, '');
+    // Strip ekstensi yang mungkin di-append manual (misal .pdf tapi file Cloudinary tanpa ekstensi)
+    const urlWithoutExt = url.replace(/\.[a-zA-Z0-9]+$/, '');
 
-    // Strategy 1: Direct access dengan URL asli
+    // Strategy 1: URL asli langsung
     result = await httpsGet(url, {});
-    console.log('[sign-url] Strategy 1 direct:', result.status, url);
+    console.log('[sign-url] S1 direct:', result.status);
 
-    // Strategy 2: Coba URL tanpa ekstensi (untuk raw yang di-append manual)
-    if (result.status === 401 || result.status === 403 || result.status === 404) {
-      if (urlWithoutExt !== url) {
-        result = await httpsGet(urlWithoutExt, {});
-        console.log('[sign-url] Strategy 2 no-ext:', result.status, urlWithoutExt);
-        if (result.status === 200) finalUrl = urlWithoutExt;
-      }
+    // Strategy 2: URL tanpa ekstensi (raw files di Cloudinary tidak punya ekstensi)
+    if (result.status !== 200 && urlWithoutExt !== url) {
+      result = await httpsGet(urlWithoutExt, {});
+      console.log('[sign-url] S2 no-ext:', result.status);
+      if (result.status === 200) finalUrl = urlWithoutExt;
     }
 
-    // Strategy 3: Basic Auth dengan URL asli
-    if (result.status === 401 || result.status === 403 || result.status === 404) {
+    // Strategy 3: Basic auth + URL asli
+    if (result.status !== 200) {
       result = await httpsGet(url, { 'Authorization': `Basic ${basicAuth}` });
-      console.log('[sign-url] Strategy 3 basic auth:', result.status);
+      console.log('[sign-url] S3 auth:', result.status);
     }
 
-    // Strategy 4: Basic Auth tanpa ekstensi
-    if (result.status === 401 || result.status === 403 || result.status === 404) {
-      if (urlWithoutExt !== url) {
-        result = await httpsGet(urlWithoutExt, { 'Authorization': `Basic ${basicAuth}` });
-        console.log('[sign-url] Strategy 4 basic auth no-ext:', result.status);
-        if (result.status === 200) finalUrl = urlWithoutExt;
-      }
-    }
-
-    // Strategy 3: Cloudinary Search API — cari file berdasarkan public_id
-    if (result.status === 401 || result.status === 403 || result.status === 404) {
-      try {
-        const urlObj = new URL(url);
-        const pathParts = urlObj.pathname.split('/');
-        const uploadIdx = pathParts.indexOf('upload');
-        if (uploadIdx !== -1) {
-          let pidParts = pathParts.slice(uploadIdx + 1);
-          if (pidParts[0] && /^v\d+$/.test(pidParts[0])) pidParts = pidParts.slice(1);
-          const pidWithExt = pidParts.join('/');
-          const publicId = pidWithExt.replace(/\.[^.]+$/, '');
-          const resourceType = urlObj.pathname.includes('/raw/') ? 'raw' : 'image';
-          const cloudName = url.match(/cloudinary\.com\/([^/]+)\//)?.[1] || process.env.CLOUDINARY_CLOUD_NAME;
-
-          // Search API
-          const searchUrl = `https://api.cloudinary.com/v1_1/${cloudName}/resources/search`;
-          const searchBody = JSON.stringify({ expression: `public_id:${publicId}`, resource_type: resourceType, max_results: 1 });
-          const searchResult = await new Promise((resolve, reject) => {
-            const body = Buffer.from(searchBody);
-            const u = new URL(searchUrl);
-            const req = require('https').request({
-              hostname: u.hostname, path: u.pathname, method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'Content-Length': body.length, 'Authorization': `Basic ${basicAuth}` }
-            }, (res) => {
-              const chunks = []; res.on('data', c => chunks.push(c));
-              res.on('end', () => resolve({ status: res.statusCode, buf: Buffer.concat(chunks) }));
-              res.on('error', reject);
-            });
-            req.on('error', reject); req.write(body); req.end();
-          });
-
-          console.log('[sign-url] Strategy 3 search status:', searchResult.status);
-          if (searchResult.status === 200) {
-            const searchData = JSON.parse(searchResult.buf.toString());
-            const found = searchData.resources?.[0];
-            if (found?.secure_url) {
-              finalUrl = found.secure_url;
-              console.log('[sign-url] Strategy 3 found secure_url:', finalUrl);
-              result = await httpsGet(finalUrl, {});
-              if (result.status !== 200) result = await httpsGet(finalUrl, { 'Authorization': `Basic ${basicAuth}` });
-            }
-          }
-        }
-      } catch(e3) { console.error('[sign-url] Strategy 3 error:', e3.message); }
+    // Strategy 4: Basic auth + tanpa ekstensi
+    if (result.status !== 200 && urlWithoutExt !== url) {
+      result = await httpsGet(urlWithoutExt, { 'Authorization': `Basic ${basicAuth}` });
+      console.log('[sign-url] S4 auth no-ext:', result.status);
+      if (result.status === 200) finalUrl = urlWithoutExt;
     }
 
     if (!result || result.status !== 200) {

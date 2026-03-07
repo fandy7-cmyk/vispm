@@ -479,24 +479,6 @@ async function downloadLaporanDashboardOperator() {
   } catch(e) { toast(e.message, "error"); }
 }
 
-function renderPeriodeBanner(periodeList) {
-  if (periodeList && periodeList.length > 0) {
-    const items = periodeList.map(pr => {
-      const jamMulai = pr.jam_mulai || '08:00';
-      const jamSelesai = pr.jam_selesai || '17:00';
-      return '<div style="background:linear-gradient(135deg,#0d9488,#06b6d4);border-radius:12px;padding:14px 16px;color:white;display:flex;align-items:flex-start;gap:12px">'
-        + '<span class="material-icons" style="font-size:22px;opacity:0.9;flex-shrink:0;margin-top:2px">event_available</span>'
-        + '<div style="flex:1;min-width:0">'
-        + '<div style="font-weight:800;font-size:14px;margin-bottom:2px">Periode Aktif: ' + pr.nama_bulan + ' ' + pr.tahun + '</div>'
-        + '<div style="font-size:12px;opacity:0.9">Dibuka: ' + formatDate(pr.tanggal_mulai) + ' ' + jamMulai + ' — Ditutup: ' + formatDate(pr.tanggal_selesai) + ' ' + jamSelesai + ' WITA</div>'
-        + (pr.notif_operator ? '<div style="margin-top:6px;padding:6px 10px;background:rgba(255,255,255,0.15);border-radius:6px;font-size:12px">📢 ' + pr.notif_operator + '</div>' : '')
-        + '</div></div>';
-    }).join('');
-    return '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px">' + items + '</div>';
-  }
-  return '<div class="info-card warning"><span class="material-icons">warning</span><div class="info-card-text">Tidak ada periode input yang aktif saat ini. Hubungi Admin.</div></div>';
-}
-
 function renderKepalasDashboard(el, d) {
   const periodeList = d.periodeAktifList || (d.periodeAktif ? [d.periodeAktif] : []);
   const periodeBanner = renderPeriodeBanner(periodeList);
@@ -926,12 +908,25 @@ async function openIndikatorModal(idUsulan) {
         <td><span style="font-family:'JetBrains Mono';font-weight:700">${ind.no}</span></td>
         <td style="max-width:220px;font-size:12.5px">${ind.nama}</td>
         <input type="hidden" id="bobot-${ind.no}" value="${ind.bobot}">
-        <td>${isLocked ? `<span>${ind.target}</span>` : `<input type="number" id="t-${ind.no}" value="${ind.target}" min="0" step="0.01"
-            style="width:72px;border:1.5px solid var(--border);border-radius:6px;padding:3px 6px;font-size:13px"
-            onchange="saveIndikator(${ind.no})" oninput="previewSPM(${ind.no})">`}</td>
-        <td>${isLocked ? `<span>${ind.capaian}</span>` : `<input type="number" id="c-${ind.no}" value="${ind.capaian}" min="0" step="0.01"
-            style="width:72px;border:1.5px solid var(--border);border-radius:6px;padding:3px 6px;font-size:13px"
-            onchange="saveIndikator(${ind.no})" oninput="previewSPM(${ind.no})">`}</td>
+        <td>
+          ${isLocked ? `<span>${ind.target}</span>` : `<input type="number" id="t-${ind.no}" value="${ind.target}" min="0" step="1"
+            style="width:72px;border:1.5px solid var(--border);border-radius:6px;padding:3px 6px;font-size:13px;text-align:center"
+            title="Target sasaran layanan (bilangan bulat)"
+            onchange="saveIndikator(${ind.no})" oninput="previewSPM(${ind.no})"
+            onkeypress="return event.charCode>=48&&event.charCode<=57">`}
+        </td>
+        <td>
+          ${isLocked ? `<span>${ind.capaian}</span>` : `<input type="number" id="c-${ind.no}" value="${ind.capaian}" min="0" step="1"
+            style="width:72px;border:1.5px solid var(--border);border-radius:6px;padding:3px 6px;font-size:13px;text-align:center"
+            title="Realisasi layanan (bilangan bulat, tidak boleh melebihi target)"
+            onchange="saveIndikator(${ind.no})" oninput="clampRealisasi(${ind.no})"
+            onkeypress="return event.charCode>=48&&event.charCode<=57">`}
+        </td>
+        <td style="width:90px;text-align:center">
+          <span id="cap-${ind.no}" style="font-weight:700;font-size:13px;color:var(--primary)">
+            ${ind.target > 0 ? Math.min((ind.capaian / ind.target) * 100, 100).toFixed(1) : '0.0'}%
+          </span>
+        </td>
         <td style="min-width:100px;text-align:center">
           ${(() => {
             // Parse link_file: bisa string URL tunggal atau JSON array
@@ -1436,7 +1431,35 @@ async function doSubmitUsulan(forceSubmit) {
 }
 
 // Preview SPM saat oninput (kalkulasi di client tanpa hit server)
+function clampRealisasi(no) {
+  const tEl = document.getElementById(`t-${no}`);
+  const cEl = document.getElementById(`c-${no}`);
+  if (!tEl || !cEl) return;
+  // Paksa integer — hapus desimal
+  if (cEl.value.includes('.')) cEl.value = Math.floor(parseFloat(cEl.value));
+  const t = parseInt(tEl.value) || 0;
+  let c = parseInt(cEl.value) || 0;
+  if (t > 0 && c > t) {
+    cEl.value = t;
+    c = t;
+    toast(`Realisasi Indikator ${no} disesuaikan ke nilai target (${t})`, 'warning');
+  }
+  previewSPM(no);
+}
+
 function previewSPM(changedNo) {
+  // Paksa integer pada target juga
+  const tEl2 = document.getElementById(`t-${changedNo}`);
+  if (tEl2 && tEl2.value.includes('.')) tEl2.value = Math.floor(parseFloat(tEl2.value));
+  // Update capaian % display untuk baris yang berubah
+  const tEl = document.getElementById(`t-${changedNo}`);
+  const cEl = document.getElementById(`c-${changedNo}`);
+  const capEl = document.getElementById(`cap-${changedNo}`);
+  if (tEl && cEl && capEl) {
+    const t = parseInt(tEl.value) || 0;
+    const c = parseInt(cEl.value) || 0;
+    capEl.textContent = (t > 0 ? Math.min((c / t) * 100, 100).toFixed(1) : '0.0') + '%';
+  }
   // Hitung SPM preview dari semua input yang ada di DOM
   const rows = document.querySelectorAll('[id^="t-"]');
   let totalNilai = 0, totalBobot = 0;
@@ -2049,18 +2072,6 @@ function openEditProfil() {
     modal.className = 'modal';
     modal.style.zIndex = '3000';
     modal.addEventListener('click', e => { if (e.target === modal) closeModal('editProfilModal'); });
-    const _ttSection = ['Kepala Puskesmas','Pengelola Program'].includes(currentUser.role) ? `
-          <div class="form-group">
-            <label>Tanda Tangan <span style="font-size:11px;color:#94a3b8">(upload gambar, maks 2MB)</span></label>
-            <div style="border:2px dashed #cbd5e1;border-radius:8px;padding:10px;text-align:center;cursor:pointer;position:relative" id="epTTWrap" onclick="document.getElementById('epTTInput').click()">
-              <img id="epTTPreview" style="max-height:80px;max-width:100%;display:none;margin:0 auto">
-              <div id="epTTPlaceholder" style="color:#94a3b8;font-size:13px;padding:8px"><span class="material-icons" style="font-size:28px;display:block;margin:0 auto 4px">draw</span>Klik untuk upload tanda tangan</div>
-              <input type="file" id="epTTInput" accept="image/*" style="display:none" onchange="previewTandaTangan(event)">
-            </div>
-            <button type="button" id="epTTHapus" style="display:none;margin-top:6px;font-size:12px;color:#ef4444;background:none;border:none;cursor:pointer;padding:0" onclick="hapusTandaTangan()">
-              <span class="material-icons" style="font-size:14px;vertical-align:middle">delete</span> Hapus tanda tangan
-            </button>
-          </div>` : '';
     modal.innerHTML = `
       <div class="modal-card" style="max-width:420px;width:100%">
         <div class="modal-header">
@@ -2085,7 +2096,18 @@ function openEditProfil() {
             <label>Role</label>
             <input class="form-control" id="epRole" disabled style="background:#f8fafc;color:var(--text-light)">
           </div>
-          ${_ttSection}
+          \${['Kepala Puskesmas','Pengelola Program'].includes(currentUser.role) ? \`
+          <div class="form-group">
+            <label>Tanda Tangan <span style="font-size:11px;color:#94a3b8">(upload gambar, maks 2MB)</span></label>
+            <div style="border:2px dashed #cbd5e1;border-radius:8px;padding:10px;text-align:center;cursor:pointer;position:relative" id="epTTWrap" onclick="document.getElementById('epTTInput').click()">
+              <img id="epTTPreview" style="max-height:80px;max-width:100%;display:none;margin:0 auto">
+              <div id="epTTPlaceholder" style="color:#94a3b8;font-size:13px;padding:8px"><span class="material-icons" style="font-size:28px;display:block;margin:0 auto 4px">draw</span>Klik untuk upload tanda tangan</div>
+              <input type="file" id="epTTInput" accept="image/*" style="display:none" onchange="previewTandaTangan(event)">
+            </div>
+            <button type="button" id="epTTHapus" style="display:none;margin-top:6px;font-size:12px;color:#ef4444;background:none;border:none;cursor:pointer;padding:0" onclick="hapusTandaTangan()">
+              <span class="material-icons" style="font-size:14px;vertical-align:middle">delete</span> Hapus tanda tangan
+            </button>
+          </div>\` : ''}
           <div id="epStatus" style="font-size:12.5px;color:#ef4444;min-height:18px"></div>
         </div>
         <div class="modal-footer">

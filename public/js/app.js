@@ -479,24 +479,6 @@ async function downloadLaporanDashboardOperator() {
   } catch(e) { toast(e.message, "error"); }
 }
 
-function renderPeriodeBanner(periodeList) {
-  if (periodeList && periodeList.length > 0) {
-    const items = periodeList.map(pr => {
-      const jamMulai = pr.jam_mulai || '08:00';
-      const jamSelesai = pr.jam_selesai || '17:00';
-      return '<div style="background:linear-gradient(135deg,#0d9488,#06b6d4);border-radius:12px;padding:14px 16px;color:white;display:flex;align-items:flex-start;gap:12px">'
-        + '<span class="material-icons" style="font-size:22px;opacity:0.9;flex-shrink:0;margin-top:2px">event_available</span>'
-        + '<div style="flex:1;min-width:0">'
-        + '<div style="font-weight:800;font-size:14px;margin-bottom:2px">Periode Aktif: ' + pr.nama_bulan + ' ' + pr.tahun + '</div>'
-        + '<div style="font-size:12px;opacity:0.9">Dibuka: ' + formatDate(pr.tanggal_mulai) + ' ' + jamMulai + ' — Ditutup: ' + formatDate(pr.tanggal_selesai) + ' ' + jamSelesai + ' WITA</div>'
-        + (pr.notif_operator ? '<div style="margin-top:6px;padding:6px 10px;background:rgba(255,255,255,0.15);border-radius:6px;font-size:12px">📢 ' + pr.notif_operator + '</div>' : '')
-        + '</div></div>';
-    }).join('');
-    return '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px">' + items + '</div>';
-  }
-  return '<div class="info-card warning"><span class="material-icons">warning</span><div class="info-card-text">Tidak ada periode input yang aktif saat ini. Hubungi Admin.</div></div>';
-}
-
 function renderKepalasDashboard(el, d) {
   const periodeList = d.periodeAktifList || (d.periodeAktif ? [d.periodeAktif] : []);
   const periodeBanner = renderPeriodeBanner(periodeList);
@@ -2049,6 +2031,18 @@ function openEditProfil() {
     modal.className = 'modal';
     modal.style.zIndex = '3000';
     modal.addEventListener('click', e => { if (e.target === modal) closeModal('editProfilModal'); });
+    const _ttSection = ['Kepala Puskesmas','Pengelola Program'].includes(currentUser.role) ? `
+          <div class="form-group">
+            <label>Tanda Tangan <span style="font-size:11px;color:#94a3b8">(upload gambar, maks 2MB)</span></label>
+            <div style="border:2px dashed #cbd5e1;border-radius:8px;padding:10px;text-align:center;cursor:pointer;position:relative" id="epTTWrap" onclick="document.getElementById('epTTInput').click()">
+              <img id="epTTPreview" style="max-height:80px;max-width:100%;display:none;margin:0 auto">
+              <div id="epTTPlaceholder" style="color:#94a3b8;font-size:13px;padding:8px"><span class="material-icons" style="font-size:28px;display:block;margin:0 auto 4px">draw</span>Klik untuk upload tanda tangan</div>
+              <input type="file" id="epTTInput" accept="image/*" style="display:none" onchange="previewTandaTangan(event)">
+            </div>
+            <button type="button" id="epTTHapus" style="display:none;margin-top:6px;font-size:12px;color:#ef4444;background:none;border:none;cursor:pointer;padding:0" onclick="hapusTandaTangan()">
+              <span class="material-icons" style="font-size:14px;vertical-align:middle">delete</span> Hapus tanda tangan
+            </button>
+          </div>` : '';
     modal.innerHTML = `
       <div class="modal-card" style="max-width:420px;width:100%">
         <div class="modal-header">
@@ -2073,18 +2067,7 @@ function openEditProfil() {
             <label>Role</label>
             <input class="form-control" id="epRole" disabled style="background:#f8fafc;color:var(--text-light)">
           </div>
-          \${['Kepala Puskesmas','Pengelola Program'].includes(currentUser.role) ? \`
-          <div class="form-group">
-            <label>Tanda Tangan <span style="font-size:11px;color:#94a3b8">(upload gambar, maks 2MB)</span></label>
-            <div style="border:2px dashed #cbd5e1;border-radius:8px;padding:10px;text-align:center;cursor:pointer;position:relative" id="epTTWrap" onclick="document.getElementById('epTTInput').click()">
-              <img id="epTTPreview" style="max-height:80px;max-width:100%;display:none;margin:0 auto">
-              <div id="epTTPlaceholder" style="color:#94a3b8;font-size:13px;padding:8px"><span class="material-icons" style="font-size:28px;display:block;margin:0 auto 4px">draw</span>Klik untuk upload tanda tangan</div>
-              <input type="file" id="epTTInput" accept="image/*" style="display:none" onchange="previewTandaTangan(event)">
-            </div>
-            <button type="button" id="epTTHapus" style="display:none;margin-top:6px;font-size:12px;color:#ef4444;background:none;border:none;cursor:pointer;padding:0" onclick="hapusTandaTangan()">
-              <span class="material-icons" style="font-size:14px;vertical-align:middle">delete</span> Hapus tanda tangan
-            </button>
-          </div>\` : ''}
+          ${_ttSection}
           <div id="epStatus" style="font-size:12.5px;color:#ef4444;min-height:18px"></div>
         </div>
         <div class="modal-footer">

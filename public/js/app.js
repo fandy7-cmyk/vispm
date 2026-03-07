@@ -636,19 +636,23 @@ async function renderInput() {
     ? tahunAktif.map(y => `<option value="${y}" ${y == defaultTahun ? 'selected' : ''}>${y}</option>`).join('')
     : `<option value="${defaultTahun}">${defaultTahun}</option>`;
 
-  // Info banner periode - dengan notifikasi dan jam
-  const periodeBanner = periodeAktif
-    ? `<div style="background:linear-gradient(135deg,#0d9488,#06b6d4);border-radius:12px;padding:16px 20px;color:white;margin-bottom:16px;display:flex;align-items:flex-start;gap:14px">
-        <span class="material-icons" style="font-size:28px;opacity:0.9;flex-shrink:0;margin-top:2px">event_available</span>
-        <div style="flex:1">
-          <div style="font-weight:800;font-size:16px;margin-bottom:2px">Periode Input Aktif: ${periodeAktif.namaBulan} ${periodeAktif.tahun}</div>
-          <div style="font-size:13px;opacity:0.9">Dibuka: ${formatDate(periodeAktif.tanggalMulai)} pukul ${periodeAktif.jamMulai||'08:00'} — Ditutup: ${formatDate(periodeAktif.tanggalSelesai)} pukul ${periodeAktif.jamSelesai||'17:00'} WITA</div>
-          ${periodeAktif.notifOperator ? `<div style="margin-top:8px;padding:8px 12px;background:rgba(255,255,255,0.15);border-radius:8px;font-size:13px;border-left:3px solid rgba(255,255,255,0.6)">📢 ${periodeAktif.notifOperator}</div>` : ''}
+  // Info banner periode - tampilkan semua periode aktif (sama seperti dashboard)
+  let periodeBanner = '';
+  if (periodeOptions.length > 0) {
+    const items = periodeOptions.map(pr => {
+      return `<div style="background:linear-gradient(135deg,#0d9488,#06b6d4);border-radius:12px;padding:14px 16px;color:white;display:flex;align-items:flex-start;gap:12px">
+        <span class="material-icons" style="font-size:22px;opacity:0.9;flex-shrink:0;margin-top:2px">event_available</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:800;font-size:14px;margin-bottom:2px">Periode Input Aktif: ${pr.namaBulan || pr.nama_bulan} ${pr.tahun}</div>
+          <div style="font-size:12px;opacity:0.9">Dibuka: ${formatDate(pr.tanggalMulai || pr.tanggal_mulai)} ${pr.jamMulai || pr.jam_mulai || '08:00'} — Ditutup: ${formatDate(pr.tanggalSelesai || pr.tanggal_selesai)} ${pr.jamSelesai || pr.jam_selesai || '17:00'} WITA</div>
+          ${(pr.notifOperator || pr.notif_operator) ? '<div style="margin-top:6px;padding:6px 10px;background:rgba(255,255,255,0.15);border-radius:6px;font-size:12px">📢 ' + (pr.notifOperator || pr.notif_operator) + '</div>' : ''}
         </div>
-      </div>`
-    : periodeOptions.length
-      ? `<div class="info-card warning"><span class="material-icons">schedule</span><div class="info-card-text">Ada periode aktif tapi di luar rentang tanggal hari ini. Pilih periode sesuai yang diizinkan Admin.</div></div>`
-      : `<div class="info-card warning"><span class="material-icons">warning</span><div class="info-card-text">Tidak ada periode input aktif saat ini. Hubungi Admin.</div></div>`;
+      </div>`;
+    }).join('');
+    periodeBanner = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;margin-bottom:4px">${items}</div>`;
+  } else {
+    periodeBanner = `<div class="info-card warning"><span class="material-icons">warning</span><div class="info-card-text">Tidak ada periode input aktif saat ini. Hubungi Admin.</div></div>`;
+  }
 
   document.getElementById('mainContent').innerHTML = `
     <div class="page-header">
@@ -728,7 +732,6 @@ async function loadMyUsulan() {
             ${u.statusGlobal === 'Draft' ? `<button class="btn-icon edit" onclick="openIndikatorModal('${u.idUsulan}')"><span class="material-icons">edit</span></button>` : ''}
             ${u.statusGlobal === 'Draft' ? `<button class="btn-icon del" onclick="deleteUsulan('${u.idUsulan}')"><span class="material-icons">delete</span></button>` : ''}
             ${u.statusGlobal === 'Ditolak' ? `<button class="btn btn-warning btn-sm" onclick="openIndikatorModal('${u.idUsulan}')" style="background:#f59e0b;color:white;border-color:#f59e0b"><span class="material-icons" style="font-size:14px">restart_alt</span> Perbaiki & Ajukan Ulang</button>` : ''}
-            ${(u.statusGlobal || '').startsWith('Menunggu') ? `<button class="btn-icon" title="Sedang diproses" style="background:#d1fae5;color:#065f46;border:1.5px solid #0d9488;cursor:default" disabled><span class="material-icons">check_circle</span></button>` : ''}
           </td>
         </tr>`).join('')}
         </tbody>

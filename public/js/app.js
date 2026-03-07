@@ -189,12 +189,8 @@ function buildSidebar() {
         { id: 'laporan', icon: 'bar_chart', label: 'Laporan' }
       ]},
       { label: 'Kelola Master', items: [
-        { id: 'users', icon: 'group', label: 'Kelola User' },
-        { id: 'jabatan', icon: 'badge', label: 'Kelola Jabatan' },
-        { id: 'pkm', icon: 'local_hospital', label: 'Kelola Puskesmas' },
+        { id: 'master-data', icon: 'storage', label: 'Master Data' },
         { id: 'target-tahunan', icon: 'track_changes', label: 'Target Tahunan' },
-        { id: 'indikator', icon: 'monitor_heart', label: 'Kelola Indikator' },
-        { id: 'periode', icon: 'event_available', label: 'Periode Input' }
       ]},
       { label: 'Manajemen', items: [
         { id: 'kelola-usulan', icon: 'manage_accounts', label: 'Kelola Semua Usulan' }
@@ -251,7 +247,7 @@ function setActiveNav(page) {
 // ============== ROUTING ==============
 const PAGE_TITLES = {
   dashboard: 'Dashboard', verifikasi: 'Verifikasi', laporan: 'Laporan',
-  users: 'Kelola User', jabatan: 'Kelola Jabatan', pkm: 'Kelola Puskesmas',
+  'master-data': 'Master Data', users: 'Kelola User', jabatan: 'Kelola Jabatan', pkm: 'Kelola Puskesmas',
   indikator: 'Kelola Indikator', periode: 'Periode Input', input: 'Input Usulan',
   'kelola-usulan': 'Kelola Usulan', 'target-tahunan': 'Target Tahunan'
 };
@@ -273,6 +269,7 @@ function loadPage(page) {
     users: renderUsers,
     pkm: renderPKM,
     'target-tahunan': renderTargetTahunan,
+    'master-data': renderMasterData,
     indikator: renderIndikator,
     periode: renderPeriode,
     input: renderInput
@@ -2249,6 +2246,94 @@ function exportLaporan() {
   toast('File CSV berhasil diunduh');
 }
 
+// ============== MASTER DATA (TAB) ==============
+let _masterActiveTab = 'users';
+
+async function renderMasterData(tab) {
+  if (tab) _masterActiveTab = tab;
+  const activeTab = _masterActiveTab;
+  const el = document.getElementById('masterTabContent');
+
+  // Jika tab bar sudah ada (pindah antar tab), langsung render konten saja
+  if (el && document.getElementById('masterTabButtons')) {
+    _rebuildTabButtons();
+    setLoading(true);
+    try {
+      if (activeTab === 'users')          await renderUsersTab(el);
+      else if (activeTab === 'jabatan')   await renderJabatanTab(el);
+      else if (activeTab === 'pkm')       await renderPKMTab(el);
+      else if (activeTab === 'indikator') await renderIndikatorTab(el);
+      else if (activeTab === 'periode')   await renderPeriodeTab(el);
+      else if (activeTab === 'settings')  await renderSettingsTab(el);
+    } finally { setLoading(false); }
+    return;
+  }
+
+  // First load: render tab pertama via _renderToTab (akan build seluruh UI)
+  setLoading(true);
+  try {
+    if (activeTab === 'users')          await renderUsersTab(null);
+    else if (activeTab === 'jabatan')   await renderJabatanTab(null);
+    else if (activeTab === 'pkm')       await renderPKMTab(null);
+    else if (activeTab === 'indikator') await renderIndikatorTab(null);
+    else if (activeTab === 'periode')   await renderPeriodeTab(null);
+    else if (activeTab === 'settings')  await renderSettingsTab(document.getElementById('masterTabContent'));
+  } finally { setLoading(false); }
+}
+
+async function renderSettingsTab(el) {
+  // Jika dipanggil dari _renderToTab (el = masterTabContent), atau dari first load
+  const target = el || document.getElementById('masterTabContent');
+  if (!target) return;
+  target.innerHTML = `
+    <div class="card">
+      <div class="card-header-bar">
+        <span class="card-title"><span class="material-icons">settings</span>Pengaturan Sistem</span>
+      </div>
+      <div class="card-body">
+        <p style="font-size:13px;color:#64748b;margin-bottom:20px">Atur rentang tahun yang tampil di seluruh sistem (filter laporan, input usulan, dll).</p>
+        <div class="form-row" style="max-width:400px">
+          <div class="form-group">
+            <label>Tahun Awal</label>
+            <input class="form-control" type="number" id="settingTahunAwal" min="2020" max="2040" placeholder="cth: 2024">
+          </div>
+          <div class="form-group">
+            <label>Tahun Akhir</label>
+            <input class="form-control" type="number" id="settingTahunAkhir" min="2020" max="2040" placeholder="cth: 2027">
+          </div>
+        </div>
+        <div id="settingStatus" style="font-size:12.5px;color:#ef4444;min-height:18px;margin-bottom:12px"></div>
+        <button class="btn btn-primary" onclick="saveSettings()">
+          <span class="material-icons">save</span>Simpan Pengaturan
+        </button>
+      </div>
+    </div>`;
+
+  try {
+    const res = await API.get('settings');
+    if (res && res.tahun_awal) {
+      document.getElementById('settingTahunAwal').value = res.tahun_awal;
+      document.getElementById('settingTahunAkhir').value = res.tahun_akhir;
+    }
+  } catch(e) { /* silent */ }
+}
+
+async function saveSettings() {
+  const awal = parseInt(document.getElementById('settingTahunAwal').value);
+  const akhir = parseInt(document.getElementById('settingTahunAkhir').value);
+  const status = document.getElementById('settingStatus');
+  if (!awal || !akhir) { status.textContent = 'Tahun awal dan akhir wajib diisi'; return; }
+  if (awal > akhir) { status.textContent = 'Tahun awal tidak boleh lebih besar dari tahun akhir'; return; }
+  setLoading(true);
+  try {
+    await API.post('settings', { tahun_awal: awal, tahun_akhir: akhir });
+    toast('Pengaturan berhasil disimpan!', 'success');
+    status.textContent = '';
+  } catch(e) { status.textContent = e.message; }
+  finally { setLoading(false); }
+}
+
+
 // ============== ADMIN - USERS ==============
 let allUsers = [], allPKMList = [], allIndList = [];
 
@@ -3435,3 +3520,58 @@ async function restoreVerifAdmin(idUsulan) {
     }
   });
 }
+
+
+// ============== MASTER DATA TAB WRAPPERS ==============
+// Fungsi-fungsi tab memanfaatkan render asli dengan cara
+// sementara override target render ke masterTabContent
+
+async function _renderToTab(renderFn) {
+  // Simpan innerHTML page-header dan tab bar dulu
+  const mc = document.getElementById('mainContent');
+  const savedHeader = mc.querySelector('.page-header') ? mc.querySelector('.page-header').outerHTML : '';
+  const savedTabBar = mc.querySelector('[id="masterTabBar"]') ? mc.querySelector('[id="masterTabBar"]').outerHTML : '';
+
+  // Panggil fungsi render asli - dia akan overwrite mainContent
+  await renderFn();
+
+  // Ambil hasil render (seluruh mainContent sekarang berisi konten tab)
+  const newContent = mc.innerHTML;
+
+  // Rebuild: tab header + konten baru di masterTabContent
+  mc.innerHTML = `
+    <div class="page-header">
+      <h1><span class="material-icons">storage</span>Master Data</h1>
+    </div>
+    <div id="masterTabBar" style="background:white;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,0.07);margin-bottom:16px">
+      <div style="display:flex;gap:0;padding:0 8px;overflow-x:auto;border-bottom:1px solid #e2e8f0" id="masterTabButtons"></div>
+    </div>
+    <div id="masterTabContent">${newContent}</div>`;
+
+  // Rebuild tab buttons
+  _rebuildTabButtons();
+}
+
+function _rebuildTabButtons() {
+  const btn = document.getElementById('masterTabButtons');
+  if (!btn) return;
+  const tabs = [
+    { id: 'users',    icon: 'group',           label: 'Kelola User' },
+    { id: 'jabatan',  icon: 'badge',            label: 'Jabatan' },
+    { id: 'pkm',      icon: 'local_hospital',   label: 'Puskesmas' },
+    { id: 'indikator',icon: 'monitor_heart',    label: 'Indikator' },
+    { id: 'periode',  icon: 'event_available',  label: 'Periode Input' },
+    { id: 'settings', icon: 'settings',         label: 'Pengaturan' },
+  ];
+  btn.innerHTML = tabs.map(t => `
+    <button onclick="renderMasterData('${t.id}')"
+      style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border:none;border-bottom:3px solid ${_masterActiveTab===t.id?'#0d9488':'transparent'};background:transparent;color:${_masterActiveTab===t.id?'#0d9488':'#64748b'};font-weight:${_masterActiveTab===t.id?'700':'500'};font-size:13px;cursor:pointer;transition:all 0.15s;white-space:nowrap">
+      <span class="material-icons" style="font-size:16px">${t.icon}</span>${t.label}
+    </button>`).join('');
+}
+
+async function renderUsersTab(el)     { await _renderToTab(renderUsers); }
+async function renderJabatanTab(el)   { await _renderToTab(renderJabatan); }
+async function renderPKMTab(el)       { await _renderToTab(renderPKM); }
+async function renderIndikatorTab(el) { await _renderToTab(renderIndikator); }
+async function renderPeriodeTab(el)   { await _renderToTab(renderPeriode); }

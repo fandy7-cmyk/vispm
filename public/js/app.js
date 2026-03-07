@@ -109,6 +109,13 @@ function startApp() {
   const dropMetaEl = document.getElementById('topbarDropMeta');
   if (dropMetaEl) dropMetaEl.textContent = currentUser.role + (currentUser.namaPKM ? ` · ${currentUser.namaPKM}` : '');
 
+  // Load app settings (tahun range) lalu build UI
+  API.get('settings').then(s => {
+    if (s && s.tahun_awal) {
+      window._appTahunAwal  = parseInt(s.tahun_awal);
+      window._appTahunAkhir = parseInt(s.tahun_akhir);
+    }
+  }).catch(() => {});
   buildSidebar();
   loadPage('dashboard');
 
@@ -190,7 +197,6 @@ function buildSidebar() {
       ]},
       { label: 'Kelola Master', items: [
         { id: 'master-data', icon: 'storage', label: 'Master Data' },
-        { id: 'target-tahunan', icon: 'track_changes', label: 'Target Tahunan' },
       ]},
       { label: 'Manajemen', items: [
         { id: 'kelola-usulan', icon: 'manage_accounts', label: 'Kelola Semua Usulan' }
@@ -296,14 +302,56 @@ function closeSidebar() {
 
 // ============== HELPER: YEAR SELECT ==============
 function yearOptions(selected, maxYear) {
-  // Gunakan maxYear dari parameter, atau ambil dari state global, minimal CURRENT_YEAR+3
-  const max = maxYear || window._maxPeriodeTahun || Math.max(CURRENT_YEAR + 3, 2030);
-  const min = Math.min(2024, CURRENT_YEAR);
+  const max = maxYear || window._appTahunAkhir || window._maxPeriodeTahun || Math.max(CURRENT_YEAR + 3, 2030);
+  const min = window._appTahunAwal || Math.min(2024, CURRENT_YEAR);
   let html = '';
   for (let y = min; y <= max; y++) {
     html += `<option value="${y}" ${y == selected ? 'selected' : ''}>${y}</option>`;
   }
   return html;
+}
+
+
+// ============== PAGINATION HELPER ==============
+const ITEMS_PER_PAGE = 12;
+
+function paginateData(rows, page) {
+  const total = rows.length;
+  const totalPages = Math.ceil(total / ITEMS_PER_PAGE);
+  const p = Math.max(1, Math.min(page || 1, totalPages || 1));
+  const start = (p - 1) * ITEMS_PER_PAGE;
+  const items = rows.slice(start, start + ITEMS_PER_PAGE);
+  return { items, page: p, totalPages, total };
+}
+
+function renderPagination(containerId, total, page, totalPages, onPageChange) {
+  if (totalPages <= 1) return '';
+  const start = (page - 1) * ITEMS_PER_PAGE + 1;
+  const end = Math.min(page * ITEMS_PER_PAGE, total);
+  const pages = [];
+  for (let i = 1; i <= totalPages; i++) {
+    if (i === 1 || i === totalPages || (i >= page - 2 && i <= page + 2)) {
+      pages.push(i);
+    } else if (pages[pages.length - 1] !== '...') {
+      pages.push('...');
+    }
+  }
+  const btnStyle = (active) => active
+    ? 'padding:5px 10px;border:1.5px solid #0d9488;background:#0d9488;color:white;border-radius:6px;font-size:12px;font-weight:700;cursor:default'
+    : 'padding:5px 10px;border:1.5px solid #e2e8f0;background:white;color:#334155;border-radius:6px;font-size:12px;cursor:pointer';
+  const pageButtons = pages.map(p =>
+    p === '...'
+      ? `<span style="padding:5px 4px;font-size:12px;color:#94a3b8">…</span>`
+      : `<button style="${btnStyle(p===page)}" ${p===page?'disabled':''} onclick="(${onPageChange})(${p})">${p}</button>`
+  ).join('');
+  return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-top:1px solid #f1f5f9;flex-wrap:wrap;gap:8px">
+    <span style="font-size:12px;color:#64748b">Menampilkan ${start}–${end} dari ${total} data</span>
+    <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
+      <button style="${btnStyle(false)}${page<=1?';opacity:0.4;cursor:not-allowed':''}" ${page<=1?'disabled':''} onclick="(${onPageChange})(${page-1})">‹</button>
+      ${pageButtons}
+      <button style="${btnStyle(false)}${page>=totalPages?';opacity:0.4;cursor:not-allowed':''}" ${page>=totalPages?'disabled':''} onclick="(${onPageChange})(${page+1})">›</button>
+    </div>
+  </div>`;
 }
 
 function bulanOptions(selected) {
@@ -2267,10 +2315,13 @@ async function renderMasterData(tab) {
   try {
     if (activeTab === 'settings') {
       await renderSettingsTab(tc);
+    } else if (activeTab === 'pejabat') {
+      await renderPejabatTab(tc);
     } else {
       const fnMap = {
         users: renderUsers, jabatan: renderJabatan, pkm: renderPKM,
-        indikator: renderIndikator, periode: renderPeriode
+        indikator: renderIndikator, periode: renderPeriode,
+        'target-tahunan': renderTargetTahunan
       };
       const fn = fnMap[activeTab];
       if (fn) await _renderIntoTab(fn);
@@ -2314,6 +2365,105 @@ async function renderSettingsTab(el) {
     }
   } catch(e) { /* silent */ }
 }
+
+async function renderPejabatTab(el) {
+  el.innerHTML = `
+    <div class="card">
+      <div class="card-header-bar">
+        <span class="card-title"><span class="material-icons">draw</span>Pejabat Penandatangan</span>
+      </div>
+      <div class="card-body">
+        <p style="font-size:13px;color:#64748b;margin-bottom:20px">Tanda tangan pejabat berikut akan muncul di laporan PDF yang telah selesai diverifikasi.</p>
+        <div id="pejabatList" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px">
+          <div class="empty-state"><span class="material-icons" style="animation:spin 1s linear infinite">refresh</span><p>Memuat...</p></div>
+        </div>
+      </div>
+    </div>`;
+  try {
+    const res = await fetch('/api/pejabat');
+    const data = await res.json();
+    const list = data.success ? data.data : [];
+    const jabatanList = ['Kepala Sub Bagian Perencanaan', 'Kepala Dinas Kesehatan PPKB'];
+    const container = document.getElementById('pejabatList');
+    container.innerHTML = jabatanList.map(jab => {
+      const pj = list.find(p => p.jabatan === jab) || {};
+      const ttValid = pj.tanda_tangan && (pj.tanda_tangan.startsWith('data:image') || pj.tanda_tangan.startsWith('http'));
+      return `<div class="card" style="margin:0">
+        <div class="card-body">
+          <div style="font-weight:700;font-size:13px;color:#0d9488;margin-bottom:12px">${jab}</div>
+          <div class="form-group">
+            <label>Nama</label>
+            <input class="form-control" id="pj_nama_${jab.replace(/\s+/g,'_')}" value="${pj.nama||''}" placeholder="Nama pejabat">
+          </div>
+          <div class="form-group">
+            <label>NIP</label>
+            <input class="form-control" id="pj_nip_${jab.replace(/\s+/g,'_')}" value="${pj.nip||''}" placeholder="NIP (opsional)">
+          </div>
+          <div class="form-group">
+            <label>Tanda Tangan <span style="font-size:11px;color:#94a3b8">(maks 2MB)</span></label>
+            <div style="border:2px dashed #cbd5e1;border-radius:8px;padding:10px;text-align:center;cursor:pointer" onclick="document.getElementById('pj_tt_input_${jab.replace(/\s+/g,'_')}').click()">
+              <img id="pj_tt_preview_${jab.replace(/\s+/g,'_')}" src="${ttValid ? pj.tanda_tangan : ''}" style="max-height:72px;max-width:200px;object-fit:contain;display:${ttValid?'block':'none'};margin:0 auto">
+              <div id="pj_tt_placeholder_${jab.replace(/\s+/g,'_')}" style="color:#94a3b8;font-size:12px;${ttValid?'display:none':''}"><span class="material-icons" style="font-size:24px;display:block">draw</span>Klik upload tanda tangan</div>
+              <input type="file" id="pj_tt_input_${jab.replace(/\s+/g,'_')}" accept="image/*" style="display:none" onchange="previewPejabatTT(event,'${jab.replace(/\s+/g,'_')}')">
+            </div>
+            ${ttValid ? `<button type="button" style="font-size:12px;color:#ef4444;background:none;border:none;cursor:pointer;margin-top:4px" onclick="hapusPejabatTT('${jab.replace(/\s+/g,'_')}')"><span class="material-icons" style="font-size:14px;vertical-align:middle">delete</span> Hapus tanda tangan</button>` : ''}
+          </div>
+          <button class="btn btn-primary btn-sm" style="margin-top:4px" onclick="savePejabat('${jab}')">
+            <span class="material-icons">save</span>Simpan
+          </button>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) { toast('Gagal memuat data pejabat: '+e.message, 'error'); }
+}
+
+function previewPejabatTT(e, jabKey) {
+  const file = e.target.files[0];
+  if (!file) return;
+  if (file.size > 2*1024*1024) { alert('File terlalu besar, maks 2MB'); e.target.value=''; return; }
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const b64 = ev.target.result;
+    e.target._newTT = b64;
+    const preview = document.getElementById('pj_tt_preview_'+jabKey);
+    const placeholder = document.getElementById('pj_tt_placeholder_'+jabKey);
+    if (preview) { preview.src = b64; preview.style.display = 'block'; }
+    if (placeholder) placeholder.style.display = 'none';
+  };
+  reader.readAsDataURL(file);
+}
+
+function hapusPejabatTT(jabKey) {
+  const preview = document.getElementById('pj_tt_preview_'+jabKey);
+  const placeholder = document.getElementById('pj_tt_placeholder_'+jabKey);
+  const input = document.getElementById('pj_tt_input_'+jabKey);
+  if (preview) { preview.src = ''; preview.style.display = 'none'; }
+  if (placeholder) placeholder.style.display = '';
+  if (input) { input.value = ''; input._newTT = null; }
+}
+
+async function savePejabat(jabatan) {
+  const jabKey = jabatan.replace(/\s+/g,'_');
+  const nama = document.getElementById('pj_nama_'+jabKey)?.value.trim();
+  const nip  = document.getElementById('pj_nip_'+jabKey)?.value.trim();
+  const ttInput = document.getElementById('pj_tt_input_'+jabKey);
+  const ttPreview = document.getElementById('pj_tt_preview_'+jabKey);
+  let tanda_tangan = ttPreview?.src && ttPreview.src !== window.location.href ? ttPreview.src : null;
+  if (ttInput?._newTT !== undefined) tanda_tangan = ttInput._newTT;
+  if (!nama) { toast('Nama pejabat tidak boleh kosong', 'error'); return; }
+  setLoading(true);
+  try {
+    await fetch('/api/pejabat', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ jabatan, nama, nip, tanda_tangan })
+    });
+    toast('Data '+jabatan+' berhasil disimpan!', 'success');
+    renderPejabatTab(document.getElementById('masterTabContent'));
+  } catch(e) { toast(e.message, 'error'); }
+  finally { setLoading(false); }
+}
+
 
 async function saveSettings() {
   const awal = parseInt(document.getElementById('settingTahunAwal').value);
@@ -2874,23 +3024,29 @@ function filterPKM() {
   renderPKMTable(filtered);
 }
 
-function renderPKMTable(pkm) {
+let _pkmPage = 1;
+function renderPKMTable(pkm, page) {
+  if (page) _pkmPage = page;
   const el = document.getElementById('pkmTable');
   if (!el) return;
-  el.innerHTML = `<div class="table-container"><table>
-    <thead><tr><th>Kode</th><th>Nama Puskesmas</th><th>Indeks Beban Kerja</th><th>Indeks Kesulitan Wilayah</th><th>Status</th><th>Aksi</th></tr></thead>
-    <tbody>${pkm.map(p => `<tr>
-      <td><span style="font-family:'JetBrains Mono';font-weight:700">${p.kode}</span></td>
-      <td>${p.nama}</td>
-      <td class="rasio-cell">${parseFloat(p.indeks||0).toFixed(2)}</td>
-      <td class="rasio-cell">${parseFloat(p.indeksKesulitan||0).toFixed(2)}</td>
-      <td>${p.aktif ? '<span class="badge badge-success">Aktif</span>' : '<span class="badge badge-default">Non-aktif</span>'}</td>
-      <td style="display:flex;gap:4px">
-        <button class="btn-icon edit" onclick="editPKM('${p.kode}')"><span class="material-icons">edit</span></button>
-        <button class="btn-icon del" onclick="deletePKM('${p.kode}')"><span class="material-icons">delete</span></button>
-      </td>
-    </tr>`).join('')}</tbody>
-  </table></div>`;
+  const { items, page: p, totalPages, total } = paginateData(pkm, _pkmPage);
+  const rowsHtml = items.map(p => {
+    const kodeQ = p.kode.replace(/'/g, "\'");
+    return '<tr>'
+      + '<td><span style="font-family:JetBrains Mono,monospace;font-weight:700">'+p.kode+'</span></td>'
+      + '<td>'+p.nama+'</td>'
+      + '<td class="rasio-cell">'+parseFloat(p.indeks||0).toFixed(2)+'</td>'
+      + '<td class="rasio-cell">'+parseFloat(p.indeksKesulitan||0).toFixed(2)+'</td>'
+      + '<td>'+(p.aktif ? '<span class="badge badge-success">Aktif</span>' : '<span class="badge badge-default">Non-aktif</span>')+'</td>'
+      + '<td style="display:flex;gap:4px">'
+      + `<button class="btn-icon edit" onclick="editPKM('${kodeQ}')"><span class="material-icons">edit</span></button>`
+      + `<button class="btn-icon del" onclick="deletePKM('${kodeQ}')"><span class="material-icons">delete</span></button>`
+      + '</td></tr>';
+  }).join('');
+  el.innerHTML = '<div class="table-container"><table>'
+    + '<thead><tr><th>Kode</th><th>Nama Puskesmas</th><th>Indeks Beban Kerja</th><th>Indeks Kesulitan Wilayah</th><th>Status</th><th>Aksi</th></tr></thead>'
+    + '<tbody>' + rowsHtml + '</tbody></table></div>'
+    + renderPagination('pkmTable', total, p, totalPages, 'pg => { _pkmPage=pg; renderPKMTable(allPKM); }');
 }
 
 function openPKMModal(editKode = null) {
@@ -3413,7 +3569,9 @@ async function renderKelolaUsulan() {
   loadKelolaUsulan();
 }
 
-async function loadKelolaUsulan() {
+let _kuPage = 1, _kuRows = [];
+async function loadKelolaUsulan(page) {
+  if (page) _kuPage = page;
   const params = { tahun: document.getElementById('kuTahun')?.value };
   const bulan = document.getElementById('kuBulan')?.value;
   const status = document.getElementById('kuStatus')?.value;
@@ -3421,15 +3579,14 @@ async function loadKelolaUsulan() {
   if (status) params.status = status;
 
   try {
-    const rows = await API.getUsulan(params);
+    if (!page) { _kuRows = await API.getUsulan(params); _kuPage = 1; }
     const el = document.getElementById('kuTable');
-    if (!rows.length) {
+    if (!_kuRows.length) {
       el.innerHTML = `<div class="empty-state" style="padding:32px"><span class="material-icons">inbox</span><p>Tidak ada usulan</p></div>`;
       return;
     }
-    el.innerHTML = `<div class="table-container"><table>
-      <thead><tr><th>ID Usulan</th><th>Puskesmas</th><th>Operator</th><th>Periode</th><th>Status</th><th>Dibuat</th><th>Aksi</th></tr></thead>
-      <tbody>${rows.map(u => `<tr>
+    const { items, page: p, totalPages, total } = paginateData(_kuRows, _kuPage);
+    const rowsHtml = items.map(u => `<tr>
         <td><span style="font-family:'JetBrains Mono',monospace;font-weight:600;font-size:12px">${u.idUsulan}</span></td>
         <td>${u.namaPKM || u.kodePKM}</td>
         <td style="font-size:12px">${u.createdBy || '-'}</td>
@@ -3444,9 +3601,11 @@ async function loadKelolaUsulan() {
             ? `<button class="btn-icon" onclick="restoreVerifAdmin('${u.idUsulan}')" title="Pulihkan verifikasi Kapus & Program" style="color:#f59e0b;background:#fffbeb;border:1px solid #fcd34d"><span class="material-icons">restore</span></button>`
             : ''}
         </td>
-      </tr>`).join('')}
-      </tbody>
-    </table></div>`;
+      </tr>`).join('');
+    el.innerHTML = '<div class="table-container"><table>'
+      + '<thead><tr><th>ID Usulan</th><th>Puskesmas</th><th>Operator</th><th>Periode</th><th>Status</th><th>Dibuat</th><th>Aksi</th></tr></thead>'
+      + '<tbody>' + rowsHtml + '</tbody></table></div>'
+      + renderPagination('kuTable', total, p, totalPages, 'pg => loadKelolaUsulan(pg)');
   } catch(e) { toast(e.message, 'error'); }
 }
 
@@ -3521,12 +3680,14 @@ async function restoreVerifAdmin(idUsulan) {
 
 // ============== MASTER DATA TAB WRAPPERS ==============
 const _masterTabs = [
-  { id: 'users',     icon: 'group',          label: 'Kelola User' },
-  { id: 'jabatan',   icon: 'badge',           label: 'Jabatan' },
-  { id: 'pkm',       icon: 'local_hospital',  label: 'Puskesmas' },
-  { id: 'indikator', icon: 'monitor_heart',   label: 'Indikator' },
-  { id: 'periode',   icon: 'event_available', label: 'Periode Input' },
-  { id: 'settings',  icon: 'settings',        label: 'Pengaturan' },
+  { id: 'users',           icon: 'group',          label: 'Kelola User' },
+  { id: 'jabatan',         icon: 'badge',           label: 'Jabatan' },
+  { id: 'pkm',             icon: 'local_hospital',  label: 'Puskesmas' },
+  { id: 'indikator',       icon: 'monitor_heart',   label: 'Indikator' },
+  { id: 'periode',         icon: 'event_available', label: 'Periode Input' },
+  { id: 'target-tahunan',  icon: 'track_changes',   label: 'Target Tahunan' },
+  { id: 'pejabat',         icon: 'draw',            label: 'Pejabat Penandatangan' },
+  { id: 'settings',        icon: 'settings',        label: 'Pengaturan' },
 ];
 
 function _buildMasterShell() {

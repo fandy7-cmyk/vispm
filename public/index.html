@@ -112,11 +112,12 @@ body { font-family: 'Plus Jakarta Sans', sans-serif; background: linear-gradient
 }
 /* Features */
 .auth-left-features { display: flex; flex-direction: column; gap: 10px; flex: 1; align-items: center; }
+.auth-left-features-inner { display: flex; flex-direction: column; gap: 10px; width: max-content; }
 .auth-left-feature {
   display: flex; align-items: center; gap: 11px;
   background: rgba(255,255,255,0.05); border-radius: 9px;
   padding: 11px 16px; border: 1px solid rgba(255,255,255,0.07);
-  width: max-content; min-width: max-content;
+  width: 100%;
 }
 .auth-left-feature .material-icons { font-size: 17px; color: #5eead4; flex-shrink: 0; }
 .auth-left-feature span {
@@ -619,7 +620,7 @@ input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-o
       </div>
       <!-- Fitur -->
       <div class="auth-left-features">
-        <div style="display:inline-flex;flex-direction:column;gap:10px">
+        <div class="auth-left-features-inner">
         <div class="auth-left-feature">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#5eead4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/><path d="m9 10 2 2 4-4"/></svg>
           <span>Digitalisasi Verifikasi</span>

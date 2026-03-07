@@ -1990,7 +1990,7 @@ function openEditProfil() {
             <label>Role</label>
             <input class="form-control" id="epRole" disabled style="background:#f8fafc;color:var(--text-light)">
           </div>
-          \${['Kepala Puskesmas','Pengelola Program','Admin'].includes(currentUser.role) ? \`
+          \${['Kepala Puskesmas','Pengelola Program','Admin','Kadis'].includes(currentUser.role) ? \`
           <div class="form-group">
             <label>Tanda Tangan <span style="font-size:11px;color:#94a3b8">(upload gambar, maks 2MB)</span></label>
             <div style="border:2px dashed #cbd5e1;border-radius:8px;padding:10px;text-align:center;cursor:pointer;position:relative" id="epTTWrap" onclick="document.getElementById('epTTInput').click()">

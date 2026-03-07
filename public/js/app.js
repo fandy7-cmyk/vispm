@@ -2523,8 +2523,9 @@ async function saveSettings() {
 // ============== ADMIN - USERS ==============
 let allUsers = [], allPKMList = [], allIndList = [];
 
-async function renderUsers() {
-  document.getElementById('mainContent').innerHTML = `
+async function renderUsers(el) {
+  const _mc = el || document.getElementById('mainContent');
+  _mc.innerHTML = `
     <div class="page-header">
       <h1><span class="material-icons">group</span>Kelola User</h1>
       <button class="btn btn-primary" onclick="openUserModal()"><span class="material-icons">person_add</span>Tambah User</button>
@@ -2880,8 +2881,9 @@ async function deleteUser(email) {
 // ============== KELOLA JABATAN ==============
 let _jabatanAllList = [];
 
-async function renderJabatan() {
-  document.getElementById('mainContent').innerHTML = `
+async function renderJabatan(el) {
+  const _mc = el || document.getElementById('mainContent');
+  _mc.innerHTML = `
     <div class="page-header">
       <h1><span class="material-icons">badge</span>Kelola Jabatan Pengelola Program</h1>
       <button class="btn btn-primary" onclick="openJabatanModal()">
@@ -3016,8 +3018,9 @@ async function deleteJabatan(id, nama) {
 // ============== ADMIN - PKM ==============
 let allPKM = [];
 
-async function renderPKM() {
-  document.getElementById('mainContent').innerHTML = `
+async function renderPKM(el) {
+  const _mc = el || document.getElementById('mainContent');
+  _mc.innerHTML = `
     <div class="page-header">
       <h1><span class="material-icons">local_hospital</span>Kelola Puskesmas</h1>
       <button class="btn btn-primary" onclick="openPKMModal()"><span class="material-icons">add</span>Tambah Puskesmas</button>
@@ -3151,9 +3154,10 @@ async function deletePKM(kode) {
 // ============== ADMIN - TARGET TAHUNAN ==============
 let _ttPKM = [], _ttIndikator = [], _ttCurrentKode = null, _ttCurrentTahun = null;
 
-async function renderTargetTahunan() {
+async function renderTargetTahunan(el) {
+  const _mc = el || document.getElementById('mainContent');
   const tahunOpts = Array.from({length:5},(_,i)=>2024+i).map(y=>`<option value="${y}" ${y===CURRENT_YEAR?'selected':''}>${y}</option>`).join('');
-  document.getElementById('mainContent').innerHTML = `
+  _mc.innerHTML = `
     <div class="page-header">
       <h1><span class="material-icons">track_changes</span>Target Tahunan per Puskesmas</h1>
     </div>
@@ -3266,8 +3270,9 @@ async function saveTargetTahunan() {
 // ============== ADMIN - INDIKATOR ==============
 let allIndikator = [];
 
-async function renderIndikator() {
-  document.getElementById('mainContent').innerHTML = `
+async function renderIndikator(el) {
+  const _mc = el || document.getElementById('mainContent');
+  _mc.innerHTML = `
     <div class="page-header">
       <h1><span class="material-icons">monitor_heart</span>Kelola Indikator</h1>
       <button class="btn btn-primary" onclick="openIndModal()"><span class="material-icons">add</span>Tambah Indikator</button>
@@ -3393,14 +3398,57 @@ async function deleteInd(no) {
 }
 
 // ============== ADMIN - PERIODE ==============
-async function renderPeriode() {
+let _editPeriodeTahun = null, _editPeriodeBulan = null;
+
+async function renderPeriode(el) {
   const currentTahun = CURRENT_YEAR;
-  document.getElementById('mainContent').innerHTML = `
-    <div class="page-header">
-      <h1><span class="material-icons">event_available</span>Kelola Periode Input</h1>
-      <button class="btn btn-primary" onclick="openPeriodeModal()"><span class="material-icons">add</span>Atur Periode</button>
+  const target = el || document.getElementById('mainContent');
+  if (!target) return;
+
+  // Load settings untuk tahun range
+  let tahunAwal = window._appTahunAwal || currentTahun;
+  let tahunAkhir = window._appTahunAkhir || (currentTahun + 3);
+  try {
+    const s = await API.get('settings');
+    if (s && s.tahun_awal) {
+      tahunAwal = parseInt(s.tahun_awal);
+      tahunAkhir = parseInt(s.tahun_akhir);
+      window._appTahunAwal = tahunAwal;
+      window._appTahunAkhir = tahunAkhir;
+    }
+  } catch(e) {}
+
+  target.innerHTML = `
+    <!-- PENGATURAN TAHUN -->
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-header-bar">
+        <span class="card-title"><span class="material-icons">settings</span>Pengaturan Rentang Tahun</span>
+      </div>
+      <div class="card-body">
+        <p style="font-size:13px;color:#64748b;margin-bottom:14px">Atur rentang tahun yang tampil di seluruh sistem (filter laporan, input usulan, periode, dll).</p>
+        <div style="display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap">
+          <div class="form-group" style="margin:0">
+            <label>Tahun Awal</label>
+            <input class="form-control" type="number" id="settingTahunAwal" min="2020" max="2040" value="${tahunAwal}" style="width:120px">
+          </div>
+          <div class="form-group" style="margin:0">
+            <label>Tahun Akhir</label>
+            <input class="form-control" type="number" id="settingTahunAkhir" min="2020" max="2040" value="${tahunAkhir}" style="width:120px">
+          </div>
+          <button class="btn btn-primary" onclick="saveSettings()" style="margin-bottom:1px">
+            <span class="material-icons">save</span>Simpan
+          </button>
+          <div id="settingStatus" style="font-size:12px;color:#ef4444;align-self:center"></div>
+        </div>
+      </div>
     </div>
+
+    <!-- DAFTAR PERIODE -->
     <div class="card">
+      <div class="card-header-bar" style="justify-content:space-between">
+        <span class="card-title"><span class="material-icons">calendar_month</span>Daftar Periode Input</span>
+        <button class="btn btn-primary btn-sm" onclick="openPeriodeModal()"><span class="material-icons">add</span>Tambah Periode</button>
+      </div>
       <div class="card-body" style="padding:12px 16px">
         <select class="form-control" id="filterTahunPeriode" style="width:150px" onchange="loadPeriodeGrid()">
           ${yearOptions(currentTahun)}
@@ -3411,10 +3459,15 @@ async function renderPeriode() {
         <div id="periodeGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;margin-top:16px"></div>
       </div>
     </div>
+
+    <!-- MODAL PERIODE -->
     <div class="modal" id="periodeModal">
       <div class="modal-card">
-        <div class="modal-header"><span class="material-icons">edit_calendar</span><h3>Atur Periode Input</h3>
-          <button class="btn-icon" onclick="closeModal('periodeModal')"><span class="material-icons">close</span></button></div>
+        <div class="modal-header">
+          <span class="material-icons">edit_calendar</span>
+          <h3 id="periodeModalTitle">Tambah Periode Input</h3>
+          <button class="btn-icon" onclick="closeModal('periodeModal')"><span class="material-icons">close</span></button>
+        </div>
         <div class="modal-body">
           <div class="form-row">
             <div class="form-group"><label>Tahun</label><select class="form-control" id="pTahun">${yearOptions(currentTahun)}</select></div>
@@ -3435,11 +3488,17 @@ async function renderPeriode() {
             <select class="form-control" id="pStatus">
               <option value="Aktif">Aktif (Bisa diinput)</option>
               <option value="Tidak Aktif">Tidak Aktif</option>
-            </select></div>
+            </select>
+          </div>
         </div>
-        <div class="modal-footer">
-          <button class="btn btn-secondary" onclick="closeModal('periodeModal')">Batal</button>
-          <button class="btn btn-primary" onclick="savePeriode()"><span class="material-icons">save</span>Simpan</button>
+        <div class="modal-footer" style="justify-content:space-between">
+          <button class="btn btn-danger" id="btnHapusPeriode" style="display:none" onclick="hapusPeriode()">
+            <span class="material-icons">delete</span>Hapus
+          </button>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-secondary" onclick="closeModal('periodeModal')">Batal</button>
+            <button class="btn btn-primary" onclick="savePeriode()"><span class="material-icons">save</span>Simpan</button>
+          </div>
         </div>
       </div>
     </div>`;
@@ -3448,10 +3507,12 @@ async function renderPeriode() {
 }
 
 async function loadPeriodeGrid() {
-  const tahun = document.getElementById('filterTahunPeriode').value;
+  const tahun = document.getElementById('filterTahunPeriode')?.value;
+  if (!tahun) return;
   try {
     const rows = await API.getPeriode(tahun);
     const grid = document.getElementById('periodeGrid');
+    if (!grid) return;
     if (!rows.length) {
       grid.innerHTML = `<div class="empty-state"><p>Belum ada data periode untuk tahun ${tahun}</p></div>`;
       return;
@@ -3482,10 +3543,18 @@ async function loadPeriodeGrid() {
 }
 
 async function openPeriodeModal() {
+  _editPeriodeTahun = null; _editPeriodeBulan = null;
+  const title = document.getElementById('periodeModalTitle');
+  const btnHapus = document.getElementById('btnHapusPeriode');
+  if (title) title.textContent = 'Tambah Periode Input';
+  if (btnHapus) btnHapus.style.display = 'none';
   document.getElementById('pTahun').value = CURRENT_YEAR;
   document.getElementById('pBulan').value = CURRENT_BULAN;
   document.getElementById('pMulai').value = '';
   document.getElementById('pSelesai').value = '';
+  document.getElementById('pJamMulai').value = '08:00';
+  document.getElementById('pJamSelesai').value = '17:00';
+  document.getElementById('pNotif').value = '';
   document.getElementById('pStatus').value = 'Aktif';
   showModal('periodeModal');
 }
@@ -3495,6 +3564,11 @@ async function editPeriode(tahun, bulan) {
     const rows = await API.getPeriode(tahun);
     const p = rows.find(r => r.bulan == bulan);
     if (!p) return openPeriodeModal();
+    _editPeriodeTahun = p.tahun; _editPeriodeBulan = p.bulan;
+    const title = document.getElementById('periodeModalTitle');
+    const btnHapus = document.getElementById('btnHapusPeriode');
+    if (title) title.textContent = 'Edit Periode Input';
+    if (btnHapus) btnHapus.style.display = '';
     document.getElementById('pTahun').value = p.tahun;
     document.getElementById('pBulan').value = p.bulan;
     document.getElementById('pMulai').value = p.tanggalMulai ? p.tanggalMulai.toString().substr(0, 10) : '';
@@ -3505,6 +3579,19 @@ async function editPeriode(tahun, bulan) {
     document.getElementById('pStatus').value = p.status;
     showModal('periodeModal');
   } catch (e) { openPeriodeModal(); }
+}
+
+async function hapusPeriode() {
+  if (!_editPeriodeTahun || !_editPeriodeBulan) return;
+  if (!confirm(`Hapus periode ${BULAN_NAMA[_editPeriodeBulan]} ${_editPeriodeTahun}?`)) return;
+  setLoading(true);
+  try {
+    await API.savePeriode({ tahun: _editPeriodeTahun, bulan: _editPeriodeBulan, _delete: true });
+    toast('Periode berhasil dihapus', 'success');
+    closeModal('periodeModal');
+    loadPeriodeGrid();
+  } catch(e) { toast(e.message, 'error'); }
+  finally { setLoading(false); }
 }
 
 async function savePeriode() {
@@ -3520,7 +3607,7 @@ async function savePeriode() {
   setLoading(true);
   try {
     await API.savePeriode({ tahun, bulan, namaBulan: BULAN_NAMA[bulan], tanggalMulai, tanggalSelesai, jamMulai, jamSelesai, notifOperator, status });
-    toast('Periode berhasil disimpan');
+    toast('Periode berhasil disimpan', 'success');
     closeModal('periodeModal');
     loadPeriodeGrid();
   } catch (e) { toast(e.message, 'error'); }
@@ -3764,30 +3851,10 @@ function _highlightMasterTab(activeId) {
   });
 }
 
-// Patch: fungsi render asli menulis ke mainContent, tapi kita butuh hasilnya di masterTabContent.
-// Solusi: sementara ganti innerHTML target, panggil render, ambil hasilnya, restore.
+// _renderIntoTab: panggil renderFn(el) dengan el = masterTabContent
+// renderFn menerima el opsional; jika tidak, pakai mainContent sebagai fallback
 async function _renderIntoTab(renderFn) {
-  const mc = document.getElementById('mainContent');
   const tc = document.getElementById('masterTabContent');
   if (!tc) return;
-
-  // Simpan shell master data
-  const shellHtml = mc.innerHTML;
-
-  // Kosongkan mainContent sementara agar renderFn bisa tulis ke sana
-  mc.innerHTML = '';
-  await renderFn();
-
-  // Ambil semua konten yang ditulis oleh renderFn (kecuali page-header)
-  const tmp = document.createElement('div');
-  tmp.innerHTML = mc.innerHTML;
-  const pageHeader = tmp.querySelector('.page-header');
-  if (pageHeader) pageHeader.remove();
-
-  // Restore shell
-  mc.innerHTML = shellHtml;
-
-  // Inject konten ke masterTabContent
-  const tc2 = document.getElementById('masterTabContent');
-  if (tc2) tc2.innerHTML = tmp.innerHTML;
+  await renderFn(tc);
 }

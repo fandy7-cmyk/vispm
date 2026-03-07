@@ -48,21 +48,25 @@ exports.handler = async (event) => {
     const indFolder = noIndikator ? 'Indikator-' + noIndikator : 'Lainnya';
     const folder    = 'VISPM/' + (kodePKM||'PKM') + '/' + (tahun||'') + '/' + (bulan||'') + '/' + indFolder;
     const safeBase  = (baseName + '_' + Math.floor(Date.now() / 1000)).replace(/[^a-zA-Z0-9_\-]/g, '_').substring(0, 60);
-    // Untuk raw: sertakan ekstensi di publicId agar URL Cloudinary langsung punya ekstensi
-    const publicId  = resourceType === 'raw' && ext
-      ? folder + '/' + safeBase + '.' + ext
-      : folder + '/' + safeBase;
+    // publicId TANPA ekstensi (Cloudinary tidak support titik di publicId untuk raw)
+    const publicId  = folder + '/' + safeBase;
     const timestamp = Math.floor(Date.now() / 1000);
 
-    // Semua file pakai 'raw' + access_mode=public agar URL bisa diakses tanpa auth
-    // image resource untuk gambar (agar preview langsung di browser)
     const imageExts = ['jpg','jpeg','png','gif','webp','bmp','svg'];
     const resourceType = imageExts.includes(ext) ? 'image' : 'raw';
 
-    // Signature mencakup access_mode untuk raw files
-    const sigParts = resourceType === 'raw'
-      ? `access_mode=public&public_id=${publicId}&timestamp=${timestamp}${apiSecret}`
-      : `public_id=${publicId}&timestamp=${timestamp}${apiSecret}`;
+    // Untuk raw: gunakan format parameter agar Cloudinary simpan dengan ekstensi yg benar
+    // Signature: parameter urut abjad — access_mode, format (jika ada), public_id, timestamp
+    let sigParts, extraParams;
+    if (resourceType === 'raw') {
+      sigParts = ext
+        ? `access_mode=public&format=${ext}&public_id=${publicId}&timestamp=${timestamp}${apiSecret}`
+        : `access_mode=public&public_id=${publicId}&timestamp=${timestamp}${apiSecret}`;
+      extraParams = { access_mode: 'public', ...(ext ? { format: ext } : {}) };
+    } else {
+      sigParts = `public_id=${publicId}&timestamp=${timestamp}${apiSecret}`;
+      extraParams = {};
+    }
     const signature = crypto.createHash('sha1').update(sigParts).digest('hex');
 
     const params = new URLSearchParams({
@@ -71,7 +75,7 @@ exports.handler = async (event) => {
       timestamp: timestamp.toString(),
       api_key: apiKey,
       signature,
-      ...(resourceType === 'raw' ? { access_mode: 'public' } : {}),
+      ...extraParams,
     });
 
     const result = await cloudinaryRequest(`/v1_1/${cloudName}/${resourceType}/upload`, params.toString());
@@ -80,7 +84,7 @@ exports.handler = async (event) => {
       throw new Error((result.body?.error?.message) || `Cloudinary error ${result.status}`);
     }
 
-    // URL langsung dari Cloudinary sudah benar karena ekstensi ada di publicId
+    // secure_url dari Cloudinary sudah include ekstensi karena pakai format parameter
     const fileUrl = result.body.secure_url;
 
     return {

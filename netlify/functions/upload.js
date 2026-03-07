@@ -47,10 +47,10 @@ exports.handler = async (event) => {
 
     const indFolder = noIndikator ? 'Indikator-' + noIndikator : 'Lainnya';
     const folder    = 'VISPM/' + (kodePKM||'PKM') + '/' + (tahun||'') + '/' + (bulan||'') + '/' + indFolder;
-    const safeBase  = (baseName + '_' + Math.floor(Date.now() / 1000)).replace(/[^a-zA-Z0-9_\-]/g, '_').substring(0, 60);
-    // publicId TANPA ekstensi (Cloudinary tidak support titik di publicId untuk raw)
+    const ts = Math.floor(Date.now() / 1000);
+    const safeBase  = (baseName + '_' + ts).replace(/[^a-zA-Z0-9_\-]/g, '_').substring(0, 60);
     const publicId  = folder + '/' + safeBase;
-    const timestamp = Math.floor(Date.now() / 1000);
+    const timestamp = ts;
 
     const imageExts = ['jpg','jpeg','png','gif','webp','bmp','svg'];
     const resourceType = imageExts.includes(ext) ? 'image' : 'raw';
@@ -67,16 +67,13 @@ exports.handler = async (event) => {
     }
     const signature = crypto.createHash('sha1').update(sigParts).digest('hex');
 
-    const params = new URLSearchParams({
-      file: 'data:application/octet-stream;base64,' + fileBase64,
-      public_id: publicId,
-      timestamp: timestamp.toString(),
-      api_key: apiKey,
-      signature,
-      ...extraParams,
-    });
+    // Build params manual — JANGAN pakai URLSearchParams karena akan encode '/' jadi '%2F'
+    // Cloudinary tidak decode %2F sehingga subfolder tidak terbentuk
+    const fileDataUri = 'data:application/octet-stream;base64,' + fileBase64;
+    let paramStr = `api_key=${apiKey}&file=${encodeURIComponent(fileDataUri)}&public_id=${publicId}&signature=${signature}&timestamp=${timestamp}`;
+    if (resourceType === 'raw') paramStr += `&access_mode=public`;
 
-    const result = await cloudinaryRequest(`/v1_1/${cloudName}/${resourceType}/upload`, params.toString());
+    const result = await cloudinaryRequest(`/v1_1/${cloudName}/${resourceType}/upload`, paramStr);
     if (result.status !== 200) {
       console.error('Cloudinary error:', result.body);
       throw new Error((result.body?.error?.message) || `Cloudinary error ${result.status}`);

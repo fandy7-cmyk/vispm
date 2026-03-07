@@ -390,8 +390,8 @@ function renderOperatorDashboard(el, d) {
     periodeBanner = `<div class="info-card warning"><span class="material-icons">warning</span><div class="info-card-text">Tidak ada periode input yang aktif saat ini. Hubungi Admin.</div></div>`;
   }
 
-  const periodeLabel = periodeList.length > 1
-    ? `${periodeList.length} Periode Aktif`
+  const periodeLabel = periodeList.length > 0
+    ? `${periodeList.length}`
     : (p ? `${p.nama_bulan} ${p.tahun}` : "-");
 
   el.innerHTML = `
@@ -442,7 +442,7 @@ function renderKepalasDashboard(el, d) {
       ${statCard('orange','pending','Menunggu Verifikasi', d.menunggu)}
       ${statCard('green','check_circle','Sudah Diverifikasi', d.terverifikasi)}
       ${statCard('blue','assignment','Total Usulan', d.total)}
-      ${statCard('cyan','event_available','Periode Aktif', periodeList.length > 1 ? `${periodeList.length} Periode Aktif` : (periodeList[0] ? `${periodeList[0].nama_bulan} ${periodeList[0].tahun}` : '-'))}
+      ${statCard('cyan','event_available','Periode Aktif', periodeList.length > 0 ? `${periodeList.length}` : '-')}
     </div>
     ${periodeBanner}
     <div class="card">
@@ -464,7 +464,7 @@ function renderProgramDashboard(el, d) {
       ${statCard('orange','pending','Menunggu Verifikasi', d.menunggu)}
       ${statCard('green','check_circle','Sudah Diverifikasi', d.terverifikasi)}
       ${statCard('blue','assignment','Total Usulan', d.total)}
-      ${statCard('cyan','event_available','Periode Aktif', periodeList.length > 1 ? `${periodeList.length} Periode Aktif` : (periodeList[0] ? `${periodeList[0].nama_bulan} ${periodeList[0].tahun}` : '-'))}
+      ${statCard('cyan','event_available','Periode Aktif', periodeList.length > 0 ? `${periodeList.length}` : '-')}
     </div>
     <div class="card">
       <div class="card-header-bar">

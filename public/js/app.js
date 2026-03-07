@@ -1201,9 +1201,9 @@ function _renderBuktiModal() {
   const isOffice = ['doc','docx','xls','xlsx','ppt','pptx'].includes(ext);
   const total = links.length;
 
-  // URL dengan ekstensi (Cloudinary raw tidak auto-append)
-  const urlWithExt = (f.url && ext && !f.url.split('/').pop().split('?')[0].includes('.'))
-    ? f.url + '.' + ext : f.url;
+  // Gunakan URL asli dari Cloudinary — JANGAN append ekstensi
+  // File raw Cloudinary disimpan tanpa ekstensi, menambah ekstensi menyebabkan 404
+  const urlWithExt = f.url;
 
   let modal = document.getElementById('previewBuktiModal');
   if (!modal) {
@@ -1310,10 +1310,10 @@ async function downloadBukti(idx) {
   const ext2 = dotIdx2 > -1 ? fileName.substring(dotIdx2 + 1).toLowerCase() : '';
   if (ext2 && !fileName.toLowerCase().endsWith('.' + ext2)) fileName += '.' + ext2;
 
-  // URL langsung — raw+public bisa diakses, append ekstensi kalau belum ada
-  let fetchUrl = f.url.replace(/\.pdf\.pdf($|\?)/, '.pdf$1');
-  const urlHasExt = fetchUrl.split('/').pop().split('?')[0].includes('.');
-  if (!urlHasExt && ext2) fetchUrl = fetchUrl + '.' + ext2;
+  // Gunakan URL asli — JANGAN append ekstensi ke URL Cloudinary raw (menyebabkan 404)
+  let fetchUrl = f.url;
+  // urlHasExt tidak diperlukan lagi
+
 
   try {
     const res = await fetch(fetchUrl);

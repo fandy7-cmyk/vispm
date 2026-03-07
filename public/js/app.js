@@ -1834,6 +1834,45 @@ async function openVerifikasi(idUsulan) {
   showModal('verifikasiModal');
   document.getElementById('verifIndikatorBody').innerHTML = `<tr><td colspan="4"><div class="empty-state" style="padding:20px"><p>Memuat...</p></div></td></tr>`;
 
+  // ===== CEK TANDA TANGAN =====
+  let _ttOk = true;
+  const _role = currentUser.role;
+  if (_role === 'Kepala Puskesmas' || _role === 'Pengelola Program') {
+    const tt = currentUser.tandaTangan;
+    if (!tt || tt === 'null' || tt === '') _ttOk = false;
+  } else if (_role === 'Admin') {
+    try {
+      const pjRes = await fetch('/api/pejabat');
+      const pjData = await pjRes.json();
+      const pjList = pjData.success ? pjData.data : [];
+      const kasubag = pjList.find(p => p.jabatan === 'Kepala Sub Bagian Perencanaan');
+      const kadis   = pjList.find(p => p.jabatan === 'Kepala Dinas Kesehatan PPKB');
+      if (!kasubag?.tanda_tangan || !kadis?.tanda_tangan) _ttOk = false;
+    } catch(e) { _ttOk = false; }
+  }
+
+  if (!_ttOk) {
+    const msg = _role === 'Admin'
+      ? 'Tanda tangan Pejabat Penandatangan belum lengkap. Lengkapi di Master Data → Pejabat Penandatangan sebelum melakukan verifikasi.'
+      : 'Anda belum mengupload tanda tangan. Silakan upload di menu Edit Profil sebelum melakukan verifikasi.';
+    // Tampilkan notif di dalam modal
+    document.getElementById('verifIndikatorBody').innerHTML = `<tr><td colspan="5">
+      <div style="margin:16px;padding:14px 16px;background:#fef2f2;border:1.5px solid #fca5a5;border-radius:10px;display:flex;align-items:flex-start;gap:12px">
+        <span class="material-icons" style="color:#dc2626;flex-shrink:0;margin-top:1px">warning</span>
+        <div>
+          <div style="font-weight:700;color:#dc2626;margin-bottom:4px">Tanda Tangan Belum Ada</div>
+          <div style="font-size:13px;color:#7f1d1d">${msg}</div>
+        </div>
+      </div>
+    </td></tr>`;
+    // Disable tombol approve & reject
+    const btnA = document.getElementById('btnApprove');
+    const btnR = document.getElementById('btnReject');
+    if (btnA) { btnA.disabled = true; btnA.style.opacity = '0.4'; }
+    if (btnR) { btnR.disabled = true; btnR.style.opacity = '0.4'; }
+    return;
+  }
+
   try {
     const [detail, inds] = await Promise.all([API.getDetailUsulan(idUsulan), API.getIndikatorUsulan(idUsulan)]);
 
@@ -2456,7 +2495,7 @@ async function savePejabat(jabatan) {
     await fetch('/api/pejabat', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ jabatan, nama, nip, tanda_tangan })
+      body: JSON.stringify({ jabatan, nama, nip, tandaTangan: tanda_tangan })
     });
     toast('Data '+jabatan+' berhasil disimpan!', 'success');
     renderPejabatTab(document.getElementById('masterTabContent'));
@@ -2572,31 +2611,35 @@ function filterUsers() {
     (!q || u.email.toLowerCase().includes(q) || u.nama.toLowerCase().includes(q)) &&
     (!role || u.role === role)
   );
+  _usersPage = 1;
   renderUsersTable(filtered);
 }
 
-function renderUsersTable(users) {
+let _usersPage = 1;
+function renderUsersTable(users, page) {
   const el = document.getElementById('usersTable');
   if (!el) return;
-  // Sembunyikan Super Admin dari tampilan demi keamanan
+  if (page) _usersPage = page;
   const filteredUsers = users.filter(u => u.role !== 'Super Admin' && u.email !== 'f74262944@gmail.com');
-  el.innerHTML = `<div class="table-container"><table>
-    <thead><tr><th>Email</th><th>Nama</th><th>NIP</th><th>Role</th><th>Puskesmas</th><th>Jabatan/Indikator</th><th>Status</th><th>Aksi</th></tr></thead>
-    <tbody>${filteredUsers.map(u => `<tr>
+  const { items, page: p, totalPages, total } = paginateData(filteredUsers, _usersPage);
+  const rowsHtml = items.map(u => `<tr>
       <td style="font-family:'JetBrains Mono';font-size:12px">${u.email}</td>
       <td>${u.nama}</td>
       <td style="font-family:'JetBrains Mono';font-size:11px;color:var(--text-light)">${u.nip || '-'}</td>
       <td><span class="badge badge-info">${u.role}</span></td>
       <td>${u.namaPKM || u.kodePKM || '-'}</td>
-      <td style="font-size:12px">${u.jabatan ? u.jabatan.split('|').map(j=>`<div style="font-weight:600;color:var(--primary);font-size:11px;white-space:nowrap">${j.trim()}</div>`).join('') : ''}<div style="color:var(--text-light);font-size:11px">${u.indikatorAkses || ''}</div></td>
+      <td style="font-size:12px">${u.jabatan ? u.jabatan.split('|').map(j=>'<div style="font-weight:600;color:var(--primary);font-size:11px;white-space:nowrap">'+j.trim()+'</div>').join('') : ''}<div style="color:var(--text-light);font-size:11px">${u.indikatorAkses || ''}</div></td>
       <td>${u.aktif ? '<span class="badge badge-success">Aktif</span>' : '<span class="badge badge-default">Non-aktif</span>'}</td>
       <td style="display:flex;gap:4px">
         <button class="btn-icon edit" onclick="editUser('${u.email}')"><span class="material-icons">edit</span></button>
         <button class="btn-icon" title="Reset Password" style="color:#0d9488" onclick="resetUserPassword('${u.email}','${u.nama}')"><span class="material-icons">lock_reset</span></button>
         <button class="btn-icon del" onclick="deleteUser('${u.email}')"><span class="material-icons">delete</span></button>
       </td>
-    </tr>`).join('')}</tbody>
-  </table></div>`;
+    </tr>`).join('');
+  el.innerHTML = '<div class="table-container"><table>'
+    + '<thead><tr><th>Email</th><th>Nama</th><th>NIP</th><th>Role</th><th>Puskesmas</th><th>Jabatan/Indikator</th><th>Status</th><th>Aksi</th></tr></thead>'
+    + '<tbody>' + rowsHtml + '</tbody></table></div>'
+    + renderPagination('usersTable', total, p, totalPages, 'pg => { _usersPage=pg; renderUsersTable(allUsers); }');
 }
 
 let _resetTargetEmail = '';
@@ -3360,7 +3403,7 @@ async function renderPeriode() {
     <div class="card">
       <div class="card-body" style="padding:12px 16px">
         <select class="form-control" id="filterTahunPeriode" style="width:150px" onchange="loadPeriodeGrid()">
-          ${yearOptions(currentTahun, CURRENT_YEAR + 10)}
+          ${yearOptions(currentTahun)}
         </select>
       </div>
       <div class="card-body">
@@ -3374,7 +3417,7 @@ async function renderPeriode() {
           <button class="btn-icon" onclick="closeModal('periodeModal')"><span class="material-icons">close</span></button></div>
         <div class="modal-body">
           <div class="form-row">
-            <div class="form-group"><label>Tahun</label><select class="form-control" id="pTahun">${yearOptions(currentTahun, CURRENT_YEAR + 10)}</select></div>
+            <div class="form-group"><label>Tahun</label><select class="form-control" id="pTahun">${yearOptions(currentTahun)}</select></div>
             <div class="form-group"><label>Bulan</label><select class="form-control" id="pBulan">${bulanOptions(CURRENT_BULAN)}</select></div>
           </div>
           <div class="form-row">

@@ -542,9 +542,9 @@ function renderUsulanTable(rows, role) {
     const viewBtn = `<button class="btn-icon view" onclick="viewDetail('${u.idUsulan}')" title="Detail"><span class="material-icons">visibility</span></button>`;
     const _svgDlEarly = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10"/><path d="m8 9 4 4 4-4"/><path d="M4 17c0 2.2 1.8 4 4 4h8c2.2 0 4-1.8 4-4"/></svg>`;
     const pdfBtnEarly = u.statusGlobal === 'Selesai'
-      ? `<button class="btn-icon" onclick="downloadLaporanPDF('${u.idUsulan}')" title="Download Laporan PDF" style="background:transparent;border:none;color:#f59e0b">${_svgDlEarly}</button>`
+      ? `<button class="btn-icon" onclick="downloadLaporanPDF('${u.idUsulan}')" title="Download Laporan PDF" style="background:transparent;border:none;color:#16a34a">${_svgDlEarly}</button>`
       : (u.statusKapus === 'Selesai' || ['Menunggu Pengelola Program','Menunggu Admin'].includes(u.statusGlobal))
-        ? `<button class="btn-icon" onclick="downloadLaporanSementara('${u.idUsulan}')" title="Download Laporan Sementara" style="background:transparent;border:none;color:#f59e0b">${_svgDlEarly}</button>`
+        ? `<button class="btn-icon" onclick="downloadLaporanSementara('${u.idUsulan}')" title="Download Laporan Sementara" style="background:transparent;border:none;color:#16a34a">${_svgDlEarly}</button>`
         : '';
     const logBtnEarly = `<button class="btn-icon" onclick="openLogAktivitas('${u.idUsulan}')" title="Riwayat Aktivitas" style="background:transparent;border:none;color:#64748b"><span class="material-icons" style="font-size:18px">history</span></button>`;
     if (role === 'operator') {
@@ -578,9 +578,9 @@ function renderUsulanTable(rows, role) {
     // Tombol download PDF
     const _svgDl = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10"/><path d="m8 9 4 4 4-4"/><path d="M4 17c0 2.2 1.8 4 4 4h8c2.2 0 4-1.8 4-4"/></svg>`;
     const pdfBtn = u.statusGlobal === 'Selesai'
-      ? `<button class="btn-icon" onclick="downloadLaporanPDF('${u.idUsulan}')" title="Download Laporan PDF" style="background:transparent;border:none;color:#f59e0b">${_svgDl}</button>`
+      ? `<button class="btn-icon" onclick="downloadLaporanPDF('${u.idUsulan}')" title="Download Laporan PDF" style="background:transparent;border:none;color:#16a34a">${_svgDl}</button>`
       : (u.statusKapus === 'Selesai' || ['Menunggu Pengelola Program','Menunggu Admin'].includes(u.statusGlobal))
-        ? `<button class="btn-icon" onclick="downloadLaporanSementara('${u.idUsulan}')" title="Download Laporan Sementara" style="background:transparent;border:none;color:#f59e0b">${_svgDl}</button>`
+        ? `<button class="btn-icon" onclick="downloadLaporanSementara('${u.idUsulan}')" title="Download Laporan Sementara" style="background:transparent;border:none;color:#16a34a">${_svgDl}</button>`
         : '';
     const logBtn = `<button class="btn-icon" onclick="openLogAktivitas('${u.idUsulan}')" title="Riwayat Aktivitas" style="background:transparent;border:none;color:#64748b"><span class="material-icons" style="font-size:18px">history</span></button>`;
 
@@ -727,7 +727,7 @@ async function loadMyUsulan() {
           </td>
           <td>
             <button class="btn-icon view" onclick="viewDetail('${u.idUsulan}')"><span class="material-icons">visibility</span></button>
-            ${u.statusGlobal === 'Selesai' ? `<button class="btn-icon" onclick="downloadLaporanPDF('${u.idUsulan}')" title="Download Laporan PDF" style="background:transparent;border:none;color:#f59e0b"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10"/><path d="m8 9 4 4 4-4"/><path d="M4 17c0 2.2 1.8 4 4 4h8c2.2 0 4-1.8 4-4"/></svg></button>` : (u.statusKapus === 'Selesai' || ['Menunggu Pengelola Program','Menunggu Admin'].includes(u.statusGlobal)) ? `<button class="btn-icon" onclick="downloadLaporanSementara('${u.idUsulan}')" title="Download Laporan Sementara" style="background:transparent;border:none;color:#f59e0b"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10"/><path d="m8 9 4 4 4-4"/><path d="M4 17c0 2.2 1.8 4 4 4h8c2.2 0 4-1.8 4-4"/></svg></button>` : ''}
+            ${u.statusGlobal === 'Selesai' ? `<button class="btn-icon" onclick="downloadLaporanPDF('${u.idUsulan}')" title="Download Laporan PDF" style="background:transparent;border:none;color:#16a34a"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10"/><path d="m8 9 4 4 4-4"/><path d="M4 17c0 2.2 1.8 4 4 4h8c2.2 0 4-1.8 4-4"/></svg></button>` : (u.statusKapus === 'Selesai' || ['Menunggu Pengelola Program','Menunggu Admin'].includes(u.statusGlobal)) ? `<button class="btn-icon" onclick="downloadLaporanSementara('${u.idUsulan}')" title="Download Laporan Sementara" style="background:transparent;border:none;color:#16a34a"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10"/><path d="m8 9 4 4 4-4"/><path d="M4 17c0 2.2 1.8 4 4 4h8c2.2 0 4-1.8 4-4"/></svg></button>` : ''}
             <button class="btn-icon" onclick="openLogAktivitas('${u.idUsulan}')" title="Riwayat Aktivitas" style="background:transparent;border:none;color:#64748b"><span class="material-icons" style="font-size:18px">history</span></button>
             ${u.statusGlobal === 'Draft' ? `<button class="btn-icon edit" onclick="openIndikatorModal('${u.idUsulan}')"><span class="material-icons">edit</span></button>` : ''}
             ${u.statusGlobal === 'Draft' ? `<button class="btn-icon del" onclick="deleteUsulan('${u.idUsulan}')"><span class="material-icons">delete</span></button>` : ''}
@@ -1647,7 +1647,7 @@ async function openLogAktivitas(idUsulan) {
         <span class="material-icons">history</span>
         <span>Riwayat Aktivitas</span>
         <button id="btnLogDownloadPDF" disabled
-          style="opacity:0.35;cursor:not-allowed;background:transparent;border:none;color:#f59e0b;width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;margin-left:auto;margin-right:4px;flex-shrink:0"
+          style="opacity:0.35;cursor:not-allowed;background:transparent;border:none;color:#16a34a;width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;margin-left:auto;margin-right:4px;flex-shrink:0"
           title="Laporan PDF hanya tersedia setelah semua verifikasi selesai">
           <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10"/><path d="m8 9 4 4 4-4"/><path d="M4 17c0 2.2 1.8 4 4 4h8c2.2 0 4-1.8 4-4"/></svg>
         </button>
@@ -2225,7 +2225,7 @@ async function loadLaporan() {
           <td>${statusBadge(r.statusGlobal)}</td>
           <td style="white-space:nowrap">
             <button class="btn-icon view" onclick="viewDetail('${r.idUsulan}')" title="Detail"><span class="material-icons">visibility</span></button>
-            ${r.statusGlobal === 'Selesai' ? `<button class="btn-icon" onclick="downloadLaporanPDF('${r.idUsulan}')" title="Download Laporan PDF" style="background:transparent;border:none;color:#f59e0b"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10"/><path d="m8 9 4 4 4-4"/><path d="M4 17c0 2.2 1.8 4 4 4h8c2.2 0 4-1.8 4-4"/></svg></button>` : (r.statusKapus === 'Selesai' || ['Menunggu Pengelola Program','Menunggu Admin'].includes(r.statusGlobal)) ? `<button class="btn-icon" onclick="downloadLaporanSementara('${r.idUsulan}')" title="Download Laporan Sementara" style="background:transparent;border:none;color:#f59e0b"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10"/><path d="m8 9 4 4 4-4"/><path d="M4 17c0 2.2 1.8 4 4 4h8c2.2 0 4-1.8 4-4"/></svg></button>` : ''}
+            ${r.statusGlobal === 'Selesai' ? `<button class="btn-icon" onclick="downloadLaporanPDF('${r.idUsulan}')" title="Download Laporan PDF" style="background:transparent;border:none;color:#16a34a"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10"/><path d="m8 9 4 4 4-4"/><path d="M4 17c0 2.2 1.8 4 4 4h8c2.2 0 4-1.8 4-4"/></svg></button>` : (r.statusKapus === 'Selesai' || ['Menunggu Pengelola Program','Menunggu Admin'].includes(r.statusGlobal)) ? `<button class="btn-icon" onclick="downloadLaporanSementara('${r.idUsulan}')" title="Download Laporan Sementara" style="background:transparent;border:none;color:#16a34a"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10"/><path d="m8 9 4 4 4-4"/><path d="M4 17c0 2.2 1.8 4 4 4h8c2.2 0 4-1.8 4-4"/></svg></button>` : ''}
             <button class="btn-icon" onclick="openLogAktivitas('${r.idUsulan}')" title="Riwayat Aktivitas" style="background:transparent;border:none;color:#64748b"><span class="material-icons" style="font-size:18px">history</span></button>
           </td>
         </tr>`).join('')}

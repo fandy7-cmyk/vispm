@@ -2925,7 +2925,9 @@ async function renderJabatan(el) {
   await loadJabatanTable();
 }
 
-async function loadJabatanTable() {
+let _jabPage = 1;
+async function loadJabatanTable(page) {
+  if (page) _jabPage = page;
   try {
     const res = await fetch('/api/jabatan');
     const data = await res.json();
@@ -2938,10 +2940,9 @@ async function loadJabatanTable() {
       return;
     }
 
-    el.innerHTML = `<div class="table-container"><table>
-      <thead><tr><th>No</th><th>Nama Jabatan</th><th>Status</th><th>Aksi</th></tr></thead>
-      <tbody>${_jabatanAllList.map((j, i) => `<tr>
-        <td>${i + 1}</td>
+    const { items, page: p, totalPages, total } = paginateData(_jabatanAllList, _jabPage);
+    const rowsHtml = items.map((j, i) => `<tr>
+        <td>${(p-1)*ITEMS_PER_PAGE + i + 1}</td>
         <td style="font-weight:500">${j.nama}</td>
         <td>${j.aktif
           ? '<span style="background:#d1fae5;color:#065f46;padding:2px 10px;border-radius:20px;font-size:12px;font-weight:600">Aktif</span>'
@@ -2950,9 +2951,11 @@ async function loadJabatanTable() {
           <button class="btn-icon edit" onclick="openJabatanModal(${j.id})" title="Edit"><span class="material-icons">edit</span></button>
           <button class="btn-icon del" onclick="deleteJabatan(${j.id}, '${j.nama.replace(/'/g, "\'")}')" title="Hapus"><span class="material-icons">delete</span></button>
         </td>
-      </tr>`).join('')}
-      </tbody>
-    </table></div>`;
+      </tr>`).join('');
+    el.innerHTML = '<div class="table-container"><table>'
+      + '<thead><tr><th>No</th><th>Nama Jabatan</th><th>Status</th><th>Aksi</th></tr></thead>'
+      + '<tbody>' + rowsHtml + '</tbody></table></div>'
+      + renderPagination('jabatanTable', total, p, totalPages, 'pg => { _jabPage=pg; loadJabatanTable(); }');
   } catch(e) { toast(e.message, 'error'); }
 }
 
@@ -3314,18 +3317,20 @@ async function renderIndikator(el) {
 
 function filterInd() {
   const q = document.getElementById('searchInd').value.toLowerCase();
+  _indPage = 1;
   renderIndTable(allIndikator.filter(i => !q || i.no.toString().includes(q) || i.nama.toLowerCase().includes(q)));
 }
 
-function renderIndTable(inds) {
+let _indPage = 1, _lastInds = [];
+function renderIndTable(inds, page) {
+  if (page) _indPage = page;
   const el = document.getElementById('indTable');
   if (!el) return;
   const totalBobot = allIndikator.filter(i => i.aktif).reduce((s, i) => s + (parseInt(i.bobot) || 0), 0);
   const tbEl = document.getElementById('totalBobot');
   if (tbEl) tbEl.textContent = totalBobot;
-  el.innerHTML = `<div class="table-container"><table>
-    <thead><tr><th>No</th><th>Nama Indikator</th><th>Bobot</th><th>Status</th><th>Aksi</th></tr></thead>
-    <tbody>${inds.map(i => `<tr>
+  const { items, page: p, totalPages, total } = paginateData(inds, _indPage);
+  const rowsHtml = items.map(i => `<tr>
       <td><span style="font-family:'JetBrains Mono';font-weight:700">${i.no}</span></td>
       <td>${i.nama}</td>
       <td style="text-align:center"><span style="font-family:'JetBrains Mono'">${i.bobot}</span></td>
@@ -3334,8 +3339,12 @@ function renderIndTable(inds) {
         <button class="btn-icon edit" onclick="editInd(${i.no})"><span class="material-icons">edit</span></button>
         <button class="btn-icon del" onclick="deleteInd(${i.no})"><span class="material-icons">delete</span></button>
       </td>
-    </tr>`).join('')}</tbody>
-  </table></div>`;
+    </tr>`).join('');
+  el.innerHTML = '<div class="table-container"><table>'
+    + '<thead><tr><th>No</th><th>Nama Indikator</th><th>Bobot</th><th>Status</th><th>Aksi</th></tr></thead>'
+    + '<tbody>' + rowsHtml + '</tbody></table></div>'
+    + renderPagination('indTable', total, p, totalPages, 'pg => { _indPage=pg; renderIndTable(_lastInds); }');
+  _lastInds = inds;
 }
 
 function openIndModal(editNo = null) {
@@ -3581,17 +3590,23 @@ async function editPeriode(tahun, bulan) {
 
 async function hapusPeriode() {
   if (!_editPeriodeTahun || !_editPeriodeBulan) return;
-  if (!confirm(`Hapus periode ${BULAN_NAMA[_editPeriodeBulan]} ${_editPeriodeTahun}?`)) return;
-  setLoading(true);
-  try {
-    const res = await fetch(`/api/periode?tahun=${_editPeriodeTahun}&bulan=${_editPeriodeBulan}`, { method: 'DELETE' });
-    const data = await res.json();
-    if (!data.success) throw new Error(data.message || 'Gagal menghapus');
-    toast('Periode berhasil dihapus', 'success');
-    closeModal('periodeModal');
-    loadPeriodeGrid();
-  } catch(e) { toast(e.message, 'error'); }
-  finally { setLoading(false); }
+  showConfirm({
+    title: 'Hapus Periode',
+    message: `Hapus periode <strong>${BULAN_NAMA[_editPeriodeBulan]} ${_editPeriodeTahun}</strong>?`,
+    type: 'danger',
+    onConfirm: async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(`/api/periode?tahun=${_editPeriodeTahun}&bulan=${_editPeriodeBulan}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message || 'Gagal menghapus');
+        toast('Periode berhasil dihapus', 'success');
+        closeModal('periodeModal');
+        loadPeriodeGrid();
+      } catch(e) { toast(e.message, 'error'); }
+      finally { setLoading(false); }
+    }
+  });
 }
 
 async function savePeriode() {

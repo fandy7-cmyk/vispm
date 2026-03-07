@@ -313,7 +313,7 @@ function yearOptions(selected, maxYear) {
 
 
 // ============== PAGINATION HELPER ==============
-const ITEMS_PER_PAGE = 12;
+const ITEMS_PER_PAGE = 10;
 
 function paginateData(rows, page) {
   const total = rows.length;
@@ -2352,9 +2352,7 @@ async function renderMasterData(tab) {
 
   setLoading(true);
   try {
-    if (activeTab === 'settings') {
-      await renderSettingsTab(tc);
-    } else if (activeTab === 'pejabat') {
+    if (activeTab === 'pejabat') {
       await renderPejabatTab(tc);
     } else {
       const fnMap = {
@@ -3586,7 +3584,9 @@ async function hapusPeriode() {
   if (!confirm(`Hapus periode ${BULAN_NAMA[_editPeriodeBulan]} ${_editPeriodeTahun}?`)) return;
   setLoading(true);
   try {
-    await API.savePeriode({ tahun: _editPeriodeTahun, bulan: _editPeriodeBulan, _delete: true });
+    const res = await fetch(`/api/periode?tahun=${_editPeriodeTahun}&bulan=${_editPeriodeBulan}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.message || 'Gagal menghapus');
     toast('Periode berhasil dihapus', 'success');
     closeModal('periodeModal');
     loadPeriodeGrid();
@@ -3814,10 +3814,9 @@ const _masterTabs = [
   { id: 'jabatan',         icon: 'badge',           label: 'Jabatan' },
   { id: 'pkm',             icon: 'local_hospital',  label: 'Puskesmas' },
   { id: 'indikator',       icon: 'monitor_heart',   label: 'Indikator' },
-  { id: 'periode',         icon: 'event_available', label: 'Periode Input' },
+  { id: 'periode',         icon: 'event_available', label: 'Periode & Pengaturan' },
   { id: 'target-tahunan',  icon: 'track_changes',   label: 'Target Tahunan' },
   { id: 'pejabat',         icon: 'draw',            label: 'Pejabat Penandatangan' },
-  { id: 'settings',        icon: 'settings',        label: 'Pengaturan' },
 ];
 
 function _buildMasterShell() {

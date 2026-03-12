@@ -1882,7 +1882,7 @@ function _renderBuktiModal() {
         </h3>
         <div style="display:flex;gap:6px;align-items:center;margin-left:auto;">
           <button onclick="downloadBukti(${idx})" title="Download" style="background:rgba(13,148,136,0.15);color:#0d9488;border:1px solid rgba(13,148,136,0.3);padding:5px 10px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px">${svgDownload}</button>
-          ${idUsulan ? `<button onclick="hapusBukti('${idUsulan}',${noIndikator},${idx})" style="background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.3);padding:5px 12px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px">${svgTrashM} Hapus</button>` : ''}
+          ${idUsulan ? `<button onclick="hapusBukti('${idUsulan}',${noIndikator},${idx})" title="Hapus file" style="background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.3);padding:5px 10px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center">${svgTrashM}</button>` : ''}
           <button onclick="document.getElementById('previewBuktiModal').classList.remove('show')" style="background:rgba(255,255,255,0.08);border:none;cursor:pointer;color:white;border-radius:7px;width:32px;height:32px;font-size:20px;display:flex;align-items:center;justify-content:center">&#215;</button>
         </div>
       </div>
@@ -2438,7 +2438,7 @@ async function openLogAktivitas(idUsulan) {
       'Ajukan Ulang':      { color:'#0d9488', bg:'#f0fdf9', icon:'restart_alt',       label:'Ajukan Ulang' },
       'Approve':           { color:'#16a34a', bg:'#f0fdf4', icon:'check_circle',      label:'Disetujui' },
       'Approve Final':     { color:'#16a34a', bg:'#f0fdf4', icon:'verified',          label:'Final Disetujui' },
-      'Re-verifikasi':     { color:'#0891b2', bg:'#ecfeff', icon:'check_circle',       label:'Re-verifikasi' },
+      'Re-verifikasi':     { color:'#0891b2', bg:'#ecfeff', icon:'verified',            label:'Re-verifikasi' },
       'Tolak':             { color:'#dc2626', bg:'#fef2f2', icon:'cancel',            label:'Ditolak' },
       'Tolak (sebagian)':  { color:'#ea580c', bg:'#fff7ed', icon:'remove_circle',     label:'Tolak Sebagian' },
       'Kembalikan':        { color:'#ea580c', bg:'#fff7ed', icon:'undo',              label:'Dikembalikan' },
@@ -3122,7 +3122,7 @@ async function openVerifikasi(idUsulan) {
       } else {
         const _isReVerif = _isPPReVerif || _isKapusReVerif || _isAdminReVerif;
         btnSubmit.innerHTML = _isReVerif
-          ? '<span class="material-icons">refresh</span> Submit Re-verifikasi'
+          ? '<span class="material-icons">verified</span> Submit Re-verifikasi'
           : '<span class="material-icons">send</span> Submit Verifikasi';
         btnSubmit.style.background = _isReVerif ? '#0891b2' : '';
         btnSubmit.style.borderColor = _isReVerif ? '#0891b2' : '';

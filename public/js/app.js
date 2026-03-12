@@ -2534,11 +2534,14 @@ async function openLogAktivitas(idUsulan) {
 // ============================================================
 async function bukaLaporan(idUsulan, mode, aksesIndikator) {
   const modeLabel = { sementara:'Laporan Sementara', final:'Laporan Final', log:'Riwayat Aktivitas' };
+
+  // window.open HARUS dipanggil sync sebelum await — agar browser tidak blokir popup
+  const pw = window.open('', '_blank');
+  if (!pw) { toast('Popup diblokir browser. Izinkan popup untuk situs ini.', 'error'); return; }
+  pw.document.write('<html><head><meta charset="utf-8"><title>Memuat...</title></head><body style="font-family:Arial;display:flex;align-items:center;justify-content:center;height:100vh;color:#64748b;margin:0"><div style="text-align:center"><p style="font-size:16px">\u23F3 Memuat laporan...</p></div></body></html>');
+
   toast('Menyiapkan ' + (modeLabel[mode]||'laporan') + '...', 'success');
   try {
-    const pw = window.open('', '_blank');
-    if (!pw) { toast('Popup diblokir browser. Izinkan popup untuk situs ini.', 'error'); return; }
-    pw.document.write('<html><body style="font-family:Arial;display:flex;align-items:center;justify-content:center;height:100vh;color:#64748b"><p>Memuat laporan...</p></body></html>');
     let _laporanUrl = `/api/laporan-pdf?id=${idUsulan}&mode=${mode}`;
     if (aksesIndikator && aksesIndikator.length) _laporanUrl += `&akses=${encodeURIComponent(aksesIndikator.join(','))}`;
     const res = await fetch(_laporanUrl);
@@ -2548,6 +2551,7 @@ async function bukaLaporan(idUsulan, mode, aksesIndikator) {
     pw.document.write(html);
     pw.document.close();
   } catch(e) {
+    pw.document.write('<html><body style="font-family:Arial;padding:40px;color:#ef4444"><p>Gagal memuat laporan: ' + e.message + '</p></body></html>');
     toast('Gagal membuka laporan: ' + e.message, 'error');
   }
 }

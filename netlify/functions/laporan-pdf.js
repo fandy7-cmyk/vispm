@@ -47,8 +47,9 @@ function approvedBadgeSVG() {
 function fmtDT(ts) {
   if (!ts) return '-';
   const d = new Date(ts);
-  return `${d.toLocaleDateString('id-ID', { day:'2-digit', month:'long', year:'numeric' })} | `
-       + `${d.toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit' })} WITA`;
+  const o = { timeZone: 'Asia/Makassar' };
+  return `${d.toLocaleDateString('id-ID', { ...o, day:'2-digit', month:'long', year:'numeric' })} | `
+       + `${d.toLocaleTimeString('id-ID', { ...o, hour:'2-digit', minute:'2-digit', hour12:false })} WITA`;
 }
 
 // ============================================================

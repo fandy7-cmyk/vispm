@@ -60,9 +60,13 @@ exports.handler = async (event) => {
     const hash = user.password_hash;
     if (hash) {
       if (!password) return err('Password diperlukan', 401);
-      // Coba plain text dulu, lalu bcrypt jika tersedia
-      let match = (password === hash);
-      if (!match && bcrypt && hash.startsWith('$2')) {
+      // FIX Bug #9: Hapus fallback plain-text comparison (security risk).
+      // Jika hash bukan bcrypt ($2...) berarti data lama — tolak dan minta reset password.
+      if (!hash.startsWith('$2')) {
+        return err('Password akun ini perlu direset. Hubungi Admin untuk reset password.', 401);
+      }
+      let match = false;
+      if (bcrypt) {
         try { match = await bcrypt.compare(password, hash); } catch(e) { match = false; }
       }
       if (!match) return err('Email atau password tidak sesuai', 401);

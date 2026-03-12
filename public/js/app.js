@@ -3318,6 +3318,12 @@ function openEditProfil() {
           <button type="button" id="epTTHapus" style="display:none;margin-top:6px;font-size:12px;color:#ef4444;background:none;border:none;cursor:pointer;padding:0" onclick="hapusTandaTangan()">
             <span class="material-icons" style="font-size:14px;vertical-align:middle">delete</span> Hapus tanda tangan
           </button>
+          <div style="margin-top:8px;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:8px 10px;font-size:11.5px;color:#92400e;line-height:1.6">
+            <span class="material-icons" style="font-size:13px;vertical-align:middle;margin-right:3px">info</span>
+            <strong>Tips tanda tangan:</strong> Gunakan foto tanda tangan dengan <b>latar putih/terang</b>.
+            Gambar akan otomatis dikompresi ke ukuran optimal saat disimpan.
+            Jika tanda tangan <b>tidak muncul di laporan PDF</b>, silakan <b>upload ulang</b> di halaman ini.
+          </div>
         </div>`;
     } else {
       epTTSection.innerHTML = '';
@@ -3699,6 +3705,12 @@ async function renderPejabatTab(el) {
               <input type="file" id="pj_tt_input_${jab.replace(/\s+/g,'_')}" accept="image/*" style="display:none" onchange="previewPejabatTT(event,'${jab.replace(/\s+/g,'_')}')">
             </div>
             ${ttValid ? `<button type="button" style="font-size:12px;color:#ef4444;background:none;border:none;cursor:pointer;margin-top:4px" onclick="hapusPejabatTT('${jab.replace(/\s+/g,'_')}')"><span class="material-icons" style="font-size:14px;vertical-align:middle">delete</span> Hapus tanda tangan</button>` : ''}
+          <div style="margin-top:8px;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:8px 10px;font-size:11.5px;color:#92400e;line-height:1.6">
+            <span class="material-icons" style="font-size:13px;vertical-align:middle;margin-right:3px">info</span>
+            <strong>Tips:</strong> Gunakan foto tanda tangan dengan <b>latar putih/terang</b>.
+            Gambar dikompresi otomatis saat disimpan.
+            Jika tanda tangan <b>tidak muncul di laporan PDF</b>, silakan <b>upload ulang</b>.
+          </div>
           </div>
           <button class="btn btn-primary btn-sm" style="margin-top:4px" onclick="savePejabat('${jab}')">
             <span class="material-icons">save</span>Simpan

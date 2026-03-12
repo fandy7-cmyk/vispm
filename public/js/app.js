@@ -3345,20 +3345,48 @@ function openEditProfil() {
 }
 
 
+// ============================================================
+//  HELPER: Resize gambar tanda tangan sebelum disimpan ke DB
+//  Max 400x200px, output JPEG quality 0.82 → maks ~50-80KB base64
+// ============================================================
+function resizeImageToBase64(file, maxW, maxH, quality, callback) {
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const img = new Image();
+    img.onload = () => {
+      let w = img.width, h = img.height;
+      // Hitung rasio agar proporsional
+      if (w > maxW || h > maxH) {
+        const ratio = Math.min(maxW / w, maxH / h);
+        w = Math.round(w * ratio);
+        h = Math.round(h * ratio);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      // Background putih (agar PNG transparan tidak jadi hitam saat JPEG)
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, w, h);
+      ctx.drawImage(img, 0, 0, w, h);
+      const resized = canvas.toDataURL('image/jpeg', quality);
+      callback(resized);
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
 function previewTandaTangan(e) {
   const file = e.target.files[0];
   if (!file) return;
   if (file.size > 2 * 1024 * 1024) { alert('File terlalu besar, maks 2MB'); e.target.value=''; return; }
-  const reader = new FileReader();
-  reader.onload = ev => {
-    const b64 = ev.target.result;
+  resizeImageToBase64(file, 400, 200, 0.82, b64 => {
     document.getElementById('epTTPreview').src = b64;
     document.getElementById('epTTPreview').style.display = 'block';
     document.getElementById('epTTPlaceholder').style.display = 'none';
     document.getElementById('epTTHapus').style.display = 'inline-block';
     e.target._newTT = b64;
-  };
-  reader.readAsDataURL(file);
+  });
 }
 
 function hapusTandaTangan() {
@@ -3685,16 +3713,13 @@ function previewPejabatTT(e, jabKey) {
   const file = e.target.files[0];
   if (!file) return;
   if (file.size > 2*1024*1024) { alert('File terlalu besar, maks 2MB'); e.target.value=''; return; }
-  const reader = new FileReader();
-  reader.onload = ev => {
-    const b64 = ev.target.result;
+  resizeImageToBase64(file, 400, 200, 0.82, b64 => {
     e.target._newTT = b64;
     const preview = document.getElementById('pj_tt_preview_'+jabKey);
     const placeholder = document.getElementById('pj_tt_placeholder_'+jabKey);
     if (preview) { preview.src = b64; preview.style.display = 'block'; }
     if (placeholder) placeholder.style.display = 'none';
-  };
-  reader.readAsDataURL(file);
+  });
 }
 
 function hapusPejabatTT(jabKey) {

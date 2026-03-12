@@ -1,12 +1,12 @@
 {
   "name": "spm-verifikasi",
   "version": "1.0.0",
-  "description": "Aplikasi Verifikasi Indeks SPM Puskesmas",
+  "description": "Aplikasi Verifikasi Indeks SPM",
   "scripts": {
     "dev": "netlify dev"
   },
   "dependencies": {
-    "pg": "^8.11.3",
-    "bcryptjs": "^2.4.3"
+    "bcryptjs": "^2.4.3",
+    "pg": "^8.20.0"
   }
 }

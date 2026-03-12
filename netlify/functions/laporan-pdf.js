@@ -1,4 +1,24 @@
 const { getPool, ok, err, cors } = require('./db');
+const zlib = require('zlib');
+const { promisify } = require('util');
+const gzip = promisify(zlib.gzip);
+
+// ============================================================
+//  HELPER: Compress base64 image — resize ke max 200px wide
+//  via strip quality metadata agar tidak lewat 6MB Lambda limit
+// ============================================================
+function compressBase64Img(dataUrl, maxWidth = 200) {
+  // Jika bukan base64 data URL (misal URL biasa), kembalikan apa adanya
+  if (!dataUrl || !dataUrl.startsWith('data:image')) return dataUrl;
+  // Potong ke max ~150KB — tanda tangan tidak perlu resolusi tinggi di PDF
+  // Base64 150KB ≈ ~112KB binary image, cukup untuk TTD di ukuran 160x80px
+  const MAX_BASE64_CHARS = 150 * 1024; // 150KB
+  if (dataUrl.length <= MAX_BASE64_CHARS) return dataUrl;
+  // Jika terlalu besar, crop base64 string TIDAK bisa (rusak) → return placeholder
+  // Solusi: ganti dengan teks "TTD terlalu besar, simpan ulang"
+  console.warn(`[laporan-pdf] tanda_tangan base64 terlalu besar: ${Math.round(dataUrl.length/1024)}KB, diganti placeholder`);
+  return null; // caller akan fallback ke approvedBadgeSVG
+}
 
 // ============================================================
 //  HELPER: Approved Badge SVG
@@ -186,7 +206,8 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
     jabatan = jabatan || v.jabatan_user || (v.jabatan_program||''). split('|')[0].trim() || 'Pengelola Program';
     const nama = v.nama_program || v.email_program;
     const nip = v.nip_program || '';
-    const tt = v.tt_program || '';
+    const ttRaw = v.tt_program || '';
+    const tt = ttRaw.startsWith('data:image') ? (compressBase64Img(ttRaw) || '') : ttRaw;
     const ttValid = tt && (tt.startsWith('data:image') || tt.startsWith('http'));
     let signImg;
     if (!approved) {
@@ -215,7 +236,8 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
     const approved = !!h.kapus_approved_by;
     const nama = h.kapus_nama || h.kapus_approved_by || '-';
     const nip  = h.kapus_nip || '';
-    const tt   = h.kapus_tt || '';
+    const ttRaw2 = h.kapus_tt || '';
+    const tt   = ttRaw2.startsWith('data:image') ? (compressBase64Img(ttRaw2) || '') : ttRaw2;
     const ttValid = tt && (tt.startsWith('data:image') || tt.startsWith('http'));
     const nipHtml = nip ? `<div style="font-size:9.5px">NIP. ${nip}</div>` : '';
     let signImg;
@@ -242,7 +264,8 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
   }
 
   function pejabatSignBlock(pj, jabatanLabel) {
-    const tt = pj.tanda_tangan || '';
+    const ttRaw3 = pj.tanda_tangan || '';
+    const tt = ttRaw3.startsWith('data:image') ? (compressBase64Img(ttRaw3) || '') : ttRaw3;
     const ttValid = tt && (tt.startsWith('data:image') || tt.startsWith('http'));
     const tsHtml = h.admin_approved_at
       ? `<div style="font-size:9px;color:#2d7a47;font-weight:700;margin-bottom:2px">✓ Disetujui: ${fmtDT(h.admin_approved_at)}</div>`
@@ -608,6 +631,29 @@ exports.handler = async (event) => {
   };
   try {
     const { html, filename } = await generateLaporanHtml(idUsulan, mode, aksesFilter);
+
+    // Cek ukuran — Lambda limit 6MB (base64 ~4.5MB raw)
+    const rawBytes = Buffer.byteLength(html, 'utf8');
+    console.log(`[laporan-pdf] HTML size: ${Math.round(rawBytes / 1024)}KB`);
+
+    // Gunakan gzip jika > 3MB untuk tetap di bawah limit 6MB
+    if (rawBytes > 3 * 1024 * 1024) {
+      const compressed = await gzip(html);
+      const b64 = compressed.toString('base64');
+      console.log(`[laporan-pdf] Gzipped size: ${Math.round(b64.length / 1024)}KB`);
+      return {
+        statusCode: 200,
+        isBase64Encoded: true,
+        headers: {
+          'Content-Type': 'text/html; charset=utf-8',
+          'Content-Encoding': 'gzip',
+          'Content-Disposition': `inline; filename="${filename}"`,
+          'Access-Control-Allow-Origin': '*'
+        },
+        body: b64
+      };
+    }
+
     return {
       statusCode: 200,
       headers: {

@@ -29,7 +29,7 @@ async function renderCatatanThread(elId, idUsulan, currentRole) {
     'Tolak':'cancel','Tolak (sebagian)':'remove_circle','Sanggah':'gavel',
     'Sanggah Selesai':'check_circle','Ajukan Ulang':'restart_alt',
     'Kembalikan':'undo','Tolak Ke Operator':'reply','Tolak Indikator':'cancel',
-    'Approve':'check_circle','Re-verifikasi':'verified',
+    'Approve':'check_circle','Re-verifikasi':'update',
   };
   function fmtDT(ts) {
     const d = new Date(ts), o = { timeZone:'Asia/Makassar' };
@@ -73,7 +73,7 @@ async function renderCatatanThread(elId, idUsulan, currentRole) {
           style="margin-top:5px;width:100%;background:${cfg.bg};border:1.5px solid ${cfg.border};border-radius:7px;padding:5px 7px;box-sizing:border-box;cursor:pointer">
           <div style="font-size:9.5px;font-weight:700;color:${cfg.color};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nama}</div>
           <div style="font-size:9px;color:#64748b">${log.role}</div>
-          <div style="margin-top:3px;font-size:9px;font-weight:700;color:${cfg.color};background:white;border-radius:3px;padding:1px 5px;display:inline-flex;align-items:center;gap:2px">
+          <div style="margin-top:3px;font-size:9px;font-weight:700;color:${cfg.color};background:${cfg.color}18;border:1px solid ${cfg.color}55;border-radius:20px;padding:2px 8px;display:inline-flex;align-items:center;gap:2px">
             <span class="material-icons" style="font-size:10px">${icon}</span>${log.aksi}
           </div>
           <div style="display:flex;justify-content:flex-end;margin-top:2px">
@@ -2438,7 +2438,7 @@ async function openLogAktivitas(idUsulan) {
       'Ajukan Ulang':      { color:'#0d9488', bg:'#f0fdf9', icon:'restart_alt',       label:'Ajukan Ulang' },
       'Approve':           { color:'#16a34a', bg:'#f0fdf4', icon:'check_circle',      label:'Disetujui' },
       'Approve Final':     { color:'#16a34a', bg:'#f0fdf4', icon:'verified',          label:'Final Disetujui' },
-      'Re-verifikasi':     { color:'#0891b2', bg:'#ecfeff', icon:'verified',            label:'Re-verifikasi' },
+      'Re-verifikasi':     { color:'#0891b2', bg:'#ecfeff', icon:'update',              label:'Re-verifikasi' },
       'Tolak':             { color:'#dc2626', bg:'#fef2f2', icon:'cancel',            label:'Ditolak' },
       'Tolak (sebagian)':  { color:'#ea580c', bg:'#fff7ed', icon:'remove_circle',     label:'Tolak Sebagian' },
       'Kembalikan':        { color:'#ea580c', bg:'#fff7ed', icon:'undo',              label:'Dikembalikan' },
@@ -3122,7 +3122,7 @@ async function openVerifikasi(idUsulan) {
       } else {
         const _isReVerif = _isPPReVerif || _isKapusReVerif || _isAdminReVerif;
         btnSubmit.innerHTML = _isReVerif
-          ? '<span class="material-icons">verified</span> Submit Re-verifikasi'
+          ? '<span class="material-icons">update</span> Submit Re-verifikasi'
           : '<span class="material-icons">send</span> Submit Verifikasi';
         btnSubmit.style.background = _isReVerif ? '#0891b2' : '';
         btnSubmit.style.borderColor = _isReVerif ? '#0891b2' : '';

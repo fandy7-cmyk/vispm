@@ -336,7 +336,7 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
               <tr><td style="width:110px;padding:2px 0">ID Usulan</td><td style="padding:2px 0">: <strong>${h.id_usulan}</strong></td></tr>
               <tr><td style="padding:2px 0">Puskesmas</td><td style="padding:2px 0">: ${h.nama_puskesmas||h.kode_pkm}</td></tr>
               <tr><td style="padding:2px 0">Periode</td><td style="padding:2px 0">: ${bulan} ${h.tahun}</td></tr>
-              <tr><td style="padding:2px 0;vertical-align:top">Indikator</td><td style="padding:2px 0;vertical-align:top">: <strong>${ind.nama_indikator||'-'}</strong></td></tr>
+              <tr><td style="width:110px;padding:2px 0;vertical-align:top;white-space:nowrap">Indikator</td><td style="padding:2px 0;vertical-align:top">: <strong>${ind.nama_indikator||'-'}</strong></td></tr>
               <tr><td style="padding:2px 0">Dicetak</td><td style="padding:2px 0">: ${now}</td></tr>
             </table>
           </td>

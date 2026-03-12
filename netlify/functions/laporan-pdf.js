@@ -12,7 +12,7 @@ function compressBase64Img(dataUrl, maxWidth = 200) {
   if (!dataUrl || !dataUrl.startsWith('data:image')) return dataUrl;
   // Potong ke max ~150KB — tanda tangan tidak perlu resolusi tinggi di PDF
   // Base64 150KB ≈ ~112KB binary image, cukup untuk TTD di ukuran 160x80px
-  const MAX_BASE64_CHARS = 150 * 1024; // 150KB
+  const MAX_BASE64_CHARS = 500 * 1024; // 500KB
   if (dataUrl.length <= MAX_BASE64_CHARS) return dataUrl;
   // Jika terlalu besar, crop base64 string TIDAK bisa (rusak) → return placeholder
   // Solusi: ganti dengan teks "TTD terlalu besar, simpan ulang"

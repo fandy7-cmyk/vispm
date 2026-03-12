@@ -88,12 +88,21 @@ function wrapHtml(title, bodyContent) {
 // ============================================================
 //  MODE: sementara & final — laporan per indikator
 // ============================================================
+// Migrasi kolom — dijalankan sekali saat cold start, bukan setiap request
+let _migrationDone = false;
+async function runMigrations(pool) {
+  if (_migrationDone) return;
+  await Promise.all([
+    pool.query(`ALTER TABLE master_indikator ADD COLUMN IF NOT EXISTS catatan TEXT`).catch(()=>{}),
+    pool.query(`ALTER TABLE verifikasi_program ADD COLUMN IF NOT EXISTS nip_program VARCHAR(50)`).catch(()=>{}),
+    pool.query(`ALTER TABLE verifikasi_program ADD COLUMN IF NOT EXISTS jabatan_program TEXT`).catch(()=>{}),
+    pool.query(`CREATE TABLE IF NOT EXISTS target_tahunan (id SERIAL PRIMARY KEY, kode_pkm VARCHAR(20) NOT NULL, no_indikator INT NOT NULL, tahun INT NOT NULL, sasaran INT NOT NULL DEFAULT 0, UNIQUE(kode_pkm, no_indikator, tahun))`).catch(()=>{}),
+  ]);
+  _migrationDone = true;
+}
+
 async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter) {
-  // Migrasi kolom opsional
-  await pool.query(`ALTER TABLE master_indikator ADD COLUMN IF NOT EXISTS catatan TEXT`).catch(()=>{});
-  await pool.query(`ALTER TABLE verifikasi_program ADD COLUMN IF NOT EXISTS nip_program VARCHAR(50)`).catch(()=>{});
-  await pool.query(`ALTER TABLE verifikasi_program ADD COLUMN IF NOT EXISTS jabatan_program TEXT`).catch(()=>{});
-  await pool.query(`CREATE TABLE IF NOT EXISTS target_tahunan (id SERIAL PRIMARY KEY, kode_pkm VARCHAR(20) NOT NULL, no_indikator INT NOT NULL, tahun INT NOT NULL, sasaran INT NOT NULL DEFAULT 0, UNIQUE(kode_pkm, no_indikator, tahun))`).catch(()=>{});
+  await runMigrations(pool);
 
   // Query header
   const hdrResult = await pool.query(

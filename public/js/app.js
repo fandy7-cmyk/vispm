@@ -2693,9 +2693,9 @@ async function bukaLaporan(idUsulan, mode, aksesIndikator) {
         <div class="ring ring-1"></div>
         <div class="ring ring-2"></div>
         <div class="ring ring-3"></div>
-        <div class="icon">📄</div>
+        <div class="icon"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#5eead4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10"/><path d="m8 9 4 4 4-4"/><path d="M4 17c0 2.2 1.8 4 4 4h8c2.2 0 4-1.8 4-4"/></svg></div>
       </div>
-      <div class="title">VISPM</div>
+      <div class="title" style="font-size:28px;letter-spacing:6px">VISPM</div>
       <div class="subtitle">Menyiapkan Laporan</div>
       <div class="desc">Mohon tunggu, sedang memuat data<br>dari server<span class="dots"><span>.</span><span>.</span><span>.</span></span></div>
       <div class="bar-wrap"><div class="bar"></div></div>

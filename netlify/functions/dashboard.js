@@ -122,7 +122,6 @@ async function programStats(pool, email) {
   );
 
   // Menunggu: VP milik PP ini masih 'Menunggu'
-  // DAN status_global sesuai (Menunggu PP atau re-verif Admin)
   const menungguRows = await pool.query(
     `SELECT vp.id_usulan, vp.indikator_akses, uh.ditolak_oleh
      FROM verifikasi_program vp
@@ -133,28 +132,35 @@ async function programStats(pool, email) {
     [email]
   );
 
-  // Untuk tiap VP yang menunggu, cek apakah PP ini terkena penolakan aktif
   let menunggu = 0;
-  for (const vp of menungguRows.rows) {
-    const pi = await pool.query(
-      `SELECT no_indikator FROM penolakan_indikator
-       WHERE id_usulan=$1 AND (aksi IS NULL OR aksi='tolak')`,
-      [vp.id_usulan]
+  if (menungguRows.rows.length > 0) {
+    // Batch-fetch semua penolakan aktif sekaligus — hindari N+1 query
+    const allIds = menungguRows.rows.map(r => r.id_usulan);
+    const piAll = await pool.query(
+      `SELECT id_usulan, no_indikator FROM penolakan_indikator
+       WHERE id_usulan=ANY($1) AND (aksi IS NULL OR aksi='tolak')`,
+      [allIds]
     ).catch(() => ({ rows: [] }));
 
-    if (pi.rows.length === 0) {
-      // Tidak ada penolakan aktif → verifikasi pertama → harus verif
-      menunggu++;
-    } else {
-      // Ada penolakan aktif → cek irisan dengan akses PP ini
-      const penolakanNos = pi.rows.map(p => parseInt(p.no_indikator));
-      const aksesArr = (vp.indikator_akses || '').split(',')
-        .map(n => parseInt(n.trim())).filter(n => !isNaN(n));
-      // aksesArr kosong = bertanggung jawab semua indikator → selalu terkena
-      const adaIrisan = aksesArr.length === 0
-        ? penolakanNos.length > 0
-        : aksesArr.some(n => penolakanNos.includes(n));
-      if (adaIrisan) menunggu++;
+    // Bangun map: id_usulan -> [no_indikator, ...]
+    const piMap = {};
+    piAll.rows.forEach(p => {
+      if (!piMap[p.id_usulan]) piMap[p.id_usulan] = [];
+      piMap[p.id_usulan].push(parseInt(p.no_indikator));
+    });
+
+    for (const vp of menungguRows.rows) {
+      const penolakanNos = piMap[vp.id_usulan] || [];
+      if (penolakanNos.length === 0) {
+        menunggu++;
+      } else {
+        const aksesArr = (vp.indikator_akses || '').split(',')
+          .map(n => parseInt(n.trim())).filter(n => !isNaN(n));
+        const adaIrisan = aksesArr.length === 0
+          ? penolakanNos.length > 0
+          : aksesArr.some(n => penolakanNos.includes(n));
+        if (adaIrisan) menunggu++;
+      }
     }
   }
 

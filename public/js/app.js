@@ -41,9 +41,6 @@ async function renderCatatanThread(elId, idUsulan, currentRole) {
   // unique prefix per elemen supaya tidak collision jika 2 thread di halaman sama
   const pfx = elId + '_ct';
 
-  // unique prefix per elemen supaya tidak collision jika 2 thread di halaman sama
-  const pfx = elId + '_ct';
-
   // === GRID MODE: 4 kolom, compact, klik expand detail ===
   const COLS = 4;
   let html = '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">';

@@ -5504,7 +5504,7 @@ function renderAuditTrailPage(page) {
   const data = window._auditTrailData || [];
   if (!data.length) return;
 
-  const PAGE_SIZE = 10;
+  const PAGE_SIZE = 11;
   const totalPages = Math.ceil(data.length / PAGE_SIZE);
   page = Math.max(1, Math.min(page, totalPages));
   window._auditTrailPage = page;

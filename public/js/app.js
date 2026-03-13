@@ -3792,6 +3792,29 @@ async function saveSettings() {
   setLoading(true);
   try {
     await API.post('settings', { tahun_awal: awal, tahun_akhir: akhir });
+
+    // Update global tahun range
+    window._appTahunAwal = awal;
+    window._appTahunAkhir = akhir;
+
+    // Refresh dropdown filterTahunPeriode dengan rentang tahun baru
+    const filterEl = document.getElementById('filterTahunPeriode');
+    if (filterEl) {
+      const currentVal = parseInt(filterEl.value);
+      // Pilih tahun yang sebelumnya dipilih jika masih dalam rentang, jika tidak gunakan tahun awal
+      const newSelected = (currentVal >= awal && currentVal <= akhir) ? currentVal : awal;
+      filterEl.innerHTML = yearOptions(newSelected);
+      loadPeriodeGrid();
+    }
+
+    // Refresh dropdown pTahun di modal tambah periode (jika modal sedang terbuka)
+    const pTahunEl = document.getElementById('pTahun');
+    if (pTahunEl) {
+      const pVal = parseInt(pTahunEl.value);
+      const pSelected = (pVal >= awal && pVal <= akhir) ? pVal : awal;
+      pTahunEl.innerHTML = yearOptions(pSelected);
+    }
+
     toast('Pengaturan berhasil disimpan!', 'success');
     status.textContent = '';
   } catch(e) { status.textContent = e.message; }

@@ -2487,13 +2487,15 @@ async function viewDetail(idUsulan) {
       <div style="font-weight:700;font-size:13.5px;margin-bottom:8px">Detail Indikator</div>
       <div class="table-container">
         <table>
-          <thead><tr><th>No</th><th>Indikator</th><th style="text-align:center">Target Bulan Ini</th><th style="text-align:center">Realisasi Bulan Ini</th><th style="text-align:center">Capaian</th><th style="text-align:center">Data Dukung</th></tr></thead>
-          <tbody>${inds.map(i => `<tr>
+          <thead><tr><th>No</th><th>Indikator</th><th style="text-align:center;min-width:80px">Target Tahunan</th><th style="text-align:center;min-width:80px">Sisa Target</th><th style="text-align:center">Target Bulan Ini</th><th style="text-align:center">Realisasi Bulan Ini</th><th style="text-align:center">Capaian</th><th style="text-align:center">Data Dukung</th></tr></thead>
+          <tbody>${inds.map(i => { const _sisa = i.sasaranTahunan > 0 ? Math.max(0, i.sasaranTahunan - i.realisasiKumulatif) : null; const _sc = _sisa !== null && _sisa === 0 ? '#16a34a' : (_sisa !== null && _sisa < 10 ? '#f59e0b' : '#1e293b'); return `<tr>
             <td>${i.no}</td><td style="max-width:220px;font-size:12.5px">${i.nama}</td>
+            <td style="text-align:center;color:#475569">${i.sasaranTahunan > 0 ? i.sasaranTahunan : '<span style=\"color:#cbd5e1\">-</span>'}</td>
+            <td style="text-align:center;font-weight:700;color:${_sc}">${_sisa !== null ? _sisa : '<span style=\"color:#cbd5e1\">-</span>'}</td>
             <td style="text-align:center">${i.target}</td><td style="text-align:center">${i.capaian}</td><td style="text-align:center">${fmtCapaianPct(i.capaian, i.target)}</td>
             
             <td style="text-align:center">${i.linkFile ? (() => { try { const ls = JSON.parse(i.linkFile); const arr = Array.isArray(ls) ? ls.map(f=>typeof f==='string'?{id:null,url:f,name:'File'}:f) : [{id:null,url:i.linkFile,name:'File'}]; window[`_buktiLinks_${i.no}`]={links:arr,idUsulan:i.idUsulan||''}; return `<button onclick="openBuktiModal(${i.no},0)" style="background:none;border:none;cursor:pointer;color:#0d9488;display:inline-flex;align-items:center;gap:3px;font-size:12px;padding:2px 6px;border-radius:5px" onmouseover="this.style.background='rgba(13,148,136,0.08)'" onmouseout="this.style.background='none'"><span class="material-icons" style="font-size:14px">visibility</span></button>`; } catch(e){ return `<a href="${i.linkFile}" target="_blank" style="color:#0d9488"><span class="material-icons" style="font-size:13px">visibility</span></a>`; } })() : '-'}</td>
-          </tr>`).join('')}</tbody>
+          </tr>`; }).join('')}</tbody>
         </table>
       </div>
       ${vpHtml}
@@ -2808,7 +2810,7 @@ async function openVerifikasi(idUsulan) {
   if (adminPanelReset) adminPanelReset.style.display = 'none';
   const programPanelReset = document.getElementById('programRejectPanel');
   if (programPanelReset) programPanelReset.style.display = 'none';
-  document.getElementById('verifIndikatorBody').innerHTML = `<tr><td colspan="5"><div class="empty-state" style="padding:20px"><p>Memuat...</p></div></td></tr>`;
+  document.getElementById('verifIndikatorBody').innerHTML = `<tr><td colspan="7"><div class="empty-state" style="padding:20px"><p>Memuat...</p></div></td></tr>`;
 
   // ===== CEK TANDA TANGAN =====
   let _ttOk = true;
@@ -3137,9 +3139,9 @@ async function openVerifikasi(idUsulan) {
     const thead = document.getElementById('verifIndikatorHead');
     if (thead) {
       if (usePerIndikator && canAct && window._verifTTOk) {
-        thead.innerHTML = `<tr><th>No</th><th>Indikator</th><th style="text-align:center">Target</th><th style="text-align:center">Realisasi</th><th style="text-align:center">Capaian</th><th style="text-align:center">Data Dukung</th><th style="text-align:center;min-width:170px">Verifikasi</th></tr>`;
+        thead.innerHTML = `<tr><th>No</th><th>Indikator</th><th style="text-align:center;min-width:80px">Target Tahunan</th><th style="text-align:center;min-width:80px">Sisa Target</th><th style="text-align:center">Target Bulan Ini</th><th style="text-align:center">Realisasi Bulan Ini</th><th style="text-align:center">Capaian</th><th style="text-align:center">Data Dukung</th><th style="text-align:center;min-width:170px">Verifikasi</th></tr>`;
       } else {
-        thead.innerHTML = `<tr><th>No</th><th>Indikator</th><th style="text-align:center!important">Target Bulan Ini</th><th style="text-align:center!important">Realisasi Bulan Ini</th><th style="text-align:center!important">Capaian</th><th style="text-align:center!important">Data Dukung</th></tr>`;
+        thead.innerHTML = `<tr><th>No</th><th>Indikator</th><th style="text-align:center!important;min-width:80px">Target Tahunan</th><th style="text-align:center!important;min-width:80px">Sisa Target</th><th style="text-align:center!important">Target Bulan Ini</th><th style="text-align:center!important">Realisasi Bulan Ini</th><th style="text-align:center!important">Capaian</th><th style="text-align:center!important">Data Dukung</th></tr>`;
       }
     }
 
@@ -3190,9 +3192,13 @@ async function openVerifikasi(idUsulan) {
       const catatanInd = (!canAct && i.catatan && i.status !== 'Draft')
         ? `<div style="font-size:10.5px;color:#065f46;margin-top:3px;font-style:italic;background:#f0fdf4;border-radius:4px;padding:2px 6px">"${i.catatan}"</div>` : '';
 
+      const _sisaV = i.sasaranTahunan > 0 ? Math.max(0, i.sasaranTahunan - i.realisasiKumulatif) : null;
+      const _scV = _sisaV !== null && _sisaV === 0 ? '#16a34a' : (_sisaV !== null && _sisaV < 10 ? '#f59e0b' : '#1e293b');
       return `<tr id="pgRow_${i.no}">
         <td>${i.no}</td>
         <td style="font-size:13px">${i.nama}${catatanInd}</td>
+        <td style="text-align:center;color:#475569">${i.sasaranTahunan > 0 ? i.sasaranTahunan : '<span style="color:#cbd5e1">-</span>'}</td>
+        <td style="text-align:center;font-weight:700;color:${_scV}">${_sisaV !== null ? _sisaV : '<span style="color:#cbd5e1">-</span>'}</td>
         <td style="text-align:center">${i.target}</td><td style="text-align:center">${i.capaian}</td><td style="text-align:center">${fmtCapaianPct(i.capaian, i.target)}</td>
         <td style="text-align:center">${buktiHtml}</td>
         ${verifCol}

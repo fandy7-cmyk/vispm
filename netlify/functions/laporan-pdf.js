@@ -390,7 +390,7 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
             <th style="padding:7px 8px;border:1px solid #334155;text-align:center;width:30px;text-transform:uppercase">No</th>
             <th style="padding:7px 8px;border:1px solid #334155;text-align:center;text-transform:uppercase">Nama Indikator</th>
             <th style="padding:7px 8px;border:1px solid #334155;text-align:center;width:65px;font-size:10px;text-transform:uppercase">Target<br>Tahunan</th>
-            <th style="padding:7px 8px;border:1px solid #334155;text-align:center;width:65px;font-size:10px;text-transform:uppercase">Sisa<br>Target</th>
+            <th style="padding:7px 8px;border:1px solid #334155;text-align:center;width:65px;font-size:10px;text-transform:uppercase">Sisa<br>Target Tahunan</th>
             <th style="padding:7px 8px;border:1px solid #334155;text-align:center;width:65px;font-size:10px;text-transform:uppercase">Target<br>Bulan Ini</th>
             <th style="padding:7px 8px;border:1px solid #334155;text-align:center;width:65px;font-size:10px;text-transform:uppercase">Realisasi<br>Bulan Ini</th>
             <th style="padding:7px 8px;border:1px solid #334155;text-align:center;width:60px;text-transform:uppercase">Capaian</th>
@@ -451,7 +451,7 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
             <tr style="background:#1e293b;color:white">
               <th style="padding:7px 10px;font-size:11px;border:1px solid #334155;text-align:center;text-transform:uppercase">Target<br>Tahunan</th>
               <th style="padding:7px 10px;font-size:11px;border:1px solid #334155;text-align:center;text-transform:uppercase">Target<br>Bulan Ini</th>
-              <th style="padding:7px 10px;font-size:11px;border:1px solid #334155;text-align:center;text-transform:uppercase">Sisa<br>Target</th>
+              <th style="padding:7px 10px;font-size:11px;border:1px solid #334155;text-align:center;text-transform:uppercase">Sisa<br>Target Tahunan</th>
               <th style="padding:7px 10px;font-size:11px;border:1px solid #334155;text-align:center;text-transform:uppercase">Realisasi<br>Bulan Ini</th>
               <th style="padding:7px 10px;font-size:11px;border:1px solid #334155;text-align:center;text-transform:uppercase">Capaian</th>
             </tr>

@@ -1044,8 +1044,9 @@ function renderOperatorDashboard(el, d) {
         // Warna berubah saat < 1 jam
         el2.style.background = diff < 3600000 ? 'rgba(239,68,68,0.4)' : 'rgba(0,0,0,0.2)';
       };
+      let tid;
+      tid = setInterval(tick, 1000);
       tick();
-      const tid = setInterval(tick, 1000);
       window._periodeTimers.push(tid);
     });
   } else {

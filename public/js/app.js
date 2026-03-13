@@ -65,7 +65,7 @@ async function renderCatatanThread(elId, idUsulan, currentRole) {
     };
     const aksiClr = aksiColorMap[log.aksi] || { c:cfg.color, b:cfg.bg };
 
-    html += `<div style="border:1.5px solid ${cfg.border};border-radius:8px;background:${cfg.bg};overflow:hidden">
+    html += `<div style="border:1.5px solid ${aksiClr.c}55;border-radius:8px;background:${aksiClr.b};overflow:hidden">
       <!-- header: selalu tampil, klik toggle -->
       <div onclick="(function(){
         var d=document.getElementById('${cardId}');
@@ -73,23 +73,23 @@ async function renderCatatanThread(elId, idUsulan, currentRole) {
         if(d.style.display==='none'){d.style.display='block';arr.textContent='expand_less';}
         else{d.style.display='none';arr.textContent='expand_more';}
       })()" style="padding:7px 8px;cursor:pointer;display:flex;align-items:flex-start;gap:6px">
-        <div style="width:28px;height:28px;border-radius:50%;background:${aksiClr.b};border:2px solid ${aksiClr.c};display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">
+        <div style="width:28px;height:28px;border-radius:50%;background:white;border:2px solid ${aksiClr.c};display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">
           <span class="material-icons" style="font-size:14px;color:${aksiClr.c}">${icon}</span>
         </div>
         <div style="flex:1;min-width:0">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:4px">
-            <span style="font-size:10px;font-weight:800;color:${cfg.color}">#${idx+1}</span>
-            <span id="${cardId}_arr" class="material-icons" style="font-size:12px;color:${cfg.color}">expand_more</span>
+            <span style="font-size:10px;font-weight:800;color:${aksiClr.c}">#${idx+1}</span>
+            <span id="${cardId}_arr" class="material-icons" style="font-size:12px;color:${aksiClr.c}">expand_more</span>
           </div>
-          <div style="font-size:11.5px;font-weight:700;color:${cfg.color};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nama}</div>
+          <div style="font-size:11.5px;font-weight:700;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nama}</div>
           <div style="font-size:10.5px;color:#64748b;margin-bottom:3px">${log.role}</div>
-          <div style="font-size:10.5px;font-weight:700;color:${aksiClr.c};background:${aksiClr.b};border:1px solid ${aksiClr.c}60;border-radius:20px;padding:1px 6px;display:inline-flex;align-items:center;gap:2px">
+          <div style="font-size:10.5px;font-weight:700;color:${aksiClr.c};background:white;border:1px solid ${aksiClr.c}60;border-radius:20px;padding:1px 6px;display:inline-flex;align-items:center;gap:2px">
             <span class="material-icons" style="font-size:11px">${icon}</span>${log.aksi}
           </div>
         </div>
       </div>
       <!-- expanded: detail + timestamp -->
-      <div id="${cardId}" style="display:none;padding:6px 8px;border-top:1px solid ${cfg.border};background:white">
+      <div id="${cardId}" style="display:none;padding:6px 8px;border-top:1px solid ${aksiClr.c}30;background:white">
         <div style="font-size:11.5px;color:#1e293b;line-height:1.5;word-break:break-word">${log.detail}</div>
         <div style="font-size:10px;color:#94a3b8;margin-top:4px">${fmtDT(log.timestamp)}</div>
       </div>

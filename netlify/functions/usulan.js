@@ -1,8 +1,34 @@
 const { getPool, ok, err, cors } = require('./db');
 
+let _migrated = false;
+async function runMigrations(pool) {
+  if (_migrated) return;
+  await Promise.all([
+    pool.query(`ALTER TABLE verifikasi_program ADD COLUMN IF NOT EXISTS nip_program VARCHAR(50)`).catch(()=>{}),
+    pool.query(`ALTER TABLE verifikasi_program ADD COLUMN IF NOT EXISTS jabatan_program TEXT`).catch(()=>{}),
+    pool.query(`ALTER TABLE verifikasi_program ADD COLUMN IF NOT EXISTS sanggahan TEXT`).catch(()=>{}),
+    pool.query(`ALTER TABLE usulan_header ADD COLUMN IF NOT EXISTS ditolak_oleh VARCHAR(50)`).catch(()=>{}),
+    pool.query(`CREATE TABLE IF NOT EXISTS penolakan_indikator (
+      id SERIAL PRIMARY KEY,
+      id_usulan VARCHAR(50) NOT NULL,
+      no_indikator INT NOT NULL,
+      alasan TEXT NOT NULL,
+      email_admin VARCHAR(200) NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      email_program VARCHAR(200),
+      aksi VARCHAR(20),
+      catatan_program TEXT,
+      responded_at TIMESTAMPTZ,
+      UNIQUE(id_usulan, no_indikator)
+    )`).catch(()=>{}),
+  ]);
+  _migrated = true;
+}
+
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors();
   const pool = getPool();
+  await runMigrations(pool);
   const method = event.httpMethod;
   const params = event.queryStringParameters || {};
   const path = params.action || '';
@@ -70,10 +96,37 @@ async function getUsulanList(pool, params) {
   );
   if (result.rows.length === 0) return ok([]);
   const ids = result.rows.map(r => r.id_usulan);
-  const vpResult = await pool.query(
-    `SELECT id_usulan, COUNT(*) as total, COUNT(CASE WHEN status='Selesai' THEN 1 END) as selesai FROM verifikasi_program WHERE id_usulan=ANY($1) GROUP BY id_usulan`,
-    [ids]
-  );
+  const ditolakIds = result.rows.filter(r => r.ditolak_oleh).map(r => r.id_usulan);
+
+  // Jalankan semua query sekunder secara paralel
+  const [vpResult, svResult, piReVerifResult, piAllResult] = await Promise.all([
+    pool.query(
+      `SELECT id_usulan, COUNT(*) as total, COUNT(CASE WHEN status='Selesai' THEN 1 END) as selesai FROM verifikasi_program WHERE id_usulan=ANY($1) GROUP BY id_usulan`,
+      [ids]
+    ),
+    params.email_program
+      ? pool.query(
+          `SELECT vp.id_usulan, vp.status, vp.indikator_akses, uh.ditolak_oleh
+           FROM verifikasi_program vp
+           JOIN usulan_header uh ON vp.id_usulan = uh.id_usulan
+           WHERE vp.id_usulan=ANY($1) AND LOWER(vp.email_program)=LOWER($2)`,
+          [ids, params.email_program]
+        )
+      : Promise.resolve({ rows: [] }),
+    params.email_program && ids.length > 0
+      ? pool.query(
+          `SELECT id_usulan, no_indikator FROM penolakan_indikator WHERE id_usulan=ANY($1) AND (aksi IS NULL OR aksi='tolak')`,
+          [ids]
+        ).catch(() => ({ rows: [] }))
+      : Promise.resolve({ rows: [] }),
+    ditolakIds.length > 0
+      ? pool.query(
+          `SELECT pi.id_usulan, pi.no_indikator, pi.alasan, pi.aksi, pi.catatan_program, pi.email_program, vp.nama_program FROM penolakan_indikator pi LEFT JOIN verifikasi_program vp ON pi.id_usulan=vp.id_usulan AND LOWER(pi.email_program)=LOWER(vp.email_program) WHERE pi.id_usulan=ANY($1) ORDER BY pi.no_indikator`,
+          [ditolakIds]
+        ).catch(() => ({ rows: [] }))
+      : Promise.resolve({ rows: [] }),
+  ]);
+
   const vpMap = {};
   vpResult.rows.forEach(r => { vpMap[r.id_usulan] = { total: parseInt(r.total), selesai: parseInt(r.selesai) }; });
 
@@ -81,21 +134,8 @@ async function getUsulanList(pool, params) {
   let sudahVerifMap = {};
   let myVerifStatusMap = {};
   if (params.email_program) {
-    const svResult = await pool.query(
-      `SELECT vp.id_usulan, vp.status, vp.indikator_akses, uh.ditolak_oleh
-       FROM verifikasi_program vp
-       JOIN usulan_header uh ON vp.id_usulan = uh.id_usulan
-       WHERE vp.id_usulan=ANY($1) AND LOWER(vp.email_program)=LOWER($2)`,
-      [ids, params.email_program]
-    );
-    // Ambil penolakan aktif per usulan (belum direspon: aksi IS NULL)
-    // Mencakup penolakan dari PP (email_program IS NOT NULL) maupun Admin (email_program = email PP terkena)
-    const piReVerif = ids.length > 0 ? await pool.query(
-      `SELECT id_usulan, no_indikator FROM penolakan_indikator WHERE id_usulan=ANY($1) AND (aksi IS NULL OR aksi='tolak')`,
-      [ids]
-    ).catch(() => ({ rows: [] })) : { rows: [] };
     const piReVerifMap = {};
-    piReVerif.rows.forEach(p => {
+    piReVerifResult.rows.forEach(p => {
       if (!piReVerifMap[p.id_usulan]) piReVerifMap[p.id_usulan] = [];
       piReVerifMap[p.id_usulan].push(parseInt(p.no_indikator));
     });
@@ -122,19 +162,12 @@ async function getUsulanList(pool, params) {
     });
   }
 
-  // Fetch penolakan indikator untuk semua usulan yang memiliki penolakan aktif
-  const ditolakIds = result.rows.filter(r => r.ditolak_oleh).map(r => r.id_usulan);
+  // Gunakan piAllResult yang sudah di-fetch secara paralel di atas
   let piMap = {};
-  if (ditolakIds.length > 0) {
-    const piAll = await pool.query(
-      `SELECT pi.id_usulan, pi.no_indikator, pi.alasan, pi.aksi, pi.catatan_program, pi.email_program, vp.nama_program FROM penolakan_indikator pi LEFT JOIN verifikasi_program vp ON pi.id_usulan=vp.id_usulan AND LOWER(pi.email_program)=LOWER(vp.email_program) WHERE pi.id_usulan=ANY($1) ORDER BY pi.no_indikator`,
-      [ditolakIds]
-    ).catch(() => ({ rows: [] }));
-    piAll.rows.forEach(p => {
-      if (!piMap[p.id_usulan]) piMap[p.id_usulan] = [];
-      piMap[p.id_usulan].push({ noIndikator: p.no_indikator, alasan: p.alasan, aksi: p.aksi, catatanProgram: p.catatan_program || '', emailProgram: p.email_program || '', namaProgram: p.nama_program || '' });
-    });
-  }
+  piAllResult.rows.forEach(p => {
+    if (!piMap[p.id_usulan]) piMap[p.id_usulan] = [];
+    piMap[p.id_usulan].push({ noIndikator: p.no_indikator, alasan: p.alasan, aksi: p.aksi, catatanProgram: p.catatan_program || '', emailProgram: p.email_program || '', namaProgram: p.nama_program || '' });
+  });
 
   return ok(result.rows.map(r => {
     const pi = piMap[r.id_usulan] || [];
@@ -239,32 +272,16 @@ async function buatUsulan(pool, body) {
   const idUsulan = `${kodePKM}-${tahun}-${String(bulan).padStart(2,'0')}`;
   const existing = await pool.query('SELECT id_usulan FROM usulan_header WHERE id_usulan=$1', [idUsulan]);
   if (existing.rows.length > 0) return err('Usulan untuk puskesmas ini di periode ini sudah ada');
-  const pkmResult = await pool.query('SELECT indeks_beban_kerja FROM master_puskesmas WHERE kode_pkm=$1', [kodePKM]);
+
+  const [pkmResult, indResult, ppResult] = await Promise.all([
+    pool.query('SELECT indeks_beban_kerja FROM master_puskesmas WHERE kode_pkm=$1', [kodePKM]),
+    pool.query('SELECT no_indikator, bobot FROM master_indikator WHERE aktif=true ORDER BY no_indikator'),
+    pool.query(`SELECT email, nama, nip, jabatan, indikator_akses FROM users WHERE role='Pengelola Program' AND aktif=true`),
+  ]);
   const indeksBeban = pkmResult.rows.length > 0 ? parseFloat(pkmResult.rows[0].indeks_beban_kerja)||0 : 0;
-  const indResult = await pool.query('SELECT no_indikator, bobot FROM master_indikator WHERE aktif=true ORDER BY no_indikator');
   const totalBobot = indResult.rows.reduce((s,r) => s+(parseInt(r.bobot)||0), 0);
-  const ppResult = await pool.query(`SELECT email, nama, nip, jabatan, indikator_akses FROM users WHERE role='Pengelola Program' AND aktif=true`);
   const client = await pool.connect();
   try {
-    // Auto-migrate di luar transaksi (DDL tidak bisa di-rollback di PG)
-    await pool.query(`ALTER TABLE verifikasi_program ADD COLUMN IF NOT EXISTS nip_program VARCHAR(50)`).catch(()=>{});
-    await pool.query(`ALTER TABLE verifikasi_program ADD COLUMN IF NOT EXISTS jabatan_program TEXT`).catch(()=>{});
-    await pool.query(`ALTER TABLE verifikasi_program ADD COLUMN IF NOT EXISTS sanggahan TEXT`).catch(()=>{});
-    await pool.query(`ALTER TABLE usulan_header ADD COLUMN IF NOT EXISTS ditolak_oleh VARCHAR(50)`).catch(()=>{});
-    await pool.query(`CREATE TABLE IF NOT EXISTS penolakan_indikator (
-      id SERIAL PRIMARY KEY,
-      id_usulan VARCHAR(50) NOT NULL,
-      no_indikator INT NOT NULL,
-      alasan TEXT NOT NULL,
-      email_admin VARCHAR(200) NOT NULL,
-      created_at TIMESTAMPTZ DEFAULT NOW(),
-      email_program VARCHAR(200),
-      aksi VARCHAR(20),
-      catatan_program TEXT,
-      responded_at TIMESTAMPTZ,
-      UNIQUE(id_usulan, no_indikator)
-    )`).catch(()=>{});
-
     await client.query('BEGIN');
     await client.query(
       `INSERT INTO usulan_header (id_usulan,tahun,bulan,periode_key,kode_pkm,total_nilai,total_bobot,indeks_kinerja_spm,indeks_beban_kerja,indeks_spm,status_kapus,status_program,status_final,status_global,is_locked,created_by,created_at)

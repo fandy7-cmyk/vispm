@@ -62,7 +62,7 @@ async function renderCatatanThread(elId, idUsulan, currentRole) {
       const cardId = pfx + '_' + idx;
 
       html += `<div style="position:relative;display:flex;flex-direction:column;align-items:center;flex:1;min-width:0;padding:0 3px">
-        <div style="font-size:9px;font-weight:800;color:${cfg.color};margin-bottom:3px">#${idx+1}</div>
+        <div style="font-size:11px;font-weight:800;color:${cfg.color};margin-bottom:3px">#${idx+1}</div>
         <!-- circle — klik toggle detail -->
         <div onclick="(function(){var d=document.getElementById('${cardId}');var arr=document.getElementById('${cardId}_arr');if(d.style.display==='none'){d.style.display='block';arr.textContent='expand_less';}else{d.style.display='none';arr.textContent='expand_more';}})()"
           style="width:36px;height:36px;border-radius:50%;background:${cfg.bg};border:2.5px solid ${cfg.color};display:flex;align-items:center;justify-content:center;flex-shrink:0;z-index:1;box-shadow:0 1px 4px ${cfg.color}33;cursor:pointer">
@@ -71,10 +71,10 @@ async function renderCatatanThread(elId, idUsulan, currentRole) {
         <!-- collapsed: nama + role + aksi, selalu tampil -->
         <div onclick="(function(){var d=document.getElementById('${cardId}');var arr=document.getElementById('${cardId}_arr');if(d.style.display==='none'){d.style.display='block';arr.textContent='expand_less';}else{d.style.display='none';arr.textContent='expand_more';}})()"
           style="margin-top:5px;width:100%;background:${cfg.bg};border:1.5px solid ${cfg.border};border-radius:7px;padding:5px 7px;box-sizing:border-box;cursor:pointer">
-          <div style="font-size:9.5px;font-weight:700;color:${cfg.color};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nama}</div>
-          <div style="font-size:9px;color:#64748b">${log.role}</div>
-          <div style="margin-top:3px;font-size:9px;font-weight:700;color:${cfg.color};background:${cfg.color}18;border:1px solid ${cfg.color}55;border-radius:20px;padding:2px 8px;display:inline-flex;align-items:center;gap:2px">
-            <span class="material-icons" style="font-size:10px">${icon}</span>${log.aksi}
+          <div style="font-size:12px;font-weight:700;color:${cfg.color};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nama}</div>
+          <div style="font-size:11px;color:#64748b">${log.role}</div>
+          <div style="margin-top:3px;font-size:11px;font-weight:700;color:${cfg.color};background:${cfg.color}18;border:1px solid ${cfg.color}55;border-radius:20px;padding:2px 8px;display:inline-flex;align-items:center;gap:2px">
+            <span class="material-icons" style="font-size:12px">${icon}</span>${log.aksi}
           </div>
           <div style="display:flex;justify-content:flex-end;margin-top:2px">
             <span id="${cardId}_arr" class="material-icons" style="font-size:12px;color:${cfg.color}">expand_more</span>
@@ -82,8 +82,8 @@ async function renderCatatanThread(elId, idUsulan, currentRole) {
         </div>
         <!-- expanded: detail + timestamp, tersembunyi by default -->
         <div id="${cardId}" style="display:none;width:100%;background:white;border:1.5px solid ${cfg.border};border-top:none;border-radius:0 0 7px 7px;padding:6px 7px;box-sizing:border-box">
-          <div style="font-size:10px;color:#1e293b;line-height:1.5;word-break:break-word">${log.detail}</div>
-          <div style="font-size:9px;color:#94a3b8;margin-top:4px">${fmtDT(log.timestamp)}</div>
+          <div style="font-size:12px;color:#1e293b;line-height:1.5;word-break:break-word">${log.detail}</div>
+          <div style="font-size:11px;color:#94a3b8;margin-top:4px">${fmtDT(log.timestamp)}</div>
         </div>
         ${hasRight ? `<div style="position:absolute;top:22px;left:calc(50% + 16px);right:0;height:2px;background:linear-gradient(to right,${cfg.color}66,#cbd5e1);z-index:0"></div>` : ''}
       </div>`;

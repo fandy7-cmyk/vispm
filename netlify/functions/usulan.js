@@ -215,9 +215,29 @@ async function getUsulanDetail(pool, idUsulan) {
 
 async function getIndikatorUsulan(pool, idUsulan) {
   if (!idUsulan) return err('ID usulan diperlukan');
+  // Ambil header dulu untuk kode_pkm dan tahun
+  const hdr = await pool.query(`SELECT kode_pkm, tahun FROM usulan_header WHERE id_usulan=$1`, [idUsulan]);
+  if (!hdr.rows.length) return err('Usulan tidak ditemukan');
+  const { kode_pkm, tahun } = hdr.rows[0];
+
   const result = await pool.query(
-    `SELECT ui.*, mi.nama_indikator FROM usulan_indikator ui LEFT JOIN master_indikator mi ON ui.no_indikator=mi.no_indikator WHERE ui.id_usulan=$1 ORDER BY ui.no_indikator`,
-    [idUsulan]
+    `SELECT ui.*, mi.nama_indikator,
+            COALESCE(tt.sasaran, 0) as sasaran_tahunan,
+            -- Total realisasi kumulatif semua bulan tahun ini (status aktif, bukan Draft/Ditolak)
+            COALESCE((
+              SELECT SUM(ui2.capaian)
+              FROM usulan_indikator ui2
+              JOIN usulan_header uh2 ON uh2.id_usulan = ui2.id_usulan
+              WHERE uh2.kode_pkm = $2
+                AND uh2.tahun = $3
+                AND ui2.no_indikator = ui.no_indikator
+                AND uh2.status_global NOT IN ('Draft', 'Ditolak')
+            ), 0) as realisasi_kumulatif
+     FROM usulan_indikator ui
+     LEFT JOIN master_indikator mi ON ui.no_indikator = mi.no_indikator
+     LEFT JOIN target_tahunan tt ON tt.kode_pkm = $2 AND tt.no_indikator = ui.no_indikator AND tt.tahun = $3
+     WHERE ui.id_usulan = $1 ORDER BY ui.no_indikator`,
+    [idUsulan, kode_pkm, tahun]
   );
   return ok(result.rows.map(r => ({
     id: r.id, no: r.no_indikator, nama: r.nama_indikator,
@@ -225,7 +245,9 @@ async function getIndikatorUsulan(pool, idUsulan) {
     realisasiRasio: parseFloat(r.realisasi_rasio)||0, bobot: r.bobot||0,
     nilaiTerbobot: parseFloat(r.nilai_terbobot)||0, status: r.status||'Draft',
     approvedBy: r.approved_by||'', approvedRole: r.approved_role||'',
-    approvedAt: r.approved_at, catatan: r.catatan||'', linkFile: r.link_file||''
+    approvedAt: r.approved_at, catatan: r.catatan||'', linkFile: r.link_file||'',
+    sasaranTahunan: parseInt(r.sasaran_tahunan)||0,
+    realisasiKumulatif: parseFloat(r.realisasi_kumulatif)||0
   })));
 }
 

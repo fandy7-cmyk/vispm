@@ -1,5 +1,7 @@
 const { getPool, ok, err, cors } = require('./db');
 
+let _migrated = false;
+
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors();
 
@@ -7,8 +9,10 @@ exports.handler = async (event) => {
   const method = event.httpMethod;
 
   try {
-    // Auto-migrate: tambah kolom catatan kalau belum ada
-    await pool.query(`ALTER TABLE master_indikator ADD COLUMN IF NOT EXISTS catatan TEXT`).catch(()=>{});
+    if (!_migrated) {
+      await pool.query(`ALTER TABLE master_indikator ADD COLUMN IF NOT EXISTS catatan TEXT`).catch(()=>{});
+      _migrated = true;
+    }
 
     if (method === 'GET') {
       const result = await pool.query(

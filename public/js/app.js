@@ -294,6 +294,41 @@ function startApp() {
     window._periodeAktifList = [];
   });
   buildSidebar();
+
+  // Inject tombol Search & Notifikasi ke topbar
+  const topbarRight = document.querySelector('.topbar-right');
+  if (topbarRight && !document.getElementById('notifBtnWrap')) {
+    const searchBtn = document.createElement('button');
+    searchBtn.id = 'globalSearchBtn';
+    searchBtn.title = 'Cari (Ctrl+K)';
+    searchBtn.style.cssText = 'background:none;border:1.5px solid #e2e8f0;border-radius:8px;padding:5px 10px;cursor:pointer;display:flex;align-items:center;gap:5px;color:#64748b;font-size:12px;font-family:inherit;transition:all 0.15s';
+    searchBtn.innerHTML = '<span class="material-icons" style="font-size:17px">search</span>';
+    searchBtn.onmouseover = () => { searchBtn.style.borderColor="#0d9488"; searchBtn.style.color="#0d9488"; };
+    searchBtn.onmouseout  = () => { searchBtn.style.borderColor="#e2e8f0"; searchBtn.style.color="#64748b"; };
+    searchBtn.onclick = openGlobalSearch;
+    const notifWrap = document.createElement('div');
+    notifWrap.id = 'notifBtnWrap';
+    notifWrap.style.cssText = 'position:relative;display:flex';
+    const notifBtn = document.createElement('button');
+    notifBtn.id = 'notifBtn';
+    notifBtn.title = 'Notifikasi';
+    notifBtn.style.cssText = 'background:none;border:1.5px solid #e2e8f0;border-radius:8px;width:36px;height:36px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#64748b;transition:all 0.15s;position:relative';
+    notifBtn.innerHTML = '<span class="material-icons" style="font-size:19px">notifications</span>';
+    notifBtn.onmouseover = () => { notifBtn.style.borderColor="#0d9488"; notifBtn.style.color="#0d9488"; };
+    notifBtn.onmouseout  = () => { notifBtn.style.borderColor="#e2e8f0"; notifBtn.style.color="#64748b"; };
+    notifBtn.onclick = toggleNotifPanel;
+    notifWrap.appendChild(notifBtn);
+    const themeBtn = document.getElementById('themeToggleBtn');
+    if (themeBtn) {
+      topbarRight.insertBefore(searchBtn, themeBtn);
+      topbarRight.insertBefore(notifWrap, themeBtn);
+    } else {
+      topbarRight.prepend(notifWrap);
+      topbarRight.prepend(searchBtn);
+    }
+  }
+  startNotifPoller();
+
   // Restore halaman terakhir sebelum refresh (jika ada), fallback ke dashboard
   // Restore halaman terakhir, tapi validasi dulu apakah role saat ini boleh akses
   let lastPage = 'dashboard';
@@ -5548,6 +5583,346 @@ function _downloadExcel(filename, headers, rows) {
   a.click();
   URL.revokeObjectURL(url);
   toast('File Excel berhasil diunduh', 'success');
+}
+
+
+// ============== PENCARIAN GLOBAL ==============
+let _searchTimeout = null;
+
+function openGlobalSearch() {
+  let modal = document.getElementById('globalSearchModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'globalSearchModal';
+    modal.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;padding-top:80px;background:rgba(15,23,42,0.7);backdrop-filter:blur(4px)';
+    modal.innerHTML = `
+      <div style="width:100%;max-width:620px;margin:0 16px">
+        <div style="background:white;border-radius:16px;box-shadow:0 24px 64px rgba(0,0,0,0.3);overflow:hidden">
+          <div style="display:flex;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid #e2e8f0">
+            <span class="material-icons" style="color:#0d9488;font-size:22px">search</span>
+            <input id="globalSearchInput" type="text" placeholder="Cari puskesmas, usulan, user..."
+              style="flex:1;border:none;outline:none;font-size:15px;font-family:inherit;color:#1e293b;background:transparent"
+              oninput="doGlobalSearch(this.value)" onkeydown="handleSearchKey(event)">
+            <button onclick="closeGlobalSearch()" style="background:none;border:none;cursor:pointer;color:#94a3b8;display:flex">
+              <span class="material-icons">close</span>
+            </button>
+          </div>
+          <div id="globalSearchResults" style="max-height:420px;overflow-y:auto;padding:8px 0">
+            <div style="padding:24px;text-align:center;color:#94a3b8;font-size:13px">
+              <span class="material-icons" style="font-size:32px;display:block;margin-bottom:8px">search</span>
+              Ketik untuk mencari...
+            </div>
+          </div>
+        </div>
+        <div style="text-align:center;margin-top:10px;font-size:11px;color:rgba(255,255,255,0.5)">
+          ESC untuk tutup &nbsp;·&nbsp; Enter untuk pilih hasil pertama
+        </div>
+      </div>`;
+    modal.addEventListener('click', e => { if (e.target === modal) closeGlobalSearch(); });
+    document.body.appendChild(modal);
+  }
+  modal.style.display = 'flex';
+  setTimeout(() => document.getElementById('globalSearchInput')?.focus(), 50);
+}
+
+function closeGlobalSearch() {
+  const modal = document.getElementById('globalSearchModal');
+  if (modal) modal.style.display = 'none';
+}
+
+function handleSearchKey(e) {
+  if (e.key === 'Escape') { closeGlobalSearch(); return; }
+  if (e.key === 'Enter') {
+    const first = document.querySelector('.search-result-item');
+    if (first) first.click();
+  }
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    const items = document.querySelectorAll('.search-result-item');
+    const focused = document.querySelector('.search-result-item:focus');
+    if (!focused && items[0]) items[0].focus();
+    else if (focused) {
+      const next = [...items].indexOf(focused) + 1;
+      if (items[next]) items[next].focus();
+    }
+  }
+}
+
+async function doGlobalSearch(q) {
+  clearTimeout(_searchTimeout);
+  const el = document.getElementById('globalSearchResults');
+  if (!el) return;
+  if (!q || q.trim().length < 2) {
+    el.innerHTML = `<div style="padding:24px;text-align:center;color:#94a3b8;font-size:13px">
+      <span class="material-icons" style="font-size:32px;display:block;margin-bottom:8px">search</span>
+      Ketik minimal 2 karakter...
+    </div>`;
+    return;
+  }
+
+  el.innerHTML = `<div style="padding:20px;text-align:center;color:#94a3b8;font-size:13px">
+    <span class="material-icons" style="animation:spin 1s linear infinite;display:block;margin:0 auto 8px">refresh</span>Mencari...
+  </div>`;
+
+  _searchTimeout = setTimeout(async () => {
+    const query = q.trim().toLowerCase();
+    const results = [];
+
+    try {
+      // Search usulan
+      const usulanList = await API.getUsulan({}).catch(() => []);
+      (usulanList || []).forEach(u => {
+        const haystack = [u.idUsulan, u.namaPKM, u.kodePKM, u.namaBulan, String(u.tahun), u.statusGlobal].join(' ').toLowerCase();
+        if (haystack.includes(query)) {
+          results.push({
+            type: 'usulan', icon: 'assignment', color: '#0d9488',
+            title: u.idUsulan,
+            sub: `${u.namaPKM} · ${u.namaBulan} ${u.tahun} · ${u.statusGlobal}`,
+            action: () => { closeGlobalSearch(); viewDetail(u.idUsulan); }
+          });
+        }
+      });
+
+      // Search puskesmas (hanya Admin)
+      if (currentUser.role === 'Admin' || currentUser.role === 'Super Admin') {
+        const pkmList = await API.getPKM().catch(() => []);
+        (pkmList || []).forEach(p => {
+          const haystack = [p.kode, p.nama].join(' ').toLowerCase();
+          if (haystack.includes(query)) {
+            results.push({
+              type: 'puskesmas', icon: 'local_hospital', color: '#2563eb',
+              title: p.nama,
+              sub: `Kode: ${p.kode} · ${p.aktif ? 'Aktif' : 'Tidak Aktif'}`,
+              action: () => { closeGlobalSearch(); loadPage('pkm'); }
+            });
+          }
+        });
+
+        // Search user
+        const userList = await API.getUsers().catch(() => []);
+        (userList || []).forEach(u => {
+          const haystack = [u.email, u.nama, u.role, u.namaPKM].join(' ').toLowerCase();
+          if (haystack.includes(query)) {
+            results.push({
+              type: 'user', icon: 'person', color: '#8b5cf6',
+              title: u.nama || u.email,
+              sub: `${u.role} · ${u.namaPKM || '-'} · ${u.email}`,
+              action: () => { closeGlobalSearch(); loadPage('users'); }
+            });
+          }
+        });
+      }
+    } catch(e) {}
+
+    if (!results.length) {
+      el.innerHTML = `<div style="padding:24px;text-align:center;color:#94a3b8;font-size:13px">
+        <span class="material-icons" style="font-size:32px;display:block;margin-bottom:8px">search_off</span>
+        Tidak ada hasil untuk "<strong style="color:#475569">${q}</strong>"
+      </div>`;
+      return;
+    }
+
+    const typeLabel = { usulan: 'Usulan', puskesmas: 'Puskesmas', user: 'User' };
+    const grouped = {};
+    results.forEach(r => { if (!grouped[r.type]) grouped[r.type] = []; grouped[r.type].push(r); });
+
+    el.innerHTML = Object.entries(grouped).map(([type, items]) => `
+      <div style="padding:6px 16px 2px;font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px">
+        ${typeLabel[type] || type} (${items.length})
+      </div>
+      ${items.slice(0, 5).map((r, i) => `
+        <button class="search-result-item" tabindex="0"
+          onclick="(${r.action.toString()})()"
+          style="width:100%;display:flex;align-items:center;gap:12px;padding:10px 16px;background:none;border:none;cursor:pointer;text-align:left;transition:background 0.1s"
+          onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='none'"
+          onfocus="this.style.background='#f0fdf9'" onblur="this.style.background='none'">
+          <div style="width:36px;height:36px;border-radius:10px;background:${r.color}18;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <span class="material-icons" style="font-size:18px;color:${r.color}">${r.icon}</span>
+          </div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:600;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.title}</div>
+            <div style="font-size:11.5px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.sub}</div>
+          </div>
+          <span class="material-icons" style="font-size:16px;color:#cbd5e1">chevron_right</span>
+        </button>`).join('')}
+    `).join('');
+  }, 300);
+}
+
+// Shortcut keyboard: Ctrl+K / Cmd+K
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+    e.preventDefault();
+    if (currentUser) openGlobalSearch();
+  }
+  if (e.key === 'Escape') closeGlobalSearch();
+});
+
+
+// ============== NOTIFIKASI IN-APP ==============
+let _notifInterval = null;
+let _notifCount = 0;
+
+async function fetchNotifCount() {
+  if (!currentUser) return;
+  try {
+    const role = currentUser.role;
+    const params = { role, email: currentUser.email, kode_pkm: currentUser.kodePKM };
+    const d = await API.dashboard(params);
+
+    let count = 0;
+    if (role === 'Operator') {
+      // Usulan yang ditolak dan perlu diperbaiki
+      const myUsulan = await API.getUsulan({ email_operator: currentUser.email }).catch(() => []);
+      count = (myUsulan || []).filter(u => u.statusGlobal === 'Ditolak').length;
+    } else if (role === 'Kepala Puskesmas') {
+      count = d.menunggu || 0;
+    } else if (role === 'Pengelola Program') {
+      count = d.menunggu || 0;
+    } else if (role === 'Admin') {
+      const allUsulan = await API.getUsulan({}).catch(() => []);
+      count = (allUsulan || []).filter(u => u.statusGlobal === 'Menunggu Admin').length;
+    }
+
+    _notifCount = count;
+    updateNotifBadge(count);
+  } catch(e) {}
+}
+
+function updateNotifBadge(count) {
+  // Update badge di topbar
+  let badge = document.getElementById('notifBadge');
+  const btn = document.getElementById('notifBtn');
+  if (!btn) return;
+
+  if (count > 0) {
+    if (!badge) {
+      badge = document.createElement('span');
+      badge.id = 'notifBadge';
+      badge.style.cssText = 'position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;background:#ef4444;color:white;border-radius:20px;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;padding:0 4px;border:2px solid white;line-height:1';
+      btn.style.position = 'relative';
+      btn.appendChild(badge);
+    }
+    badge.textContent = count > 99 ? '99+' : count;
+    badge.style.display = 'flex';
+  } else {
+    if (badge) badge.style.display = 'none';
+  }
+
+  // Update title halaman
+  const base = 'VISPM';
+  document.title = count > 0 ? `(${count}) ${base}` : base;
+}
+
+function toggleNotifPanel() {
+  let panel = document.getElementById('notifPanel');
+  if (panel) {
+    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+    if (panel.style.display === 'block') loadNotifPanel();
+    return;
+  }
+
+  panel = document.createElement('div');
+  panel.id = 'notifPanel';
+  panel.style.cssText = 'position:absolute;top:calc(100% + 8px);right:0;width:340px;background:white;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.15);border:1px solid #e2e8f0;z-index:9000;overflow:hidden';
+  panel.innerHTML = `
+    <div style="padding:12px 16px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:14px;font-weight:700;color:#1e293b">Notifikasi</span>
+      <button onclick="document.getElementById('notifPanel').style.display='none'" style="background:none;border:none;cursor:pointer;color:#94a3b8;display:flex"><span class="material-icons" style="font-size:18px">close</span></button>
+    </div>
+    <div id="notifPanelBody" style="max-height:360px;overflow-y:auto">
+      <div style="padding:24px;text-align:center;color:#94a3b8;font-size:13px">Memuat...</div>
+    </div>`;
+
+  const wrap = document.getElementById('notifBtnWrap');
+  if (wrap) { wrap.style.position = 'relative'; wrap.appendChild(panel); }
+
+  loadNotifPanel();
+
+  // Tutup saat klik di luar
+  setTimeout(() => {
+    document.addEventListener('click', function handler(e) {
+      const p = document.getElementById('notifPanel');
+      const w = document.getElementById('notifBtnWrap');
+      if (p && w && !w.contains(e.target)) {
+        p.style.display = 'none';
+        document.removeEventListener('click', handler);
+      }
+    });
+  }, 100);
+}
+
+async function loadNotifPanel() {
+  const el = document.getElementById('notifPanelBody');
+  if (!el) return;
+
+  try {
+    const role = currentUser.role;
+    const items = [];
+
+    if (role === 'Operator') {
+      const myUsulan = await API.getUsulan({ email_operator: currentUser.email }).catch(() => []);
+      (myUsulan || []).filter(u => u.statusGlobal === 'Ditolak').forEach(u => {
+        items.push({ icon: 'cancel', color: '#ef4444', bg: '#fef2f2',
+          title: `Usulan ${u.idUsulan} Ditolak`,
+          sub: `${u.namaBulan} ${u.tahun} — ${u.namaPKM}`,
+          action: `openIndikatorModal('${u.idUsulan}')` });
+      });
+    } else if (role === 'Kepala Puskesmas') {
+      const list = await API.getUsulan({ kode_pkm: currentUser.kodePKM }).catch(() => []);
+      (list || []).filter(u => u.statusGlobal === 'Menunggu Kepala Puskesmas').forEach(u => {
+        items.push({ icon: 'hourglass_top', color: '#f59e0b', bg: '#fffbeb',
+          title: `Menunggu Verifikasi Anda`,
+          sub: `${u.idUsulan} · ${u.namaBulan} ${u.tahun}`,
+          action: `loadPage('verifikasi')` });
+      });
+    } else if (role === 'Pengelola Program') {
+      const list = await API.getUsulan({ email_program: currentUser.email }).catch(() => []);
+      (list || []).filter(u => u.statusGlobal === 'Menunggu Pengelola Program').forEach(u => {
+        items.push({ icon: 'hourglass_top', color: '#2563eb', bg: '#eff6ff',
+          title: `Menunggu Verifikasi Program`,
+          sub: `${u.idUsulan} · ${u.namaBulan} ${u.tahun}`,
+          action: `loadPage('verifikasi')` });
+      });
+    } else if (role === 'Admin') {
+      const list = await API.getUsulan({}).catch(() => []);
+      (list || []).filter(u => u.statusGlobal === 'Menunggu Admin').forEach(u => {
+        items.push({ icon: 'admin_panel_settings', color: '#8b5cf6', bg: '#f5f3ff',
+          title: `Menunggu Persetujuan Admin`,
+          sub: `${u.idUsulan} · ${u.namaPKM} · ${u.namaBulan} ${u.tahun}`,
+          action: `loadPage('verifikasi')` });
+      });
+    }
+
+    if (!items.length) {
+      el.innerHTML = `<div style="padding:32px;text-align:center;color:#94a3b8;font-size:13px">
+        <span class="material-icons" style="font-size:36px;display:block;margin-bottom:8px;color:#d1fae5">check_circle</span>
+        Tidak ada notifikasi baru
+      </div>`;
+      return;
+    }
+
+    el.innerHTML = items.map(item => `
+      <button onclick="${item.action};document.getElementById('notifPanel').style.display='none'"
+        style="width:100%;display:flex;align-items:flex-start;gap:10px;padding:12px 16px;background:none;border:none;border-bottom:1px solid #f8fafc;cursor:pointer;text-align:left"
+        onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='none'">
+        <div style="width:34px;height:34px;border-radius:10px;background:${item.bg};display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">
+          <span class="material-icons" style="font-size:17px;color:${item.color}">${item.icon}</span>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${item.title}</div>
+          <div style="font-size:11.5px;color:#64748b;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${item.sub}</div>
+        </div>
+      </button>`).join('');
+  } catch(e) {
+    el.innerHTML = `<div style="padding:20px;text-align:center;color:#ef4444;font-size:13px">Gagal memuat notifikasi</div>`;
+  }
+}
+
+function startNotifPoller() {
+  fetchNotifCount();
+  clearInterval(_notifInterval);
+  _notifInterval = setInterval(fetchNotifCount, 60000); // cek tiap 1 menit
 }
 
 function _buildMasterShell() {

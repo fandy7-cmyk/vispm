@@ -204,6 +204,8 @@ async function doLogin() {
     const user = await API.login(email, password);
     currentUser = user;
     localStorage.setItem('spm_user', JSON.stringify(user));
+    // Catat log login
+    API.logAudit({ module: 'auth', action: 'LOGIN', userEmail: user.email, userNama: user.nama, userRole: user.role, detail: 'Login berhasil' });
     startApp();
     startIdleWatcher();
   } catch (e) {
@@ -231,7 +233,7 @@ function doLogout() {
     title: 'Keluar dari Sistem',
     message: 'Yakin ingin keluar dari sistem?',
     type: 'warning',
-    onConfirm: () => { currentUser = null; localStorage.removeItem('spm_user'); try { sessionStorage.removeItem('spm_last_page'); } catch(e) {} location.reload(); }
+    onConfirm: () => { if(currentUser) API.logAudit({module:'auth',action:'LOGOUT',userEmail:currentUser.email,userNama:currentUser.nama,userRole:currentUser.role,detail:'Logout manual'}); currentUser = null; localStorage.removeItem('spm_user'); try { sessionStorage.removeItem('spm_last_page'); } catch(e) {} location.reload(); }
   });
 }
 
@@ -284,6 +286,13 @@ function startApp() {
       window._appTahunAkhir = parseInt(s.tahun_akhir);
     }
   }).catch(() => {});
+  // Fetch periode aktif untuk proteksi sidebar Input Usulan
+  API.get('periode').then(allPeriode => {
+    window._periodeAktifList = Array.isArray(allPeriode) ? allPeriode : [];
+    buildSidebar(); // rebuild sidebar setelah tahu status periode
+  }).catch(() => {
+    window._periodeAktifList = [];
+  });
   buildSidebar();
   // Restore halaman terakhir sebelum refresh (jika ada), fallback ke dashboard
   // Restore halaman terakhir, tapi validasi dulu apakah role saat ini boleh akses
@@ -500,9 +509,19 @@ function buildSidebar() {
   for (const section of sections) {
     html += `<div class="sidebar-section">${section.label}</div>`;
     for (const item of section.items) {
-      html += `<div class="menu-item" id="nav-${item.id}" onclick="loadPage('${item.id}')">
-        <span class="material-icons">${item.icon}</span><span>${item.label}</span>
-      </div>`;
+      // Disable menu Input Usulan jika tidak ada periode aktif
+      const isInputMenu = item.id === 'input';
+      const noPeriodeAktif = isInputMenu && !(window._periodeAktifList || []).some(p => p.isAktifToday);
+      if (isInputMenu && noPeriodeAktif) {
+        html += `<div class="menu-item" id="nav-${item.id}" title="Tidak ada periode input aktif" style="opacity:0.45;cursor:not-allowed;pointer-events:none">
+          <span class="material-icons">${item.icon}</span><span>${item.label}</span>
+          <span class="material-icons" style="font-size:14px;margin-left:auto;color:#fbbf24">lock</span>
+        </div>`;
+      } else {
+        html += `<div class="menu-item" id="nav-${item.id}" onclick="loadPage('${item.id}')">
+          <span class="material-icons">${item.icon}</span><span>${item.label}</span>
+        </div>`;
+      }
     }
   }
   // Tombol Buku Panduan — tampil untuk semua role di bagian bawah sidebar
@@ -585,6 +604,14 @@ const PAGE_TITLES = {
 };
 
 function loadPage(page) {
+  // === PROTEKSI PERIODE: Cegah akses halaman Input Usulan jika tidak ada periode aktif ===
+  if (page === 'input' && currentUser && currentUser.role === 'Operator') {
+    const periodeAktif = (window._periodeAktifList || []).filter(p => p.isAktifToday);
+    if (periodeAktif.length === 0) {
+      showPeriodeTutupBanner();
+      return;
+    }
+  }
   currentPage = page;
   // Simpan halaman terakhir agar bisa di-restore saat refresh
   try { sessionStorage.setItem('spm_last_page', page); } catch(e) {}
@@ -1132,6 +1159,31 @@ function renderUsulanTable(rows, role) {
   </table></div>`;
 }
 
+// ============== PROTEKSI PERIODE: Banner periode tutup ==============
+function showPeriodeTutupBanner() {
+  const mc = document.getElementById('mainContent');
+  if (!mc) return;
+  mc.innerHTML = `
+    <div class="page-header">
+      <h1 style="display:flex;align-items:center;gap:8px">
+        <span class="material-icons" style="color:#0d9488">edit</span>Input Usulan
+      </h1>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;text-align:center">
+      <div style="width:72px;height:72px;border-radius:50%;background:#fef9c3;border:2px solid #fde68a;display:flex;align-items:center;justify-content:center;margin-bottom:20px">
+        <span class="material-icons" style="font-size:36px;color:#d97706">event_busy</span>
+      </div>
+      <div style="font-size:20px;font-weight:800;color:#78350f;margin-bottom:8px">Periode Input Ditutup</div>
+      <div style="font-size:14px;color:#92400e;max-width:400px;line-height:1.6;margin-bottom:24px">
+        Saat ini tidak ada periode input yang aktif.<br>
+        Hubungi Admin untuk membuka periode input.
+      </div>
+      <button class="btn btn-secondary" onclick="loadPage('dashboard')">
+        <span class="material-icons">arrow_back</span>Kembali ke Dashboard
+      </button>
+    </div>`;
+}
+
 // ============== INPUT USULAN (OPERATOR) ==============
 async function renderInput() {
   // Guard: hanya Operator yang bisa input usulan
@@ -1420,6 +1472,24 @@ async function openGDriveFolder(kodePKM, tahun, bulan, namaBulan, idUsulan) {
 }
 
 async function openIndikatorModal(idUsulan) {
+  // === PROTEKSI PERIODE: cek apakah periode masih aktif sebelum buka modal ===
+  // Hanya berlaku untuk Operator (yang input data), bukan verifikasi
+  if (currentUser && currentUser.role === 'Operator') {
+    // Re-fetch periode untuk memastikan data terkini (bukan cache lama)
+    try {
+      const freshPeriode = await API.get('periode');
+      window._periodeAktifList = Array.isArray(freshPeriode) ? freshPeriode : [];
+    } catch(e) {}
+    const periodeAktif = (window._periodeAktifList || []).filter(p => p.isAktifToday);
+    if (periodeAktif.length === 0) {
+      // Tutup paksa jika modal sudah terbuka, rebuild sidebar lalu tampilkan banner
+      closeModal('indikatorModal');
+      buildSidebar();
+      showPeriodeTutupBanner();
+      toast('Periode input telah ditutup. Anda tidak dapat mengubah usulan saat ini.', 'error');
+      return;
+    }
+  }
   currentIndikatorUsulan = idUsulan;
   document.getElementById('indModalId').textContent = idUsulan;
   // Reset notifikasi dan tombol submit ke state awal
@@ -2102,6 +2172,21 @@ async function saveIndikator(noIndikator) {
 }
 
 async function submitUsulanFromModal() {
+  // === PROTEKSI PERIODE: cek ulang saat submit agar tidak bisa submit jika periode sudah tutup ===
+  if (currentUser && currentUser.role === 'Operator') {
+    try {
+      const freshPeriode = await API.get('periode');
+      window._periodeAktifList = Array.isArray(freshPeriode) ? freshPeriode : [];
+    } catch(e) {}
+    const periodeAktif = (window._periodeAktifList || []).filter(p => p.isAktifToday);
+    if (periodeAktif.length === 0) {
+      closeModal('indikatorModal');
+      buildSidebar();
+      showPeriodeTutupBanner();
+      toast('Periode input telah ditutup. Usulan tidak dapat disubmit.', 'error');
+      return;
+    }
+  }
   // Cek apakah ini mode perbaiki (tombol sudah berubah jadi "Ajukan Ulang")
   const submitBtn = document.getElementById('btnSubmitFromModal');
   const isResubmit = submitBtn && submitBtn.textContent.includes('Ajukan Ulang');
@@ -3496,7 +3581,7 @@ async function renderLaporan() {
       <h1><span class="material-icons">bar_chart</span>Laporan</h1>
     </div>
     <div class="card">
-      <div class="card-header-bar"><span class="card-title"><span class="material-icons">filter_list</span>Filter</span></div>
+      <div class="card-header-bar" style="justify-content:space-between"><span class="card-title"><span class="material-icons">filter_list</span>Filter</span><button class="btn btn-primary btn-sm" onclick="exportLaporan()"><span class="material-icons">download</span>Export Excel</button></div>
       <div class="card-body">
         <div class="filter-row">
           <select class="form-control" id="lapTahun" onchange="loadLaporan()">${yearOptions(CURRENT_YEAR)}</select>
@@ -3582,16 +3667,15 @@ async function loadLaporan() {
 function exportLaporan() {
   const data = window._laporanData;
   if (!data || !data.length) return toast('Tidak ada data untuk diekspor', 'warning');
-
-  const headers = ['No','ID Usulan','Puskesmas','Periode','Tgl Dibuat','Indeks SPM','Status'];
-  const rows = data.map(r => [r.no, r.idUsulan, r.namaPKM, `${r.namaBulan} ${r.tahun}`, formatDateTime(r.createdAt), parseFloat(r.indeksSPM||0).toFixed(2), r.statusGlobal]);
-  const csv = [headers, ...rows].map(r => r.map(c => `"${c}"`).join(',')).join('\n');
-
-  const blob = new Blob([csv], { type: 'text/csv' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href = url; a.download = 'laporan_spm.csv'; a.click();
-  URL.revokeObjectURL(url);
-  toast('File CSV berhasil diunduh');
+  const headers = ['No','ID Usulan','Puskesmas','Periode','Tgl Dibuat','Indeks SPM','Status','Dibuat Oleh'];
+  const rows = data.map(r => [
+    r.no, r.idUsulan, r.namaPKM,
+    r.namaBulan + ' ' + r.tahun,
+    formatDateTime(r.createdAt),
+    parseFloat(r.indeksSPM||0).toFixed(2),
+    r.statusGlobal, r.createdBy||''
+  ]);
+  _downloadExcel('Laporan_SPM', headers, rows);
 }
 
 // ============== MASTER DATA (TAB) ==============
@@ -3615,6 +3699,8 @@ async function renderMasterData(tab) {
   try {
     if (activeTab === 'pejabat') {
       await renderPejabatTab(tc);
+    } else if (activeTab === 'audit-trail') {
+      await renderAuditTrail(tc);
     } else {
       const fnMap = {
         users: renderUsers, jabatan: renderJabatan, pkm: renderPKM,
@@ -5016,15 +5102,77 @@ document.addEventListener('click', (e) => {
 
 // Enter key on auth
 // ============== IDLE AUTO LOGOUT ==============
-const IDLE_TIMEOUT = 4 * 60 * 1000; // 4 menit
-let _idleTimer = null;
+const IDLE_TIMEOUT      = 30 * 60 * 1000; // 30 menit idle → logout
+const IDLE_WARN_BEFORE  =  2 * 60 * 1000; // tampilkan warning 2 menit sebelum logout
+let _idleTimer     = null;
+let _idleWarnTimer = null;
+let _idleCountdown = null;
+
+function _clearIdleTimers() {
+  clearTimeout(_idleTimer);
+  clearTimeout(_idleWarnTimer);
+  clearInterval(_idleCountdown);
+}
+
+function _hideIdleWarning() {
+  const el = document.getElementById('idleWarningModal');
+  if (el) el.remove();
+}
+
+function _showIdleWarning() {
+  _hideIdleWarning();
+  let secs = Math.floor(IDLE_WARN_BEFORE / 1000);
+  const modal = document.createElement('div');
+  modal.id = 'idleWarningModal';
+  modal.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.5)';
+  modal.innerHTML = `
+    <div style="background:white;border-radius:16px;padding:32px 28px;max-width:360px;width:90%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.3)">
+      <div style="width:56px;height:56px;border-radius:50%;background:#fef9c3;border:2px solid #fde68a;display:flex;align-items:center;justify-content:center;margin:0 auto 16px">
+        <span class="material-icons" style="font-size:28px;color:#d97706">hourglass_top</span>
+      </div>
+      <div style="font-size:17px;font-weight:800;color:#1e293b;margin-bottom:8px">Sesi Akan Berakhir</div>
+      <div style="font-size:13px;color:#64748b;margin-bottom:16px;line-height:1.5">
+        Anda tidak aktif. Sistem akan logout otomatis dalam
+      </div>
+      <div id="idleCountdownNum" style="font-size:42px;font-weight:900;color:#d97706;font-family:monospace;margin-bottom:20px">${secs}</div>
+      <button onclick="window._resetIdleFromWarning()" style="width:100%;height:44px;background:linear-gradient(135deg,#0d9488,#06b6d4);border:none;border-radius:10px;color:white;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">
+        <span style="display:flex;align-items:center;justify-content:center;gap:6px">
+          <span class="material-icons" style="font-size:18px">touch_app</span> Saya Masih Di Sini
+        </span>
+      </button>
+    </div>`;
+  document.body.appendChild(modal);
+
+  _idleCountdown = setInterval(() => {
+    secs--;
+    const el = document.getElementById('idleCountdownNum');
+    if (el) el.textContent = secs;
+    if (secs <= 0) clearInterval(_idleCountdown);
+  }, 1000);
+}
+
+window._resetIdleFromWarning = function() {
+  _hideIdleWarning();
+  resetIdleTimer();
+};
 
 function resetIdleTimer() {
-  clearTimeout(_idleTimer);
+  _clearIdleTimers();
+  _hideIdleWarning();
+  if (!currentUser) return;
+
+  // Warning 2 menit sebelum timeout
+  _idleWarnTimer = setTimeout(() => {
+    if (currentUser) _showIdleWarning();
+  }, IDLE_TIMEOUT - IDLE_WARN_BEFORE);
+
+  // Logout setelah timeout penuh
   _idleTimer = setTimeout(() => {
     if (currentUser) {
+      _hideIdleWarning();
       currentUser = null;
       localStorage.removeItem('spm_user');
+      try { sessionStorage.removeItem('spm_last_page'); } catch(e) {}
       toast('Sesi berakhir karena tidak ada aktivitas. Silakan login kembali.', 'warning');
       setTimeout(() => location.reload(), 2000);
     }
@@ -5206,7 +5354,201 @@ const _masterTabs = [
   { id: 'periode',         icon: 'event_available', label: 'Periode' },
   { id: 'target-tahunan',  icon: 'track_changes',   label: 'Target Tahunan' },
   { id: 'pejabat',         icon: 'draw',            label: 'Pejabat Penandatangan' },
+  { id: 'audit-trail',     icon: 'manage_search',   label: 'Audit Trail' },
 ];
+
+
+// ============== AUDIT TRAIL ==============
+async function renderAuditTrail(el) {
+  const target = el || document.getElementById('masterTabContent');
+  if (!target) return;
+
+  const today = new Date();
+  const weekAgo = new Date(today); weekAgo.setDate(today.getDate() - 7);
+  const fmt = d => d.toISOString().split('T')[0];
+
+  target.innerHTML = `
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-header-bar" style="justify-content:space-between">
+        <span class="card-title"><span class="material-icons">manage_search</span>Audit Trail — Log Aktivitas Global</span>
+        <button class="btn btn-primary btn-sm" onclick="exportAuditTrail()">
+          <span class="material-icons">download</span>Export Excel
+        </button>
+      </div>
+      <div class="card-body" style="padding:12px 16px">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+          <div>
+            <label style="font-size:12px;font-weight:600;color:#64748b;display:block;margin-bottom:4px">Tanggal Mulai</label>
+            <input type="date" class="form-control" id="atDateFrom" value="${fmt(weekAgo)}" style="width:150px">
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:600;color:#64748b;display:block;margin-bottom:4px">Tanggal Akhir</label>
+            <input type="date" class="form-control" id="atDateTo" value="${fmt(today)}" style="width:150px">
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:600;color:#64748b;display:block;margin-bottom:4px">Modul</label>
+            <select class="form-control" id="atModule" style="width:160px">
+              <option value="">Semua Modul</option>
+              <option value="auth">Login / Auth</option>
+              <option value="usulan">Usulan</option>
+              <option value="users">User</option>
+              <option value="puskesmas">Puskesmas</option>
+              <option value="indikator">Indikator</option>
+              <option value="periode">Periode</option>
+              <option value="settings">Pengaturan</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:600;color:#64748b;display:block;margin-bottom:4px">Aksi</label>
+            <select class="form-control" id="atAction" style="width:140px">
+              <option value="">Semua Aksi</option>
+              <option value="LOGIN">Login</option>
+              <option value="CREATE">Tambah</option>
+              <option value="UPDATE">Ubah</option>
+              <option value="DELETE">Hapus</option>
+              <option value="SUBMIT">Submit</option>
+              <option value="APPROVE">Approve</option>
+              <option value="REJECT">Tolak</option>
+            </select>
+          </div>
+          <div style="flex:1;min-width:160px">
+            <label style="font-size:12px;font-weight:600;color:#64748b;display:block;margin-bottom:4px">Cari User</label>
+            <input type="text" class="form-control" id="atUser" placeholder="Email atau nama...">
+          </div>
+          <button class="btn btn-primary" onclick="loadAuditTrail()">
+            <span class="material-icons">search</span>Tampilkan
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-body" style="padding:0" id="auditTrailTable">
+        <div class="empty-state" style="padding:40px">
+          <span class="material-icons" style="font-size:40px;color:#cbd5e1">manage_search</span>
+          <p>Memuat log 7 hari terakhir...</p>
+        </div>
+      </div>
+    </div>`;
+
+  loadAuditTrail();
+}
+
+async function loadAuditTrail() {
+  const el = document.getElementById('auditTrailTable');
+  if (!el) return;
+  el.innerHTML = `<div class="empty-state" style="padding:32px"><span class="material-icons" style="animation:spin 1s linear infinite">refresh</span><p>Memuat...</p></div>`;
+
+  const params = {};
+  const df = document.getElementById('atDateFrom')?.value;
+  const dt = document.getElementById('atDateTo')?.value;
+  const mod = document.getElementById('atModule')?.value;
+  const act = document.getElementById('atAction')?.value;
+  const usr = document.getElementById('atUser')?.value;
+  if (df) params.date_from = df;
+  if (dt) params.date_to = dt;
+  if (mod) params.module = mod;
+  if (act) params.action = act;
+  if (usr) params.user = usr;
+
+  try {
+    const data = await API.get('audit-trail', params);
+    window._auditTrailData = data;
+
+    if (!data || !data.length) {
+      el.innerHTML = `<div class="empty-state" style="padding:32px"><span class="material-icons">inbox</span><p>Tidak ada log untuk filter ini</p></div>`;
+      return;
+    }
+
+    const actionColor = { LOGIN:'#0d9488',CREATE:'#2563eb',UPDATE:'#f59e0b',DELETE:'#ef4444',SUBMIT:'#8b5cf6',APPROVE:'#10b981',REJECT:'#f43f5e' };
+    const actionBg    = { LOGIN:'#f0fdf9',CREATE:'#eff6ff',UPDATE:'#fffbeb',DELETE:'#fef2f2',SUBMIT:'#f5f3ff',APPROVE:'#ecfdf5',REJECT:'#fff1f2' };
+
+    el.innerHTML = `<div class="table-container"><table>
+      <thead><tr>
+        <th style="width:160px">Waktu</th>
+        <th style="width:90px">Modul</th>
+        <th style="width:80px">Aksi</th>
+        <th>User</th>
+        <th style="width:120px">Role</th>
+        <th>Detail</th>
+        <th style="width:110px">IP Address</th>
+      </tr></thead>
+      <tbody>${data.map(r => {
+        const ac = (r.action||'').toUpperCase();
+        const col = actionColor[ac] || '#64748b';
+        const bg  = actionBg[ac]    || '#f8fafc';
+        return `<tr>
+          <td style="font-size:11.5px;color:#64748b;white-space:nowrap">${formatDateTime(r.created_at)}</td>
+          <td><span style="font-size:11px;font-weight:700;background:#f1f5f9;color:#475569;padding:2px 8px;border-radius:20px">${r.module||'-'}</span></td>
+          <td><span style="font-size:11px;font-weight:700;background:${bg};color:${col};padding:2px 8px;border-radius:20px;border:1px solid ${col}33">${ac||'-'}</span></td>
+          <td style="font-size:12px"><div style="font-weight:600">${r.user_nama||'-'}</div><div style="font-size:11px;color:#94a3b8">${r.user_email||''}</div></td>
+          <td style="font-size:12px;color:#64748b">${r.user_role||'-'}</td>
+          <td style="font-size:12px;max-width:280px;word-break:break-word">${r.detail||'-'}</td>
+          <td style="font-size:11px;color:#94a3b8">${r.ip_address||'-'}</td>
+        </tr>`;
+      }).join('')}
+      </tbody></table></div>
+      <div style="padding:10px 16px;font-size:12px;color:#94a3b8;border-top:1px solid #f1f5f9">
+        Total: <strong>${data.length}</strong> entri
+      </div>`;
+  } catch(e) {
+    el.innerHTML = `<div class="empty-state" style="padding:32px"><span class="material-icons" style="color:#ef4444">error</span><p style="color:#ef4444">${e.message}</p></div>`;
+  }
+}
+
+function exportAuditTrail() {
+  const data = window._auditTrailData;
+  if (!data || !data.length) return toast('Tidak ada data untuk diekspor', 'warning');
+  const headers = ['Waktu','Modul','Aksi','Email','Nama','Role','Detail','IP Address'];
+  const rows = data.map(r => [
+    formatDateTime(r.created_at), r.module||'', r.action||'',
+    r.user_email||'', r.user_nama||'', r.user_role||'',
+    r.detail||'', r.ip_address||''
+  ]);
+  _downloadExcel('Audit_Trail', headers, rows);
+}
+
+
+// ============== EXCEL EXPORT HELPER (SpreadsheetML, no external lib) ==============
+function _downloadExcel(filename, headers, rows) {
+  const esc = v => String(v == null ? '' : v)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+  let xml = '<?xml version="1.0" encoding="UTF-8"?>';
+  xml += '<?mso-application progid="Excel.Sheet"?>';
+  xml += '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" ';
+  xml += 'xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">';
+  xml += '<Styles>';
+  xml += '<Style ss:ID="hdr"><Font ss:Bold="1" ss:Color="#FFFFFF"/>';
+  xml += '<Interior ss:Color="#0D9488" ss:Pattern="Solid"/></Style>';
+  xml += '<Style ss:ID="even"><Interior ss:Color="#F8FAFC" ss:Pattern="Solid"/></Style>';
+  xml += '</Styles>';
+  xml += '<Worksheet ss:Name="Data"><Table>';
+
+  xml += '<Row>';
+  headers.forEach(h => { xml += `<Cell ss:StyleID="hdr"><Data ss:Type="String">${esc(h)}</Data></Cell>`; });
+  xml += '</Row>';
+
+  rows.forEach((row, ri) => {
+    const style = ri % 2 === 1 ? ' ss:StyleID="even"' : '';
+    xml += `<Row${style}>`;
+    row.forEach(v => {
+      const num = !isNaN(v) && v !== '' && v !== null;
+      xml += `<Cell><Data ss:Type="${num ? 'Number' : 'String'}">${esc(v)}</Data></Cell>`;
+    });
+    xml += '</Row>';
+  });
+
+  xml += '</Table></Worksheet></Workbook>';
+
+  const blob = new Blob([xml], { type: 'application/vnd.ms-excel;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename + '_' + new Date().toISOString().split('T')[0] + '.xls';
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('File Excel berhasil diunduh', 'success');
+}
 
 function _buildMasterShell() {
   const tabsHtml = _masterTabs.map(t => `

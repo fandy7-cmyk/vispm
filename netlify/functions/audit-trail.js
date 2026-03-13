@@ -1,10 +1,8 @@
 const { getPool, ok, err, cors } = require('./db');
 
-exports.handler = async (event) => {
-  if (event.httpMethod === 'OPTIONS') return cors();
-  const pool = getPool();
-
-  // Auto-migrate: buat tabel audit_trail jika belum ada
+let _migrated = false;
+async function runMigrations(pool) {
+  if (_migrated) return;
   await pool.query(`
     CREATE TABLE IF NOT EXISTS audit_trail (
       id          BIGSERIAL PRIMARY KEY,
@@ -19,10 +17,18 @@ exports.handler = async (event) => {
       meta        JSONB
     )
   `).catch(() => {});
+  await Promise.all([
+    pool.query(`CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_trail(created_at DESC)`).catch(() => {}),
+    pool.query(`CREATE INDEX IF NOT EXISTS idx_audit_module  ON audit_trail(module)`).catch(() => {}),
+    pool.query(`CREATE INDEX IF NOT EXISTS idx_audit_email   ON audit_trail(user_email)`).catch(() => {}),
+  ]);
+  _migrated = true;
+}
 
-  await pool.query(`CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_trail(created_at DESC)`).catch(() => {});
-  await pool.query(`CREATE INDEX IF NOT EXISTS idx_audit_module  ON audit_trail(module)`).catch(() => {});
-  await pool.query(`CREATE INDEX IF NOT EXISTS idx_audit_email   ON audit_trail(user_email)`).catch(() => {});
+exports.handler = async (event) => {
+  if (event.httpMethod === 'OPTIONS') return cors();
+  const pool = getPool();
+  await runMigrations(pool);
 
   try {
     // ===== GET: query log =====

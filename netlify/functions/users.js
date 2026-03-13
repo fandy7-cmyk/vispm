@@ -1,13 +1,17 @@
 const { getPool, ok, err, cors } = require('./db');
 const bcrypt = require('bcryptjs');
 
+let _migrated = false;
+
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors();
   const pool = getPool();
   const method = event.httpMethod;
   try {
-    // Auto-migrate: pastikan kolom tanda_tangan ada (TEXT untuk simpan base64/URL)
-    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS tanda_tangan TEXT`).catch(()=>{});
+    if (!_migrated) {
+      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS tanda_tangan TEXT`).catch(()=>{});
+      _migrated = true;
+    }
     if (method === 'GET') {
       const r = await pool.query(
         `SELECT u.email, u.nama, u.nip, u.role, u.kode_pkm, u.indikator_akses, u.jabatan, u.aktif,

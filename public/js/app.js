@@ -43,7 +43,7 @@ async function renderCatatanThread(elId, idUsulan, currentRole) {
 
   // === GRID MODE: 4 kolom, compact, klik expand detail ===
   const COLS = 10;
-  let html = '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">';
+  let html = '<div style="display:grid;grid-template-columns:repeat(10,1fr);gap:6px">';
 
   logs.forEach((log, idx) => {
     const cfg = roleCfg[log.role] || { color:'#64748b', bg:'#f8fafc', border:'#e2e8f0' };
@@ -2573,7 +2573,7 @@ async function openLogAktivitas(idUsulan) {
       const jam = d.toLocaleTimeString('id-ID', { ...o, hour:'2-digit', minute:'2-digit', hour12:false });
       return `${tgl} | ${jam} WITA`;
     }
-    const COLS = 10;
+    const COLS = 4;
     let gridHtml;
     if (!logs.length) {
       gridHtml = `<div class="empty-state"><span class="material-icons">history_toggle_off</span><p>Belum ada aktivitas</p></div>`;

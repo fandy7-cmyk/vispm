@@ -145,12 +145,24 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
   const kasubag = pjResult.rows.find(p => p.jabatan === 'Kepala Sub Bagian Perencanaan') || {};
   const kadis   = pjResult.rows.find(p => p.jabatan === 'Kepala Dinas Kesehatan PPKB') || {};
 
-  // Indikator + target tahunan
+  // Indikator + target tahunan + realisasi kumulatif semua bulan di tahun ini
+  // sisa_target = sasaran_tahunan - realisasi_kumulatif (akurat lintas bulan)
   const indResult = await pool.query(
     `SELECT ui.*,
             mi.nama_indikator, mi.catatan as catatan_indikator,
             COALESCE(tt.sasaran, 0) as sasaran_tahunan,
-            -- realisasi_rasio dihitung ulang langsung dari nilai aktual (bukan stored)
+            -- realisasi kumulatif = SUM semua bulan di tahun ini, puskesmas & indikator sama
+            -- status NOT IN Draft/Ditolak agar hanya hitung yang sudah diproses
+            COALESCE((
+              SELECT SUM(ui2.capaian)
+              FROM usulan_indikator ui2
+              JOIN usulan_header uh2 ON uh2.id_usulan = ui2.id_usulan
+              WHERE uh2.kode_pkm = $2
+                AND uh2.tahun = $3
+                AND ui2.no_indikator = ui.no_indikator
+                AND uh2.status_global NOT IN ('Draft', 'Ditolak')
+            ), 0) as realisasi_kumulatif,
+            -- capaian_pct bulan ini vs target tahunan
             CASE WHEN COALESCE(tt.sasaran,0) > 0
                  THEN ROUND((COALESCE(ui.capaian,0)::numeric / tt.sasaran::numeric) * 100, 2)
                  ELSE ROUND(COALESCE(ui.realisasi_rasio,0)::numeric * 100, 2)
@@ -352,7 +364,8 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
       const sasaranTahunan = parseInt(ind.sasaran_tahunan) || 0;
       const target  = parseFloat(ind.target)  || 0;
       const capaian = parseFloat(ind.capaian) || 0;
-      const sisaTarget = sasaranTahunan > 0 ? Math.max(0, sasaranTahunan - capaian) : '-';
+      const realisasiKumulatif = parseFloat(ind.realisasi_kumulatif) || 0;
+      const sisaTarget = sasaranTahunan > 0 ? Math.max(0, sasaranTahunan - realisasiKumulatif) : '-';
       const capaianPct = parseFloat(ind.capaian_pct || 0).toFixed(0);
       const bg = i % 2 === 0 ? '#f8fafc' : 'white';
       return `<tr style="background:${bg}">
@@ -395,7 +408,8 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
       const sasaranTahunan = parseInt(ind.sasaran_tahunan) || 0;
       const target  = parseFloat(ind.target)  || 0;
       const capaian = parseFloat(ind.capaian) || 0;
-      const sisaTarget = sasaranTahunan > 0 ? Math.max(0, sasaranTahunan - capaian) : null;
+      const realisasiKumulatif = parseFloat(ind.realisasi_kumulatif) || 0;
+      const sisaTarget = sasaranTahunan > 0 ? Math.max(0, sasaranTahunan - realisasiKumulatif) : null;
       const capaianPct = parseFloat(ind.capaian_pct || 0).toFixed(0);
       const catatan = ind.catatan_indikator || '';
       const slots = getVerifierSlots(ind.no_indikator);

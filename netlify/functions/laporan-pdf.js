@@ -377,9 +377,9 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
         <td style="padding:6px 8px;border:1px solid #cbd5e1;text-align:center;font-weight:700">${ind.no_indikator}</td>
         <td style="padding:6px 8px;border:1px solid #cbd5e1;font-size:10.5px">${ind.nama_indikator||'-'}</td>
         <td style="padding:6px 8px;border:1px solid #cbd5e1;text-align:center">${sasaranTahunan > 0 ? sasaranTahunan : '<span style="color:#94a3b8">-</span>'}</td>
-        <td style="padding:6px 8px;border:1px solid #cbd5e1;text-align:center;font-weight:700;color:${sisaColor}">${typeof sisaTarget === 'number' ? sisaTarget : '<span style="color:#94a3b8">-</span>'}</td>
         <td style="padding:6px 8px;border:1px solid #cbd5e1;text-align:center">${target}</td>
         <td style="padding:6px 8px;border:1px solid #cbd5e1;text-align:center">${capaian}</td>
+        <td style="padding:6px 8px;border:1px solid #cbd5e1;text-align:center;font-weight:700;color:${sisaColor}">${typeof sisaTarget === 'number' ? sisaTarget : '<span style="color:#94a3b8">-</span>'}</td>
         <td style="padding:6px 8px;border:1px solid #cbd5e1;text-align:center;font-weight:700;color:#1e293b">${capaianPct}%</td>
       </tr>`;
     }).join('');
@@ -393,9 +393,9 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
             <th style="padding:7px 8px;border:1px solid #334155;text-align:center;width:30px;text-transform:uppercase">No</th>
             <th style="padding:7px 8px;border:1px solid #334155;text-align:center;text-transform:uppercase">Nama Indikator</th>
             <th style="padding:7px 8px;border:1px solid #334155;text-align:center;width:65px;font-size:10px;text-transform:uppercase">Target<br>Tahunan</th>
-            <th style="padding:7px 8px;border:1px solid #334155;text-align:center;width:65px;font-size:10px;text-transform:uppercase">Sisa<br>Target Tahunan</th>
             <th style="padding:7px 8px;border:1px solid #334155;text-align:center;width:65px;font-size:10px;text-transform:uppercase">Target<br>Bulan Ini</th>
             <th style="padding:7px 8px;border:1px solid #334155;text-align:center;width:65px;font-size:10px;text-transform:uppercase">Realisasi<br>Bulan Ini</th>
+            <th style="padding:7px 8px;border:1px solid #334155;text-align:center;width:65px;font-size:10px;text-transform:uppercase">Sisa<br>Target Tahunan</th>
             <th style="padding:7px 8px;border:1px solid #334155;text-align:center;width:60px;text-transform:uppercase">Capaian</th>
           </tr>
         </thead>
@@ -453,18 +453,18 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
           <thead>
             <tr style="background:#1e293b;color:white">
               <th style="padding:7px 10px;font-size:11px;border:1px solid #334155;text-align:center;text-transform:uppercase">Target<br>Tahunan</th>
-              <th style="padding:7px 10px;font-size:11px;border:1px solid #334155;text-align:center;text-transform:uppercase">Sisa<br>Target Tahunan</th>
               <th style="padding:7px 10px;font-size:11px;border:1px solid #334155;text-align:center;text-transform:uppercase">Target<br>Bulan Ini</th>
               <th style="padding:7px 10px;font-size:11px;border:1px solid #334155;text-align:center;text-transform:uppercase">Realisasi<br>Bulan Ini</th>
+              <th style="padding:7px 10px;font-size:11px;border:1px solid #334155;text-align:center;text-transform:uppercase">Sisa<br>Target Tahunan</th>
               <th style="padding:7px 10px;font-size:11px;border:1px solid #334155;text-align:center;text-transform:uppercase">Capaian</th>
             </tr>
           </thead>
           <tbody>
             <tr>
               <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:center;font-size:11px">${sasaranTahunan>0?sasaranTahunan:'<span style="color:#94a3b8;font-style:italic">-</span>'}</td>
-              <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:center;font-size:11px;color:${sisaTarget !== null && sisaTarget === 0 ? '#16a34a' : '#1e293b'}">${sisaTarget !== null ? sisaTarget : '<span style="color:#94a3b8;font-style:italic">-</span>'}</td>
               <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:center;font-size:11px">${target}</td>
               <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:center;font-size:11px">${capaian}</td>
+              <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:center;font-size:11px;color:${sisaTarget !== null && sisaTarget === 0 ? '#16a34a' : '#1e293b'}">${sisaTarget !== null ? sisaTarget : '<span style="color:#94a3b8;font-style:italic">-</span>'}</td>
               <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:center;font-size:11px;font-weight:700;color:#1e293b">${capaianPct}%</td>
             </tr>
           </tbody>

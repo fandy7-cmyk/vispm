@@ -572,7 +572,7 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
       </table>
       <!-- TANDA TANGAN PEJABAT -->
       <div style="margin-top:32px">
-        <div style="font-size:10px;color:#334155;margin-bottom:6px;text-align:right">Adean, ${fmtDT(h.kapus_approved_at)}</div>
+        <div style="font-size:10px;color:#334155;margin-bottom:6px;text-align:right">Adean, ${fmtDT(h.final_approved_at)}</div>
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:20px">
           ${ttdKiri}
           ${ttdKanan}

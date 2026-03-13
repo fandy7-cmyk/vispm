@@ -355,6 +355,7 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
               <tr><td style="width:160px;padding:2px 0">Status</td><td style="padding:2px 0">: ${h.status_global||'Draft'}</td></tr>
               <tr><td style="padding:2px 0">Indeks Beban Kerja</td><td style="padding:2px 0">: ${parseFloat(h.indeks_beban_kerja||0).toFixed(2)}</td></tr>
               <tr><td style="padding:2px 0">Indeks Kesulitan Wilayah</td><td style="padding:2px 0">: ${parseFloat(h.indeks_kesulitan_wilayah||0).toFixed(2)}</td></tr>
+              <tr><td style="padding:2px 0"><strong>Indeks SPM</strong></td><td style="padding:2px 0">: <strong style="color:#0d9488;font-size:13px">${parseFloat(h.indeks_spm||0).toFixed(2)}</strong></td></tr>
             </table>
           </td>
         </tr>
@@ -368,12 +369,13 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
       const sisaTarget = sasaranTahunan > 0 ? Math.max(0, sasaranTahunan - realisasiKumulatif) : '-';
       const capaianPct = parseFloat(ind.capaian_pct || 0).toFixed(0);
       const bg = i % 2 === 0 ? '#f8fafc' : 'white';
+      const sisaColor = typeof sisaTarget === 'number' && sisaTarget === 0 ? '#16a34a' : '#1e293b';
       return `<tr style="background:${bg}">
         <td style="padding:6px 8px;border:1px solid #cbd5e1;text-align:center;font-weight:700">${ind.no_indikator}</td>
         <td style="padding:6px 8px;border:1px solid #cbd5e1;font-size:10.5px">${ind.nama_indikator||'-'}</td>
         <td style="padding:6px 8px;border:1px solid #cbd5e1;text-align:center">${sasaranTahunan > 0 ? sasaranTahunan : '<span style="color:#94a3b8">-</span>'}</td>
+        <td style="padding:6px 8px;border:1px solid #cbd5e1;text-align:center;font-weight:700;color:${sisaColor}">${typeof sisaTarget === 'number' ? sisaTarget : '<span style="color:#94a3b8">-</span>'}</td>
         <td style="padding:6px 8px;border:1px solid #cbd5e1;text-align:center">${target}</td>
-        <td style="padding:6px 8px;border:1px solid #cbd5e1;text-align:center">${typeof sisaTarget === 'number' ? sisaTarget : '-'}</td>
         <td style="padding:6px 8px;border:1px solid #cbd5e1;text-align:center">${capaian}</td>
         <td style="padding:6px 8px;border:1px solid #cbd5e1;text-align:center;font-weight:700;color:#1e293b">${capaianPct}%</td>
       </tr>`;
@@ -388,8 +390,8 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
             <th style="padding:7px 8px;border:1px solid #334155;text-align:center;width:30px;text-transform:uppercase">No</th>
             <th style="padding:7px 8px;border:1px solid #334155;text-align:center;text-transform:uppercase">Nama Indikator</th>
             <th style="padding:7px 8px;border:1px solid #334155;text-align:center;width:65px;font-size:10px;text-transform:uppercase">Target<br>Tahunan</th>
-            <th style="padding:7px 8px;border:1px solid #334155;text-align:center;width:65px;font-size:10px;text-transform:uppercase">Target<br>Bulan Ini</th>
             <th style="padding:7px 8px;border:1px solid #334155;text-align:center;width:65px;font-size:10px;text-transform:uppercase">Sisa<br>Target</th>
+            <th style="padding:7px 8px;border:1px solid #334155;text-align:center;width:65px;font-size:10px;text-transform:uppercase">Target<br>Bulan Ini</th>
             <th style="padding:7px 8px;border:1px solid #334155;text-align:center;width:65px;font-size:10px;text-transform:uppercase">Realisasi<br>Bulan Ini</th>
             <th style="padding:7px 8px;border:1px solid #334155;text-align:center;width:60px;text-transform:uppercase">Capaian</th>
           </tr>

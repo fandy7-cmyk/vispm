@@ -2,23 +2,28 @@ const { getPool, ok, err, cors } = require('./db');
 
 const CURRENT_YEAR = new Date().getFullYear();
 
+let _migrated = false;
+
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors();
   const pool = getPool();
   try {
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS app_settings (
-        key VARCHAR(100) PRIMARY KEY,
-        value TEXT NOT NULL,
-        updated_at TIMESTAMPTZ DEFAULT NOW()
-      )
-    `);
-    await pool.query(`
-      INSERT INTO app_settings (key, value) VALUES
-        ('tahun_awal',  $1),
-        ('tahun_akhir', $2)
-      ON CONFLICT (key) DO NOTHING
-    `, [String(CURRENT_YEAR), String(CURRENT_YEAR + 2)]);
+    if (!_migrated) {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS app_settings (
+          key VARCHAR(100) PRIMARY KEY,
+          value TEXT NOT NULL,
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        )
+      `);
+      await pool.query(`
+        INSERT INTO app_settings (key, value) VALUES
+          ('tahun_awal',  $1),
+          ('tahun_akhir', $2)
+        ON CONFLICT (key) DO NOTHING
+      `, [String(CURRENT_YEAR), String(CURRENT_YEAR + 2)]);
+      _migrated = true;
+    }
 
     if (event.httpMethod === 'GET') {
       const res = await pool.query('SELECT key, value FROM app_settings');

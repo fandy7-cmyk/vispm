@@ -588,6 +588,10 @@ function openBukuPanduan() {
           </svg>
           <h3>Buku Panduan VISPM</h3>
           <div style="display:flex;align-items:center;gap:8px;margin-left:auto">
+            <button onclick="downloadBukuPanduan()" title="Download Buku Panduan" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:#10b981;color:white;border:none;border-radius:8px;cursor:pointer;font-size:12.5px;font-weight:600">
+              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10"/><path d="m8 9 4 4 4-4"/><path d="M4 17c0 2.2 1.8 4 4 4h8c2.2 0 4-1.8 4-4"/></svg>
+              Download
+            </button>
             <button class="btn-icon" onclick="closeModal('bukuPanduanModal')">
               <span class="material-icons">close</span>
             </button>
@@ -776,12 +780,33 @@ function renderAdminDashboard(el, d) {
       ${statCard('orange','pending','Menunggu', d.menunggu)}
       ${statCard('purple','local_hospital','Puskesmas Aktif', d.puskesmasAktif)}
     </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start">
+      <div class="card" style="margin:0">
+        <div class="card-header-bar">
+          <span class="card-title"><span class="material-icons">timeline</span>Statistik per Bulan (${CURRENT_YEAR})</span>
+        </div>
+        <div class="card-body">
+          ${renderChart(d.chartData)}
+        </div>
+      </div>
+      <div class="card" style="margin:0">
+        <div class="card-header-bar">
+          <span class="card-title"><span class="material-icons">bar_chart</span>Ringkasan Status</span>
+        </div>
+        <div class="card-body" style="padding:12px 14px">
+          ${renderStatusSummary(d)}
+        </div>
+      </div>
+    </div>
     <div class="card">
       <div class="card-header-bar">
-        <span class="card-title"><span class="material-icons">timeline</span>Statistik per Bulan (${CURRENT_YEAR})</span>
+        <span class="card-title"><span class="material-icons">local_hospital</span>Progress per Puskesmas</span>
+        <button class="btn btn-secondary btn-sm" onclick="loadPage('verifikasi')">
+          <span class="material-icons">arrow_forward</span>Lihat Semua Usulan
+        </button>
       </div>
-      <div class="card-body">
-        ${renderChart(d.chartData)}
+      <div class="card-body" style="padding:0" id="pkmProgressTable">
+        <div class="empty-state" style="padding:32px"><span class="material-icons">hourglass_empty</span><p>Memuat...</p></div>
       </div>
     </div>
     <div class="card">
@@ -799,10 +824,157 @@ function renderAdminDashboard(el, d) {
   // Load recent usulan
   API.getUsulan({ tahun: CURRENT_YEAR }).then(rows => {
     document.getElementById('recentTable').innerHTML = renderUsulanTable(rows.slice(0, 10), 'admin');
+    // Render progress per PKM dari data usulan
+    renderPKMProgressTable(rows);
   }).catch(() => {
     const el = document.getElementById('recentTable');
     if (el) el.innerHTML = `<div class="empty-state" style="padding:32px"><span class="material-icons">inbox</span><p>Belum ada data usulan</p></div>`;
   });
+}
+
+function renderStatusSummary(d) {
+  const total = d.totalUsulan || 0;
+  const selesai = d.selesai || 0;
+  const menunggu = d.menunggu || 0;
+  const ditolak = Math.max(0, total - selesai - menunggu);
+  const pct = total > 0 ? Math.round((selesai / total) * 100) : 0;
+  const items = [
+    { label: 'Selesai', val: selesai, color: '#10b981', bg: '#ecfdf5' },
+    { label: 'Dalam Proses', val: menunggu, color: '#f59e0b', bg: '#fffbeb' },
+    { label: 'Ditolak/Draft', val: ditolak, color: '#ef4444', bg: '#fef2f2' },
+  ];
+  return `
+    <div style="margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="font-size:12px;color:var(--text-light);font-weight:600">Tingkat Penyelesaian</span>
+        <span style="font-size:18px;font-weight:900;color:#10b981;font-family:'JetBrains Mono',monospace">${pct}%</span>
+      </div>
+      <div style="height:8px;background:#e2e8f0;border-radius:99px;overflow:hidden">
+        <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#0d9488,#10b981);border-radius:99px;transition:width 0.6s ease"></div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      ${items.map(it => `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:${it.bg};border-radius:8px;border-left:3px solid ${it.color}">
+          <span style="font-size:12.5px;font-weight:600;color:var(--text)">${it.label}</span>
+          <span style="font-size:16px;font-weight:900;color:${it.color};font-family:'JetBrains Mono',monospace">${it.val}</span>
+        </div>`).join('')}
+    </div>`;
+}
+
+function renderPKMProgressTable(rows) {
+  const el = document.getElementById('pkmProgressTable');
+  if (!el) return;
+  if (!rows || rows.length === 0) {
+    el.innerHTML = `<div class="empty-state" style="padding:32px"><span class="material-icons">inbox</span><p>Belum ada data</p></div>`;
+    return;
+  }
+  // Group by puskesmas
+  const map = {};
+  rows.forEach(u => {
+    const k = u.kodePKM || u.kode_pkm || '-';
+    const n = u.namaPKM || u.nama_puskesmas || k;
+    if (!map[k]) map[k] = { nama: n, total: 0, selesai: 0, menunggu: 0, ditolak: 0 };
+    map[k].total++;
+    if (u.statusGlobal === 'Selesai') map[k].selesai++;
+    else if (u.statusGlobal === 'Ditolak') map[k].ditolak++;
+    else map[k].menunggu++;
+  });
+  const pkms = Object.values(map).sort((a,b) => b.total - a.total);
+  el.innerHTML = `<table>
+    <thead><tr>
+      <th>Puskesmas</th>
+      <th style="text-align:center">Total</th>
+      <th style="text-align:center">Selesai</th>
+      <th style="text-align:center">Proses</th>
+      <th style="text-align:center">Ditolak</th>
+      <th style="min-width:120px">Progress</th>
+    </tr></thead>
+    <tbody>${pkms.map(p => {
+      const pct = p.total > 0 ? Math.round((p.selesai / p.total) * 100) : 0;
+      return `<tr>
+        <td style="font-weight:600;font-size:13px">${p.nama}</td>
+        <td style="text-align:center">${p.total}</td>
+        <td style="text-align:center"><span style="color:#10b981;font-weight:700">${p.selesai}</span></td>
+        <td style="text-align:center"><span style="color:#f59e0b;font-weight:700">${p.menunggu}</span></td>
+        <td style="text-align:center"><span style="color:#ef4444;font-weight:700">${p.ditolak}</span></td>
+        <td>
+          <div style="display:flex;align-items:center;gap:6px">
+            <div style="flex:1;height:6px;background:#e2e8f0;border-radius:99px;overflow:hidden">
+              <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#0d9488,#10b981);border-radius:99px"></div>
+            </div>
+            <span style="font-size:11px;font-weight:700;color:#0d9488;min-width:28px;text-align:right">${pct}%</span>
+          </div>
+        </td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table>`;
+}
+
+function renderOperatorStatusSummary(rows) {
+  const total = rows.length;
+  if (total === 0) return `<div class="empty-state" style="padding:16px"><span class="material-icons">inbox</span><p>Belum ada usulan</p></div>`;
+  const selesai  = rows.filter(u => u.statusGlobal === 'Selesai').length;
+  const ditolak  = rows.filter(u => u.statusGlobal === 'Ditolak').length;
+  const proses   = rows.filter(u => !['Selesai','Ditolak','Draft'].includes(u.statusGlobal)).length;
+  const draft    = rows.filter(u => u.statusGlobal === 'Draft').length;
+  const pct      = total > 0 ? Math.round((selesai / total) * 100) : 0;
+  const items = [
+    { label: 'Selesai',      val: selesai, color: '#10b981', bg: '#ecfdf5' },
+    { label: 'Dalam Proses', val: proses,  color: '#f59e0b', bg: '#fffbeb' },
+    { label: 'Ditolak',      val: ditolak, color: '#ef4444', bg: '#fef2f2' },
+    { label: 'Draft',        val: draft,   color: '#94a3b8', bg: '#f8fafc' },
+  ];
+  return `
+    <div style="margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="font-size:12px;color:var(--text-light);font-weight:600">Tingkat Penyelesaian</span>
+        <span style="font-size:18px;font-weight:900;color:#10b981;font-family:'JetBrains Mono',monospace">${pct}%</span>
+      </div>
+      <div style="height:8px;background:#e2e8f0;border-radius:99px;overflow:hidden">
+        <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#0d9488,#10b981);border-radius:99px;transition:width 0.6s ease"></div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      ${items.map(it => `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:${it.bg};border-radius:8px;border-left:3px solid ${it.color}">
+          <span style="font-size:12px;font-weight:600;color:var(--text)">${it.label}</span>
+          <span style="font-size:16px;font-weight:900;color:${it.color};font-family:'JetBrains Mono',monospace">${it.val}</span>
+        </div>`).join('')}
+    </div>`;
+}
+
+function renderKapusStatusSummary(rows) {
+  const total   = rows.length;
+  if (total === 0) return `<div class="empty-state" style="padding:16px"><span class="material-icons">inbox</span><p>Belum ada usulan</p></div>`;
+  const selesai = rows.filter(u => u.statusGlobal === 'Selesai').length;
+  const menungguKapus = rows.filter(u => u.statusGlobal === 'Menunggu Kepala Puskesmas').length;
+  const proses  = rows.filter(u => !['Selesai','Ditolak','Draft','Menunggu Kepala Puskesmas'].includes(u.statusGlobal)).length;
+  const ditolak = rows.filter(u => u.statusGlobal === 'Ditolak').length;
+  const pct     = total > 0 ? Math.round((selesai / total) * 100) : 0;
+  const items = [
+    { label: 'Selesai',           val: selesai,        color: '#10b981', bg: '#ecfdf5' },
+    { label: 'Menunggu Saya',     val: menungguKapus,  color: '#f59e0b', bg: '#fffbeb' },
+    { label: 'Lanjut ke PP/Admin',val: proses,         color: '#0d9488', bg: '#f0fdfa' },
+    { label: 'Ditolak',           val: ditolak,        color: '#ef4444', bg: '#fef2f2' },
+  ];
+  return `
+    <div style="margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="font-size:12px;color:var(--text-light);font-weight:600">Tingkat Penyelesaian PKM</span>
+        <span style="font-size:18px;font-weight:900;color:#10b981;font-family:'JetBrains Mono',monospace">${pct}%</span>
+      </div>
+      <div style="height:8px;background:#e2e8f0;border-radius:99px;overflow:hidden">
+        <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#0d9488,#10b981);border-radius:99px;transition:width 0.6s ease"></div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      ${items.map(it => `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:${it.bg};border-radius:8px;border-left:3px solid ${it.color}">
+          <span style="font-size:12px;font-weight:600;color:var(--text)">${it.label}</span>
+          <span style="font-size:16px;font-weight:900;color:${it.color};font-family:'JetBrains Mono',monospace">${it.val}</span>
+        </div>`).join('')}
+    </div>`;
 }
 
 function renderOperatorDashboard(el, d) {
@@ -863,14 +1035,23 @@ function renderOperatorDashboard(el, d) {
       </div>
     </div>
     <div id="dashPeriodeBanner">${periodeBanner}</div>
-    <div class="card">
-      <div class="card-header-bar">
-        <span class="card-title"><span class="material-icons">quickreply</span>Aksi Cepat</span>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start">
+      <div class="card" style="margin:0">
+        <div class="card-header-bar">
+          <span class="card-title"><span class="material-icons">quickreply</span>Aksi Cepat</span>
+        </div>
+        <div class="card-body" style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button class="btn btn-primary" onclick="loadPage('input')"><span class="material-icons">add</span>Buat Usulan Baru</button>
+          <button class="btn btn-secondary" onclick="loadPage('laporan')"><span class="material-icons">bar_chart</span>Lihat Laporan</button>
+        </div>
       </div>
-      <div class="card-body" style="display:flex;gap:10px;flex-wrap:wrap;">
-        <button class="btn btn-primary" onclick="loadPage('input')"><span class="material-icons">add</span>Buat Usulan Baru</button>
-        <button class="btn btn-secondary" onclick="loadPage('laporan')"><span class="material-icons">bar_chart</span>Lihat Laporan</button>
-
+      <div class="card" style="margin:0">
+        <div class="card-header-bar">
+          <span class="card-title"><span class="material-icons">donut_large</span>Status Usulan Saya</span>
+        </div>
+        <div class="card-body" style="padding:12px 14px" id="operatorStatusSummary">
+          <div class="empty-state" style="padding:16px"><span class="material-icons">hourglass_empty</span></div>
+        </div>
       </div>
     </div>
     <div class="card">
@@ -880,6 +1061,9 @@ function renderOperatorDashboard(el, d) {
 
   API.getUsulan({ email_operator: currentUser.email }).then(rows => {
     document.getElementById("recentTable").innerHTML = renderUsulanTable(rows.slice(0, 5), "operator");
+    // Render status summary
+    const el2 = document.getElementById("operatorStatusSummary");
+    if (el2) el2.innerHTML = renderOperatorStatusSummary(rows);
   }).catch(() => {
     const el2 = document.getElementById("recentTable");
     if (el2) el2.innerHTML = `<div class="empty-state" style="padding:32px"><span class="material-icons">inbox</span><p>Belum ada data usulan</p></div>`;
@@ -991,42 +1175,94 @@ function renderKepalasDashboard(el, d) {
     <div class="stats-grid">
       ${statCard('orange','pending','Menunggu Verifikasi', d.menunggu)}
       ${statCard('green','check_circle','Sudah Diverifikasi', d.terverifikasi)}
-      ${statCard('blue','assignment','Total Usulan', d.total)}
+      ${statCard('blue','assignment','Total Usulan PKM Saya', d.total)}
+    </div>
+    ${renderPeriodeBanner(periodeList)}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start">
+      <div class="card" style="margin:0">
+        <div class="card-header-bar">
+          <span class="card-title"><span class="material-icons">pending_actions</span>Menunggu Verifikasi Saya</span>
+          <button class="btn btn-secondary btn-sm" onclick="loadPage('verifikasi')"><span class="material-icons">arrow_forward</span>Lihat Semua</button>
+        </div>
+        <div class="card-body" style="padding:0" id="pendingTable"></div>
+      </div>
+      <div class="card" style="margin:0">
+        <div class="card-header-bar">
+          <span class="card-title"><span class="material-icons">donut_large</span>Progress PKM Saya</span>
+        </div>
+        <div class="card-body" style="padding:12px 14px" id="kapusStatusSummary">
+          <div class="empty-state" style="padding:16px"><span class="material-icons">hourglass_empty</span></div>
+        </div>
+      </div>
     </div>
     <div class="card">
       <div class="card-header-bar">
-        <span class="card-title"><span class="material-icons">pending_actions</span>Usulan Menunggu Verifikasi</span>
+        <span class="card-title"><span class="material-icons">history</span>Riwayat Semua Usulan PKM Saya</span>
         <button class="btn btn-secondary btn-sm" onclick="loadPage('verifikasi')"><span class="material-icons">arrow_forward</span>Lihat Semua</button>
       </div>
-      <div class="card-body" style="padding:0" id="pendingTable"></div>
+      <div class="card-body" style="padding:0" id="kapusAllTable"></div>
     </div>`;
 
   API.getUsulan({ kode_pkm: currentUser.kodePKM, status: 'Menunggu Kepala Puskesmas' }).then(rows => {
     document.getElementById('pendingTable').innerHTML = renderUsulanTable(rows, 'kepala-puskesmas');
   }).catch(() => {});
+
+  API.getUsulan({ kode_pkm: currentUser.kodePKM }).then(rows => {
+    // Progress summary
+    const elSum = document.getElementById('kapusStatusSummary');
+    if (elSum) elSum.innerHTML = renderKapusStatusSummary(rows);
+    // Riwayat semua
+    const elAll = document.getElementById('kapusAllTable');
+    if (elAll) elAll.innerHTML = renderUsulanTable(rows, 'kepala-puskesmas');
+  }).catch(() => {});
 }
 
 function renderProgramDashboard(el, d) {
   const periodeList = d.periodeAktifList || (d.periodeAktif ? [d.periodeAktif] : []);
+  // Ringkasan indikator tanggung jawab PP
+  const aksesArr = (currentUser.indikatorAkses || []);
+  const indikatorInfo = aksesArr.length > 0
+    ? `<span style="font-size:12px;color:var(--text-light)">Indikator tanggung jawab Anda: <strong style="color:var(--primary)">${aksesArr.join(', ')}</strong></span>`
+    : `<span style="font-size:12px;color:var(--text-light)">Anda bertanggung jawab atas <strong style="color:var(--primary)">semua indikator</strong></span>`;
+
   el.innerHTML = `
     <div class="stats-grid">
       ${statCard('orange','pending','Menunggu Verifikasi', d.menunggu)}
       ${statCard('green','check_circle','Sudah Diverifikasi', d.terverifikasi)}
-      ${statCard('blue','assignment','Total Usulan', d.total)}
+      ${statCard('blue','assignment','Total Ditugaskan', d.total)}
     </div>
-    <div class="card">
-      <div class="card-header-bar">
-        <span class="card-title"><span class="material-icons">pending_actions</span>Usulan Menunggu Verifikasi Pengelola Program</span>
-        <button class="btn btn-secondary btn-sm" onclick="loadPage('verifikasi')"><span class="material-icons">arrow_forward</span>Lihat Semua</button>
+    <div class="card" style="border-left:3px solid var(--primary)">
+      <div class="card-body" style="padding:10px 16px;display:flex;align-items:center;gap:8px">
+        <span class="material-icons" style="color:var(--primary);font-size:18px">info</span>
+        ${indikatorInfo}
       </div>
-      <div class="card-body" style="padding:0" id="pendingTable"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start">
+      <div class="card" style="margin:0">
+        <div class="card-header-bar">
+          <span class="card-title"><span class="material-icons">pending_actions</span>Menunggu Verifikasi Saya</span>
+          <button class="btn btn-secondary btn-sm" onclick="loadPage('verifikasi')"><span class="material-icons">arrow_forward</span>Lihat Semua</button>
+        </div>
+        <div class="card-body" style="padding:0" id="pendingTable"></div>
+      </div>
+      <div class="card" style="margin:0">
+        <div class="card-header-bar">
+          <span class="card-title"><span class="material-icons">check_circle</span>Sudah Diverifikasi</span>
+        </div>
+        <div class="card-body" style="padding:0" id="ppDoneTable"></div>
+      </div>
     </div>`;
 
   API.getUsulan({ status_program: 'Menunggu Pengelola Program,Ditolak,Selesai,Menunggu Admin', email_program: currentUser.email }).then(rows => {
-    // Hanya tampilkan yang belum diverifikasi di dashboard (Menunggu saja)
-    // Hanya tampilkan yang belum diverifikasi oleh user ini (sudahVerif = false/undefined)
     const pending = rows.filter(u => !u.sudahVerif);
+    const done = rows.filter(u => u.sudahVerif);
     document.getElementById('pendingTable').innerHTML = renderUsulanTable(pending, 'program');
+    const elDone = document.getElementById('ppDoneTable');
+    if (elDone) {
+      elDone.innerHTML = done.length
+        ? renderUsulanTable(done, 'program')
+        : `<div class="empty-state" style="padding:32px"><span class="material-icons">inbox</span><p>Belum ada yang selesai</p></div>`;
+    }
   }).catch(() => {});
 }
 

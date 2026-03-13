@@ -972,3 +972,239 @@ if (typeof API !== 'undefined' && !API.getIndikatorUsulan) {
     return d.data || d || [];
   };
 }
+
+// ============================================================
+// 14. Dark Mode CSS Injection
+// ============================================================
+// Karena banyak komponen di app.js pakai inline style dengan warna hardcode,
+// kita inject CSS khusus yang override dengan [data-theme="dark"] + !important
+(function injectDarkModeCSS() {
+  const styleId = 'vispm-dark-mode-overrides';
+  if (document.getElementById(styleId)) return;
+
+  const css = `
+/* ===== DARK MODE OVERRIDES — mengatasi inline style di app.js ===== */
+[data-theme="dark"] #mainContent,
+[data-theme="dark"] .main-content {
+  background: transparent !important;
+}
+
+/* Topbar inline white bg */
+[data-theme="dark"] #topbar,
+[data-theme="dark"] .topbar {
+  background: #1a2a2a !important;
+  border-bottom-color: #2a3a3a !important;
+}
+
+/* Kartu dashboard dengan background:white inline */
+[data-theme="dark"] [style*="background:white"],
+[data-theme="dark"] [style*="background: white"],
+[data-theme="dark"] [style*="background:#ffffff"],
+[data-theme="dark"] [style*="background: #ffffff"],
+[data-theme="dark"] [style*="background:#fff"],
+[data-theme="dark"] [style*="background: #fff"] {
+  background: #1a2a2a !important;
+}
+
+/* Text warna gelap */
+[data-theme="dark"] [style*="color:#0f172a"],
+[data-theme="dark"] [style*="color: #0f172a"],
+[data-theme="dark"] [style*="color:#1e293b"],
+[data-theme="dark"] [style*="color:#334155"],
+[data-theme="dark"] [style*="color:#1f2937"],
+[data-theme="dark"] [style*="color:#111827"] {
+  color: #c8ddd9 !important;
+}
+
+/* Border abu-abu */
+[data-theme="dark"] [style*="border:1px solid #e2e8f0"],
+[data-theme="dark"] [style*="border: 1px solid #e2e8f0"],
+[data-theme="dark"] [style*="border-bottom:1px solid #e2e8f0"],
+[data-theme="dark"] [style*="border-top:1px solid #e2e8f0"],
+[data-theme="dark"] [style*="border-right:1px solid #e2e8f0"] {
+  border-color: #2a3a3a !important;
+}
+
+/* Background abu muda (tabel, card header) */
+[data-theme="dark"] [style*="background:#f8fafc"],
+[data-theme="dark"] [style*="background: #f8fafc"],
+[data-theme="dark"] [style*="background:#f1f5f9"],
+[data-theme="dark"] [style*="background: #f1f5f9"],
+[data-theme="dark"] [style*="background:#f0f9ff"],
+[data-theme="dark"] [style*="background: #f0f9ff"],
+[data-theme="dark"] [style*="background:#edf7f6"],
+[data-theme="dark"] [style*="background: #edf7f6"],
+[data-theme="dark"] [style*="background:#f0fdf9"],
+[data-theme="dark"] [style*="background: #f0fdf9"] {
+  background: #0f2020 !important;
+}
+
+/* Tabel */
+[data-theme="dark"] table { background: #1a2a2a !important; }
+[data-theme="dark"] thead th {
+  background: #0f2020 !important;
+  color: #7a9e9a !important;
+  border-color: #2a3a3a !important;
+}
+[data-theme="dark"] tbody td {
+  border-color: #1e2e2e !important;
+  color: #c8ddd9 !important;
+}
+[data-theme="dark"] tbody tr:hover td { background: #1e2e2e !important; }
+[data-theme="dark"] tbody tr:nth-child(even) td { background: #162424 !important; }
+
+/* Master data tab shell */
+[data-theme="dark"] [style*="background:white;border-radius:12px"],
+[data-theme="dark"] [style*="background: white;border-radius:12px"] {
+  background: #1a2a2a !important;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3) !important;
+}
+[data-theme="dark"] [style*="border-bottom:1px solid #e2e8f0"],
+[data-theme="dark"] [style*="border-bottom: 1px solid #e2e8f0"] {
+  border-color: #2a3a3a !important;
+}
+
+/* Tab buttons di master data */
+[data-theme="dark"] #masterTabContent { color: #c8ddd9 !important; }
+[data-theme="dark"] button[id^="masterTab_"] {
+  color: #7a9e9a !important;
+}
+[data-theme="dark"] button[id^="masterTab_"][style*="color:var(--primary)"],
+[data-theme="dark"] button[id^="masterTab_"][style*="color: var(--primary)"],
+[data-theme="dark"] button[id^="masterTab_"][style*="border-bottom:3px solid var(--primary)"] {
+  color: #0d9488 !important;
+  border-bottom-color: #0d9488 !important;
+}
+
+/* Input dan form di dark mode */
+[data-theme="dark"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {
+  background: #0f2020 !important;
+  border-color: #2a3a3a !important;
+  color: #c8ddd9 !important;
+}
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] textarea::placeholder {
+  color: #4a7070 !important;
+}
+
+/* Search input inline */
+[data-theme="dark"] input[class*="search"],
+[data-theme="dark"] .search-input {
+  background: #0f2020 !important;
+  border-color: #2a3a3a !important;
+  color: #c8ddd9 !important;
+}
+
+/* Auth screen kanan */
+[data-theme="dark"] .auth-right {
+  background: #1a2a2a !important;
+}
+[data-theme="dark"] .auth-right h2,
+[data-theme="dark"] .auth-right-sub { color: #c8ddd9 !important; }
+[data-theme="dark"] .auth-field label { color: #7a9e9a !important; }
+[data-theme="dark"] #authEmail,
+[data-theme="dark"] #authPassword {
+  background: #0f2020 !important;
+  border-color: #2a3a3a !important;
+  color: #c8ddd9 !important;
+}
+
+/* Modal card */
+[data-theme="dark"] .modal-card {
+  background: #1a2a2a !important;
+}
+[data-theme="dark"] .modal-header {
+  background: #1a2a2a !important;
+  border-bottom-color: #2a3a3a !important;
+}
+[data-theme="dark"] .modal-header h3 { color: #c8ddd9 !important; }
+[data-theme="dark"] .modal-footer {
+  background: #1a2a2a !important;
+  border-top-color: #2a3a3a !important;
+}
+[data-theme="dark"] .modal-body { color: #c8ddd9 !important; }
+
+/* Topbar dropdown */
+[data-theme="dark"] .topbar-dropdown { background: #1a2a2a !important; border-color: #2a3a3a !important; }
+[data-theme="dark"] .topbar-dropdown-header { background: #0f2020 !important; border-color: #2a3a3a !important; }
+[data-theme="dark"] .topbar-dropdown-name { color: #c8ddd9 !important; }
+[data-theme="dark"] .topbar-dropdown-meta { color: #7a9e9a !important; }
+[data-theme="dark"] .topbar-dropdown-item { color: #c8ddd9 !important; }
+[data-theme="dark"] .topbar-dropdown-item:hover { background: #0f2020 !important; }
+
+/* Stat cards */
+[data-theme="dark"] .stat-card {
+  background: #1a2a2a !important;
+  border-color: #2a3a3a !important;
+}
+
+/* Page header title */
+[data-theme="dark"] .page-header h1 { color: #c8ddd9 !important; }
+[data-theme="dark"] h1, [data-theme="dark"] h2, [data-theme="dark"] h3,
+[data-theme="dark"] h4, [data-theme="dark"] h5 { color: #c8ddd9 !important; }
+[data-theme="dark"] p, [data-theme="dark"] span:not(.material-icons):not(.badge):not([style*="color:#"]) {
+  /* hanya override kalau tidak ada color inline */
+}
+
+/* Pagination */
+[data-theme="dark"] .page-btn {
+  background: #1a2a2a !important;
+  border-color: #2a3a3a !important;
+  color: #c8ddd9 !important;
+}
+[data-theme="dark"] .page-btn.active { background: #0d9488 !important; color: white !important; }
+
+/* Split view */
+[data-theme="dark"] .split-view { background: transparent !important; }
+[data-theme="dark"] .split-list { background: #1a2a2a !important; border-color: #2a3a3a !important; }
+[data-theme="dark"] .split-list-header { background: #1a2a2a !important; }
+[data-theme="dark"] .usulan-card { background: #1a2a2a !important; border-color: #2a3a3a !important; }
+[data-theme="dark"] .usulan-card.active { background: #0f2a28 !important; border-color: #0d9488 !important; }
+[data-theme="dark"] .usulan-card-pkm { color: #c8ddd9 !important; }
+
+/* Catatan thread bubble */
+[data-theme="dark"] .catatan-bubble {
+  background: #0f2020 !important;
+  border-color: #2a3a3a !important;
+}
+[data-theme="dark"] .catatan-bubble.operator-bubble { background: #0f2a10 !important; }
+[data-theme="dark"] .catatan-bubble.kapus-bubble { background: #1a200f !important; }
+[data-theme="dark"] .catatan-bubble.pp-bubble { background: #0f151a !important; }
+[data-theme="dark"] .catatan-bubble.admin-bubble { background: #1a100f !important; }
+
+/* Notif banner */
+[data-theme="dark"] .notif-banner.warning { background: #1a1400 !important; border-color: #4a3800 !important; }
+[data-theme="dark"] .notif-banner.info { background: #001020 !important; border-color: #003050 !important; }
+[data-theme="dark"] .notif-banner.danger { background: #1a0000 !important; border-color: #4a0000 !important; }
+
+/* Card umum */
+[data-theme="dark"] .card { background: #1a2a2a !important; border-color: #2a3a3a !important; }
+[data-theme="dark"] .card-title { color: #c8ddd9 !important; }
+
+/* Tombol secondary */
+[data-theme="dark"] .btn-secondary {
+  background: #1a2a2a !important;
+  border-color: #2a3a3a !important;
+  color: #c8ddd9 !important;
+}
+[data-theme="dark"] .btn-secondary:hover { background: #2a3a3a !important; }
+
+/* Label umum */
+[data-theme="dark"] label { color: #7a9e9a !important; }
+
+/* Detail item */
+[data-theme="dark"] .detail-item label { color: #4a7070 !important; }
+[data-theme="dark"] .detail-item span { color: #c8ddd9 !important; }
+[data-theme="dark"] .detail-grid { background: #0f2020 !important; }
+
+/* Skeleton loader */
+[data-theme="dark"] .skeleton { background: linear-gradient(90deg, #1a2a2a 25%, #2a3a3a 50%, #1a2a2a 75%) !important; }
+`;
+
+  const style = document.createElement('style');
+  style.id = styleId;
+  style.textContent = css;
+  document.head.appendChild(style);
+})();

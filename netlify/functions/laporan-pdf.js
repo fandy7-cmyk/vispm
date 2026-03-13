@@ -184,7 +184,10 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
 
   const bulanNama = ['','Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
   const bulan = bulanNama[h.bulan] || h.bulan;
-  const now = new Date().toLocaleDateString('id-ID', { day:'2-digit', month:'long', year:'numeric' });
+  const _nowDt = new Date();
+  const _nowOpt = { timeZone: 'Asia/Makassar' };
+  const now = _nowDt.toLocaleDateString('id-ID', { ..._nowOpt, day:'2-digit', month:'long', year:'numeric' })
+            + ' | ' + _nowDt.toLocaleTimeString('id-ID', { ..._nowOpt, hour:'2-digit', minute:'2-digit', hour12:false }) + ' WITA';
 
   const JABATAN_MAP = {
     1:  ['Pengelola Program Kesehatan Ibu Kabupaten','Pengelola Program HIV / AIDS Kabupaten','Pengelola Program Hepatitis Kabupaten','Pengelola Program Imunisasi Kabupaten'],
@@ -355,7 +358,7 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
               <tr><td style="width:160px;padding:2px 0">Status</td><td style="padding:2px 0">: ${h.status_global||'Draft'}</td></tr>
               <tr><td style="padding:2px 0">Indeks Beban Kerja</td><td style="padding:2px 0">: ${parseFloat(h.indeks_beban_kerja||0).toFixed(2)}</td></tr>
               <tr><td style="padding:2px 0">Indeks Kesulitan Wilayah</td><td style="padding:2px 0">: ${parseFloat(h.indeks_kesulitan_wilayah||0).toFixed(2)}</td></tr>
-              <tr><td style="padding:2px 0"><strong>Indeks SPM</strong></td><td style="padding:2px 0">: <strong style="color:#0d9488;font-size:13px">${parseFloat(h.indeks_spm||0).toFixed(2)}</strong></td></tr>
+              <tr><td style="padding:2px 0"><strong>Indeks SPM</strong></td><td style="padding:2px 0">: <strong>${parseFloat(h.indeks_spm||0).toFixed(2)}</strong></td></tr>
             </table>
           </td>
         </tr>
@@ -367,7 +370,7 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
       const capaian = parseFloat(ind.capaian) || 0;
       const realisasiKumulatif = parseFloat(ind.realisasi_kumulatif) || 0;
       const sisaTarget = sasaranTahunan > 0 ? Math.max(0, sasaranTahunan - realisasiKumulatif) : '-';
-      const capaianPct = parseFloat(ind.capaian_pct || 0).toFixed(0);
+      const capaianPct = parseFloat(ind.capaian_pct || 0).toFixed(2);
       const bg = i % 2 === 0 ? '#f8fafc' : 'white';
       const sisaColor = typeof sisaTarget === 'number' && sisaTarget === 0 ? '#16a34a' : '#1e293b';
       return `<tr style="background:${bg}">
@@ -412,7 +415,7 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
       const capaian = parseFloat(ind.capaian) || 0;
       const realisasiKumulatif = parseFloat(ind.realisasi_kumulatif) || 0;
       const sisaTarget = sasaranTahunan > 0 ? Math.max(0, sasaranTahunan - realisasiKumulatif) : null;
-      const capaianPct = parseFloat(ind.capaian_pct || 0).toFixed(0);
+      const capaianPct = parseFloat(ind.capaian_pct || 0).toFixed(2);
       const catatan = ind.catatan_indikator || '';
       const slots = getVerifierSlots(ind.no_indikator);
 

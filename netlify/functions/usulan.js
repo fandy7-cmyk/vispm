@@ -555,20 +555,43 @@ async function verifKapus(pool, body) {
        kapus_approved_by=$2, kapus_approved_at=NOW(), kapus_catatan=$4 WHERE id_usulan=$3`,
       [ditolakOlehVal, email, idUsulan, catatanKapus || 'Semua indikator disetujui']
     );
-    // Pastikan semua PP aktif sudah punya record di verifikasi_program
-    // (PP yang ditambahkan setelah usulan dibuat belum punya record)
-    const allPP = await pool.query(`SELECT email, nama, nip, jabatan, indikator_akses FROM users WHERE role='Pengelola Program' AND aktif=true`);
-    for (const pp of allPP.rows) {
-      await pool.query(
-        `INSERT INTO verifikasi_program (id_usulan,email_program,nama_program,nip_program,jabatan_program,indikator_akses,status,created_at)
-         VALUES ($1,$2,$3,$4,$5,$6,'Menunggu',NOW())
-         ON CONFLICT (id_usulan, email_program) DO UPDATE
-           SET nama_program=EXCLUDED.nama_program,
-               nip_program=EXCLUDED.nip_program,
-               jabatan_program=EXCLUDED.jabatan_program`,
-        [idUsulan, pp.email, pp.nama, pp.nip||null, pp.jabatan||null, pp.indikator_akses||'']
-      );
+
+    if (isReVerif) {
+      // Re-verifikasi (dari PP atau Admin): hanya reset VP yang statusnya Ditolak,
+      // PP yang sudah Selesai tidak perlu verif ulang.
+      // Juga pastikan PP baru (belum punya record) tetap di-insert dengan status Menunggu.
+      const allPP = await pool.query(`SELECT email, nama, nip, jabatan, indikator_akses FROM users WHERE role='Pengelola Program' AND aktif=true`);
+      for (const pp of allPP.rows) {
+        await pool.query(
+          `INSERT INTO verifikasi_program (id_usulan,email_program,nama_program,nip_program,jabatan_program,indikator_akses,status,created_at)
+           VALUES ($1,$2,$3,$4,$5,$6,'Menunggu',NOW())
+           ON CONFLICT (id_usulan, email_program) DO UPDATE
+             SET nama_program=EXCLUDED.nama_program,
+                 nip_program=EXCLUDED.nip_program,
+                 jabatan_program=EXCLUDED.jabatan_program,
+                 -- Hanya reset ke Menunggu jika sebelumnya Ditolak; Selesai tetap Selesai
+                 status=CASE WHEN verifikasi_program.status='Ditolak' THEN 'Menunggu' ELSE verifikasi_program.status END,
+                 catatan=CASE WHEN verifikasi_program.status='Ditolak' THEN NULL ELSE verifikasi_program.catatan END,
+                 verified_at=CASE WHEN verifikasi_program.status='Ditolak' THEN NULL ELSE verifikasi_program.verified_at END`,
+          [idUsulan, pp.email, pp.nama, pp.nip||null, pp.jabatan||null, pp.indikator_akses||'']
+        );
+      }
+    } else {
+      // Siklus pertama kali: semua PP harus verif, pastikan semua punya record Menunggu
+      const allPP = await pool.query(`SELECT email, nama, nip, jabatan, indikator_akses FROM users WHERE role='Pengelola Program' AND aktif=true`);
+      for (const pp of allPP.rows) {
+        await pool.query(
+          `INSERT INTO verifikasi_program (id_usulan,email_program,nama_program,nip_program,jabatan_program,indikator_akses,status,created_at)
+           VALUES ($1,$2,$3,$4,$5,$6,'Menunggu',NOW())
+           ON CONFLICT (id_usulan, email_program) DO UPDATE
+             SET nama_program=EXCLUDED.nama_program,
+                 nip_program=EXCLUDED.nip_program,
+                 jabatan_program=EXCLUDED.jabatan_program`,
+          [idUsulan, pp.email, pp.nama, pp.nip||null, pp.jabatan||null, pp.indikator_akses||'']
+        );
+      }
     }
+
     const logDetailKapus = isReVerif
       ? `Re-verifikasi disetujui — diteruskan ke Pengelola Program${catatanKapus && catatanKapus !== 'Semua indikator disetujui' ? ' | Catatan: ' + catatanKapus : ''}`
       : 'Semua indikator disetujui';
@@ -798,27 +821,15 @@ async function verifProgram(pool, body) {
     }
   }
 
-  // Tentukan arah: jika re-verif dari Admin → kembali ke Admin; jika normal → ke Kapus
+  // Tentukan arah: PP tolak → SELALU balik ke Kapus dulu (berjenjang)
+  // Pertahankan ditolak_oleh asli ('Admin' atau 'Pengelola Program') agar Kapus tahu ini re-verifikasi
   const headerDirCheck = await pool.query('SELECT ditolak_oleh FROM usulan_header WHERE id_usulan=$1', [idUsulan]);
   const ditolakOlehDir = headerDirCheck.rows[0]?.ditolak_oleh;
   const indDitolak = nomorBermasalah;
 
-  if (ditolakOlehDir === 'Admin') {
-    await pool.query(
-      `UPDATE usulan_header SET status_global='Menunggu Admin', status_kapus='Selesai',
-       status_program='Menunggu', is_locked=true WHERE id_usulan=$1`, [idUsulan]
-    );
-    if (indDitolak.length) {
-      await logAktivitas(pool, email, 'Pengelola Program', 'Kembalikan', idUsulan,
-        'Indikator bermasalah: ' + indDitolak.join(',') + ' — dikembalikan ke Admin untuk re-verifikasi' + (alasanGabungan ? ' | Catatan: ' + alasanGabungan : ''));
-    }
-    return ok({ message: 'Indikator bermasalah dikembalikan ke Admin untuk re-verifikasi.', allDone: true });
-  }
-
-  // Normal / loop PP↔Kapus: PP tolak → ke Kapus
-  // Pertahankan ditolak_oleh yang sudah ada ('Admin' jika sedang re-verif dari Admin,
-  // atau set 'Pengelola Program' jika ini loop normal PP↔Kapus)
-  const ditolakOlehKapus = ditolakOlehDir === 'Admin' ? 'Admin' : 'Pengelola Program';
+  // Selalu ke Kapus terlepas dari asal penolakan (Admin atau PP)
+  // ditolak_oleh dipertahankan agar Kapus approve → tahu harus ke mana setelah approve
+  const ditolakOlehKapus = ditolakOlehDir || 'Pengelola Program';
   await pool.query(
     `UPDATE usulan_header SET status_global='Menunggu Kepala Puskesmas', status_kapus='Menunggu',
      status_program='Menunggu', ditolak_oleh=$2, is_locked=true WHERE id_usulan=$1`, [idUsulan, ditolakOlehKapus]
@@ -827,7 +838,7 @@ async function verifProgram(pool, body) {
     await logAktivitas(pool, email, 'Pengelola Program', 'Kembalikan', idUsulan,
       'Indikator bermasalah: ' + indDitolak.join(',') + ' — dikembalikan ke Kepala Puskesmas' + (alasanGabungan ? ' | Catatan: ' + alasanGabungan : ''));
   }
-  return ok({ message: 'Indikator bermasalah dikembalikan untuk re-verifikasi dari Kepala Puskesmas.', allDone: true });
+  return ok({ message: 'Indikator bermasalah dikembalikan ke Kepala Puskesmas untuk re-verifikasi.', allDone: true });
 }
 
 

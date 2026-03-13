@@ -84,7 +84,11 @@ const API = {
   // Jabatan
   getJabatan: () => API.get('jabatan'),
   saveJabatan: (data) => API.post('jabatan', data),
-  deleteJabatan: (id) => API.del('jabatan', { id })
+  deleteJabatan: (id) => API.del('jabatan', { id }),
+
+  // Audit Trail
+  logAudit: (data) => API.post('audit-trail', data).catch(() => {}),
+  getAuditTrail: (params) => API.get('audit-trail', params)
 };
 
 // Utils

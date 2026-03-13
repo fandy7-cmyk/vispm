@@ -1,5 +1,7 @@
 const { getPool, ok, err, cors } = require('./db');
 
+let _migrated = false;
+
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors();
   const pool = getPool();
@@ -7,19 +9,21 @@ exports.handler = async (event) => {
   const params = event.queryStringParameters || {};
 
   try {
-    // Auto-migrate
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS target_tahunan (
-        id SERIAL PRIMARY KEY,
-        kode_pkm VARCHAR(20) NOT NULL,
-        no_indikator INT NOT NULL,
-        tahun INT NOT NULL,
-        sasaran INT NOT NULL DEFAULT 0,
-        created_at TIMESTAMP DEFAULT NOW(),
-        updated_at TIMESTAMP DEFAULT NOW(),
-        UNIQUE(kode_pkm, no_indikator, tahun)
-      )
-    `).catch(() => {});
+    if (!_migrated) {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS target_tahunan (
+          id SERIAL PRIMARY KEY,
+          kode_pkm VARCHAR(20) NOT NULL,
+          no_indikator INT NOT NULL,
+          tahun INT NOT NULL,
+          sasaran INT NOT NULL DEFAULT 0,
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW(),
+          UNIQUE(kode_pkm, no_indikator, tahun)
+        )
+      `).catch(() => {});
+      _migrated = true;
+    }
 
     if (method === 'GET') {
       const { kode_pkm, tahun } = params;

@@ -596,11 +596,25 @@ async function verifKapus(pool, body) {
     );
 
     if (isReVerif) {
-      // Re-verifikasi (dari PP atau Admin): hanya reset VP yang statusnya Ditolak,
-      // PP yang sudah Selesai tidak perlu verif ulang.
-      // Juga pastikan PP baru (belum punya record) tetap di-insert dengan status Menunggu.
+      // Re-verifikasi (dari PP atau Admin): reset semua PP yang punya irisan
+      // dengan indikator bermasalah — termasuk yang sebelumnya sudah Selesai.
+      // PP yang tidak punya irisan tetap Selesai (tidak perlu verif ulang).
+      // Ambil daftar indikator bermasalah dari penolakan_indikator
+      const piRows = await pool.query(
+        `SELECT no_indikator FROM penolakan_indikator WHERE id_usulan=$1 AND (aksi IS NULL OR aksi='tolak')`,
+        [idUsulan]
+      );
+      const nomorBermasalahReVerif = piRows.rows.map(r => parseInt(r.no_indikator));
+
       const allPP = await pool.query(`SELECT email, nama, nip, jabatan, indikator_akses FROM users WHERE role='Pengelola Program' AND aktif=true`);
       for (const pp of allPP.rows) {
+        const aksesArr = parseIndikatorAkses(pp.indikator_akses || '');
+        // PP wajib re-verif jika punya irisan dengan indikator bermasalah
+        // PP dengan akses kosong = bertanggung jawab atas semua indikator → selalu terkena
+        const adaIrisan = aksesArr.length === 0
+          ? nomorBermasalahReVerif.length > 0
+          : aksesArr.some(n => nomorBermasalahReVerif.includes(n));
+        const statusBaru = adaIrisan ? 'Menunggu' : null; // null = tidak diubah jika sudah Selesai
         await pool.query(
           `INSERT INTO verifikasi_program (id_usulan,email_program,nama_program,nip_program,jabatan_program,indikator_akses,status,created_at)
            VALUES ($1,$2,$3,$4,$5,$6,'Menunggu',NOW())
@@ -608,11 +622,12 @@ async function verifKapus(pool, body) {
              SET nama_program=EXCLUDED.nama_program,
                  nip_program=EXCLUDED.nip_program,
                  jabatan_program=EXCLUDED.jabatan_program,
-                 -- Hanya reset ke Menunggu jika sebelumnya Ditolak; Selesai tetap Selesai
-                 status=CASE WHEN verifikasi_program.status='Ditolak' THEN 'Menunggu' ELSE verifikasi_program.status END,
-                 catatan=CASE WHEN verifikasi_program.status='Ditolak' THEN NULL ELSE verifikasi_program.catatan END,
-                 verified_at=CASE WHEN verifikasi_program.status='Ditolak' THEN NULL ELSE verifikasi_program.verified_at END`,
-          [idUsulan, pp.email, pp.nama, pp.nip||null, pp.jabatan||null, pp.indikator_akses||'']
+                 -- Reset ke Menunggu jika punya irisan indikator bermasalah (termasuk yang sudah Selesai)
+                 -- PP tanpa irisan tetap pada status semula
+                 status=CASE WHEN $7 THEN 'Menunggu' ELSE verifikasi_program.status END,
+                 catatan=CASE WHEN $7 THEN NULL ELSE verifikasi_program.catatan END,
+                 verified_at=CASE WHEN $7 THEN NULL ELSE verifikasi_program.verified_at END`,
+          [idUsulan, pp.email, pp.nama, pp.nip||null, pp.jabatan||null, pp.indikator_akses||'', adaIrisan]
         );
       }
     } else {
@@ -841,10 +856,10 @@ async function verifProgram(pool, body) {
     );
   }
 
-  // FIX Bug #5 (syntax): Gunakan template literal, bukan single-quote di dalam single-quote
-  // Reset VP yang Ditolak — HANYA yang punya irisan dengan nomorBermasalah
+  // Reset VP yang punya irisan dengan indikator bermasalah — termasuk yang sudah Selesai.
+  // PP yang tidak punya irisan tidak perlu re-verif.
   const allVPVerif = await pool.query(
-    `SELECT email_program, indikator_akses FROM verifikasi_program WHERE id_usulan=$1 AND status='Ditolak'`,
+    `SELECT email_program, indikator_akses FROM verifikasi_program WHERE id_usulan=$1`,
     [idUsulan]
   );
   for (const vp of allVPVerif.rows) {

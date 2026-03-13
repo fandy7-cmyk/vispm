@@ -5485,16 +5485,71 @@ async function loadAuditTrail() {
   try {
     const data = await API.get('audit-trail', params);
     window._auditTrailData = data;
+    window._auditTrailPage = 1;
 
     if (!data || !data.length) {
       el.innerHTML = `<div class="empty-state" style="padding:32px"><span class="material-icons">inbox</span><p>Tidak ada log untuk filter ini</p></div>`;
       return;
     }
 
-    const actionColor = { LOGIN:'#0d9488',CREATE:'#2563eb',UPDATE:'#f59e0b',DELETE:'#ef4444',SUBMIT:'#8b5cf6',APPROVE:'#10b981',REJECT:'#f43f5e' };
-    const actionBg    = { LOGIN:'#f0fdf9',CREATE:'#eff6ff',UPDATE:'#fffbeb',DELETE:'#fef2f2',SUBMIT:'#f5f3ff',APPROVE:'#ecfdf5',REJECT:'#fff1f2' };
+    renderAuditTrailPage(1);
+  } catch(e) {
+    el.innerHTML = `<div class="empty-state" style="padding:32px"><span class="material-icons" style="color:#ef4444">error</span><p style="color:#ef4444">${e.message}</p></div>`;
+  }
+}
 
-    el.innerHTML = `<div class="table-container"><table>
+function renderAuditTrailPage(page) {
+  const el = document.getElementById('auditTrailTable');
+  if (!el) return;
+  const data = window._auditTrailData || [];
+  if (!data.length) return;
+
+  const PAGE_SIZE = 25;
+  const totalPages = Math.ceil(data.length / PAGE_SIZE);
+  page = Math.max(1, Math.min(page, totalPages));
+  window._auditTrailPage = page;
+
+  const start = (page - 1) * PAGE_SIZE;
+  const pageData = data.slice(start, start + PAGE_SIZE);
+
+  const actionColor = { LOGIN:'#0d9488',CREATE:'#2563eb',UPDATE:'#f59e0b',DELETE:'#ef4444',SUBMIT:'#8b5cf6',APPROVE:'#10b981',REJECT:'#f43f5e' };
+  const actionBg    = { LOGIN:'#f0fdf9',CREATE:'#eff6ff',UPDATE:'#fffbeb',DELETE:'#fef2f2',SUBMIT:'#f5f3ff',APPROVE:'#ecfdf5',REJECT:'#fff1f2' };
+
+  // Build pagination controls
+  function buildPagination() {
+    if (totalPages <= 1) return '';
+    const btn = (p, label, disabled = false, active = false) =>
+      `<button onclick="renderAuditTrailPage(${p})"
+        style="min-width:32px;height:32px;padding:0 10px;border-radius:6px;border:1px solid ${active ? '#0d9488' : '#e2e8f0'};
+        background:${active ? '#0d9488' : 'white'};color:${active ? 'white' : disabled ? '#cbd5e1' : '#374151'};
+        font-size:12px;font-weight:600;cursor:${disabled ? 'default' : 'pointer'};pointer-events:${disabled ? 'none' : 'auto'}"
+        ${disabled ? 'disabled' : ''}>${label}</button>`;
+
+    let pages = '';
+    // Always show first, last, current ±2
+    const showPages = new Set([1, totalPages, page, page-1, page-2, page+1, page+2].filter(p => p >= 1 && p <= totalPages));
+    const sorted = [...showPages].sort((a,b) => a-b);
+    let prev = 0;
+    for (const p of sorted) {
+      if (prev && p - prev > 1) pages += `<span style="color:#94a3b8;padding:0 4px;line-height:32px">…</span>`;
+      pages += btn(p, p, false, p === page);
+      prev = p;
+    }
+
+    return `<div style="display:flex;align-items:center;gap:6px;padding:10px 16px;border-top:1px solid #f1f5f9;flex-wrap:wrap">
+      ${btn(page-1, '← Prev', page === 1)}
+      ${pages}
+      ${btn(page+1, 'Next →', page === totalPages)}
+      <span style="font-size:12px;color:#94a3b8;margin-left:8px">
+        Halaman <strong>${page}</strong> dari <strong>${totalPages}</strong>
+        &nbsp;·&nbsp; Total <strong>${data.length}</strong> entri
+        &nbsp;·&nbsp; Menampilkan ${start+1}–${Math.min(start+PAGE_SIZE, data.length)}
+      </span>
+    </div>`;
+  }
+
+  el.innerHTML = `
+    <div class="table-container"><table>
       <thead><tr>
         <th style="width:160px">Waktu</th>
         <th style="width:90px">Modul</th>
@@ -5504,7 +5559,7 @@ async function loadAuditTrail() {
         <th>Detail</th>
         <th style="width:110px">IP Address</th>
       </tr></thead>
-      <tbody>${data.map(r => {
+      <tbody>${pageData.map(r => {
         const ac = (r.action||'').toUpperCase();
         const col = actionColor[ac] || '#64748b';
         const bg  = actionBg[ac]    || '#f8fafc';
@@ -5518,13 +5573,9 @@ async function loadAuditTrail() {
           <td style="font-size:11px;color:#94a3b8">${r.ip_address||'-'}</td>
         </tr>`;
       }).join('')}
-      </tbody></table></div>
-      <div style="padding:10px 16px;font-size:12px;color:#94a3b8;border-top:1px solid #f1f5f9">
-        Total: <strong>${data.length}</strong> entri
-      </div>`;
-  } catch(e) {
-    el.innerHTML = `<div class="empty-state" style="padding:32px"><span class="material-icons" style="color:#ef4444">error</span><p style="color:#ef4444">${e.message}</p></div>`;
-  }
+      </tbody>
+    </table></div>
+    ${buildPagination()}`;
 }
 
 function exportAuditTrail() {

@@ -436,7 +436,6 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
                 <tr><td style="padding:2px 0">Puskesmas</td><td style="padding:2px 0">: ${h.nama_puskesmas||h.kode_pkm}</td></tr>
                 <tr><td style="padding:2px 0">Periode</td><td style="padding:2px 0">: ${bulan} ${h.tahun}</td></tr>
                 <tr><td style="width:110px;padding:2px 0;vertical-align:top;white-space:nowrap">Indikator</td><td style="padding:2px 0;vertical-align:top">: <strong>${ind.nama_indikator||'-'}</strong></td></tr>
-                <tr><td style="padding:2px 0">Dicetak</td><td style="padding:2px 0">: ${now}</td></tr>
               </table>
             </td>
             <td style="width:50%;vertical-align:top;padding-left:20px">
@@ -444,6 +443,7 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
                 <tr><td style="width:160px;padding:2px 0">Status</td><td style="padding:2px 0">: ${h.status_global||'Draft'}</td></tr>
                 <tr><td style="padding:2px 0">Indeks Beban Kerja</td><td style="padding:2px 0">: ${parseFloat(h.indeks_beban_kerja||0).toFixed(2)}</td></tr>
                 <tr><td style="padding:2px 0">Indeks Kesulitan Wilayah</td><td style="padding:2px 0">: ${parseFloat(h.indeks_kesulitan_wilayah||0).toFixed(2)}</td></tr>
+                <tr><td style="padding:2px 0">Dicetak</td><td style="padding:2px 0">: ${now}</td></tr>
               </table>
             </td>
           </tr>

@@ -1639,17 +1639,21 @@ async function openIndikatorModal(idUsulan) {
     }
 
     if (displayInds.length === 0) {
-      document.getElementById('indikatorInputBody').innerHTML = `<tr><td colspan="6"><div class="empty-state" style="padding:30px"><span class="material-icons" style="color:#0d9488">check_circle</span><p style="color:#0d9488;font-weight:600">Semua indikator sudah disetujui</p></div></td></tr>`;
+      document.getElementById('indikatorInputBody').innerHTML = `<tr><td colspan="8"><div class="empty-state" style="padding:30px"><span class="material-icons" style="color:#0d9488">check_circle</span><p style="color:#0d9488;font-weight:600">Semua indikator sudah disetujui</p></div></td></tr>`;
     } else {
     document.getElementById('indikatorInputBody').innerHTML = displayInds.map(ind => {
       const hasBukti = !!ind.linkFile;
       const uploadBtnStyle = hasBukti
         ? 'display:inline-flex;align-items:center;gap:3px;padding:4px 9px;background:#0d9488;color:white;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:600;border:1.5px solid #0d9488;white-space:nowrap'
         : 'display:inline-flex;align-items:center;gap:3px;padding:4px 9px;background:#ef4444;color:white;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:600;border:1.5px solid #ef4444;white-space:nowrap';
+      const _sisaTgt = ind.sasaranTahunan > 0 ? Math.max(0, ind.sasaranTahunan - ind.realisasiKumulatif) : null;
+      const _sisaColor = _sisaTgt !== null && _sisaTgt === 0 ? '#16a34a' : (_sisaTgt !== null && _sisaTgt < 10 ? '#f59e0b' : '#1e293b');
       return `<tr id="indRow-${ind.no}">
         <td><span style="font-family:'JetBrains Mono';font-weight:700">${ind.no}</span></td>
         <td style="max-width:220px;font-size:12.5px">${ind.nama}</td>
         <input type="hidden" id="bobot-${ind.no}" value="${ind.bobot}">
+        <td style="text-align:center;font-size:12.5px;color:#475569">${ind.sasaranTahunan > 0 ? ind.sasaranTahunan : '<span style="color:#cbd5e1">-</span>'}</td>
+        <td style="text-align:center;font-size:12.5px;font-weight:700;color:${_sisaColor}">${_sisaTgt !== null ? _sisaTgt : '<span style="color:#cbd5e1">-</span>'}</td>
         <td style="text-align:center">
           ${isLocked ? `<span>${ind.target}</span>` : `<input type="number" id="t-${ind.no}" value="${ind.target}" min="0" step="1"
             style="width:72px;border:1.5px solid var(--border);border-radius:6px;padding:3px 6px;font-size:13px;text-align:center"

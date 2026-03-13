@@ -147,8 +147,14 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
 
   // Indikator + target tahunan
   const indResult = await pool.query(
-    `SELECT ui.*, mi.nama_indikator, mi.catatan as catatan_indikator,
-            COALESCE(tt.sasaran, 0) as sasaran_tahunan
+    `SELECT ui.*,
+            mi.nama_indikator, mi.catatan as catatan_indikator,
+            COALESCE(tt.sasaran, 0) as sasaran_tahunan,
+            -- realisasi_rasio dihitung ulang langsung dari nilai aktual (bukan stored)
+            CASE WHEN COALESCE(tt.sasaran,0) > 0
+                 THEN ROUND((COALESCE(ui.capaian,0)::numeric / tt.sasaran::numeric) * 100, 2)
+                 ELSE ROUND(COALESCE(ui.realisasi_rasio,0)::numeric * 100, 2)
+            END as capaian_pct
      FROM usulan_indikator ui
      LEFT JOIN master_indikator mi ON ui.no_indikator = mi.no_indikator
      LEFT JOIN target_tahunan tt ON tt.kode_pkm = $2 AND tt.no_indikator = ui.no_indikator AND tt.tahun = $3
@@ -311,25 +317,17 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
   const _allInds = aksesFilter && aksesFilter.length
     ? indResult.rows.filter(ind => aksesFilter.includes(ind.no_indikator))
     : indResult.rows;
-  const pagesHtml = _allInds.map(ind => {
-    const rasio = parseFloat(ind.realisasi_rasio) || 0;
-    const capaianPct = (rasio * 100).toFixed(0);
-    const sasaranTahunan = parseInt(ind.sasaran_tahunan) || 0;
-    const target  = parseFloat(ind.target)  || 0;
-    const capaian = parseFloat(ind.capaian) || 0;
-    const catatan = ind.catatan_indikator || '';
-    const slots = getVerifierSlots(ind.no_indikator);
 
-    return `
-    <div class="page-break">
+  // ── LAPORAN SEMENTARA: semua 12 indikator dalam 1 halaman tabel ─────────────
+  let pagesHtml;
+  if (isSementara) {
+    const infoHeader = `
       ${kopSurat()}
-      <!-- JUDUL -->
-      <div style="text-align:center;margin-bottom:16px">
-        <div style="font-size:12px;font-weight:700;text-transform:uppercase">Lembar Hasil Verifikasi Laporan Standar Pelayanan Minimal (SPM)</div>
+      <div style="text-align:center;margin-bottom:14px">
+        <div style="font-size:12px;font-weight:700;text-transform:uppercase">Laporan Sementara Standar Pelayanan Minimal (SPM)</div>
         <div style="font-size:12px;font-weight:700;text-transform:uppercase">Bidang Kesehatan Tahun ${h.tahun}</div>
-        ${isSementara ? `<div style="margin-top:4px;display:inline-block;background:#fef3c7;border:1px solid #f59e0b;border-radius:6px;padding:2px 12px;font-size:10px;font-weight:700;color:#b45309">LAPORAN SEMENTARA</div>` : ''}
+        <div style="margin-top:4px;display:inline-block;background:#fef3c7;border:1px solid #f59e0b;border-radius:6px;padding:2px 12px;font-size:10px;font-weight:700;color:#b45309">LAPORAN SEMENTARA</div>
       </div>
-      <!-- INFO 2 KOLOM -->
       <table style="width:100%;margin-bottom:14px;font-size:11px">
         <tr>
           <td style="width:50%;vertical-align:top">
@@ -337,7 +335,6 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
               <tr><td style="width:110px;padding:2px 0">ID Usulan</td><td style="padding:2px 0">: <strong>${h.id_usulan}</strong></td></tr>
               <tr><td style="padding:2px 0">Puskesmas</td><td style="padding:2px 0">: ${h.nama_puskesmas||h.kode_pkm}</td></tr>
               <tr><td style="padding:2px 0">Periode</td><td style="padding:2px 0">: ${bulan} ${h.tahun}</td></tr>
-              <tr><td style="width:110px;padding:2px 0;vertical-align:top;white-space:nowrap">Indikator</td><td style="padding:2px 0;vertical-align:top">: <strong>${ind.nama_indikator||'-'}</strong></td></tr>
               <tr><td style="padding:2px 0">Dicetak</td><td style="padding:2px 0">: ${now}</td></tr>
             </table>
           </td>
@@ -346,38 +343,122 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
               <tr><td style="width:160px;padding:2px 0">Status</td><td style="padding:2px 0">: ${h.status_global||'Draft'}</td></tr>
               <tr><td style="padding:2px 0">Indeks Beban Kerja</td><td style="padding:2px 0">: ${parseFloat(h.indeks_beban_kerja||0).toFixed(2)}</td></tr>
               <tr><td style="padding:2px 0">Indeks Kesulitan Wilayah</td><td style="padding:2px 0">: ${parseFloat(h.indeks_kesulitan_wilayah||0).toFixed(2)}</td></tr>
-              <tr><td style="padding:2px 0"><strong>Indeks SPM</strong></td><td style="padding:2px 0">: <strong>${parseFloat(h.indeks_spm||0).toFixed(2)}</strong></td></tr>
             </table>
           </td>
         </tr>
-      </table>
-      <!-- TABEL DATA -->
-      <table style="width:100%;border-collapse:collapse;margin-bottom:${catatan?'10px':'20px'}">
+      </table>`;
+
+    const tabelRows = _allInds.map((ind, i) => {
+      const sasaranTahunan = parseInt(ind.sasaran_tahunan) || 0;
+      const target  = parseFloat(ind.target)  || 0;
+      const capaian = parseFloat(ind.capaian) || 0;
+      const sisaTarget = sasaranTahunan > 0 ? Math.max(0, sasaranTahunan - capaian) : '-';
+      const capaianPct = parseFloat(ind.capaian_pct || 0).toFixed(0);
+      const bg = i % 2 === 0 ? '#f8fafc' : 'white';
+      return `<tr style="background:${bg}">
+        <td style="padding:6px 8px;border:1px solid #cbd5e1;text-align:center;font-weight:700">${ind.no_indikator}</td>
+        <td style="padding:6px 8px;border:1px solid #cbd5e1;font-size:10.5px">${ind.nama_indikator||'-'}</td>
+        <td style="padding:6px 8px;border:1px solid #cbd5e1;text-align:center">${sasaranTahunan > 0 ? sasaranTahunan : '<span style="color:#94a3b8">-</span>'}</td>
+        <td style="padding:6px 8px;border:1px solid #cbd5e1;text-align:center">${target}</td>
+        <td style="padding:6px 8px;border:1px solid #cbd5e1;text-align:center">${typeof sisaTarget === 'number' ? sisaTarget : '-'}</td>
+        <td style="padding:6px 8px;border:1px solid #cbd5e1;text-align:center">${capaian}</td>
+        <td style="padding:6px 8px;border:1px solid #cbd5e1;text-align:center;font-weight:700;color:#1e293b">${capaianPct}%</td>
+      </tr>`;
+    }).join('');
+
+    const tanda_tangan_kapus = kapusSignBlock();
+    pagesHtml = `<div class="page-break">
+      ${infoHeader}
+      <table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:20px">
         <thead>
           <tr style="background:#1e293b;color:white">
-            <th style="padding:7px 10px;font-size:11px;border:1px solid #334155;text-align:center;text-transform:uppercase">Jumlah Sasaran<br>(Tahun)</th>
-            <th style="padding:7px 10px;font-size:11px;border:1px solid #334155;text-align:center;text-transform:uppercase">Target Bulan Ini</th>
-            <th style="padding:7px 10px;font-size:11px;border:1px solid #334155;text-align:center;text-transform:uppercase">Realisasi Bulan Ini</th>
-            <th style="padding:7px 10px;font-size:11px;border:1px solid #334155;text-align:center;text-transform:uppercase">Capaian</th>
+            <th style="padding:7px 8px;border:1px solid #334155;text-align:center;width:30px;text-transform:uppercase">No</th>
+            <th style="padding:7px 8px;border:1px solid #334155;text-align:center;text-transform:uppercase">Nama Indikator</th>
+            <th style="padding:7px 8px;border:1px solid #334155;text-align:center;width:65px;font-size:10px;text-transform:uppercase">Target<br>Tahunan</th>
+            <th style="padding:7px 8px;border:1px solid #334155;text-align:center;width:65px;font-size:10px;text-transform:uppercase">Target<br>Bulan Ini</th>
+            <th style="padding:7px 8px;border:1px solid #334155;text-align:center;width:65px;font-size:10px;text-transform:uppercase">Sisa<br>Target</th>
+            <th style="padding:7px 8px;border:1px solid #334155;text-align:center;width:65px;font-size:10px;text-transform:uppercase">Realisasi<br>Bulan Ini</th>
+            <th style="padding:7px 8px;border:1px solid #334155;text-align:center;width:60px;text-transform:uppercase">Capaian</th>
           </tr>
         </thead>
-        <tbody>
-          <tr>
-            <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:center;font-size:11px">${sasaranTahunan>0?sasaranTahunan:'<span style="color:#94a3b8;font-style:italic">-</span>'}</td>
-            <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:center;font-size:11px">${target}</td>
-            <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:center;font-size:11px">${capaian}</td>
-            <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:center;font-size:11px;font-weight:700;color:#1e293b">${capaianPct}%</td>
-          </tr>
-        </tbody>
+        <tbody>${tabelRows}</tbody>
       </table>
-      ${catatan?`<div style="margin-bottom:20px;font-size:10px;color:#334155"><strong>Catatan :</strong> ${catatan}</div>`:''}
-      <!-- TANDA TANGAN -->
       <div style="margin-top:28px">
         <div style="font-size:10px;color:#334155;margin-bottom:6px;text-align:right">Adean, ${now}</div>
-        ${buildSignLayout(slots)}
+        <div style="display:flex;justify-content:flex-end">${tanda_tangan_kapus}</div>
       </div>
     </div>`;
-  }).join('');
+
+  } else {
+    // ── LAPORAN FINAL: per indikator, 1 halaman masing-masing ────────────────
+    pagesHtml = _allInds.map(ind => {
+      const sasaranTahunan = parseInt(ind.sasaran_tahunan) || 0;
+      const target  = parseFloat(ind.target)  || 0;
+      const capaian = parseFloat(ind.capaian) || 0;
+      const sisaTarget = sasaranTahunan > 0 ? Math.max(0, sasaranTahunan - capaian) : null;
+      const capaianPct = parseFloat(ind.capaian_pct || 0).toFixed(0);
+      const catatan = ind.catatan_indikator || '';
+      const slots = getVerifierSlots(ind.no_indikator);
+
+      return `
+      <div class="page-break">
+        ${kopSurat()}
+        <!-- JUDUL -->
+        <div style="text-align:center;margin-bottom:16px">
+          <div style="font-size:12px;font-weight:700;text-transform:uppercase">Lembar Hasil Verifikasi Laporan Standar Pelayanan Minimal (SPM)</div>
+          <div style="font-size:12px;font-weight:700;text-transform:uppercase">Bidang Kesehatan Tahun ${h.tahun}</div>
+        </div>
+        <!-- INFO 2 KOLOM -->
+        <table style="width:100%;margin-bottom:14px;font-size:11px">
+          <tr>
+            <td style="width:50%;vertical-align:top">
+              <table style="width:100%">
+                <tr><td style="width:110px;padding:2px 0">ID Usulan</td><td style="padding:2px 0">: <strong>${h.id_usulan}</strong></td></tr>
+                <tr><td style="padding:2px 0">Puskesmas</td><td style="padding:2px 0">: ${h.nama_puskesmas||h.kode_pkm}</td></tr>
+                <tr><td style="padding:2px 0">Periode</td><td style="padding:2px 0">: ${bulan} ${h.tahun}</td></tr>
+                <tr><td style="width:110px;padding:2px 0;vertical-align:top;white-space:nowrap">Indikator</td><td style="padding:2px 0;vertical-align:top">: <strong>${ind.nama_indikator||'-'}</strong></td></tr>
+                <tr><td style="padding:2px 0">Dicetak</td><td style="padding:2px 0">: ${now}</td></tr>
+              </table>
+            </td>
+            <td style="width:50%;vertical-align:top;padding-left:20px">
+              <table style="width:100%">
+                <tr><td style="width:160px;padding:2px 0">Status</td><td style="padding:2px 0">: ${h.status_global||'Draft'}</td></tr>
+                <tr><td style="padding:2px 0">Indeks Beban Kerja</td><td style="padding:2px 0">: ${parseFloat(h.indeks_beban_kerja||0).toFixed(2)}</td></tr>
+                <tr><td style="padding:2px 0">Indeks Kesulitan Wilayah</td><td style="padding:2px 0">: ${parseFloat(h.indeks_kesulitan_wilayah||0).toFixed(2)}</td></tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+        <!-- TABEL DATA -->
+        <table style="width:100%;border-collapse:collapse;margin-bottom:${catatan?'10px':'20px'}">
+          <thead>
+            <tr style="background:#1e293b;color:white">
+              <th style="padding:7px 10px;font-size:11px;border:1px solid #334155;text-align:center;text-transform:uppercase">Target<br>Tahunan</th>
+              <th style="padding:7px 10px;font-size:11px;border:1px solid #334155;text-align:center;text-transform:uppercase">Target<br>Bulan Ini</th>
+              <th style="padding:7px 10px;font-size:11px;border:1px solid #334155;text-align:center;text-transform:uppercase">Sisa<br>Target</th>
+              <th style="padding:7px 10px;font-size:11px;border:1px solid #334155;text-align:center;text-transform:uppercase">Realisasi<br>Bulan Ini</th>
+              <th style="padding:7px 10px;font-size:11px;border:1px solid #334155;text-align:center;text-transform:uppercase">Capaian</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:center;font-size:11px">${sasaranTahunan>0?sasaranTahunan:'<span style="color:#94a3b8;font-style:italic">-</span>'}</td>
+              <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:center;font-size:11px">${target}</td>
+              <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:center;font-size:11px;color:${sisaTarget !== null && sisaTarget === 0 ? '#16a34a' : '#1e293b'}">${sisaTarget !== null ? sisaTarget : '<span style="color:#94a3b8;font-style:italic">-</span>'}</td>
+              <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:center;font-size:11px">${capaian}</td>
+              <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:center;font-size:11px;font-weight:700;color:#1e293b">${capaianPct}%</td>
+            </tr>
+          </tbody>
+        </table>
+        ${catatan?`<div style="margin-bottom:20px;font-size:10px;color:#334155"><strong>Catatan :</strong> ${catatan}</div>`:''}
+        <!-- TANDA TANGAN -->
+        <div style="margin-top:28px">
+          <div style="font-size:10px;color:#334155;margin-bottom:6px;text-align:right">Adean, ${now}</div>
+          ${buildSignLayout(slots)}
+        </div>
+      </div>`;
+    }).join('');
+  }
 
   // ── HALAMAN REKAP (hanya mode final) ──────────────────────────
   const rekapPage = isSementara ? '' : (() => {

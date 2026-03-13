@@ -1,20 +1,24 @@
 const { getPool, ok, err, cors } = require('./db');
 
+let _migrated = false;
+
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors();
   const pool = getPool();
 
-  // Migration
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS pejabat_penandatangan (
-      id SERIAL PRIMARY KEY,
-      jabatan VARCHAR(100) NOT NULL UNIQUE,
-      nama VARCHAR(200) NOT NULL,
-      nip VARCHAR(50),
-      tanda_tangan TEXT,
-      updated_at TIMESTAMPTZ DEFAULT NOW()
-    )
-  `).catch(()=>{});
+  if (!_migrated) {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS pejabat_penandatangan (
+        id SERIAL PRIMARY KEY,
+        jabatan VARCHAR(100) NOT NULL UNIQUE,
+        nama VARCHAR(200) NOT NULL,
+        nip VARCHAR(50),
+        tanda_tangan TEXT,
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `).catch(()=>{});
+    _migrated = true;
+  }
 
   try {
     if (event.httpMethod === 'GET') {

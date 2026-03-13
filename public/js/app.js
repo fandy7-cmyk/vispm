@@ -1011,44 +1011,6 @@ function renderOperatorDashboard(el, d) {
         + `</div>`;
     }).join("");
     periodeBanner = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px">${items}</div>`;
-    // Mulai timer setelah DOM render
-    window._periodeTimers = window._periodeTimers || [];
-    window._periodeTimers.forEach(t => clearInterval(t));
-    window._periodeTimers = [];
-    periodeList.forEach((pr, idx) => {
-      const jamSelesai = pr.jam_selesai || "17:00";
-      const [thnS, blnS, tglS] = (pr.tanggal_selesai || '').split('-').map(Number);
-      const [jsH, jsM] = jamSelesai.split(':').map(Number);
-      if (!thnS) return;
-      const deadline = new Date(Date.UTC(thnS, blnS-1, tglS, jsH-8, jsM));
-      const el = () => document.getElementById('periodeTimer_' + idx);
-      const tick = () => {
-        const el2 = el();
-        if (!el2) { clearInterval(tid); return; }
-        const diff = deadline - Date.now();
-        if (diff <= 0) {
-          el2.textContent = 'Ditutup';
-          el2.style.background = 'rgba(239,68,68,0.35)';
-          clearInterval(tid);
-          return;
-        }
-        const h = Math.floor(diff / 3600000);
-        const m = Math.floor((diff % 3600000) / 60000);
-        const s = Math.floor((diff % 60000) / 1000);
-        const hh = String(h).padStart(2,'0');
-        const mm = String(m).padStart(2,'0');
-        const ss = String(s).padStart(2,'0');
-        el2.textContent = h >= 24
-          ? Math.floor(h/24) + 'h ' + String(h%24).padStart(2,'0') + ':' + mm + ':' + ss
-          : hh + ':' + mm + ':' + ss;
-        // Warna berubah saat < 1 jam
-        el2.style.background = diff < 3600000 ? 'rgba(239,68,68,0.4)' : 'rgba(0,0,0,0.2)';
-      };
-      let tid;
-      tid = setInterval(tick, 1000);
-      tick();
-      window._periodeTimers.push(tid);
-    });
   } else {
     periodeBanner = `
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px">
@@ -1106,6 +1068,46 @@ function renderOperatorDashboard(el, d) {
       <div class="card-header-bar"><span class="card-title"><span class="material-icons">history</span>Usulan Terbaru Saya</span></div>
       <div class="card-body" style="padding:0" id="recentTable"></div>
     </div>`;
+
+  // Mulai timer countdown periode — setelah DOM di-render
+  setTimeout(() => {
+    window._periodeTimers = window._periodeTimers || [];
+    window._periodeTimers.forEach(t => clearInterval(t));
+    window._periodeTimers = [];
+    periodeList.forEach((pr, idx) => {
+      const jamSelesai = pr.jam_selesai || '17:00';
+      const [thnS, blnS, tglS] = (pr.tanggal_selesai || '').split('-').map(Number);
+      const [jsH, jsM] = jamSelesai.split(':').map(Number);
+      if (!thnS) return;
+      const deadline = new Date(Date.UTC(thnS, blnS-1, tglS, jsH-8, jsM));
+      const getEl = () => document.getElementById('periodeTimer_' + idx);
+      const tick = () => {
+        const el2 = getEl();
+        if (!el2) { clearInterval(tid); return; }
+        const diff = deadline - Date.now();
+        if (diff <= 0) {
+          el2.textContent = 'Ditutup';
+          el2.style.background = 'rgba(239,68,68,0.35)';
+          clearInterval(tid);
+          return;
+        }
+        const h = Math.floor(diff / 3600000);
+        const m = Math.floor((diff % 3600000) / 60000);
+        const s = Math.floor((diff % 60000) / 1000);
+        const hh = String(h).padStart(2,'0');
+        const mm = String(m).padStart(2,'0');
+        const ss = String(s).padStart(2,'0');
+        el2.textContent = h >= 24
+          ? Math.floor(h/24) + 'h ' + String(h%24).padStart(2,'0') + ':' + mm + ':' + ss
+          : hh + ':' + mm + ':' + ss;
+        el2.style.background = diff < 3600000 ? 'rgba(239,68,68,0.4)' : 'rgba(0,0,0,0.2)';
+      };
+      let tid;
+      tid = setInterval(tick, 1000);
+      tick();
+      window._periodeTimers.push(tid);
+    });
+  }, 0);
 
   API.getUsulan({ email_operator: currentUser.email }).then(rows => {
     document.getElementById("recentTable").innerHTML = renderUsulanTable(rows.slice(0, 5), "operator");

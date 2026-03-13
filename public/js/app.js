@@ -50,6 +50,20 @@ async function renderCatatanThread(elId, idUsulan, currentRole) {
     const icon = aksiIcon[log.aksi] || 'chat';
     const nama = log.user_nama || log.user_email;
     const cardId = pfx + '_' + idx;
+    // Warna badge aksi — berbeda dari warna role agar mudah dibedakan
+    const aksiColorMap = {
+      'Tolak':           { c:'#dc2626', b:'#fef2f2' },
+      'Tolak (sebagian)':{ c:'#d97706', b:'#fffbeb' },
+      'Tolak Indikator': { c:'#dc2626', b:'#fef2f2' },
+      'Tolak Ke Operator':{ c:'#dc2626', b:'#fef2f2' },
+      'Kembalikan':      { c:'#7c3aed', b:'#f5f3ff' },
+      'Approve':         { c:'#059669', b:'#ecfdf5' },
+      'Re-verifikasi':   { c:'#0891b2', b:'#ecfeff' },
+      'Ajukan Ulang':    { c:'#2563eb', b:'#eff6ff' },
+      'Sanggah':         { c:'#7c3aed', b:'#f5f3ff' },
+      'Sanggah Selesai': { c:'#059669', b:'#ecfdf5' },
+    };
+    const aksiClr = aksiColorMap[log.aksi] || { c:cfg.color, b:cfg.bg };
 
     html += `<div style="border:1.5px solid ${cfg.border};border-radius:8px;background:${cfg.bg};overflow:hidden">
       <!-- header: selalu tampil, klik toggle -->
@@ -59,8 +73,8 @@ async function renderCatatanThread(elId, idUsulan, currentRole) {
         if(d.style.display==='none'){d.style.display='block';arr.textContent='expand_less';}
         else{d.style.display='none';arr.textContent='expand_more';}
       })()" style="padding:7px 8px;cursor:pointer;display:flex;align-items:flex-start;gap:6px">
-        <div style="width:28px;height:28px;border-radius:50%;background:${cfg.color}20;border:2px solid ${cfg.color};display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">
-          <span class="material-icons" style="font-size:14px;color:${cfg.color}">${icon}</span>
+        <div style="width:28px;height:28px;border-radius:50%;background:${aksiClr.b};border:2px solid ${aksiClr.c};display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">
+          <span class="material-icons" style="font-size:14px;color:${aksiClr.c}">${icon}</span>
         </div>
         <div style="flex:1;min-width:0">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:4px">
@@ -69,7 +83,7 @@ async function renderCatatanThread(elId, idUsulan, currentRole) {
           </div>
           <div style="font-size:11.5px;font-weight:700;color:${cfg.color};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nama}</div>
           <div style="font-size:10.5px;color:#64748b;margin-bottom:3px">${log.role}</div>
-          <div style="font-size:10.5px;font-weight:700;color:${cfg.color};background:${cfg.color}15;border:1px solid ${cfg.color}40;border-radius:20px;padding:1px 6px;display:inline-flex;align-items:center;gap:2px">
+          <div style="font-size:10.5px;font-weight:700;color:${aksiClr.c};background:${aksiClr.b};border:1px solid ${aksiClr.c}60;border-radius:20px;padding:1px 6px;display:inline-flex;align-items:center;gap:2px">
             <span class="material-icons" style="font-size:11px">${icon}</span>${log.aksi}
           </div>
         </div>
@@ -1155,6 +1169,11 @@ function renderUsulanTable(rows, role) {
           <div style="margin-top:4px;display:inline-flex;align-items:center;gap:4px;flex-wrap:wrap;background:#fef9c3;border:1px solid #fde047;border-radius:5px;padding:2px 7px">
             <span class="material-icons" style="font-size:12px;color:#ca8a04">replay</span>
             <span style="font-size:10.5px;color:#92400e;font-weight:600">Re-verifikasi berlangsung</span>
+            <span style="font-size:10px;color:#78350f;background:#fde68a;border-radius:3px;padding:1px 5px">${
+              u.statusGlobal === 'Menunggu Kepala Puskesmas' ? '→ Kepala Puskesmas' :
+              u.statusGlobal === 'Menunggu Pengelola Program' ? '→ Pengelola Program' :
+              u.statusGlobal === 'Menunggu Admin' ? '→ Admin' : ''
+            }</span>
             ${u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak').map(p => `<span style="background:#fecaca;color:#7f1d1d;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700">#${p.noIndikator}</span>`).join('')}
           </div>` : ''}
         ${(role === 'kepala-puskesmas' && u.ditolakOleh === 'Pengelola Program' && u.penolakanIndikator && u.penolakanIndikator.length) ? `
@@ -3016,29 +3035,26 @@ async function openVerifikasi(idUsulan) {
           const ppReVerifInfo = ppTerkena.map(vp => {
             const emailPP = vp.email_program;
             const namaPP = vp.nama_program || emailPP;
-            // Prioritas: verifikasi_program.catatan (per PP, tidak tertimpa PP lain)
-            // Fallback: penolakan_indikator.catatan_program (per indikator)
-            let rows = '';
+            let catatanText = '';
             if (vp.catatan && vp.catatan.trim()) {
-              rows = `<div style="font-size:11px;color:#78350f;margin-top:2px">${vp.catatan}</div>`;
+              catatanText = vp.catatan;
             } else {
               const items = catatanMap[emailPP?.toLowerCase()] || catatanMap[emailPP] || [];
-              rows = items.map(it =>
-                `<div style="font-size:11px;color:#78350f;margin-top:2px"><span style="background:#fef3c7;border-radius:3px;padding:1px 5px;font-weight:700;margin-right:4px">Ind. ${it.no}</span>${it.catatan}</div>`
-              ).join('');
+              catatanText = items.map(it => `Ind.${it.no}: ${it.catatan}`).join(' | ');
             }
-            return `<div style="font-size:11.5px;color:#78350f;margin-top:4px;padding:6px 8px;background:rgba(255,255,255,0.6);border-radius:4px">
-              <div style="font-weight:700;margin-bottom:2px">${namaPP}</div>${rows || '<div style="font-size:11px;color:#b45309;font-style:italic">Belum ada catatan</div>'}
+            return `<div style="background:rgba(255,255,255,0.7);border:1px solid #fde68a;border-radius:6px;padding:6px 8px">
+              <div style="font-size:11px;font-weight:700;color:#78350f;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${namaPP}</div>
+              <div style="font-size:10.5px;color:#92400e;margin-top:2px;line-height:1.4">${catatanText || '<span style="font-style:italic;color:#b45309">Belum ada catatan</span>'}</div>
             </div>`;
           }).join('');
           _reVerifBanner.innerHTML = `<div style="width:100%">
-            <div style="display:flex;align-items:center;gap:6px;margin-bottom:${ppReVerifInfo ? '6px' : '0'}">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:${ppReVerifInfo ? '8px' : '0'}">
               <span class="material-icons" style="color:#f59e0b;font-size:16px;flex-shrink:0">warning</span>
               <span style="font-size:12.5px;color:#92400e"><b>Re-verifikasi</b> — Hanya menampilkan <b>${displayInds.length} indikator</b> yang sebelumnya bermasalah dan sudah diverifikasi ulang oleh Pengelola Program.</span>
             </div>
-            ${ppReVerifInfo ? `<div style="border-top:1px solid #fde68a;padding-top:6px;margin-top:2px">
-              <div style="font-size:11px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:2px">Catatan Pengelola Program:</div>
-              ${ppReVerifInfo}
+            ${ppReVerifInfo ? `<div style="border-top:1px solid #fde68a;padding-top:6px">
+              <div style="font-size:10px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:6px">Catatan Pengelola Program:</div>
+              <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:6px">${ppReVerifInfo}</div>
             </div>` : ''}
           </div>`;
           _reVerifBanner.style.display = 'flex';

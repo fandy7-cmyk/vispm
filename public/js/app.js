@@ -42,7 +42,7 @@ async function renderCatatanThread(elId, idUsulan, currentRole) {
   const pfx = elId + '_ct';
 
   // === GRID MODE: 4 kolom, compact, klik expand detail ===
-  const COLS = 10;
+  const COLS = 7;
   let html = '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">';
 
   logs.forEach((log, idx) => {

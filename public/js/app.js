@@ -2664,7 +2664,44 @@ async function bukaLaporan(idUsulan, mode, aksesIndikator) {
   // window.open HARUS dipanggil sync sebelum await — agar browser tidak blokir popup
   const pw = window.open('', '_blank');
   if (!pw) { toast('Popup diblokir browser. Izinkan popup untuk situs ini.', 'error'); return; }
-  pw.document.write('<html><head><meta charset="utf-8"><title>Memuat...</title></head><body style="font-family:Arial;display:flex;align-items:center;justify-content:center;height:100vh;color:#64748b;margin:0"><div style="text-align:center"><p style="font-size:16px">\u23F3 Memuat laporan...</p></div></body></html>');
+  pw.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Memuat Laporan...</title><style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'Segoe UI',Arial,sans-serif;background:linear-gradient(135deg,#0f172a 0%,#1e293b 50%,#0f172a 100%);display:flex;align-items:center;justify-content:center;height:100vh;overflow:hidden}
+    .card{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:20px;padding:48px 56px;text-align:center;backdrop-filter:blur(12px);box-shadow:0 25px 60px rgba(0,0,0,0.4);max-width:380px;width:90%}
+    .logo-ring{width:80px;height:80px;margin:0 auto 28px;position:relative}
+    .ring{position:absolute;inset:0;border-radius:50%;border:3px solid transparent}
+    .ring-1{border-top-color:#0d9488;animation:spin 1.2s linear infinite}
+    .ring-2{inset:8px;border-right-color:#14b8a6;animation:spin 1.8s linear infinite reverse}
+    .ring-3{inset:16px;border-bottom-color:#5eead4;animation:spin 2.4s linear infinite}
+    .icon{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:26px}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .title{font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#5eead4;margin-bottom:10px}
+    .subtitle{font-size:18px;font-weight:700;color:white;margin-bottom:6px}
+    .desc{font-size:13px;color:#94a3b8;margin-bottom:32px}
+    .bar-wrap{background:rgba(255,255,255,0.08);border-radius:99px;height:6px;overflow:hidden;margin-bottom:14px}
+    .bar{height:100%;width:0%;background:linear-gradient(90deg,#0d9488,#14b8a6,#5eead4);border-radius:99px;animation:load 3.5s ease-in-out forwards}
+    @keyframes load{0%{width:0%}30%{width:45%}65%{width:72%}85%{width:88%}100%{width:95%}}
+    .status{font-size:12px;color:#64748b;animation:blink 1.8s ease-in-out infinite}
+    @keyframes blink{0%,100%{opacity:.5}50%{opacity:1}}
+    .dots span{animation:dot 1.4s infinite both}
+    .dots span:nth-child(2){animation-delay:.2s}
+    .dots span:nth-child(3){animation-delay:.4s}
+    @keyframes dot{0%,80%,100%{opacity:0}40%{opacity:1}}
+  </style></head><body>
+    <div class="card">
+      <div class="logo-ring">
+        <div class="ring ring-1"></div>
+        <div class="ring ring-2"></div>
+        <div class="ring ring-3"></div>
+        <div class="icon">📄</div>
+      </div>
+      <div class="title">VISPM</div>
+      <div class="subtitle">Menyiapkan Laporan</div>
+      <div class="desc">Mohon tunggu, sedang memuat data<br>dari server<span class="dots"><span>.</span><span>.</span><span>.</span></span></div>
+      <div class="bar-wrap"><div class="bar"></div></div>
+      <div class="status">Mengambil data laporan...</div>
+    </div>
+  </body></html>`);
 
   toast('Menyiapkan ' + (modeLabel[mode]||'laporan') + '...', 'success');
   try {

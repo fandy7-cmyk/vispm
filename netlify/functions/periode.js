@@ -1,5 +1,7 @@
 const { getPool, ok, err, cors } = require('./db');
 
+let _migrated = false;
+
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors();
 
@@ -8,10 +10,14 @@ exports.handler = async (event) => {
   const params = event.queryStringParameters || {};
 
   try {
-    // Auto-migrate: tambah kolom baru kalau belum ada
-    await pool.query(`ALTER TABLE periode_input ADD COLUMN IF NOT EXISTS jam_mulai VARCHAR(5) DEFAULT '08:00'`).catch(()=>{});
-    await pool.query(`ALTER TABLE periode_input ADD COLUMN IF NOT EXISTS jam_selesai VARCHAR(5) DEFAULT '17:00'`).catch(()=>{});
-    await pool.query(`ALTER TABLE periode_input ADD COLUMN IF NOT EXISTS notif_operator TEXT`).catch(()=>{});
+    if (!_migrated) {
+      await Promise.all([
+        pool.query(`ALTER TABLE periode_input ADD COLUMN IF NOT EXISTS jam_mulai VARCHAR(5) DEFAULT '08:00'`).catch(()=>{}),
+        pool.query(`ALTER TABLE periode_input ADD COLUMN IF NOT EXISTS jam_selesai VARCHAR(5) DEFAULT '17:00'`).catch(()=>{}),
+        pool.query(`ALTER TABLE periode_input ADD COLUMN IF NOT EXISTS notif_operator TEXT`).catch(()=>{}),
+      ]);
+      _migrated = true;
+    }
 
     if (method === 'GET') {
       let query = `SELECT id, tahun, bulan, nama_bulan, tanggal_mulai, tanggal_selesai, jam_mulai, jam_selesai, notif_operator, status

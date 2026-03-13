@@ -5858,7 +5858,7 @@ function updateNotifBadge(count) {
   }
 
   // Update title halaman
-  const base = 'VISPM';
+  const base = 'VISPM | Verifikasi Indeks SPM';
   document.title = count > 0 ? `(${count}) ${base}` : base;
 }
 

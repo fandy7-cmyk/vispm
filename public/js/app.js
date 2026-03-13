@@ -41,73 +41,57 @@ async function renderCatatanThread(elId, idUsulan, currentRole) {
   // unique prefix per elemen supaya tidak collision jika 2 thread di halaman sama
   const pfx = elId + '_ct';
 
-  const COLS = 10;
-  const rows = [];
-  for (let i = 0; i < logs.length; i += COLS) rows.push(logs.slice(i, i + COLS));
+  // unique prefix per elemen supaya tidak collision jika 2 thread di halaman sama
+  const pfx = elId + '_ct';
 
-  let html = '';
-  rows.forEach((row, rowIdx) => {
-    const isLtr = rowIdx % 2 === 0;
-    const displayRow = isLtr ? row.map((l,ci)=>({log:l,idx:rowIdx*COLS+ci,ci}))
-                             : [...row.map((l,ci)=>({log:l,idx:rowIdx*COLS+ci,ci}))].reverse();
-    const isLastRow = rowIdx === rows.length - 1;
+  // === GRID MODE: 4 kolom, compact, klik expand detail ===
+  const COLS = 4;
+  let html = '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">';
 
-    html += `<div style="display:flex;flex-direction:row;align-items:flex-start;gap:0">`;
-    displayRow.forEach(({log, idx}, di) => {
-      const cfg = roleCfg[log.role] || { color:'#64748b', bg:'#f8fafc', border:'#e2e8f0' };
-      const icon = aksiIcon[log.aksi] || 'chat';
-      const nama = log.user_nama || log.user_email;
-      const isLastInRow = di === displayRow.length - 1;
-      const hasRight = !isLastInRow;
-      const cardId = pfx + '_' + idx;
+  logs.forEach((log, idx) => {
+    const cfg = roleCfg[log.role] || { color:'#64748b', bg:'#f8fafc', border:'#e2e8f0' };
+    const icon = aksiIcon[log.aksi] || 'chat';
+    const nama = log.user_nama || log.user_email;
+    const cardId = pfx + '_' + idx;
 
-      html += `<div style="position:relative;display:flex;flex-direction:column;align-items:center;flex:1;min-width:0;padding:0 3px">
-        <div style="font-size:11px;font-weight:800;color:${cfg.color};margin-bottom:3px">#${idx+1}</div>
-        <!-- circle — klik toggle detail -->
-        <div onclick="(function(){var d=document.getElementById('${cardId}');var arr=document.getElementById('${cardId}_arr');if(d.style.display==='none'){d.style.display='block';arr.textContent='expand_less';}else{d.style.display='none';arr.textContent='expand_more';}})()"
-          style="width:36px;height:36px;border-radius:50%;background:${cfg.bg};border:2.5px solid ${cfg.color};display:flex;align-items:center;justify-content:center;flex-shrink:0;z-index:1;box-shadow:0 1px 4px ${cfg.color}33;cursor:pointer">
-          <span class="material-icons" style="font-size:16px;color:${cfg.color}">${icon}</span>
+    html += `<div style="border:1.5px solid ${cfg.border};border-radius:8px;background:${cfg.bg};overflow:hidden">
+      <!-- header: selalu tampil, klik toggle -->
+      <div onclick="(function(){
+        var d=document.getElementById('${cardId}');
+        var arr=document.getElementById('${cardId}_arr');
+        if(d.style.display==='none'){d.style.display='block';arr.textContent='expand_less';}
+        else{d.style.display='none';arr.textContent='expand_more';}
+      })()" style="padding:7px 8px;cursor:pointer;display:flex;align-items:flex-start;gap:6px">
+        <div style="width:28px;height:28px;border-radius:50%;background:${cfg.color}20;border:2px solid ${cfg.color};display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">
+          <span class="material-icons" style="font-size:14px;color:${cfg.color}">${icon}</span>
         </div>
-        <!-- collapsed: nama + role + aksi, selalu tampil -->
-        <div onclick="(function(){var d=document.getElementById('${cardId}');var arr=document.getElementById('${cardId}_arr');if(d.style.display==='none'){d.style.display='block';arr.textContent='expand_less';}else{d.style.display='none';arr.textContent='expand_more';}})()"
-          style="margin-top:5px;width:100%;background:${cfg.bg};border:1.5px solid ${cfg.border};border-radius:7px;padding:5px 7px;box-sizing:border-box;cursor:pointer">
-          <div style="font-size:12px;font-weight:700;color:${cfg.color};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nama}</div>
-          <div style="font-size:11px;color:#64748b">${log.role}</div>
-          <div style="margin-top:3px;font-size:11px;font-weight:700;color:${cfg.color};background:${cfg.color}18;border:1px solid ${cfg.color}55;border-radius:20px;padding:2px 8px;display:inline-flex;align-items:center;gap:2px">
-            <span class="material-icons" style="font-size:12px">${icon}</span>${log.aksi}
-          </div>
-          <div style="display:flex;justify-content:flex-end;margin-top:2px">
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:4px">
+            <span style="font-size:10px;font-weight:800;color:${cfg.color}">#${idx+1}</span>
             <span id="${cardId}_arr" class="material-icons" style="font-size:12px;color:${cfg.color}">expand_more</span>
           </div>
+          <div style="font-size:11.5px;font-weight:700;color:${cfg.color};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nama}</div>
+          <div style="font-size:10.5px;color:#64748b;margin-bottom:3px">${log.role}</div>
+          <div style="font-size:10.5px;font-weight:700;color:${cfg.color};background:${cfg.color}15;border:1px solid ${cfg.color}40;border-radius:20px;padding:1px 6px;display:inline-flex;align-items:center;gap:2px">
+            <span class="material-icons" style="font-size:11px">${icon}</span>${log.aksi}
+          </div>
         </div>
-        <!-- expanded: detail + timestamp, tersembunyi by default -->
-        <div id="${cardId}" style="display:none;width:100%;background:white;border:1.5px solid ${cfg.border};border-top:none;border-radius:0 0 7px 7px;padding:6px 7px;box-sizing:border-box">
-          <div style="font-size:12px;color:#1e293b;line-height:1.5;word-break:break-word">${log.detail}</div>
-          <div style="font-size:11px;color:#94a3b8;margin-top:4px">${fmtDT(log.timestamp)}</div>
-        </div>
-        ${hasRight ? `<div style="position:absolute;top:22px;left:calc(50% + 16px);right:0;height:2px;background:linear-gradient(to right,${cfg.color}66,#cbd5e1);z-index:0"></div>` : ''}
-      </div>`;
-    });
-    html += `</div>`;
-
-    if (!isLastRow) {
-      const lastLog = isLtr ? row[row.length-1] : row[0];
-      const lCfg = roleCfg[lastLog.role] || { color:'#94a3b8' };
-      const side = isLtr ? 'justify-content:flex-end' : 'justify-content:flex-start';
-      html += `<div style="display:flex;${side};padding:0 3px;margin:0">
-        <div style="display:flex;flex-direction:column;align-items:center">
-          <div style="width:2px;height:18px;background:linear-gradient(to bottom,${lCfg.color}88,#cbd5e1)"></div>
-          <span class="material-icons" style="font-size:14px;color:#94a3b8;margin-top:-2px">arrow_downward</span>
-        </div>
-      </div>`;
-    }
+      </div>
+      <!-- expanded: detail + timestamp -->
+      <div id="${cardId}" style="display:none;padding:6px 8px;border-top:1px solid ${cfg.border};background:white">
+        <div style="font-size:11.5px;color:#1e293b;line-height:1.5;word-break:break-word">${log.detail}</div>
+        <div style="font-size:10px;color:#94a3b8;margin-top:4px">${fmtDT(log.timestamp)}</div>
+      </div>
+    </div>`;
   });
+
+  html += '</div>';
 
   el.innerHTML = `<div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px;padding:12px 14px">
     <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #e2e8f0">
       <span class="material-icons" style="font-size:15px;color:#64748b">forum</span>
       <span style="font-size:12px;font-weight:700;color:#475569">Riwayat Catatan</span>
-      <span style="font-size:10px;color:#94a3b8;margin-left:4px">(klik bubble untuk lihat detail)</span>
+      <span style="font-size:10px;color:#94a3b8;margin-left:4px">(${logs.length} entri — klik untuk detail)</span>
     </div>
     <div style="width:100%">${html}</div>
   </div>`;
@@ -2560,8 +2544,8 @@ async function openLogAktivitas(idUsulan) {
       'Approve Final':     { color:'#16a34a', bg:'#f0fdf4', icon:'verified',          label:'Final Disetujui' },
       'Re-verifikasi':     { color:'#0891b2', bg:'#ecfeff', icon:'update',              label:'Re-verifikasi' },
       'Tolak':             { color:'#dc2626', bg:'#fef2f2', icon:'cancel',            label:'Ditolak' },
-      'Tolak (sebagian)':  { color:'#ea580c', bg:'#fff7ed', icon:'remove_circle',     label:'Tolak Sebagian' },
-      'Kembalikan':        { color:'#ea580c', bg:'#fff7ed', icon:'undo',              label:'Dikembalikan' },
+      'Tolak (sebagian)':  { color:'#d97706', bg:'#fffbeb', icon:'remove_circle',     label:'Tolak Sebagian' },
+      'Kembalikan':        { color:'#7c3aed', bg:'#f5f3ff', icon:'undo',              label:'Dikembalikan' },
       'Sanggah':           { color:'#7c3aed', bg:'#f5f3ff', icon:'gavel',            label:'Sanggah' },
       'Reset':             { color:'#d97706', bg:'#fffbeb', icon:'restart_alt',       label:'Direset Admin' },
       'Restore Verif':     { color:'#6366f1', bg:'#fff7ed', icon:'restore',           label:'Dipulihkan' },

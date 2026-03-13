@@ -2487,7 +2487,7 @@ async function viewDetail(idUsulan) {
       <div style="font-weight:700;font-size:13.5px;margin-bottom:8px">Detail Indikator</div>
       <div class="table-container">
         <table>
-          <thead><tr><th>No</th><th>Indikator</th><th style="text-align:center;min-width:80px">Target Tahunan</th><th style="text-align:center;min-width:80px">Sisa Target</th><th style="text-align:center">Target Bulan Ini</th><th style="text-align:center">Realisasi Bulan Ini</th><th style="text-align:center">Capaian</th><th style="text-align:center">Data Dukung</th></tr></thead>
+          <thead><tr><th>No</th><th>Indikator</th><th style="text-align:center;min-width:80px">Target Tahunan</th><th style="text-align:center;min-width:80px">Sisa Target Tahunan</th><th style="text-align:center">Target Bulan Ini</th><th style="text-align:center">Realisasi Bulan Ini</th><th style="text-align:center">Capaian</th><th style="text-align:center">Data Dukung</th></tr></thead>
           <tbody>${inds.map(i => { const _sisa = i.sasaranTahunan > 0 ? Math.max(0, i.sasaranTahunan - i.realisasiKumulatif) : null; const _sc = _sisa !== null && _sisa === 0 ? '#16a34a' : (_sisa !== null && _sisa < 10 ? '#f59e0b' : '#1e293b'); return `<tr>
             <td>${i.no}</td><td style="max-width:220px;font-size:12.5px">${i.nama}</td>
             <td style="text-align:center;color:#475569">${i.sasaranTahunan > 0 ? i.sasaranTahunan : '<span style=\"color:#cbd5e1\">-</span>'}</td>
@@ -3139,9 +3139,9 @@ async function openVerifikasi(idUsulan) {
     const thead = document.getElementById('verifIndikatorHead');
     if (thead) {
       if (usePerIndikator && canAct && window._verifTTOk) {
-        thead.innerHTML = `<tr><th>No</th><th>Indikator</th><th style="text-align:center;min-width:80px">Target Tahunan</th><th style="text-align:center;min-width:80px">Sisa Target</th><th style="text-align:center">Target Bulan Ini</th><th style="text-align:center">Realisasi Bulan Ini</th><th style="text-align:center">Capaian</th><th style="text-align:center">Data Dukung</th><th style="text-align:center;min-width:170px">Verifikasi</th></tr>`;
+        thead.innerHTML = `<tr><th>No</th><th>Indikator</th><th style="text-align:center;min-width:80px">Target Tahunan</th><th style="text-align:center;min-width:80px">Sisa Target Tahunan</th><th style="text-align:center">Target Bulan Ini</th><th style="text-align:center">Realisasi Bulan Ini</th><th style="text-align:center">Capaian</th><th style="text-align:center">Data Dukung</th><th style="text-align:center;min-width:170px">Verifikasi</th></tr>`;
       } else {
-        thead.innerHTML = `<tr><th>No</th><th>Indikator</th><th style="text-align:center!important;min-width:80px">Target Tahunan</th><th style="text-align:center!important;min-width:80px">Sisa Target</th><th style="text-align:center!important">Target Bulan Ini</th><th style="text-align:center!important">Realisasi Bulan Ini</th><th style="text-align:center!important">Capaian</th><th style="text-align:center!important">Data Dukung</th></tr>`;
+        thead.innerHTML = `<tr><th>No</th><th>Indikator</th><th style="text-align:center!important;min-width:80px">Target Tahunan</th><th style="text-align:center!important;min-width:80px">Sisa Target Tahunan</th><th style="text-align:center!important">Target Bulan Ini</th><th style="text-align:center!important">Realisasi Bulan Ini</th><th style="text-align:center!important">Capaian</th><th style="text-align:center!important">Data Dukung</th></tr>`;
       }
     }
 

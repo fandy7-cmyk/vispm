@@ -480,7 +480,7 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
   }
 
   // ── HALAMAN REKAP (hanya mode final) ──────────────────────────
-  const rekapPage = isSementara ? '' : (() => {
+  const rekapPage = (isSementara || (aksesFilter && aksesFilter.length > 0)) ? '' : (() => {
     // Label sub-baris baku per no_indikator
     const subLabel = {
       1:  ['Jumlah bumil yang mendapatkan pelayanan antenatal sesuai standar', 'Jumlah bumil bulan ini'],

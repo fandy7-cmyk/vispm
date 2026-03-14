@@ -2991,7 +2991,7 @@ async function openLogAktivitas(idUsulan) {
       const jam = d.toLocaleTimeString('id-ID', { ...o, hour:'2-digit', minute:'2-digit', hour12:false });
       return `${tgl} | ${jam} WITA`;
     }
-    const COLS = 4;
+    const COLS = 10;
     let gridHtml;
     if (!logs.length) {
       gridHtml = `<div class="empty-state"><span class="material-icons">history_toggle_off</span><p>Belum ada aktivitas</p></div>`;

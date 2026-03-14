@@ -3420,7 +3420,8 @@ async function openVerifikasi(idUsulan) {
       const myAkses = currentUser.indikatorAkses || [];
 
       // Cek apakah ini re-verifikasi: ada penolakan aktif yang menjadi tanggung jawab PP ini
-      const penolakanAktif = (detail.penolakanIndikator || []);
+      // Hanya penolakan aktif: aksi NULL (belum direspon) atau aksi='tolak'
+      const penolakanAktif = (detail.penolakanIndikator || []).filter(p => !p.aksi || p.aksi === 'tolak');
       const penolakanNosSaya = myAkses.length > 0
         ? penolakanAktif.filter(p => myAkses.includes(parseInt(p.no_indikator))).map(p => parseInt(p.no_indikator))
         : penolakanAktif.map(p => parseInt(p.no_indikator));

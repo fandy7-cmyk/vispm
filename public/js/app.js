@@ -779,7 +779,7 @@ function renderAdminDashboard(el, d) {
       ${statCard('orange','pending','Menunggu', d.menunggu)}
       ${statCard('purple','local_hospital','Puskesmas Aktif', d.puskesmasAktif)}
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:stretch">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:stretch;margin-bottom:14px">
       <div class="card" style="margin:0;display:flex;flex-direction:column">
         <div class="card-header-bar">
           <span class="card-title"><span class="material-icons">timeline</span>Statistik per Bulan (${CURRENT_YEAR})</span>
@@ -1052,7 +1052,7 @@ function renderOperatorDashboard(el, d) {
       </div>
     </div>
     <div id="dashPeriodeBanner" style="margin-bottom:14px">${periodeBanner}</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:stretch">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:stretch;margin-bottom:14px">
       <div class="card" style="margin:0;display:flex;flex-direction:column">
         <div class="card-header-bar">
           <span class="card-title"><span class="material-icons">quickreply</span>Aksi Cepat</span>
@@ -1320,7 +1320,7 @@ function renderProgramDashboard(el, d) {
         <span style="font-size:12px;color:var(--text-light)">Memuat indikator...</span>
       </div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:stretch">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:stretch;margin-bottom:14px">
       <div class="card" style="margin:0;display:flex;flex-direction:column">
         <div class="card-header-bar">
           <span class="card-title"><span class="material-icons">pending_actions</span>Menunggu Verifikasi Saya</span>

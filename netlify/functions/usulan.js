@@ -912,12 +912,14 @@ async function verifProgram(pool, body) {
   }
   for (const no of nomorBermasalah) {
     const emailPenolak = emailTolakMap[no] || email;
+    // $4 = email PP yang bertanggung jawab atas indikator ini (email_program)
+    // email_admin diisi email yang sama karena PP bertindak sebagai "pelapor" penolakan ini
     await pool.query(
       `INSERT INTO penolakan_indikator (id_usulan, no_indikator, alasan, email_admin, created_at, aksi, email_program)
-       VALUES ($1,$2,$3,$4,NOW(),'tolak',$4)
+       VALUES ($1,$2,$3,$4,NOW(),'tolak',$5)
        ON CONFLICT (id_usulan, no_indikator) DO UPDATE
-       SET alasan=$3, email_admin=$4, created_at=NOW(), aksi='tolak', catatan_program=NULL, responded_at=NULL, email_program=$4`,
-      [idUsulan, no, alasanMap[no] || 'Ditolak', emailPenolak]
+       SET alasan=$3, email_admin=$4, created_at=NOW(), aksi='tolak', catatan_program=NULL, responded_at=NULL, email_program=$5`,
+      [idUsulan, no, alasanMap[no] || 'Ditolak', email, emailPenolak]
     );
   }
 
@@ -1464,13 +1466,19 @@ function mapHeader(r) {
     if ((r.status_kapus||'') === 'Ditolak') {
       ditolakOleh = 'Kepala Puskesmas';
       alasanTolak = r.kapus_catatan || '';
-    // FIX Bug #5: kondisi sebelumnya `|| status_program !== 'Ditolak'` terlalu lebar
-    // dan menyebabkan semua kasus non-PP dianggap Admin meski ditolak Kapus.
-    // Sekarang pakai kolom `ditolak_oleh` yang eksplisit dari DB sebagai sumber kebenaran.
     } else if ((r.ditolak_oleh||'') === 'Admin') {
       ditolakOleh = 'Admin';
       alasanTolak = r.admin_catatan || '';
+    } else if ((r.ditolak_oleh||'') === 'Pengelola Program') {
+      // Gunakan kolom ditolak_oleh dari DB sebagai sumber utama (lebih akurat)
+      ditolakOleh = 'Pengelola Program';
+      alasanTolak = r.admin_catatan || '';
+    } else if (r.ditolak_oleh) {
+      // Nilai lain yang tersimpan eksplisit di DB
+      ditolakOleh = r.ditolak_oleh;
+      alasanTolak = r.admin_catatan || r.kapus_catatan || '';
     } else {
+      // Fallback untuk data lama yang belum punya kolom ditolak_oleh
       const raw = r.admin_catatan || '';
       ditolakOleh = raw.startsWith('Ditolak oleh ') ? raw.split(':')[0].replace('Ditolak oleh ','').trim() : 'Pengelola Program';
       alasanTolak = raw.includes(':') ? raw.split(':').slice(1).join(':').trim() : raw;

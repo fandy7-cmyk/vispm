@@ -324,17 +324,34 @@ async function buatUsulan(pool, body) {
   } catch (e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }
 }
 
+// Nomor indikator yang target bulannya selalu = target tahunan (Hipertensi & DM)
+const INDIKATOR_TARGET_KUNCI = [8, 9];
+
 async function updateIndikator(pool, body) {
   const { idUsulan, noIndikator, target, capaian, catatan, linkFile } = body;
 
-  const lockCheck = await pool.query('SELECT is_locked, status_global FROM usulan_header WHERE id_usulan=$1', [idUsulan]);
+  const lockCheck = await pool.query('SELECT is_locked, status_global, kode_pkm, tahun FROM usulan_header WHERE id_usulan=$1', [idUsulan]);
   if (lockCheck.rows.length === 0) return err('Usulan tidak ditemukan');
-  const { is_locked, status_global } = lockCheck.rows[0];
+  const { is_locked, status_global, kode_pkm, tahun } = lockCheck.rows[0];
   // Boleh edit kalau: tidak terkunci, ATAU status Ditolak (operator perbaiki)
   if (is_locked && status_global !== 'Ditolak') return err('Usulan sudah terkunci dan tidak dapat diedit');
 
-  const t = parseFloat(target) || 0;
-  const c = parseFloat(capaian) || 0;
+  let t = parseFloat(target) || 0;
+  let c = parseFloat(capaian) || 0;
+
+  // Untuk indikator kunci (8 & 9): target bulan selalu = sasaran tahunan
+  if (INDIKATOR_TARGET_KUNCI.includes(parseInt(noIndikator))) {
+    const ttRes = await pool.query(
+      'SELECT sasaran FROM target_tahunan WHERE kode_pkm=$1 AND no_indikator=$2 AND tahun=$3 LIMIT 1',
+      [kode_pkm, noIndikator, tahun]
+    ).catch(() => ({ rows: [] }));
+    const sasaranTahunan = ttRes.rows.length > 0 ? (parseInt(ttRes.rows[0].sasaran) || 0) : 0;
+    if (sasaranTahunan > 0) {
+      t = sasaranTahunan;
+      // Clamp realisasi agar tidak melebihi sasaran tahunan
+      if (c > sasaranTahunan) c = sasaranTahunan;
+    }
+  }
 
   // Rumus rasio: capaian / target, maks 1.00, 2 angka di belakang koma
   let rasio = 0;

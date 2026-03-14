@@ -681,14 +681,16 @@ async function verifKapus(pool, body) {
   // Bersihkan penolakan lama dari Kapus untuk usulan ini
   await pool.query(`DELETE FROM penolakan_indikator WHERE id_usulan=$1`, [idUsulan]).catch(()=>{});
 
-  // Simpan ke penolakan_indikator (konsisten dengan PP/Admin, supaya frontend bisa filter)
+  // Simpan ke penolakan_indikator — pertahankan email_program dari PP asli jika ada
+  // Ini penting agar saat KaPus approve nanti, sistem bisa deteksi ini re-verif dari PP
   for (const item of indikatorList.filter(i => i.aksi === 'tolak')) {
+    const emailPPAsli = emailPPMap[item.noIndikator] || null;
     await pool.query(
-      `INSERT INTO penolakan_indikator (id_usulan, no_indikator, alasan, email_admin, created_at)
-       VALUES ($1,$2,$3,$4,NOW())
+      `INSERT INTO penolakan_indikator (id_usulan, no_indikator, alasan, email_admin, created_at, email_program)
+       VALUES ($1,$2,$3,$4,NOW(),$5)
        ON CONFLICT (id_usulan, no_indikator) DO UPDATE
-       SET alasan=$3, email_admin=$4, created_at=NOW(), aksi=NULL, catatan_program=NULL, responded_at=NULL, email_program=NULL`,
-      [idUsulan, item.noIndikator, item.alasan.trim(), email]
+       SET alasan=$3, email_admin=$4, created_at=NOW(), aksi=NULL, catatan_program=NULL, responded_at=NULL, email_program=$5`,
+      [idUsulan, item.noIndikator, item.alasan.trim(), email, emailPPAsli]
     );
   }
 
@@ -712,6 +714,17 @@ async function verifKapus(pool, body) {
     : isReVerifAdminKapusTolak
       ? 'Membenarkan penolakan Admin — dikembalikan ke Operator'
       : 'Dikembalikan ke Operator';
+
+  // Simpan email_program dari penolakan PP yang asli (jika ada) sebelum dihapus
+  // Ini penting agar saat KaPus approve nanti, sistem bisa deteksi ini re-verif dari PP
+  const piPPEmailRows = await pool.query(
+    `SELECT no_indikator, email_program FROM penolakan_indikator WHERE id_usulan=$1 AND email_program IS NOT NULL`,
+    [idUsulan]
+  ).catch(() => ({ rows: [] }));
+  const emailPPMap = {};
+  for (const r of piPPEmailRows.rows) {
+    emailPPMap[r.no_indikator] = r.email_program;
+  }
 
   await pool.query(
     `UPDATE usulan_header SET status_global='Ditolak', status_kapus='Ditolak', is_locked=false,

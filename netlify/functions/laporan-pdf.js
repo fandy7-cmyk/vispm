@@ -369,7 +369,8 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
       const target  = parseFloat(ind.target)  || 0;
       const capaian = parseFloat(ind.capaian) || 0;
       const realisasiKumulatif = parseFloat(ind.realisasi_kumulatif) || 0;
-      const sisaTarget = sasaranTahunan > 0 ? Math.max(0, sasaranTahunan - realisasiKumulatif) : '-';
+      const _isKunci1 = [8,9].includes(parseInt(ind.no_indikator));
+      const sisaTarget = sasaranTahunan > 0 ? (_isKunci1 ? sasaranTahunan : Math.max(0, sasaranTahunan - realisasiKumulatif)) : '-';
       const capaianPct = parseFloat(ind.capaian_pct || 0).toFixed(2);
       const bg = i % 2 === 0 ? '#f8fafc' : 'white';
       const sisaColor = typeof sisaTarget === 'number' && sisaTarget === 0 ? '#16a34a' : '#1e293b';
@@ -414,7 +415,8 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
       const target  = parseFloat(ind.target)  || 0;
       const capaian = parseFloat(ind.capaian) || 0;
       const realisasiKumulatif = parseFloat(ind.realisasi_kumulatif) || 0;
-      const sisaTarget = sasaranTahunan > 0 ? Math.max(0, sasaranTahunan - realisasiKumulatif) : null;
+      const _isKunci2 = [8,9].includes(parseInt(ind.no_indikator));
+      const sisaTarget = sasaranTahunan > 0 ? (_isKunci2 ? sasaranTahunan : Math.max(0, sasaranTahunan - realisasiKumulatif)) : null;
       const capaianPct = parseFloat(ind.capaian_pct || 0).toFixed(2);
       const catatan = ind.catatan_indikator || '';
       const slots = getVerifierSlots(ind.no_indikator);

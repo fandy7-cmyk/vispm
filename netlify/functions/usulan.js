@@ -681,13 +681,25 @@ async function verifKapus(pool, body) {
     );
   }
 
+  // Cek apakah ini re-verifikasi dari PP (KaPus membenarkan penolakan PP)
+  const headerReVerifCheck = await pool.query('SELECT ditolak_oleh FROM usulan_header WHERE id_usulan=$1', [idUsulan]);
+  const ditolakOlehKapusTolak = headerReVerifCheck.rows[0]?.ditolak_oleh;
+  const isReVerifPPKapusTolak = ditolakOlehKapusTolak === 'Pengelola Program';
+  const isReVerifAdminKapusTolak = ditolakOlehKapusTolak === 'Admin';
+
+  const konteksLog = isReVerifPPKapusTolak
+    ? 'Membenarkan penolakan Pengelola Program — dikembalikan ke Operator'
+    : isReVerifAdminKapusTolak
+      ? 'Membenarkan penolakan Admin — dikembalikan ke Operator'
+      : 'Dikembalikan ke Operator';
+
   await pool.query(
     `UPDATE usulan_header SET status_global='Ditolak', status_kapus='Ditolak', is_locked=false,
      ditolak_oleh='Kepala Puskesmas', kapus_approved_by=NULL, kapus_catatan=$1 WHERE id_usulan=$2`,
     [alasanGabungan, idUsulan]
   );
   await logAktivitas(pool, email, 'Kepala Puskesmas', 'Tolak', idUsulan,
-    'Indikator bermasalah: ' + nomorTolak.join(',') + ' — ' + alasanGabungan);
+    konteksLog + ' | Indikator bermasalah: ' + nomorTolak.join(',') + ' — ' + alasanGabungan);
   return ok({ message: 'Indikator bermasalah dikembalikan ke Operator untuk diperbaiki.', nomorTolak });
 }
 

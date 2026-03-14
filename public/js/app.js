@@ -2098,7 +2098,9 @@ async function openIndikatorModal(idUsulan) {
       const uploadBtnStyle = hasBukti
         ? 'display:inline-flex;align-items:center;gap:3px;padding:4px 9px;background:#0d9488;color:white;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:600;border:1.5px solid #0d9488;white-space:nowrap'
         : 'display:inline-flex;align-items:center;gap:3px;padding:4px 9px;background:#ef4444;color:white;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:600;border:1.5px solid #ef4444;white-space:nowrap';
-      const _sisaTgt = ind.sasaranTahunan > 0 ? Math.max(0, ind.sasaranTahunan - ind.realisasiKumulatif) : null;
+      const _sisaTgt = INDIKATOR_TARGET_KUNCI.includes(ind.no)
+        ? (ind.sasaranTahunan > 0 ? ind.sasaranTahunan : null)
+        : (ind.sasaranTahunan > 0 ? Math.max(0, ind.sasaranTahunan - ind.realisasiKumulatif) : null);
       const _sisaColor = _sisaTgt !== null && _sisaTgt === 0 ? '#16a34a' : (_sisaTgt !== null && _sisaTgt < 10 ? '#f59e0b' : '#1e293b');
       return `<tr id="indRow-${ind.no}">
         <td><span style="font-family:'JetBrains Mono';font-weight:700">${ind.no}</span></td>
@@ -3035,7 +3037,7 @@ async function viewDetail(idUsulan) {
       <div class="table-container">
         <table>
           <thead><tr><th>No</th><th>Indikator</th><th style="text-align:center;min-width:80px">Target Tahunan</th><th style="text-align:center">Target Bulan Ini</th><th style="text-align:center">Realisasi Bulan Ini</th><th style="text-align:center;min-width:80px">Sisa Target Tahunan</th><th style="text-align:center">Capaian</th><th style="text-align:center">Data Dukung</th></tr></thead>
-          <tbody>${inds.map(i => { const _sisa = i.sasaranTahunan > 0 ? Math.max(0, i.sasaranTahunan - i.realisasiKumulatif) : null; const _sc = _sisa !== null && _sisa === 0 ? '#16a34a' : (_sisa !== null && _sisa < 10 ? '#f59e0b' : '#1e293b'); return `<tr>
+          <tbody>${inds.map(i => { const _sisa = INDIKATOR_TARGET_KUNCI.includes(i.no) ? (i.sasaranTahunan > 0 ? i.sasaranTahunan : null) : (i.sasaranTahunan > 0 ? Math.max(0, i.sasaranTahunan - i.realisasiKumulatif) : null); const _sc = _sisa !== null && _sisa === 0 ? '#16a34a' : (_sisa !== null && _sisa < 10 ? '#f59e0b' : '#1e293b'); return `<tr>
             <td>${i.no}</td><td style="max-width:220px;font-size:12.5px">${i.nama}</td>
             <td style="text-align:center;color:#475569">${i.sasaranTahunan > 0 ? i.sasaranTahunan : '<span style=\"color:#cbd5e1\">-</span>'}</td>
             <td style="text-align:center">${i.target}</td><td style="text-align:center">${i.capaian}</td>
@@ -3778,7 +3780,9 @@ async function openVerifikasi(idUsulan) {
       const catatanInd = (!canAct && i.catatan && i.status !== 'Draft')
         ? `<div style="font-size:10.5px;color:#065f46;margin-top:3px;font-style:italic;background:#f0fdf4;border-radius:4px;padding:2px 6px">"${i.catatan}"</div>` : '';
 
-      const _sisaV = i.sasaranTahunan > 0 ? Math.max(0, i.sasaranTahunan - i.realisasiKumulatif) : null;
+      const _sisaV = INDIKATOR_TARGET_KUNCI.includes(i.no)
+        ? (i.sasaranTahunan > 0 ? i.sasaranTahunan : null)
+        : (i.sasaranTahunan > 0 ? Math.max(0, i.sasaranTahunan - i.realisasiKumulatif) : null);
       const _scV = _sisaV !== null && _sisaV === 0 ? '#16a34a' : (_sisaV !== null && _sisaV < 10 ? '#f59e0b' : '#1e293b');
       return `<tr id="pgRow_${i.no}">
         <td>${i.no}</td>

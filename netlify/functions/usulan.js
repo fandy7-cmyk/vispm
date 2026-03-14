@@ -578,19 +578,32 @@ async function verifKapus(pool, body) {
     // KUNCI: isReVerifPP hanya true jika ditolak_oleh masih terisi — jika NULL berarti siklus baru
     const isReVerifPP = ditolakOleh === 'Pengelola Program';
     const isReVerifAdmin = ditolakOleh === 'Admin';
-    const isReVerifKapus = ditolakOleh === 'Kepala Puskesmas';
-    const isReVerif = isReVerifPP || isReVerifAdmin || isReVerifKapus;
+    const isReVerif = isReVerifPP || isReVerifAdmin;
 
-    // Jika bukan re-verifikasi (siklus baru), bersihkan sisa penolakan lama dari siklus sebelumnya
-    if (!isReVerif) {
+    // Cek apakah ada penolakan dari PP yang masih aktif (email_program IS NOT NULL)
+    // Ini lebih akurat dari ditolak_oleh untuk kasus KaPus tolak setelah PP tolak:
+    // - PP tolak → email_program IS NOT NULL → isReVerifPPAktif = true
+    // - KaPus tolak sendiri (bukan dari PP) → email_program IS NULL → false
+    const piCheckPP = await pool.query(
+      `SELECT COUNT(*) as ct FROM penolakan_indikator WHERE id_usulan=$1 AND email_program IS NOT NULL AND (aksi IS NULL OR aksi='tolak' OR aksi='reset')`,
+      [idUsulan]
+    );
+    const isReVerifPPAktif = parseInt(piCheckPP.rows[0]?.ct) > 0;
+    const isReVerifEfektif = isReVerif || isReVerifPPAktif;
+
+    // Jika bukan re-verifikasi, bersihkan penolakan lama
+    if (!isReVerifEfektif) {
       await pool.query(`DELETE FROM penolakan_indikator WHERE id_usulan=$1`, [idUsulan]).catch(() => {});
     }
 
     // Kapus hanya ada dalam loop PP↔Kapus atau sub-loop Admin↔PP↔Kapus.
     // Selalu teruskan ke Pengelola Program, pertahankan ditolak_oleh aslinya.
-    // Jika KaPus yang sebelumnya menolak lalu sekarang approve → set 'Kepala Puskesmas'
-    // agar PP tahu ini re-verifikasi dan hanya tampilkan indikator bermasalah.
-    const ditolakOlehVal = isReVerifAdmin ? 'Admin' : (isReVerifPP ? 'Pengelola Program' : (isReVerifKapus ? 'Kepala Puskesmas' : null));
+    // Jika ada penolakan PP aktif tapi ditolak_oleh='Kepala Puskesmas', set ke 'Pengelola Program'
+    // agar PP tahu ini re-verifikasi
+    const ditolakOlehVal = isReVerifAdmin ? 'Admin'
+      : (isReVerifPP ? 'Pengelola Program'
+      : (isReVerifPPAktif ? 'Pengelola Program'
+      : null));
     await pool.query(
       `UPDATE usulan_header SET status_kapus='Selesai', status_global='Menunggu Pengelola Program',
        ditolak_oleh=$1,
@@ -598,8 +611,8 @@ async function verifKapus(pool, body) {
       [ditolakOlehVal, email, idUsulan, catatanKapus || 'Semua indikator disetujui']
     );
 
-    if (isReVerif) {
-      // Re-verifikasi (dari PP, Admin, atau KaPus yg sebelumnya tolak):
+    if (isReVerifEfektif) {
+      // Re-verifikasi (dari PP atau Admin, atau KaPus approve setelah PP tolak):
       // reset semua PP yang punya irisan dengan indikator bermasalah.
       // PP yang tidak punya irisan tetap Selesai (tidak perlu verif ulang).
       // FIX: Reset aksi 'reset' → NULL agar PP bisa baca indikator bermasalah saat re-verif berikutnya.

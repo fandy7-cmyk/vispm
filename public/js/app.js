@@ -3109,7 +3109,7 @@ async function bukaLaporan(idUsulan, mode, aksesIndikator) {
       </div>
       <div class="title" style="font-size:28px;letter-spacing:6px">VISPM</div>
       <div class="subtitle">Menyiapkan Laporan</div>
-      <div class="desc">Mohon tunggu, sedang memuat data<br>dari server<span class="dots"><span>.</span><span>.</span><span>.</span></span></div>
+      <div class="desc">Mohon tunggu, sedang memuat data<span class="dots"><span>.</span><span>.</span><span>.</span></span></div>
       <div class="bar-wrap"><div class="bar"></div></div>
       <div class="status">Mengambil data laporan...</div>
     </div>

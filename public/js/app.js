@@ -779,12 +779,12 @@ function renderAdminDashboard(el, d) {
       ${statCard('orange','pending','Menunggu', d.menunggu)}
       ${statCard('purple','local_hospital','Puskesmas Aktif', d.puskesmasAktif)}
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start">
-      <div class="card" style="margin:0">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:stretch">
+      <div class="card" style="margin:0;display:flex;flex-direction:column">
         <div class="card-header-bar">
           <span class="card-title"><span class="material-icons">timeline</span>Statistik per Bulan (${CURRENT_YEAR})</span>
         </div>
-        <div class="card-body" style="padding:12px 16px">
+        <div class="card-body" style="padding:12px 16px;flex:1;display:flex;flex-direction:column;justify-content:center">
           <div style="display:flex;align-items:flex-end;gap:16px">
             <div style="flex:1;min-width:0">
               ${renderChart(d.chartData)}
@@ -795,11 +795,11 @@ function renderAdminDashboard(el, d) {
           </div>
         </div>
       </div>
-      <div class="card" style="margin:0">
+      <div class="card" style="margin:0;display:flex;flex-direction:column">
         <div class="card-header-bar">
           <span class="card-title"><span class="material-icons">bar_chart</span>Ringkasan Status</span>
         </div>
-        <div class="card-body" style="padding:12px 14px">
+        <div class="card-body" style="padding:12px 14px;flex:1;display:flex;flex-direction:column;justify-content:center">
           ${renderStatusSummary(d)}
         </div>
       </div>

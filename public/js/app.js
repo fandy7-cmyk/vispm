@@ -2152,7 +2152,7 @@ async function openIndikatorModal(idUsulan) {
               ? `<div style="display:flex;align-items:center;gap:1px">
                   <input type="hidden" id="indLinks-${ind.no}" value='${JSON.stringify(normLinks).replace(/'/g,"&#39;")}' data-idusulan="${idUsulan}">
                   <button onclick="openBuktiModal(${ind.no},0)" title="Preview" style="background:none;border:none;cursor:pointer;padding:2px 4px;border-radius:5px;display:flex;align-items:center;color:#0d9488" onmouseover="this.style.background='rgba(13,148,136,0.08)'" onmouseout="this.style.background='none'"><span class="material-icons" style="font-size:16px">visibility</span></button>
-                  ${normLinks.map((_, fi) => `<button onclick="hapusBukti('${idUsulan}',${ind.no},${fi})" title="Hapus file ${fi+1}" style="background:none;border:none;cursor:pointer;padding:3px 4px;border-radius:5px;display:flex;align-items:center;color:#ef4444" onmouseover="this.style.background='rgba(239,68,68,0.08)'" onmouseout="this.style.background='none'">${SVG_TRASH}${normLinks.length > 1 ? `<span style="font-size:9px;margin-left:1px">${fi+1}</span>` : ''}</button>`).join('')}
+                  <button onclick="hapusSemuaBukti('${idUsulan}',${ind.no})" title="Hapus semua file" style="background:none;border:none;cursor:pointer;padding:3px 4px;border-radius:5px;display:flex;align-items:center;color:#ef4444" onmouseover="this.style.background='rgba(239,68,68,0.08)'" onmouseout="this.style.background='none'">${SVG_TRASH}</button>
                 </div>`
               : '';
             return `<div id="uploadCell-${ind.no}" style="display:flex;align-items:center;gap:6px;justify-content:center">
@@ -2197,7 +2197,7 @@ async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, tahun
   }
   const oversizedFiles = files.filter(f => f.size > MAX_FILE_SIZE);
   if (oversizedFiles.length > 0) {
-    toast(`File terlalu besar (maks 5MB): ${oversizedFiles.map(f => f.name).join(', ')}`, 'error');
+    toast(`File terlalu besar (maks 10MB): ${oversizedFiles.map(f => f.name).join(', ')}`, 'error');
     event.target.value = '';
     return;
   }
@@ -2274,7 +2274,7 @@ async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, tahun
       if (allLinks.length > 0) {
         controls.innerHTML = '<div style="display:flex;align-items:center;gap:1px">'
           + '<button onclick="openBuktiModal(' + noIndikator + ',0)" title="Preview" style="background:none;border:none;cursor:pointer;padding:2px 4px;border-radius:5px;display:flex;align-items:center;color:#0d9488"><span class="material-icons" style="font-size:16px">visibility</span></button>'
-          + allLinks.map((_, fi) => '<button onclick="hapusBukti(\'' + idUsulan + '\',' + noIndikator + ',' + fi + ')" title="Hapus file ' + (fi+1) + '" style="background:none;border:none;cursor:pointer;padding:3px 4px;border-radius:5px;display:flex;align-items:center;color:#ef4444">' + SVG_TRASH + (allLinks.length > 1 ? '<span style="font-size:9px;margin-left:1px">' + (fi+1) + '</span>' : '') + '</button>').join('')
+          + '<button onclick="hapusSemuaBukti(\'' + idUsulan + '\',' + noIndikator + ')" title="Hapus semua file" style="background:none;border:none;cursor:pointer;padding:3px 4px;border-radius:5px;display:flex;align-items:center;color:#ef4444">' + SVG_TRASH + '</button>'  
           + '</div>';
       } else {
         controls.innerHTML = '';
@@ -2324,8 +2324,7 @@ function _refreshFileControls(noIndikator, links, idUsulan) {
     if (links.length > 0) {
       ctrl.innerHTML = '<div style="display:flex;align-items:center;gap:1px">'
         + '<button onclick="openBuktiModal(' + noIndikator + ',0)" title="Preview" style="background:none;border:none;cursor:pointer;padding:2px 4px;border-radius:5px;display:flex;align-items:center;color:#0d9488"><span class="material-icons" style="font-size:16px">visibility</span></button>'
-        + links.map((_, fi) => '<button onclick="hapusBukti(\'' + idUsulan + '\',' + noIndikator + ',' + fi + ')" title="Hapus file ' + (fi+1) + '" style="background:none;border:none;cursor:pointer;padding:3px 4px;border-radius:5px;display:flex;align-items:center;color:#ef4444">' + SVG_TRASH + (links.length > 1 ? '<span style="font-size:9px;margin-left:1px">' + (fi+1) + '</span>' : '') + '</button>').join('')
-        + '<button onclick="hapusSemuaBukti(\'' + idUsulan + '\',' + noIndikator + ')" title="Hapus semua file" style="background:none;border:none;cursor:pointer;padding:3px 4px;border-radius:5px;display:flex;align-items:center;color:#dc2626">' + SVG_TRASH + '<span style="font-size:9px;margin-left:1px">all</span></button>'
+        + '<button onclick="hapusSemuaBukti(\'' + idUsulan + '\',' + noIndikator + ')" title="Hapus semua file" style="background:none;border:none;cursor:pointer;padding:3px 4px;border-radius:5px;display:flex;align-items:center;color:#ef4444">' + SVG_TRASH + '</button>'
         + '</div>';
     } else {
       ctrl.innerHTML = '';

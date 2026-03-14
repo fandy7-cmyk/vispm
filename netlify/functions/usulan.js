@@ -578,7 +578,8 @@ async function verifKapus(pool, body) {
     // KUNCI: isReVerifPP hanya true jika ditolak_oleh masih terisi — jika NULL berarti siklus baru
     const isReVerifPP = ditolakOleh === 'Pengelola Program';
     const isReVerifAdmin = ditolakOleh === 'Admin';
-    const isReVerif = isReVerifPP || isReVerifAdmin;
+    const isReVerifKapus = ditolakOleh === 'Kepala Puskesmas';
+    const isReVerif = isReVerifPP || isReVerifAdmin || isReVerifKapus;
 
     // Jika bukan re-verifikasi (siklus baru), bersihkan sisa penolakan lama dari siklus sebelumnya
     if (!isReVerif) {
@@ -587,7 +588,9 @@ async function verifKapus(pool, body) {
 
     // Kapus hanya ada dalam loop PP↔Kapus atau sub-loop Admin↔PP↔Kapus.
     // Selalu teruskan ke Pengelola Program, pertahankan ditolak_oleh aslinya.
-    const ditolakOlehVal = isReVerifAdmin ? 'Admin' : (isReVerifPP ? 'Pengelola Program' : null);
+    // Jika KaPus yang sebelumnya menolak lalu sekarang approve → set 'Kepala Puskesmas'
+    // agar PP tahu ini re-verifikasi dan hanya tampilkan indikator bermasalah.
+    const ditolakOlehVal = isReVerifAdmin ? 'Admin' : (isReVerifPP ? 'Pengelola Program' : (isReVerifKapus ? 'Kepala Puskesmas' : null));
     await pool.query(
       `UPDATE usulan_header SET status_kapus='Selesai', status_global='Menunggu Pengelola Program',
        ditolak_oleh=$1,
@@ -596,13 +599,10 @@ async function verifKapus(pool, body) {
     );
 
     if (isReVerif) {
-      // Re-verifikasi (dari PP atau Admin): reset semua PP yang punya irisan
-      // dengan indikator bermasalah — termasuk yang sebelumnya sudah Selesai.
+      // Re-verifikasi (dari PP, Admin, atau KaPus yg sebelumnya tolak):
+      // reset semua PP yang punya irisan dengan indikator bermasalah.
       // PP yang tidak punya irisan tetap Selesai (tidak perlu verif ulang).
-      // Ambil daftar indikator bermasalah dari penolakan_indikator
       // FIX: Reset aksi 'reset' → NULL agar PP bisa baca indikator bermasalah saat re-verif berikutnya.
-      // Saat respondPenolakan PP tolak, aksi diubah ke 'reset' — perlu dikembalikan ke NULL
-      // supaya frontend filter penolakanNosSaya bisa menemukannya.
       await pool.query(
         `UPDATE penolakan_indikator SET aksi=NULL WHERE id_usulan=$1 AND aksi='reset'`,
         [idUsulan]

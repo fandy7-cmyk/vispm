@@ -995,9 +995,12 @@ function renderOperatorDashboard(el, d) {
       const jamSelesai = pr.jam_selesai || "17:00";
       const timerId = `periodeTimer_${idx}`;
       // Hitung deadline: tanggal_selesai + jam_selesai di timezone WITA (UTC+8)
-      const [thnS, blnS, tglS] = (pr.tanggal_selesai || '').split('-').map(Number);
-      const [jsH, jsM] = jamSelesai.split(':').map(Number);
-      const deadlineWITA = thnS ? new Date(Date.UTC(thnS, blnS-1, tglS, jsH-8, jsM)) : null;
+      const _tglRaw2 = pr.tanggal_selesai || '';
+      const _tglDate2 = _tglRaw2 ? new Date(_tglRaw2) : null;
+      const deadlineWITA = (_tglDate2 && !isNaN(_tglDate2)) ? (() => {
+        const [jsH2, jsM2] = jamSelesai.split(':').map(Number);
+        return new Date(Date.UTC(_tglDate2.getUTCFullYear(), _tglDate2.getUTCMonth(), _tglDate2.getUTCDate(), jsH2-8, jsM2));
+      })() : null;
       return `<div style="border:1.5px solid #a7f3d0;border-radius:10px;overflow:hidden;background:white;box-shadow:0 1px 4px rgba(13,148,136,0.08)">`
         + `<div style="background:linear-gradient(135deg,#0d9488,#06b6d4);padding:8px 14px;color:white;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:space-between;gap:7px">`
         + `<span style="display:flex;align-items:center;gap:7px"><span style="opacity:0.9;display:flex">${_svgCal}</span> Periode Aktif: ${pr.nama_bulan} ${pr.tahun}</span>`
@@ -1010,7 +1013,7 @@ function renderOperatorDashboard(el, d) {
         + (pr.notif_operator ? `<div style="display:flex;align-items:flex-start;gap:8px;padding:8px 14px;background:#fffbeb;border-top:1px solid #fcd34d"><span style="color:#d97706;display:flex;flex-shrink:0;margin-top:1px">${_svgNotif}</span><div style="font-size:12px;color:#0f172a;line-height:1.5">${pr.notif_operator}</div></div>` : "")
         + `</div>`;
     }).join("");
-    periodeBanner = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px">${items}</div>`;
+    periodeBanner = `<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:10px">${items}</div>`;
   } else {
     periodeBanner = `
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px">
@@ -1042,7 +1045,7 @@ function renderOperatorDashboard(el, d) {
         </div>
       </div>
     </div>
-    <div id="dashPeriodeBanner">${periodeBanner}</div>
+    <div id="dashPeriodeBanner" style="margin-bottom:14px">${periodeBanner}</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:stretch">
       <div class="card" style="margin:0;display:flex;flex-direction:column">
         <div class="card-header-bar">
@@ -1064,7 +1067,7 @@ function renderOperatorDashboard(el, d) {
         </div>
       </div>
     </div>
-    <div class="card">
+    <div class="card" style="margin-top:14px">
       <div class="card-header-bar"><span class="card-title"><span class="material-icons">history</span>Usulan Terbaru Saya</span></div>
       <div class="card-body" style="padding:0" id="recentTable"></div>
     </div>`;
@@ -1076,10 +1079,16 @@ function renderOperatorDashboard(el, d) {
     window._periodeTimers = [];
     periodeList.forEach((pr, idx) => {
       const jamSelesai = pr.jam_selesai || '17:00';
-      const [thnS, blnS, tglS] = (pr.tanggal_selesai || '').split('-').map(Number);
+      // Parse tanggal_selesai — bisa ISO string atau YYYY-MM-DD dari PostgreSQL
+      const _tglRaw = pr.tanggal_selesai || '';
+      const _tglDate = _tglRaw ? new Date(_tglRaw) : null;
+      if (!_tglDate || isNaN(_tglDate)) return;
+      const thnS = _tglDate.getUTCFullYear();
+      const blnS = _tglDate.getUTCMonth(); // sudah 0-based
+      const tglS = _tglDate.getUTCDate();
       const [jsH, jsM] = jamSelesai.split(':').map(Number);
-      if (!thnS) return;
-      const deadline = new Date(Date.UTC(thnS, blnS-1, tglS, jsH-8, jsM));
+      // Deadline: tanggal_selesai jam_selesai WITA (UTC+8)
+      const deadline = new Date(Date.UTC(thnS, blnS, tglS, jsH-8, jsM));
       const getEl = () => document.getElementById('periodeTimer_' + idx);
       const tick = () => {
         const el2 = getEl();

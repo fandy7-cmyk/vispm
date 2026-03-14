@@ -1,3 +1,7 @@
+// Indikator yang target bulannya selalu = target tahunan (dikunci)
+// No. 8: Hipertensi, No. 9: Diabetes Melitus
+const INDIKATOR_TARGET_KUNCI = [8, 9];
+
 // ============== CATATAN THREAD HELPER ==============
 // Render riwayat catatan sebagai zigzag timeline (5 per baris), collapse by default
 async function renderCatatanThread(elId, idUsulan, currentRole) {
@@ -2841,12 +2845,19 @@ function clampRealisasi(no) {
   if (!tEl || !cEl) return;
   // Paksa integer — hapus desimal
   if (cEl.value.includes('.')) cEl.value = Math.floor(parseFloat(cEl.value));
+  const sasaranEl = document.getElementById(`sasaran-${no}`);
+  const sasaran = sasaranEl ? (parseInt(sasaranEl.value) || 0) : 0;
+  const isKunci = INDIKATOR_TARGET_KUNCI.includes(no);
+  // Untuk indikator kunci: batas maks realisasi = sasaran tahunan
+  // Untuk indikator biasa: batas maks realisasi = target bulan ini
   const t = parseInt(tEl.value) || 0;
+  const batasMaks = isKunci && sasaran > 0 ? sasaran : t;
   let c = parseInt(cEl.value) || 0;
-  if (t > 0 && c > t) {
-    cEl.value = t;
-    c = t;
-    toast(`Realisasi Indikator ${no} disesuaikan ke nilai target (${t})`, 'warning');
+  if (batasMaks > 0 && c > batasMaks) {
+    cEl.value = batasMaks;
+    c = batasMaks;
+    const label = isKunci ? `target tahunan (${batasMaks})` : `target bulan ini (${batasMaks})`;
+    toast(`Realisasi Indikator ${no} disesuaikan ke ${label}`, 'warning');
   }
   previewSPM(no);
 }
@@ -2855,13 +2866,25 @@ function previewSPM(changedNo) {
   // Paksa integer pada target juga
   const tEl2 = document.getElementById(`t-${changedNo}`);
   if (tEl2 && tEl2.value.includes('.')) tEl2.value = Math.floor(parseFloat(tEl2.value));
-  // Clamp Target Bulan Ini ≤ sasaranTahunan (Target Tahunan)
+  // Auto-koreksi Target Bulan Ini
   if (tEl2) {
     const sasaranEl = document.getElementById(`sasaran-${changedNo}`);
     const sasaran = sasaranEl ? parseInt(sasaranEl.value) : 0;
+    const isKunci = INDIKATOR_TARGET_KUNCI.includes(changedNo);
     if (sasaran > 0) {
       let tVal = parseInt(tEl2.value) || 0;
-      if (tVal > sasaran) {
+      if (isKunci && tVal !== sasaran) {
+        // Indikator 8 & 9: target bulan HARUS = target tahunan, apapun yang diinput
+        tEl2.value = sasaran;
+        toast(`Target Bulan Ini Indikator ${changedNo} otomatis disesuaikan ke Target Tahunan (${sasaran})`, 'warning');
+        // Clamp realisasi juga kalau melebihi sasaran tahunan
+        const cEl2 = document.getElementById(`c-${changedNo}`);
+        if (cEl2 && (parseInt(cEl2.value) || 0) > sasaran) {
+          cEl2.value = sasaran;
+          toast(`Realisasi Indikator ${changedNo} disesuaikan ke target tahunan (${sasaran})`, 'warning');
+        }
+      } else if (!isKunci && tVal > sasaran) {
+        // Indikator biasa: tidak boleh melebihi target tahunan
         tEl2.value = sasaran;
         toast(`Target Bulan Ini Indikator ${changedNo} disesuaikan ke Target Tahunan (${sasaran})`, 'warning');
       }

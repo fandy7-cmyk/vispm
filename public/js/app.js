@@ -786,9 +786,13 @@ function renderAdminDashboard(el, d) {
           <span class="card-title"><span class="material-icons">timeline</span>Statistik per Bulan (${CURRENT_YEAR})</span>
         </div>
         <div class="card-body" style="padding:12px 16px">
-          ${renderChart(d.chartData)}
-          <div style="border-top:1px solid var(--border);margin-top:4px;padding-top:12px">
-            ${renderDonutChart(d.selesai||0, d.menunggu||0, Math.max(0,(d.totalUsulan||0)-(d.selesai||0)-(d.menunggu||0)))}
+          <div style="display:flex;align-items:flex-end;gap:16px">
+            <div style="flex:1;min-width:0">
+              ${renderChart(d.chartData)}
+            </div>
+            <div style="flex-shrink:0;border-left:1px solid var(--border);padding-left:16px">
+              ${renderDonutChart(d.selesai||0, d.menunggu||0, Math.max(0,(d.totalUsulan||0)-(d.selesai||0)-(d.menunggu||0)))}
+            </div>
           </div>
         </div>
       </div>
@@ -1019,7 +1023,7 @@ function renderOperatorDashboard(el, d) {
     periodeBanner = `<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:10px">${items}</div>`;
   } else {
     periodeBanner = `
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px">
+      <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:10px">
         <div style="background:linear-gradient(135deg,#fffbeb,#fef3c7);border:1.5px solid #fcd34d;border-radius:12px;padding:16px 18px;display:flex;align-items:center;gap:14px;box-shadow:0 2px 8px rgba(245,158,11,0.10)">
           <div style="width:42px;height:42px;border-radius:10px;background:#fef9c3;border:1.5px solid #fde68a;display:flex;align-items:center;justify-content:center;flex-shrink:0">
             <span class="material-icons" style="font-size:22px;color:#d97706">event_busy</span>
@@ -1311,10 +1315,10 @@ function renderProgramDashboard(el, d) {
       ${statCard('green','check_circle','Sudah Diverifikasi', d.terverifikasi)}
       ${statCard('blue','assignment','Total Ditugaskan', d.total)}
     </div>
-    <div class="card" style="border-left:3px solid var(--primary);margin-bottom:14px">
+    <div class="card" style="border-left:3px solid var(--primary);margin-bottom:14px" id="ppIndikatorInfoCard">
       <div class="card-body" style="padding:10px 16px;display:flex;align-items:center;gap:8px">
         <span class="material-icons" style="color:var(--primary);font-size:18px">info</span>
-        ${indikatorInfo}
+        <span style="font-size:12px;color:var(--text-light)">Memuat indikator...</span>
       </div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:stretch">
@@ -1333,9 +1337,39 @@ function renderProgramDashboard(el, d) {
       </div>
     </div>`;
 
-  // Pastikan master indikator tersedia untuk menampilkan nama
-  if (!window.allIndList || !window.allIndList.length) {
-    API.getIndikator().then(inds => { window.allIndList = inds; }).catch(() => {});
+  // Fetch indikator dulu, lalu render info card dengan nama lengkap
+  const _renderPPIndikatorInfo = (indList) => {
+    const _getNama = (no) => {
+      const found = (indList||[]).find(i => parseInt(i.no) === parseInt(no));
+      return found ? (found.nama || found.namaIndikator || '') : '';
+    };
+    const aksesArr2 = (currentUser.indikatorAkses || []);
+    const infoHtml = aksesArr2.length > 0
+      ? `<div style="display:flex;flex-direction:column;gap:4px;width:100%">
+          <span style="font-size:12px;color:var(--text-light);font-weight:600">Indikator tanggung jawab Anda:</span>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:2px">
+            ${aksesArr2.map(no => {
+              const nama = _getNama(no);
+              return `<span style="display:inline-flex;align-items:center;gap:4px;background:#e6fffa;border:1px solid var(--primary);border-radius:20px;padding:2px 10px;font-size:11.5px;font-weight:600;color:var(--primary)">
+                <span style="font-weight:800">${no}</span>${nama ? `<span style="font-weight:400;color:var(--text-light)"> — ${nama}</span>` : ''}
+              </span>`;
+            }).join('')}
+          </div>
+        </div>`
+      : `<span style="font-size:12px;color:var(--text-light)">Anda bertanggung jawab atas <strong style="color:var(--primary)">semua indikator</strong></span>`;
+    const card = document.getElementById('ppIndikatorInfoCard');
+    if (card) card.querySelector('.card-body').innerHTML = `
+      <span class="material-icons" style="color:var(--primary);font-size:18px;flex-shrink:0">info</span>
+      ${infoHtml}`;
+  };
+
+  if (window.allIndList && window.allIndList.length) {
+    _renderPPIndikatorInfo(window.allIndList);
+  } else {
+    API.getIndikator().then(inds => {
+      window.allIndList = inds;
+      _renderPPIndikatorInfo(inds);
+    }).catch(() => { _renderPPIndikatorInfo([]); });
   }
 
   API.getUsulan({ status_program: 'Menunggu Pengelola Program,Ditolak,Selesai,Menunggu Admin', email_program: currentUser.email }).then(rows => {

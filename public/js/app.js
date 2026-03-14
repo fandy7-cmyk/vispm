@@ -2183,7 +2183,7 @@ async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, tahun
   if (!files.length) return;
 
   // Validasi: hanya PDF dan gambar
-  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB per file
+  const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB per file
   const invalidFiles = files.filter(f => {
     const t = f.type;
     const n = f.name.toLowerCase();

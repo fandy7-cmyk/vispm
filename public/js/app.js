@@ -785,8 +785,11 @@ function renderAdminDashboard(el, d) {
         <div class="card-header-bar">
           <span class="card-title"><span class="material-icons">timeline</span>Statistik per Bulan (${CURRENT_YEAR})</span>
         </div>
-        <div class="card-body">
+        <div class="card-body" style="padding:12px 16px">
           ${renderChart(d.chartData)}
+          <div style="border-top:1px solid var(--border);margin-top:4px;padding-top:12px">
+            ${renderDonutChart(d.selesai||0, d.menunggu||0, Math.max(0,(d.totalUsulan||0)-(d.selesai||0)-(d.menunggu||0)))}
+          </div>
         </div>
       </div>
       <div class="card" style="margin:0">
@@ -1175,7 +1178,7 @@ async function downloadLaporanDashboardOperator() {
 function renderPeriodeBanner(periodeList) {
   if (!periodeList || !periodeList.length) {
     return `
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-bottom:4px">
+      <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-bottom:14px">
         <div style="background:linear-gradient(135deg,#fffbeb,#fef3c7);border:1.5px solid #fcd34d;border-radius:12px;padding:16px 18px;display:flex;align-items:center;gap:14px;box-shadow:0 2px 8px rgba(245,158,11,0.10)">
           <div style="width:42px;height:42px;border-radius:10px;background:#fef9c3;border:1.5px solid #fde68a;display:flex;align-items:center;justify-content:center;flex-shrink:0">
             <span class="material-icons" style="font-size:22px;color:#d97706">event_busy</span>
@@ -1224,7 +1227,7 @@ function renderPeriodeBanner(periodeList) {
       ${notif ? `<div style="display:flex;align-items:flex-start;gap:8px;padding:8px 14px;background:#fffbeb;border-top:1px solid #fcd34d"><span style="color:#d97706;display:flex;flex-shrink:0;margin-top:1px">${svgNotif}</span><div style="font-size:12px;color:#0f172a;line-height:1.5">${notif}</div></div>` : ''}
     </div>`;
   }).join('');
-  return `<div class="card"><div class="card-header-bar"><span class="card-title" style="display:flex;align-items:center;gap:7px"><span style="color:#0d9488;display:flex">${svgCal}</span> Periode Input Aktif</span></div><div class="card-body"><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px">${items}</div></div></div>`;
+  return `<div style="margin-bottom:14px"><div class="card" style="margin:0"><div class="card-header-bar"><span class="card-title" style="display:flex;align-items:center;gap:7px"><span style="color:#0d9488;display:flex">${svgCal}</span> Periode Input Aktif</span></div><div class="card-body"><div style="display:flex;flex-wrap:wrap;justify-content:center;gap:10px">${items}</div></div></div></div>`;
 }
 
 function renderKepalasDashboard(el, d) {
@@ -1237,7 +1240,7 @@ function renderKepalasDashboard(el, d) {
       ${statCard('blue','assignment','Total Usulan PKM Saya', d.total)}
     </div>
     ${renderPeriodeBanner(periodeList)}
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:stretch">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:stretch;margin-bottom:14px">
       <div class="card" style="margin:0;display:flex;flex-direction:column">
         <div class="card-header-bar">
           <span class="card-title"><span class="material-icons">pending_actions</span>Menunggu Verifikasi Saya</span>
@@ -1254,7 +1257,7 @@ function renderKepalasDashboard(el, d) {
         </div>
       </div>
     </div>
-    <div class="card">
+    <div class="card" style="margin-top:0">
       <div class="card-header-bar">
         <span class="card-title"><span class="material-icons">history</span>Riwayat Semua Usulan PKM Saya</span>
         <button class="btn btn-secondary btn-sm" onclick="loadPage('verifikasi')"><span class="material-icons">arrow_forward</span>Lihat Semua</button>
@@ -1280,8 +1283,26 @@ function renderProgramDashboard(el, d) {
   const periodeList = d.periodeAktifList || (d.periodeAktif ? [d.periodeAktif] : []);
   // Ringkasan indikator tanggung jawab PP
   const aksesArr = (currentUser.indikatorAkses || []);
+  // Ambil nama indikator dari master jika tersedia (allIndList dari halaman master)
+  const _getIndNama = (no) => {
+    if (window.allIndList && window.allIndList.length) {
+      const found = window.allIndList.find(i => parseInt(i.no) === parseInt(no));
+      if (found) return found.nama || found.namaIndikator || '';
+    }
+    return '';
+  };
   const indikatorInfo = aksesArr.length > 0
-    ? `<span style="font-size:12px;color:var(--text-light)">Indikator tanggung jawab Anda: <strong style="color:var(--primary)">${aksesArr.join(', ')}</strong></span>`
+    ? `<div style="display:flex;flex-direction:column;gap:4px;width:100%">
+        <span style="font-size:12px;color:var(--text-light);font-weight:600">Indikator tanggung jawab Anda:</span>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:2px">
+          ${aksesArr.map(no => {
+            const nama = _getIndNama(no);
+            return `<span style="display:inline-flex;align-items:center;gap:4px;background:var(--primary-light,#e6fffa);border:1px solid var(--primary);border-radius:20px;padding:2px 10px;font-size:11.5px;font-weight:600;color:var(--primary)">
+              <span style="font-weight:800">${no}</span>${nama ? `<span style="font-weight:400;color:var(--text-light)">— ${nama}</span>` : ''}
+            </span>`;
+          }).join('')}
+        </div>
+      </div>`
     : `<span style="font-size:12px;color:var(--text-light)">Anda bertanggung jawab atas <strong style="color:var(--primary)">semua indikator</strong></span>`;
 
   el.innerHTML = `
@@ -1290,7 +1311,7 @@ function renderProgramDashboard(el, d) {
       ${statCard('green','check_circle','Sudah Diverifikasi', d.terverifikasi)}
       ${statCard('blue','assignment','Total Ditugaskan', d.total)}
     </div>
-    <div class="card" style="border-left:3px solid var(--primary)">
+    <div class="card" style="border-left:3px solid var(--primary);margin-bottom:14px">
       <div class="card-body" style="padding:10px 16px;display:flex;align-items:center;gap:8px">
         <span class="material-icons" style="color:var(--primary);font-size:18px">info</span>
         ${indikatorInfo}
@@ -1311,6 +1332,11 @@ function renderProgramDashboard(el, d) {
         <div class="card-body" style="padding:0;flex:1" id="ppDoneTable"></div>
       </div>
     </div>`;
+
+  // Pastikan master indikator tersedia untuk menampilkan nama
+  if (!window.allIndList || !window.allIndList.length) {
+    API.getIndikator().then(inds => { window.allIndList = inds; }).catch(() => {});
+  }
 
   API.getUsulan({ status_program: 'Menunggu Pengelola Program,Ditolak,Selesai,Menunggu Admin', email_program: currentUser.email }).then(rows => {
     const pending = rows.filter(u => !u.sudahVerif);
@@ -1351,12 +1377,69 @@ function statCard(color, icon, label, value, sub = null) {
 function renderChart(data) {
   if (!data || data.length === 0) return `<div class="empty-state"><p>Belum ada data chart</p></div>`;
   const max = Math.max(...data.map(d => d.total || 0), 1);
-  return `<div class="chart-container">${data.map(d => `
+  return `<div class="chart-container" style="min-height:120px;padding:8px 0 4px;justify-content:center">${data.map(d => `
     <div class="chart-bar-wrap">
       <div class="chart-bar-val">${d.total}</div>
-      <div class="chart-bar" style="height:${Math.max(((d.total || 0) / max) * 160, 4)}px" title="${d.bulan}: ${d.total} usulan"></div>
+      <div class="chart-bar" style="height:${Math.max(((d.total || 0) / max) * 90, 4)}px" title="${d.bulan}: ${d.total} usulan"></div>
       <div class="chart-bar-lbl">${d.bulan}</div>
     </div>`).join('')}</div>`;
+}
+
+function renderDonutChart(selesai, proses, ditolak) {
+  const total = selesai + proses + ditolak;
+  if (total === 0) return '';
+  // SVG donut: cx=70,cy=70,r=52, stroke-width=18
+  const cx = 70, cy = 70, r = 52;
+  const circ = 2 * Math.PI * r;
+  const pctSelesai = selesai / total;
+  const pctProses  = proses  / total;
+  const pctDitolak = ditolak / total;
+  // Segmen: mulai dari atas (-90deg = -PI/2)
+  const seg = (pct) => pct * circ;
+  const gap = 2; // px gap antar segmen
+  const dSelesai = seg(pctSelesai);
+  const dProses  = seg(pctProses);
+  const dDitolak = seg(pctDitolak);
+  // offset: rotate -90deg = transform rotate(-90 cx cy)
+  const offSelesai = 0;
+  const offProses  = dSelesai + gap;
+  const offDitolak = dSelesai + gap + dProses + gap;
+  const segments = [
+    { val: selesai, d: dSelesai, off: offSelesai, color: '#10b981', label: 'Selesai' },
+    { val: proses,  d: dProses,  off: offProses,  color: '#f59e0b', label: 'Proses' },
+    { val: ditolak, d: dDitolak, off: offDitolak, color: '#ef4444', label: 'Ditolak/Draft' },
+  ].filter(s => s.val > 0);
+  const pct = total > 0 ? Math.round((selesai / total) * 100) : 0;
+  const svgSegs = segments.map(s =>
+    `<circle cx="${cx}" cy="${cy}" r="${r}"
+      fill="none" stroke="${s.color}" stroke-width="18"
+      stroke-dasharray="${s.d - gap} ${circ - s.d + gap}"
+      stroke-dashoffset="${-(s.off)}"
+      transform="rotate(-90 ${cx} ${cy})"
+      style="transition:all 0.4s ease"/>`
+  ).join('');
+  const legend = segments.map(s =>
+    `<div style="display:flex;align-items:center;gap:5px;font-size:11px">
+      <div style="width:8px;height:8px;border-radius:50%;background:${s.color};flex-shrink:0"></div>
+      <span style="color:var(--text-light)">${s.label}</span>
+      <span style="font-weight:700;color:var(--text);margin-left:2px">${s.val}</span>
+    </div>`
+  ).join('');
+  return `<div style="display:flex;align-items:center;gap:16px;padding:8px 0 4px">
+    <svg width="140" height="140" viewBox="0 0 140 140" style="flex-shrink:0">
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#e2e8f0" stroke-width="18"/>
+      ${svgSegs}
+      <text x="${cx}" y="${cy - 6}" text-anchor="middle" font-size="18" font-weight="900"
+        fill="var(--text)" font-family="'JetBrains Mono',monospace">${pct}%</text>
+      <text x="${cx}" y="${cy + 12}" text-anchor="middle" font-size="9" fill="var(--text-light)"
+        font-family="inherit">selesai</text>
+    </svg>
+    <div style="display:flex;flex-direction:column;gap:8px;flex:1">
+      <div style="font-size:11px;font-weight:600;color:var(--text-light);text-transform:uppercase;letter-spacing:0.4px">Total Usulan</div>
+      <div style="font-size:28px;font-weight:900;color:var(--text);font-family:'JetBrains Mono',monospace;line-height:1">${total}</div>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px">${legend}</div>
+    </div>
+  </div>`;
 }
 
 // ============== USULAN TABLE HELPER ==============
@@ -4383,6 +4466,7 @@ async function renderUsers(el) {
   // Load data
   try {
     [allUsers, allPKMList, allIndList] = await Promise.all([API.getUsers(), API.getPKM(), API.getIndikator()]);
+    window.allIndList = allIndList;
     renderUsersTable(allUsers);
 
     // Fill PKM dropdown
@@ -5478,8 +5562,8 @@ document.addEventListener('click', (e) => {
 
 // Enter key on auth
 // ============== IDLE AUTO LOGOUT ==============
-const IDLE_TIMEOUT      = 10 * 60 * 1000; // 10 menit idle → logout
-const IDLE_WARN_BEFORE  =  1 * 60 * 1000; // tampilkan warning 1 menit sebelum logout
+const IDLE_TIMEOUT      = 30 * 60 * 1000; // 30 menit idle → logout
+const IDLE_WARN_BEFORE  =  2 * 60 * 1000; // tampilkan warning 2 menit sebelum logout
 let _idleTimer     = null;
 let _idleWarnTimer = null;
 let _idleCountdown = null;

@@ -141,7 +141,8 @@ function renderStatusBar(u) {
     { label: 'Input', icon: 'edit_note', done: true, active: u.statusGlobal === 'Draft', rejected: false },
     { label: 'Kepala Puskesmas', icon: 'person', done: u.statusKapus === 'Selesai', active: u.statusGlobal === 'Menunggu Kepala Puskesmas', rejected: u.statusKapus === 'Ditolak' },
     { label: 'Pengelola Program', icon: 'groups', done: u.statusProgram === 'Selesai', active: u.statusGlobal === 'Menunggu Pengelola Program', rejected: u.statusProgram === 'Ditolak',
-      partial: vp && vp.selesai > 0 && vp.selesai < vp.total, vpText: vp ? vp.selesai + '/' + vp.total : '' },
+      partial: u.statusGlobal === 'Menunggu Pengelola Program' && vp && vp.selesai > 0 && vp.selesai < vp.total,
+      vpText: u.statusGlobal === 'Menunggu Pengelola Program' && vp && vp.total > 0 ? vp.selesai + '/' + vp.total : '' },
     { label: 'Admin', icon: 'admin_panel_settings', done: u.statusGlobal === 'Selesai', active: u.statusGlobal === 'Menunggu Admin', rejected: false },
   ];
   const isDitolak = u.statusGlobal === 'Ditolak';
@@ -149,9 +150,9 @@ function renderStatusBar(u) {
     let color = '#cbd5e1', textColor = '#94a3b8', bg = 'white';
     let icon = s.icon;
     if (s.done) { color='#0d9488'; textColor='#0d9488'; bg='#e6fffa'; icon='check_circle'; }
+    else if (s.partial) { color='#06b6d4'; textColor='#0891b2'; bg='#ecfeff'; icon='hourglass_top'; }
     else if (isDitolak && s.rejected) { color='#ef4444'; textColor='#ef4444'; bg='#fef2f2'; icon='cancel'; }
     else if (s.active) { color='#f59e0b'; textColor='#d97706'; bg='#fffbeb'; icon='hourglass_top'; }
-    else if (s.partial) { color='#06b6d4'; textColor='#0891b2'; bg='#ecfeff'; icon='hourglass_top'; }
     return '<div style="display:flex;align-items:center;flex:1">' +
       '<div style="display:flex;flex-direction:column;align-items:center;gap:1px;flex:1">' +
         '<div style="width:28px;height:28px;border-radius:50%;background:' + bg + ';border:2px solid ' + color + ';display:flex;align-items:center;justify-content:center">' +
@@ -160,7 +161,7 @@ function renderStatusBar(u) {
         '<span style="font-size:10px;font-weight:700;color:' + textColor + ';white-space:nowrap">' + s.label + '</span>' +
         (s.vpText && !s.done ? '<span style="font-size:9px;color:#0891b2">' + s.vpText + '</span>' : '') +
       '</div>' +
-      (i < steps.length-1 ? '<div style="flex:1;height:2px;background:' + (s.done ? '#0d9488' : '#e2e8f0') + ';margin-bottom:18px;min-width:8px"></div>' : '') +
+      (i < steps.length-1 ? '<div style="flex:1;height:2px;background:' + (s.done ? '#0d9488' : s.partial ? '#06b6d4' : '#e2e8f0') + ';margin-bottom:18px;min-width:8px"></div>' : '') +
     '</div>';
   }).join('')}</div>`;
 }

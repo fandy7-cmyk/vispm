@@ -1671,15 +1671,19 @@ async function renderInput() {
   const _bSvgWarn = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
   let periodeBanner = '';
   if (periodeOptions.length > 0) {
-    const items = periodeOptions.map(pr => {
+    const items = periodeOptions.map((pr, idx) => {
       const nm  = pr.namaBulan || pr.nama_bulan || '';
       const jm  = pr.jamMulai  || pr.jam_mulai  || '08:00';
       const js  = pr.jamSelesai|| pr.jam_selesai|| '17:00';
       const mul = formatDate(pr.tanggalMulai  || pr.tanggal_mulai);
       const sel = formatDate(pr.tanggalSelesai|| pr.tanggal_selesai);
       const not = pr.notifOperator || pr.notif_operator || '';
+      const timerId = `inputPeriodeTimer_${idx}`;
       return `<div style="border:1.5px solid #a7f3d0;border-radius:10px;overflow:hidden;background:white;box-shadow:0 1px 4px rgba(13,148,136,0.08)">`
-        + `<div style="background:linear-gradient(135deg,#0d9488,#06b6d4);padding:8px 14px;color:white;font-weight:700;font-size:13px;display:flex;align-items:center;gap:7px"><span style="opacity:0.9;display:flex">${_bSvgCal}</span> Periode Aktif: ${nm} ${pr.tahun}</div>`
+        + `<div style="background:linear-gradient(135deg,#0d9488,#06b6d4);padding:8px 14px;color:white;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:space-between;gap:7px">`
+        + `<span style="display:flex;align-items:center;gap:7px"><span style="opacity:0.9;display:flex">${_bSvgCal}</span> Periode Aktif: ${nm} ${pr.tahun}</span>`
+        + `<span id="${timerId}" style="font-size:11px;font-weight:700;background:rgba(0,0,0,0.2);padding:3px 8px;border-radius:20px;letter-spacing:0.3px;font-family:'JetBrains Mono',monospace;white-space:nowrap">--:--:--</span>`
+        + `</div>`
         + `<div style="display:grid;grid-template-columns:1fr 1fr">`
         + `<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:#f0fdf9;border-right:1px solid #d1fae5"><span style="color:#0d9488;display:flex;flex-shrink:0">${_bSvgOpen}</span><div><div style="font-size:10px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.4px">Dibuka</div><div style="font-size:12px;font-weight:700;color:#0f172a">${mul} ${jm} WITA</div></div></div>`
         + `<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:#fef2f2"><span style="color:#ef4444;display:flex;flex-shrink:0">${_bSvgClos}</span><div><div style="font-size:10px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.4px">Ditutup</div><div style="font-size:12px;font-weight:700;color:#0f172a">${sel} ${js} WITA</div></div></div>`
@@ -1687,7 +1691,7 @@ async function renderInput() {
         + (not ? `<div style="display:flex;align-items:flex-start;gap:8px;padding:8px 14px;background:#fffbeb;border-top:1px solid #fcd34d"><span style="color:#d97706;display:flex;flex-shrink:0;margin-top:1px">${_bSvgNoti}</span><div style="font-size:12px;color:#0f172a;line-height:1.5">${not}</div></div>` : '')
         + `</div>`;
     }).join('');
-    periodeBanner = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;margin-bottom:4px">${items}</div>`;
+    periodeBanner = `<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-bottom:14px">${items}</div>`;
   } else {
     periodeBanner = `
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-bottom:4px">
@@ -1736,6 +1740,39 @@ async function renderInput() {
       <div class="card-header-bar"><span class="card-title"><span class="material-icons">list</span>Daftar Usulan Saya</span></div>
       <div class="card-body" style="padding:0" id="myUsulanTable"></div>
     </div>`;
+
+  // Timer countdown untuk periode di halaman Input Usulan
+  setTimeout(() => {
+    window._periodeTimers = window._periodeTimers || [];
+    window._periodeTimers.forEach(t => clearInterval(t));
+    window._periodeTimers = [];
+    periodeOptions.forEach((pr, idx) => {
+      const js = pr.jamSelesai || pr.jam_selesai || '17:00';
+      const tglRaw = pr.tanggalSelesai || pr.tanggal_selesai || '';
+      const tglDate = tglRaw ? new Date(tglRaw) : null;
+      if (!tglDate || isNaN(tglDate)) return;
+      const [jsH, jsM] = js.split(':').map(Number);
+      const deadline = new Date(Date.UTC(tglDate.getUTCFullYear(), tglDate.getUTCMonth(), tglDate.getUTCDate(), jsH-8, jsM));
+      const getEl = () => document.getElementById('inputPeriodeTimer_' + idx);
+      const tick = () => {
+        const el2 = getEl();
+        if (!el2) { clearInterval(tid); return; }
+        const diff = deadline - Date.now();
+        if (diff <= 0) { el2.textContent = 'Ditutup'; el2.style.background = 'rgba(239,68,68,0.35)'; clearInterval(tid); return; }
+        const h = Math.floor(diff / 3600000);
+        const m = Math.floor((diff % 3600000) / 60000);
+        const s = Math.floor((diff % 60000) / 1000);
+        el2.textContent = h >= 24
+          ? Math.floor(h/24) + 'h ' + String(h%24).padStart(2,'0') + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0')
+          : String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+        el2.style.background = diff < 3600000 ? 'rgba(239,68,68,0.4)' : 'rgba(0,0,0,0.2)';
+      };
+      let tid;
+      tid = setInterval(tick, 1000);
+      tick();
+      window._periodeTimers.push(tid);
+    });
+  }, 0);
 
   // Simpan semua periodeOptions (berstatus Aktif) untuk updateBulanOptions
   window._periodeInputAktif = periodeOptions;
@@ -2146,6 +2183,7 @@ async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, tahun
   if (!files.length) return;
 
   // Validasi: hanya PDF dan gambar
+  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB per file
   const invalidFiles = files.filter(f => {
     const t = f.type;
     const n = f.name.toLowerCase();
@@ -2153,6 +2191,12 @@ async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, tahun
   });
   if (invalidFiles.length > 0) {
     toast(`Hanya PDF dan gambar yang diizinkan. File ditolak: ${invalidFiles.map(f => f.name).join(', ')}`, 'error');
+    event.target.value = '';
+    return;
+  }
+  const oversizedFiles = files.filter(f => f.size > MAX_FILE_SIZE);
+  if (oversizedFiles.length > 0) {
+    toast(`File terlalu besar (maks 10MB): ${oversizedFiles.map(f => f.name).join(', ')}`, 'error');
     event.target.value = '';
     return;
   }
@@ -2259,6 +2303,74 @@ async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, tahun
 }
 // Folder management dipindah ke backend (drive-upload.js)
 
+// Helper: hapus file dari Cloudinary
+async function _deleteFromCloudinary(publicId) {
+  if (!publicId) return;
+  try {
+    await fetch('/.netlify/functions/delete-file', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ publicId })
+    });
+  } catch(e) { console.warn('Cloudinary delete warning:', e.message); }
+}
+
+// Helper: refresh fileControls UI setelah hapus
+function _refreshFileControls(noIndikator, links, idUsulan) {
+  window[`_buktiLinks_${noIndikator}`] = { links, idUsulan };
+  const ctrl = document.getElementById(`fileControls-${noIndikator}`);
+  if (ctrl) {
+    if (links.length > 0) {
+      ctrl.innerHTML = '<div style="display:flex;align-items:center;gap:1px">'
+        + '<button onclick="openBuktiModal(' + noIndikator + ',0)" title="Preview" style="background:none;border:none;cursor:pointer;padding:2px 4px;border-radius:5px;display:flex;align-items:center;color:#0d9488"><span class="material-icons" style="font-size:16px">visibility</span></button>'
+        + links.map((_, fi) => '<button onclick="hapusBukti(\'' + idUsulan + '\',' + noIndikator + ',' + fi + ')" title="Hapus file ' + (fi+1) + '" style="background:none;border:none;cursor:pointer;padding:3px 4px;border-radius:5px;display:flex;align-items:center;color:#ef4444">' + SVG_TRASH + (links.length > 1 ? '<span style="font-size:9px;margin-left:1px">' + (fi+1) + '</span>' : '') + '</button>').join('')
+        + '<button onclick="hapusSemuaBukti(\'' + idUsulan + '\',' + noIndikator + ')" title="Hapus semua file" style="background:none;border:none;cursor:pointer;padding:3px 4px;border-radius:5px;display:flex;align-items:center;color:#dc2626">' + SVG_TRASH + '<span style="font-size:9px;margin-left:1px">all</span></button>'
+        + '</div>';
+    } else {
+      ctrl.innerHTML = '';
+    }
+  }
+  const lbl = document.getElementById(`uploadLabel-${noIndikator}`);
+  if (lbl && links.length === 0) {
+    lbl.style.cssText = 'display:inline-flex;align-items:center;padding:4px 12px;background:#ef4444;color:white;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:600;border:1.5px solid #ef4444;white-space:nowrap';
+    const tn = [...lbl.childNodes].find(n => n.nodeType === 3);
+    if (tn) tn.textContent = 'Upload';
+  }
+}
+
+// Hapus SEMUA file data dukung sekaligus
+async function hapusSemuaBukti(idUsulan, noIndikator) {
+  const previewModal = document.getElementById('previewBuktiModal');
+  if (previewModal) previewModal.classList.remove('show');
+  showConfirm({
+    title: 'Hapus Semua Data Dukung',
+    message: `Hapus <strong>semua file</strong> data dukung indikator ${noIndikator}? Tindakan ini tidak dapat dibatalkan.`,
+    type: 'danger',
+    onConfirm: async () => {
+      try {
+        const existingDetail = await API.getIndikatorUsulan(idUsulan);
+        const existingInd = (existingDetail || []).find(i => i.no === noIndikator || i.noIndikator === noIndikator);
+        let links = [];
+        if (existingInd?.linkFile) {
+          try {
+            const parsed = JSON.parse(existingInd.linkFile);
+            links = Array.isArray(parsed)
+              ? parsed.map(f => typeof f === 'string' ? { id: null, url: f, name: 'File' } : f)
+              : [{ id: null, url: existingInd.linkFile, name: 'File' }];
+          } catch { links = [{ id: null, url: existingInd.linkFile, name: 'File' }]; }
+        }
+        // Hapus semua dari Cloudinary
+        await Promise.all(links.map(f => _deleteFromCloudinary(f.id || f.publicId)));
+        const tVal = parseFloat(document.getElementById(`t-${noIndikator}`)?.value) || 0;
+        const cVal = parseFloat(document.getElementById(`c-${noIndikator}`)?.value) || 0;
+        await API.updateIndikatorUsulan({ idUsulan, noIndikator, target: tVal, capaian: cVal, linkFile: '' });
+        _refreshFileControls(noIndikator, [], idUsulan);
+        toast('Semua file berhasil dihapus', 'success');
+      } catch(e) { toast('Gagal hapus: ' + e.message, 'error'); }
+    }
+  });
+}
+
 // Hapus satu file data dukung berdasarkan index
 async function hapusBukti(idUsulan, noIndikator, fileIndex) {
   // Tutup modal preview jika sedang terbuka
@@ -2283,6 +2395,12 @@ async function hapusBukti(idUsulan, noIndikator, fileIndex) {
           } catch { links = [{ id: null, url: existingInd.linkFile, name: 'File' }]; }
         }
 
+        // Hapus dari Cloudinary dulu
+        const fileToDelete = links[fileIndex];
+        if (fileToDelete?.id || fileToDelete?.publicId) {
+          await _deleteFromCloudinary(fileToDelete.id || fileToDelete.publicId);
+        }
+
         links.splice(fileIndex, 1);
         const newLinkFile = links.length ? JSON.stringify(links) : '';
         const tVal = parseFloat(document.getElementById(`t-${noIndikator}`)?.value) || 0;
@@ -2292,24 +2410,7 @@ async function hapusBukti(idUsulan, noIndikator, fileIndex) {
         toast('File berhasil dihapus', 'success');
 
         // Refresh fileControls
-        window[`_buktiLinks_${noIndikator}`] = { links, idUsulan };
-        const ctrl = document.getElementById(`fileControls-${noIndikator}`);
-        if (ctrl) {
-          if (links.length > 0) {
-            ctrl.innerHTML = '<div style="display:flex;align-items:center;gap:1px">'
-              + '<button onclick="openBuktiModal(' + noIndikator + ',0)" title="Preview" style="background:none;border:none;cursor:pointer;padding:2px 4px;border-radius:5px;display:flex;align-items:center;color:#0d9488"><span class="material-icons" style="font-size:16px">visibility</span></button>'
-              + links.map((_, fi) => '<button onclick="hapusBukti(\'' + idUsulan + '\',' + noIndikator + ',' + fi + ')" title="Hapus file ' + (fi+1) + '" style="background:none;border:none;cursor:pointer;padding:3px 4px;border-radius:5px;display:flex;align-items:center;color:#ef4444">' + SVG_TRASH + (links.length > 1 ? '<span style="font-size:9px;margin-left:1px">' + (fi+1) + '</span>' : '') + '</button>').join('')
-              + '</div>';
-          } else {
-            ctrl.innerHTML = '';
-          }
-        }
-        const lbl = document.getElementById(`uploadLabel-${noIndikator}`);
-        if (lbl && links.length === 0) {
-          lbl.style.cssText = 'display:inline-flex;align-items:center;padding:4px 12px;background:#ef4444;color:white;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:600;border:1.5px solid #ef4444;white-space:nowrap';
-          const tn = [...lbl.childNodes].find(n => n.nodeType === 3);
-          if (tn) tn.textContent = 'Upload';
-        }
+        _refreshFileControls(noIndikator, links, idUsulan);
       } catch(e) {
         toast('Gagal hapus: ' + e.message, 'error');
       }

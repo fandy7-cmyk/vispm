@@ -600,6 +600,13 @@ async function verifKapus(pool, body) {
       // dengan indikator bermasalah — termasuk yang sebelumnya sudah Selesai.
       // PP yang tidak punya irisan tetap Selesai (tidak perlu verif ulang).
       // Ambil daftar indikator bermasalah dari penolakan_indikator
+      // FIX: Reset aksi 'reset' → NULL agar PP bisa baca indikator bermasalah saat re-verif berikutnya.
+      // Saat respondPenolakan PP tolak, aksi diubah ke 'reset' — perlu dikembalikan ke NULL
+      // supaya frontend filter penolakanNosSaya bisa menemukannya.
+      await pool.query(
+        `UPDATE penolakan_indikator SET aksi=NULL WHERE id_usulan=$1 AND aksi='reset'`,
+        [idUsulan]
+      ).catch(() => {});
       const piRows = await pool.query(
         `SELECT no_indikator FROM penolakan_indikator WHERE id_usulan=$1 AND (aksi IS NULL OR aksi='tolak')`,
         [idUsulan]

@@ -2100,6 +2100,7 @@ async function openIndikatorModal(idUsulan) {
         <td><span style="font-family:'JetBrains Mono';font-weight:700">${ind.no}</span></td>
         <td style="max-width:220px;font-size:12.5px">${ind.nama}</td>
         <input type="hidden" id="bobot-${ind.no}" value="${ind.bobot}">
+        <input type="hidden" id="sasaran-${ind.no}" value="${ind.sasaranTahunan || 0}">
         <td style="text-align:center;font-size:12.5px;color:#475569">${ind.sasaranTahunan > 0 ? ind.sasaranTahunan : '<span style="color:#cbd5e1">-</span>'}</td>
         <td style="text-align:center">
           ${isLocked ? `<span>${ind.target}</span>` : `<input type="number" id="t-${ind.no}" value="${ind.target}" min="0" step="1"
@@ -2855,6 +2856,18 @@ function previewSPM(changedNo) {
   // Paksa integer pada target juga
   const tEl2 = document.getElementById(`t-${changedNo}`);
   if (tEl2 && tEl2.value.includes('.')) tEl2.value = Math.floor(parseFloat(tEl2.value));
+  // Clamp Target Bulan Ini ≤ sasaranTahunan (Target Tahunan)
+  if (tEl2) {
+    const sasaranEl = document.getElementById(`sasaran-${changedNo}`);
+    const sasaran = sasaranEl ? parseInt(sasaranEl.value) : 0;
+    if (sasaran > 0) {
+      let tVal = parseInt(tEl2.value) || 0;
+      if (tVal > sasaran) {
+        tEl2.value = sasaran;
+        toast(`Target Bulan Ini Indikator ${changedNo} disesuaikan ke Target Tahunan (${sasaran})`, 'warning');
+      }
+    }
+  }
   // Update capaian % display untuk baris yang berubah
   const tEl = document.getElementById(`t-${changedNo}`);
   const cEl = document.getElementById(`c-${changedNo}`);

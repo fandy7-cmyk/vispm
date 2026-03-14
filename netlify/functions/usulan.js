@@ -678,6 +678,17 @@ async function verifKapus(pool, body) {
   const alasanGabungan = indikatorList.filter(i => i.aksi === 'tolak')
     .map(i => '#' + i.noIndikator + ': ' + i.alasan).join(' | ');
 
+  // Simpan email_program dari penolakan PP yang asli (jika ada) SEBELUM dihapus
+  // Ini penting agar saat KaPus approve nanti, sistem bisa deteksi ini re-verif dari PP
+  const piPPEmailRows = await pool.query(
+    `SELECT no_indikator, email_program FROM penolakan_indikator WHERE id_usulan=$1 AND email_program IS NOT NULL`,
+    [idUsulan]
+  ).catch(() => ({ rows: [] }));
+  const emailPPMap = {};
+  for (const r of piPPEmailRows.rows) {
+    emailPPMap[r.no_indikator] = r.email_program;
+  }
+
   // Bersihkan penolakan lama dari Kapus untuk usulan ini
   await pool.query(`DELETE FROM penolakan_indikator WHERE id_usulan=$1`, [idUsulan]).catch(()=>{});
 
@@ -714,17 +725,6 @@ async function verifKapus(pool, body) {
     : isReVerifAdminKapusTolak
       ? 'Membenarkan penolakan Admin — dikembalikan ke Operator'
       : 'Dikembalikan ke Operator';
-
-  // Simpan email_program dari penolakan PP yang asli (jika ada) sebelum dihapus
-  // Ini penting agar saat KaPus approve nanti, sistem bisa deteksi ini re-verif dari PP
-  const piPPEmailRows = await pool.query(
-    `SELECT no_indikator, email_program FROM penolakan_indikator WHERE id_usulan=$1 AND email_program IS NOT NULL`,
-    [idUsulan]
-  ).catch(() => ({ rows: [] }));
-  const emailPPMap = {};
-  for (const r of piPPEmailRows.rows) {
-    emailPPMap[r.no_indikator] = r.email_program;
-  }
 
   await pool.query(
     `UPDATE usulan_header SET status_global='Ditolak', status_kapus='Ditolak', is_locked=false,

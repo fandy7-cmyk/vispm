@@ -3630,8 +3630,11 @@ async function openVerifikasi(idUsulan) {
             const emailPP = vp.email_program;
             const namaPP = vp.nama_program || emailPP;
             let catatanText = '';
-            if (vp.catatan && vp.catatan.trim()) {
-              catatanText = vp.catatan;
+            // Prioritas sumber catatan:
+            // 1. vp.sanggahan — catatan/sanggahan PP ke Admin (disimpan di field sanggahan)
+            // 2. catatanMap dari penolakan_indikator.catatan_program (fallback legacy)
+            if (vp.sanggahan && vp.sanggahan.trim()) {
+              catatanText = vp.sanggahan;
             } else {
               const items = catatanMap[emailPP?.toLowerCase()] || catatanMap[emailPP] || [];
               catatanText = items.map(it => `Ind.${it.no}: ${it.catatan}`).join(' | ');

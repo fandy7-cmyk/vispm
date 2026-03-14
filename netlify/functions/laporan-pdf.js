@@ -510,13 +510,23 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
           <td style="padding:6px 10px;border:1px solid #cbd5e1;text-align:center"></td>
         </tr>
         <tr style="background:${bgInduk}">
-          <td style="padding:4px 10px;border:1px solid #cbd5e1;text-align:center;color:#94a3b8;font-size:14px">◦</td>
-          <td style="padding:4px 10px;border:1px solid #cbd5e1;color:#334155;padding-left:24px;font-style:italic">${labels[0]}</td>
+          <td style="padding:4px 10px;border:1px solid #cbd5e1;text-align:center;color:#94a3b8"></td>
+          <td style="padding:4px 10px;border:1px solid #cbd5e1;color:#334155;padding-left:16px">
+            <span style="display:inline-flex;align-items:baseline;gap:6px">
+              <span style="color:#475569;font-size:13px;flex-shrink:0">▪</span>
+              <span style="font-style:italic">${labels[0]}</span>
+            </span>
+          </td>
           <td style="padding:4px 10px;border:1px solid #cbd5e1;text-align:center;font-weight:600;background:#fef9c3">${capaian}</td>
         </tr>
         <tr style="background:${bgInduk}">
-          <td style="padding:4px 10px;border:1px solid #cbd5e1;text-align:center;color:#94a3b8;font-size:14px">◦</td>
-          <td style="padding:4px 10px;border:1px solid #cbd5e1;color:#334155;padding-left:24px;font-style:italic">${labels[1]}</td>
+          <td style="padding:4px 10px;border:1px solid #cbd5e1;text-align:center;color:#94a3b8"></td>
+          <td style="padding:4px 10px;border:1px solid #cbd5e1;color:#334155;padding-left:16px">
+            <span style="display:inline-flex;align-items:baseline;gap:6px">
+              <span style="color:#475569;font-size:13px;flex-shrink:0">▪</span>
+              <span style="font-style:italic">${labels[1]}</span>
+            </span>
+          </td>
           <td style="padding:4px 10px;border:1px solid #cbd5e1;text-align:center;font-weight:600;background:#fef9c3">${target}</td>
         </tr>`;
     }).join('');

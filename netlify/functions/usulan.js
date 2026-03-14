@@ -202,7 +202,7 @@ async function getUsulanDetail(pool, idUsulan) {
     [idUsulan]
   );
   const piResult = await pool.query(
-    `SELECT * FROM penolakan_indikator WHERE id_usulan=$1 ORDER BY no_indikator`,
+    `SELECT * FROM penolakan_indikator WHERE id_usulan=$1 AND (aksi IS NULL OR aksi='tolak') ORDER BY no_indikator`,
     [idUsulan]
   ).catch(() => ({ rows: [] }));
   const detail = mapHeader(result.rows[0]);

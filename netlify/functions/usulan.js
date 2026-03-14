@@ -791,23 +791,26 @@ async function verifProgram(pool, body) {
     : null;
   const logLabel = adaTolak ? alasanGabungan : 'Semua indikator disetujui';
 
-  // Simpan catatanProgram (level usulan) ke semua indikator yang disetujui
+  // Simpan catatanProgram ke penolakan_indikator untuk SEMUA indikator bermasalah
+  // (bukan hanya yang disetujui) agar Admin bisa baca catatan PP walau ada yang ditolak
   if (catatanProgram) {
-    for (const item of indikatorList.filter(i => i.aksi === 'setuju')) {
-      await pool.query(
-        `UPDATE penolakan_indikator SET catatan_program=$1, email_program=$2, responded_at=NOW()
-         WHERE id_usulan=$3 AND no_indikator=$4 AND (aksi IS NULL OR aksi='tolak')`,
-        [catatanProgram, email, idUsulan, item.noIndikator]
-      ).catch(() => {});
-    }
+    await pool.query(
+      `UPDATE penolakan_indikator SET catatan_program=$1, email_program=$2, responded_at=NOW()
+       WHERE id_usulan=$3 AND (aksi IS NULL OR aksi='tolak')`,
+      [catatanProgram, email, idUsulan]
+    ).catch(() => {});
   }
 
   // FIX Bug #1 & #3: Simpan dulu keputusan VP ini ke verifikasi_program,
   // tapi JANGAN ubah status_global atau insert penolakan_indikator dulu.
   // Semua perubahan global ditunda sampai semua VP sudah selesai verifikasi.
+  // Simpan catatan dan alasan secara terpisah agar tidak saling menimpa:
+  // catatan = alasan penolakan indikator (jika ada yang ditolak)
+  // sanggahan = catatan/sanggahan PP ke Admin (selalu disimpan jika ada)
   await pool.query(
-    `UPDATE verifikasi_program SET status=$1, catatan=$2, verified_at=NOW() WHERE id_usulan=$3 AND LOWER(email_program)=LOWER($4)`,
-    [statusVP, alasanGabungan || catatanProgram || null, idUsulan, email]
+    `UPDATE verifikasi_program SET status=$1, catatan=$2, sanggahan=$3, verified_at=NOW()
+     WHERE id_usulan=$4 AND LOWER(email_program)=LOWER($5)`,
+    [statusVP, alasanGabungan || null, catatanProgram || null, idUsulan, email]
   );
   // Saat re-verif dari Admin: tulis 'Re-verifikasi' agar muncul di bubble masing2 PP
   // Saat verifikasi normal: tulis 'Approve' (atau 'Tolak sebagian')
@@ -815,7 +818,7 @@ async function verifProgram(pool, body) {
     ? 'Tolak (sebagian)'
     : (isReVerifAdmin ? 'Re-verifikasi' : 'Approve');
   const detailLog = adaTolak
-    ? alasanGabungan
+    ? alasanGabungan + (catatanProgram ? ` | Catatan PP: ${catatanProgram}` : '')
     : (isReVerifAdmin && catatanProgram ? `Semua indikator disetujui — catatan: ${catatanProgram}` : logLabel);
   await logAktivitas(pool, email, 'Pengelola Program', aksiLog, idUsulan, detailLog);
 

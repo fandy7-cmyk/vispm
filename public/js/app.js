@@ -2197,7 +2197,7 @@ async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, tahun
   }
   const oversizedFiles = files.filter(f => f.size > MAX_FILE_SIZE);
   if (oversizedFiles.length > 0) {
-    toast(`File terlalu besar (maks 10MB): ${oversizedFiles.map(f => f.name).join(', ')}`, 'error');
+    toast(`File terlalu besar (maks 5MB): ${oversizedFiles.map(f => f.name).join(', ')}`, 'error');
     event.target.value = '';
     return;
   }

@@ -1464,7 +1464,7 @@ function renderUsulanTable(rows, role) {
         })() : ''}
       </td>
       <td style="font-size:12px;color:var(--text-light)">${formatDateTime(u.createdAt)}</td>
-      <td>${actionBtn(u)}</td>
+      <td style="white-space:nowrap"><div style="display:flex;align-items:center;gap:2px">${actionBtn(u)}</div></td>
     </tr>`).join('')}</tbody>
   </table></div>`;
 }

@@ -379,7 +379,7 @@ async function showPeriodeLoginPopup() {
     if (!aktifList.length) return;
 
     const periodesHtml = aktifList.map(aktif => `
-      <div style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;margin-bottom:10px">
+      <div style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden">
         <div style="background:linear-gradient(135deg,#0d9488,#06b6d4);padding:8px 14px;color:white;font-weight:700;font-size:14px">
           ${aktif.namaBulan} ${aktif.tahun}
         </div>
@@ -406,15 +406,15 @@ async function showPeriodeLoginPopup() {
     popup.id = 'periodePopup';
     popup.style.cssText = `position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9998;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px);animation:fadeIn 0.3s ease`;
     popup.innerHTML = `
-      <div style="background:white;border-radius:16px;width:480px;max-width:calc(100vw - 32px);overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,0.3);animation:authIn 0.3s ease">
-        <div style="background:linear-gradient(135deg,#0d9488,#06b6d4);padding:16px 20px;color:white">
+      <div style="background:white;border-radius:16px;width:min(960px,calc(100vw - 32px));max-height:calc(100vh - 48px);overflow:hidden;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(0,0,0,0.3);animation:authIn 0.3s ease">
+        <div style="background:linear-gradient(135deg,#0d9488,#06b6d4);padding:16px 20px;color:white;flex-shrink:0">
           <div style="display:flex;align-items:center;gap:10px">
             <span class="material-icons" style="font-size:22px">notifications_active</span>
             <span style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px">Informasi Periode Input</span>
           </div>
         </div>
-        <div style="padding:16px 20px">
-          ${periodesHtml}
+        <div style="padding:16px 20px;overflow-y:auto;flex:1">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin-bottom:12px">${periodesHtml}</div>
           <button onclick="document.getElementById('periodePopup').remove()" style="width:100%;margin-top:4px;height:42px;background:linear-gradient(135deg,#0d9488,#06b6d4);border:none;border-radius:10px;color:white;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">
             <span style="display:flex;align-items:center;justify-content:center;gap:6px"><span class="material-icons" style="font-size:18px">check</span>Mengerti, Tutup</span>
           </button>
@@ -864,8 +864,8 @@ function renderStatusSummary(d) {
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
         <span style="font-size:12px;color:var(--text-light);font-weight:600">Tingkat Penyelesaian</span>
         <div style="display:flex;align-items:center;gap:6px">
-          ${pctSelesai > 0 ? `<span style="font-size:11px;font-weight:700;color:#10b981;font-family:'JetBrains Mono',monospace">${pctSelesai}% selesai</span>` : ''}
-          <span style="font-size:18px;font-weight:900;color:#0d9488;font-family:'JetBrains Mono',monospace">${pctBerjalan}%</span>
+          ${(pctSelesai > 0 && pctSelesai < pctBerjalan) ? `<span style="font-size:11px;font-weight:700;color:#10b981;font-family:'JetBrains Mono',monospace">${pctSelesai}% selesai</span>` : ''}
+          <span style="font-size:18px;font-weight:900;color:#0d9488;font-family:'JetBrains Mono',monospace">${pctSelesai === pctBerjalan ? pctSelesai : pctBerjalan}%</span>
         </div>
       </div>
       <div style="height:8px;background:#e2e8f0;border-radius:99px;overflow:hidden;position:relative">
@@ -960,8 +960,8 @@ function renderOperatorStatusSummary(rows) {
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
         <span style="font-size:12px;color:var(--text-light);font-weight:600">Tingkat Penyelesaian</span>
         <div style="display:flex;align-items:center;gap:6px">
-          ${pctSelesai > 0 ? `<span style="font-size:11px;font-weight:700;color:#10b981;font-family:'JetBrains Mono',monospace">${pctSelesai}% selesai</span>` : ''}
-          <span style="font-size:18px;font-weight:900;color:#0d9488;font-family:'JetBrains Mono',monospace">${pctDiajukan}%</span>
+          ${(pctSelesai > 0 && pctSelesai < pctDiajukan) ? `<span style="font-size:11px;font-weight:700;color:#10b981;font-family:'JetBrains Mono',monospace">${pctSelesai}% selesai</span>` : ''}
+          <span style="font-size:18px;font-weight:900;color:#0d9488;font-family:'JetBrains Mono',monospace">${pctSelesai === pctDiajukan ? pctSelesai : pctDiajukan}%</span>
         </div>
       </div>
       <div style="height:8px;background:#e2e8f0;border-radius:99px;overflow:hidden;position:relative">
@@ -1006,8 +1006,8 @@ function renderKapusStatusSummary(rows) {
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
         <span style="font-size:12px;color:var(--text-light);font-weight:600">Progress PKM</span>
         <div style="display:flex;align-items:center;gap:6px">
-          ${pctSelesai > 0 ? `<span style="font-size:11px;font-weight:700;color:#10b981;font-family:'JetBrains Mono',monospace">${pctSelesai}% selesai</span>` : ''}
-          <span style="font-size:18px;font-weight:900;color:#0d9488;font-family:'JetBrains Mono',monospace">${pctProses}%</span>
+          ${(pctSelesai > 0 && pctSelesai < pctProses) ? `<span style="font-size:11px;font-weight:700;color:#10b981;font-family:'JetBrains Mono',monospace">${pctSelesai}% selesai</span>` : ''}
+          <span style="font-size:18px;font-weight:900;color:#0d9488;font-family:'JetBrains Mono',monospace">${pctSelesai === pctProses ? pctSelesai : pctProses}%</span>
         </div>
       </div>
       <div style="height:8px;background:#e2e8f0;border-radius:99px;overflow:hidden;position:relative">

@@ -8,7 +8,7 @@ async function renderCatatanThread(elId, idUsulan, currentRole) {
   const el = document.getElementById(elId);
   if (!el) return;
 
-  const AKSI_CHAT = ['Tolak','Tolak (sebagian)','Sanggah','Sanggah Selesai','Ajukan Ulang','Kembalikan','Tolak Ke Operator','Tolak Indikator','Approve','Re-verifikasi'];
+  const AKSI_CHAT = ['Tolak','Tolak (sebagian)','Sanggah','Sanggah Selesai','Ajukan Ulang','Kembalikan','Tolak Ke Operator','Tolak Indikator','Approve','Re-verifikasi','PP Membenarkan','Kapus Membenarkan','Kapus Menyanggah'];
   const APPROVE_SKIP = ['Semua indikator disetujui'];
 
   let logs = [];
@@ -34,6 +34,7 @@ async function renderCatatanThread(elId, idUsulan, currentRole) {
     'Sanggah Selesai':'check_circle','Ajukan Ulang':'restart_alt',
     'Kembalikan':'undo','Tolak Ke Operator':'reply','Tolak Indikator':'cancel',
     'Approve':'check_circle','Re-verifikasi':'update',
+    'PP Membenarkan':'thumb_down_alt','Kapus Membenarkan':'thumb_down_alt','Kapus Menyanggah':'gavel',
   };
   function fmtDT(ts) {
     const d = new Date(ts), o = { timeZone:'Asia/Makassar' };
@@ -66,6 +67,9 @@ async function renderCatatanThread(elId, idUsulan, currentRole) {
       'Ajukan Ulang':    { c:'#2563eb', b:'#eff6ff' },
       'Sanggah':         { c:'#7c3aed', b:'#f5f3ff' },
       'Sanggah Selesai': { c:'#059669', b:'#ecfdf5' },
+      'PP Membenarkan':   { c:'#dc2626', b:'#fef2f2' },
+      'Kapus Membenarkan':{ c:'#dc2626', b:'#fef2f2' },
+      'Kapus Menyanggah': { c:'#7c3aed', b:'#f5f3ff' },
     };
     const aksiClr = aksiColorMap[log.aksi] || { c:cfg.color, b:cfg.bg };
 
@@ -1628,17 +1632,62 @@ function renderUsulanTable(rows, role) {
             }</span>
             ${u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak').map(p => `<span style="background:#fecaca;color:#7f1d1d;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700">#${p.noIndikator}</span>`).join('')}
           </div>` : ''}
-        ${(role === 'kepala-puskesmas' && u.ditolakOleh === 'Pengelola Program' && u.penolakanIndikator && u.penolakanIndikator.length) ? `
-          <div style="margin-top:4px;display:inline-flex;align-items:center;gap:4px;flex-wrap:wrap;background:#fef2f2;border:1px solid #fca5a5;border-radius:5px;padding:2px 7px">
-            <span class="material-icons" style="font-size:12px;color:#dc2626">replay</span>
-            <span style="font-size:10.5px;color:#dc2626;font-weight:600">Perlu re-verifikasi:</span>
-            ${u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak').map(p => `<span style="background:#fecaca;color:#7f1d1d;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700">#${p.noIndikator}</span>`).join('')}
-          </div>` : ''}
+        ${(role === 'kepala-puskesmas' && u.statusGlobal === 'Menunggu Kepala Puskesmas' && u.ditolakOleh && u.penolakanIndikator && u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak').length) ? (() => {
+          // FIX (c): tampilkan notif re-verifikasi untuk Kapus dari sumber manapun (PP atau Admin)
+          const aktif = u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak');
+          const sumber = u.ditolakOleh === 'Admin' ? 'Admin' : 'Pengelola Program';
+          const bgColor = u.ditolakOleh === 'Admin' ? '#fff7ed' : '#fef2f2';
+          const bdColor = u.ditolakOleh === 'Admin' ? '#fed7aa' : '#fca5a5';
+          const txColor = u.ditolakOleh === 'Admin' ? '#c2410c' : '#dc2626';
+          return `<div style="margin-top:4px;display:inline-flex;align-items:center;gap:4px;flex-wrap:wrap;background:${bgColor};border:1px solid ${bdColor};border-radius:5px;padding:2px 7px">
+            <span class="material-icons" style="font-size:12px;color:${txColor}">replay</span>
+            <span style="font-size:10.5px;color:${txColor};font-weight:600">Perlu re-verifikasi:</span>
+            ${aktif.map(p => `<span style="background:#fecaca;color:#7f1d1d;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700">#${p.noIndikator}</span>`).join('')}
+          </div>`;
+        })() : ''}
         ${(role === 'kepala-puskesmas' && u.statusGlobal === 'Menunggu Kepala Puskesmas' && u.ditolakOleh === 'Kepala Puskesmas') ? `
           <div style="margin-top:4px;display:inline-flex;align-items:center;gap:4px;background:#fef9c3;border:1px solid #fde047;border-radius:5px;padding:2px 7px">
             <span class="material-icons" style="font-size:12px;color:#ca8a04">replay</span>
             <span style="font-size:10.5px;color:#92400e;font-weight:600">Re-submit dari Operator</span>
           </div>` : ''}
+
+        ${/* ── PP: menunggu verifikasi Kapus (setelah PP tolak/membenarkan) ── */
+        (role === 'program' && u.statusGlobal === 'Menunggu Kepala Puskesmas' && u.penolakanIndikator && u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'reset').length) ? (() => {
+          const aktif = u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'reset');
+          const myAkses = currentUser.indikatorAkses || [];
+          const filtered = myAkses.length > 0 ? aktif.filter(p => myAkses.includes(parseInt(p.noIndikator))) : aktif;
+          if (!filtered.length) return '';
+          const isPPMembenarkan = u.ditolakOleh === 'Admin';
+          return `<div style="margin-top:4px;display:inline-flex;align-items:center;gap:4px;flex-wrap:wrap;background:#fef9c3;border:1px solid #fde047;border-radius:5px;padding:2px 7px">
+            <span class="material-icons" style="font-size:12px;color:#ca8a04">${isPPMembenarkan ? 'assignment_return' : 'pending'}</span>
+            <span style="font-size:10.5px;color:#92400e;font-weight:600">${isPPMembenarkan ? 'Sudah dibenarkan' : 'Sudah ditolak'} — menunggu Kapus</span>
+            ${filtered.map(p=>`<span style="background:#fecaca;color:#7f1d1d;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700">#${p.noIndikator}</span>`).join('')}
+          </div>`;
+        })() : ''}
+
+        ${/* ── PP: Kapus menyanggah → PP perlu verif ulang ── */
+        (role === 'program' && u.ditolakOleh === 'Pengelola Program' && u.statusGlobal === 'Menunggu Pengelola Program' && !u.sudahVerif && u.penolakanIndikator && u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak').length) ? (() => {
+          const aktif = u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak');
+          const myAkses = currentUser.indikatorAkses || [];
+          const filtered = myAkses.length > 0 ? aktif.filter(p => myAkses.includes(parseInt(p.noIndikator))) : aktif;
+          if (!filtered.length) return '';
+          return `<div style="margin-top:4px;display:inline-flex;align-items:center;gap:4px;flex-wrap:wrap;background:#f5f3ff;border:1px solid #c4b5fd;border-radius:5px;padding:2px 7px">
+            <span class="material-icons" style="font-size:12px;color:#7c3aed">gavel</span>
+            <span style="font-size:10.5px;color:#5b21b6;font-weight:600">Kapus menyanggah — perlu verif ulang:</span>
+            ${filtered.map(p=>`<span style="background:#fecaca;color:#7f1d1d;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700">#${p.noIndikator}</span>`).join('')}
+          </div>`;
+        })() : ''}
+
+        ${/* ── KAPUS: sudah verif, menunggu PP/Admin ── */
+        (role === 'kepala-puskesmas' && u.statusKapus === 'Selesai' && u.ditolakOleh && u.penolakanIndikator && u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak').length && ['Menunggu Pengelola Program','Menunggu Admin'].includes(u.statusGlobal)) ? (() => {
+          const aktif = u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak');
+          const arahLabel = u.statusGlobal === 'Menunggu Admin' ? '→ Admin' : '→ Pengelola Program';
+          return `<div style="margin-top:4px;display:inline-flex;align-items:center;gap:4px;flex-wrap:wrap;background:#f0fdf4;border:1px solid #86efac;border-radius:5px;padding:2px 7px">
+            <span class="material-icons" style="font-size:12px;color:#16a34a">check_circle</span>
+            <span style="font-size:10.5px;color:#15803d;font-weight:600">Sudah diverifikasi ${arahLabel}</span>
+            ${aktif.map(p=>`<span style="background:#fecaca;color:#7f1d1d;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700">#${p.noIndikator}</span>`).join('')}
+          </div>`;
+        })() : ''}
       </td>
       <td style="font-size:12px;color:var(--text-light)">${formatDateTime(u.createdAt)}</td>
       <td>${actionBtn(u)}</td>
@@ -3156,6 +3205,9 @@ async function openLogAktivitas(idUsulan) {
       'Tolak (sebagian)':  { color:'#d97706', bg:'#fffbeb', icon:'remove_circle',     label:'Tolak Sebagian' },
       'Kembalikan':        { color:'#7c3aed', bg:'#f5f3ff', icon:'undo',              label:'Dikembalikan' },
       'Sanggah':           { color:'#7c3aed', bg:'#f5f3ff', icon:'gavel',            label:'Sanggah' },
+      'PP Membenarkan':    { color:'#dc2626', bg:'#fef2f2', icon:'thumb_down_alt',  label:'PP Membenarkan' },
+      'Kapus Membenarkan': { color:'#dc2626', bg:'#fef2f2', icon:'thumb_down_alt',  label:'Kapus Membenarkan' },
+      'Kapus Menyanggah':  { color:'#7c3aed', bg:'#f5f3ff', icon:'gavel',            label:'Kapus Menyanggah' },
       'Reset':             { color:'#d97706', bg:'#fffbeb', icon:'restart_alt',       label:'Direset Admin' },
       'Restore Verif':     { color:'#6366f1', bg:'#fff7ed', icon:'restore',           label:'Dipulihkan' },
     };
@@ -3508,9 +3560,18 @@ async function openVerifikasi(idUsulan) {
         _ppBanner.innerHTML = `<span class="material-icons" style="color:#f59e0b;font-size:16px;flex-shrink:0">warning</span>
           <span style="font-size:12.5px;color:#92400e"><b>Verifikasi Ulang</b> — Hanya menampilkan <b>${displayInds.length} indikator</b> yang sebelumnya bermasalah dan perlu diverifikasi ulang. Indikator lain sudah disetujui.</span>`;
         _ppBanner.style.display = 'flex';
-        // Tampilkan input catatan PP saat re-verif dari Admin
+        // ppCatatanWrap: set mode reVerif dan sembunyikan dulu
+        // akan muncul dinamis lewat setIndVerif() saat PP memilih 'setuju' (menyanggah Admin)
         const _ppCatatanWrap = document.getElementById('ppCatatanWrap');
-        if (_ppCatatanWrap) _ppCatatanWrap.style.display = detail.ditolakOleh === 'Admin' ? 'block' : 'none';
+        if (_ppCatatanWrap) {
+          if (detail.ditolakOleh === 'Admin') {
+            _ppCatatanWrap.dataset.mode = 'reVerif'; // tandai agar setIndVerif tahu
+            _ppCatatanWrap.style.display = 'none';   // tersembunyi dulu, muncul saat ada yg setuju
+          } else {
+            _ppCatatanWrap.dataset.mode = '';
+            _ppCatatanWrap.style.display = 'none';
+          }
+        }
         // Tampilkan alasan penolakan per indikator dari Admin
         if (detail.ditolakOleh === 'Admin') {
           const myAkses = currentUser.indikatorAkses || [];
@@ -3617,9 +3678,18 @@ async function openVerifikasi(idUsulan) {
               _reVerifBanner.style.display = 'flex';
             }
           }
-          // kapusCatatanWrap hanya muncul saat loop Kapus↔PP
+          // kapusCatatanWrap: set mode reVerif dan sembunyikan dulu
+          // akan muncul dinamis lewat setIndVerif() saat Kapus memilih 'setuju' (menyanggah PP)
           const _kapusCatatanWrap = document.getElementById('kapusCatatanWrap');
-          if (_kapusCatatanWrap) _kapusCatatanWrap.style.display = _isPPLoop ? 'block' : 'none';
+          if (_kapusCatatanWrap) {
+            if (_isKapusReVerif) {
+              _kapusCatatanWrap.dataset.mode = 'reVerif'; // tandai agar setIndVerif tahu
+              _kapusCatatanWrap.style.display = 'none';   // tersembunyi dulu, muncul saat ada yg setuju
+            } else {
+              _kapusCatatanWrap.dataset.mode = '';
+              _kapusCatatanWrap.style.display = 'none';
+            }
+          }
         } else {
           _reVerifBanner.style.display = 'none';
           const _kapusCatatanWrap = document.getElementById('kapusCatatanWrap');
@@ -3918,6 +3988,22 @@ function setIndVerif(no, aksi) {
     if (row) row.style.background = '#fef2f2';
     setTimeout(() => document.getElementById(`pgAlasan_${no}`)?.focus(), 50);
   }
+
+  // Dinamis show/hide catatanWrap untuk Kapus dan PP
+  // Setuju = menyanggah → wajib isi catatan
+  // Tolak semua = membenarkan → tidak perlu catatan (alasan per indikator sudah cukup)
+  const _allApprove = document.querySelectorAll('[id^="pgApprove_"]');
+  const _adaSetuju  = Array.from(_allApprove).some(btn => btn.dataset.active === '1');
+
+  const _kapusCatatanWrap = document.getElementById('kapusCatatanWrap');
+  if (_kapusCatatanWrap && _kapusCatatanWrap.dataset.mode === 'reVerif') {
+    _kapusCatatanWrap.style.display = _adaSetuju ? 'block' : 'none';
+  }
+
+  const _ppCatatanWrap = document.getElementById('ppCatatanWrap');
+  if (_ppCatatanWrap && _ppCatatanWrap.dataset.mode === 'reVerif') {
+    _ppCatatanWrap.style.display = _adaSetuju ? 'block' : 'none';
+  }
 }
 
 // ======= Submit verifikasi per indikator — generik untuk Kapus, PP, Admin =======
@@ -3942,13 +4028,17 @@ async function submitIndVerifikasi(idUsulan, displayInds, role) {
 
   const catatanKapus = role === 'Kepala Puskesmas' ? (document.getElementById('kapusCatatanInput')?.value?.trim() || '') : undefined;
   if (role === 'Kepala Puskesmas' && document.getElementById('kapusCatatanWrap')?.style.display !== 'none') {
-    if (!catatanKapus) return toast('Catatan / Tanggapan untuk Pengelola Program wajib diisi sebelum submit re-verifikasi', 'warning');
+    // Catatan wajib hanya saat menyanggah (ada indikator setuju) — bukan saat membenarkan (semua tolak)
+    const _adaSetuju = indikatorList.some(i => i.aksi === 'setuju');
+    if (_adaSetuju && !catatanKapus) return toast('Catatan / Tanggapan wajib diisi saat menyanggah penolakan PP', 'warning');
   }
   // Validasi catatan wajib untuk PP saat re-verif dari Admin
   const catatanProgram = role === 'Pengelola Program' ? (document.getElementById('ppCatatanInput')?.value?.trim() || '') : undefined;
   if (role === 'Pengelola Program' && document.getElementById('ppCatatanWrap')?.style.display !== 'none') {
+    // Catatan wajib hanya saat menyanggah Admin (ada indikator setuju)
+    // Saat membenarkan Admin (semua tolak) → tidak wajib, alasan per indikator sudah cukup
     const adaYangSetuju = indikatorList.some(i => i.aksi === 'setuju');
-    if (adaYangSetuju && !catatanProgram) return toast('Catatan / Sanggahan untuk Admin wajib diisi jika ada indikator yang disetujui', 'warning');
+    if (adaYangSetuju && !catatanProgram) return toast('Catatan / Sanggahan wajib diisi saat menyanggah penolakan Admin', 'warning');
   }
 
   setLoading(true);

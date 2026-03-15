@@ -1358,7 +1358,7 @@ function renderUsulanTable(rows, role) {
         ${statusBadge(u.statusGlobal)}
         ${(role === 'admin' && u.ditolakOleh === 'Admin') ? (() => {
           const sg = u.statusGlobal;
-          const nos = (u.penolakanIndikator || []).filter(p => !p.aksi || p.aksi === 'tolak').map(p => `<span style="background:#fecaca;color:#7f1d1d;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700">#${p.noIndikator}</span>`).join(' ');
+          const nos = (u.penolakanIndikator || []).filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'reset').map(p => `<span style="background:#fecaca;color:#7f1d1d;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700">#${p.noIndikator}</span>`).join(' ');
           const indBadge = nos ? `<span style="margin-left:4px">${nos}</span>` : '';
           if (sg === 'Menunggu Pengelola Program')
             return `<div style="margin-top:4px;background:#fff7ed;border:1px solid #fed7aa;border-radius:5px;padding:3px 7px"><div style="display:inline-flex;align-items:center;gap:4px"><span class="material-icons" style="font-size:12px;color:#ea580c">replay</span><span style="font-size:10.5px;color:#c2410c;font-weight:600">Re-verifikasi PP</span>${indBadge}</div></div>`;
@@ -1375,7 +1375,7 @@ function renderUsulanTable(rows, role) {
             <span style="font-size:10.5px;color:#dc2626;font-weight:600">Indikator bermasalah:</span>
             ${(() => {
               const myAkses = currentUser.indikatorAkses || [];
-              const aktif = u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak');
+              const aktif = u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'reset');
               const filtered = myAkses.length > 0 ? aktif.filter(p => myAkses.includes(parseInt(p.noIndikator))) : aktif;
               return filtered.map(p => `<span style="background:#fecaca;color:#7f1d1d;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700">#${p.noIndikator}</span>`).join('');
             })()}
@@ -1386,7 +1386,7 @@ function renderUsulanTable(rows, role) {
             <span style="font-size:10.5px;color:#dc2626;font-weight:600">Perlu re-verifikasi:</span>
             ${(() => {
               const myAkses = currentUser.indikatorAkses || [];
-              const aktif = u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak');
+              const aktif = u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'reset');
               const filtered = myAkses.length > 0 ? aktif.filter(p => myAkses.includes(parseInt(p.noIndikator))) : aktif;
               return filtered.map(p => `<span style="background:#fecaca;color:#7f1d1d;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700">#${p.noIndikator}</span>`).join('');
             })()}
@@ -1395,7 +1395,7 @@ function renderUsulanTable(rows, role) {
           <div style="margin-top:4px;display:inline-flex;align-items:center;gap:5px;flex-wrap:wrap;background:#fef2f2;border:1px solid #fca5a5;border-radius:5px;padding:2px 7px">
             <span class="material-icons" style="font-size:12px;color:#dc2626">cancel</span>
             <span style="font-size:10.5px;color:#dc2626;font-weight:600">Ditolak oleh ${u.ditolakOleh}</span>
-            ${(u.penolakanIndikator||[]).filter(p=>!p.aksi||p.aksi==='tolak').map(p=>`<span style="background:#fecaca;color:#7f1d1d;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700">#${p.noIndikator}</span>`).join('')}
+            ${(u.penolakanIndikator||[]).filter(p=>!p.aksi||p.aksi==='tolak'||p.aksi==='reset').map(p=>`<span style="background:#fecaca;color:#7f1d1d;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700">#${p.noIndikator}</span>`).join('')}
           </div>` : ''}
         ${(role === 'operator' && u.statusGlobal !== 'Ditolak' && u.ditolakOleh && ['Menunggu Kepala Puskesmas','Menunggu Pengelola Program','Menunggu Admin'].includes(u.statusGlobal) && u.penolakanIndikator && u.penolakanIndikator.length) ? `
           <div style="margin-top:4px;display:inline-flex;align-items:center;gap:4px;flex-wrap:wrap;background:#fef9c3;border:1px solid #fde047;border-radius:5px;padding:2px 7px">
@@ -1406,11 +1406,11 @@ function renderUsulanTable(rows, role) {
               u.statusGlobal === 'Menunggu Pengelola Program' ? '→ Pengelola Program' :
               u.statusGlobal === 'Menunggu Admin' ? '→ Admin' : ''
             }</span>
-            ${u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak').map(p => `<span style="background:#fecaca;color:#7f1d1d;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700">#${p.noIndikator}</span>`).join('')}
+            ${u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'reset').map(p => `<span style="background:#fecaca;color:#7f1d1d;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700">#${p.noIndikator}</span>`).join('')}
           </div>` : ''}
-        ${(role === 'kepala-puskesmas' && u.statusGlobal === 'Menunggu Kepala Puskesmas' && u.ditolakOleh && u.penolakanIndikator && u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak').length) ? (() => {
+        ${(role === 'kepala-puskesmas' && u.statusGlobal === 'Menunggu Kepala Puskesmas' && u.ditolakOleh && u.penolakanIndikator && u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'reset').length) ? (() => {
           // FIX (c): tampilkan notif re-verifikasi untuk Kapus dari sumber manapun (PP atau Admin)
-          const aktif = u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak');
+          const aktif = u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'reset');
           const sumber = u.ditolakOleh === 'Admin' ? 'Admin' : 'Pengelola Program';
           const bgColor = u.ditolakOleh === 'Admin' ? '#fff7ed' : '#fef2f2';
           const bdColor = u.ditolakOleh === 'Admin' ? '#fed7aa' : '#fca5a5';
@@ -1442,8 +1442,8 @@ function renderUsulanTable(rows, role) {
         })() : ''}
 
         ${/* ── PP: Kapus menyanggah → PP perlu verif ulang ── */
-        (role === 'program' && u.ditolakOleh === 'Pengelola Program' && u.statusGlobal === 'Menunggu Pengelola Program' && !u.sudahVerif && u.penolakanIndikator && u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak').length) ? (() => {
-          const aktif = u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak');
+        (role === 'program' && u.ditolakOleh === 'Pengelola Program' && u.statusGlobal === 'Menunggu Pengelola Program' && !u.sudahVerif && u.penolakanIndikator && u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'reset').length) ? (() => {
+          const aktif = u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'reset');
           const myAkses = currentUser.indikatorAkses || [];
           const filtered = myAkses.length > 0 ? aktif.filter(p => myAkses.includes(parseInt(p.noIndikator))) : aktif;
           if (!filtered.length) return '';
@@ -1469,8 +1469,8 @@ function renderUsulanTable(rows, role) {
         })() : ''}
 
         ${/* ── KAPUS: sudah verif, menunggu PP/Admin ── */
-        (role === 'kepala-puskesmas' && u.statusKapus === 'Selesai' && u.ditolakOleh && u.penolakanIndikator && u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak').length && ['Menunggu Pengelola Program','Menunggu Admin'].includes(u.statusGlobal)) ? (() => {
-          const aktif = u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak');
+        (role === 'kepala-puskesmas' && u.statusKapus === 'Selesai' && u.ditolakOleh && u.penolakanIndikator && u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'reset').length && ['Menunggu Pengelola Program','Menunggu Admin'].includes(u.statusGlobal)) ? (() => {
+          const aktif = u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'reset');
           const arahLabel = u.statusGlobal === 'Menunggu Admin' ? '→ Admin' : '→ Pengelola Program';
           return `<div style="margin-top:4px;display:inline-flex;align-items:center;gap:4px;flex-wrap:wrap;background:#f0fdf4;border:1px solid #86efac;border-radius:5px;padding:2px 7px">
             <span class="material-icons" style="font-size:12px;color:#16a34a">check_circle</span>
@@ -3327,7 +3327,7 @@ async function openVerifikasi(idUsulan) {
 
       // Cek apakah ini re-verifikasi: ada penolakan aktif yang menjadi tanggung jawab PP ini
       // Hanya penolakan aktif: aksi NULL (belum direspon) atau aksi='tolak'
-      const penolakanAktif = (detail.penolakanIndikator || []).filter(p => !p.aksi || p.aksi === 'tolak');
+      const penolakanAktif = (detail.penolakanIndikator || []).filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'reset');
       const penolakanNosSaya = myAkses.length > 0
         ? penolakanAktif.filter(p => myAkses.includes(parseInt(p.no_indikator))).map(p => parseInt(p.no_indikator))
         : penolakanAktif.map(p => parseInt(p.no_indikator));
@@ -3370,7 +3370,7 @@ async function openVerifikasi(idUsulan) {
         if (detail.ditolakOleh === 'Admin') {
           const myAkses = currentUser.indikatorAkses || [];
           const alasanDariAdmin = (detail.penolakanIndikator || [])
-            .filter(p => (!p.aksi || p.aksi === 'tolak') && (myAkses.length === 0 || myAkses.includes(parseInt(p.noIndikator || p.no_indikator))))
+            .filter(p => (!p.aksi || p.aksi === 'tolak' || p.aksi === 'reset') && (myAkses.length === 0 || myAkses.includes(parseInt(p.noIndikator || p.no_indikator))))
             .map(p => ({ no: parseInt(p.noIndikator || p.no_indikator), alasan: p.alasan || '-' }));
           renderPenolakanBanner('verifPenolakanBanner', 'Admin', alasanDariAdmin);
         } else {
@@ -3421,7 +3421,7 @@ async function openVerifikasi(idUsulan) {
       const adaPenolakanAktif = penolakanList.length > 0 && !!detail.ditolakOleh;
       if (adaPenolakanAktif) {
         // Ada indikator bermasalah dari penolakan sebelumnya → filter hanya itu
-        const bermasalahNos = penolakanList.filter(p => !p.aksi || p.aksi === 'tolak').map(p => parseInt(p.noIndikator || p.no_indikator));
+        const bermasalahNos = penolakanList.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'reset').map(p => parseInt(p.noIndikator || p.no_indikator));
         displayInds = inds.filter(i => bermasalahNos.includes(parseInt(i.no)));
         _isKapusReVerif = true;
       }
@@ -3444,7 +3444,7 @@ async function openVerifikasi(idUsulan) {
             _reVerifBanner.style.display = 'flex';
             // Tampilkan alasan penolakan per indikator dari PP
             const alasanDariPP = (detail.penolakanIndikator || [])
-              .filter(p => !p.aksi || p.aksi === 'tolak')
+              .filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'reset')
               .map(p => ({ no: parseInt(p.noIndikator || p.no_indikator), alasan: p.alasan || '-' }));
             renderPenolakanBanner('verifPenolakanBanner', 'Pengelola Program', alasanDariPP);
           } else {
@@ -3504,7 +3504,7 @@ async function openVerifikasi(idUsulan) {
       if (detail.ditolakOleh === 'Admin') {
         _isAdminReVerif = true;
         _bermasalahNos = penolakanList
-          .filter(p => !p.aksi || p.aksi === 'tolak')
+          .filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'reset')
           .map(p => parseInt(p.noIndikator || p.no_indikator));
         if (_bermasalahNos.length > 0) {
           // Ada indikator yang masih bermasalah → filter

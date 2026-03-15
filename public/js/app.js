@@ -3376,14 +3376,16 @@ async function openVerifikasi(idUsulan) {
         _ppBanner.innerHTML = `<span class="material-icons" style="color:#0891b2;font-size:16px;flex-shrink:0">info</span>
           <span style="font-size:12.5px;color:#0c4a6e">Menampilkan <b>${displayInds.length} indikator</b> yang menjadi tanggung jawab Anda (dari total ${inds.length} indikator).</span>`;
         _ppBanner.style.display = 'flex';
+        const _ppCatatanWrap2 = document.getElementById('ppCatatanWrap');
+        if (_ppCatatanWrap2) { _ppCatatanWrap2.dataset.mode = ''; _ppCatatanWrap2.style.display = 'none'; }
         const _vpb = document.getElementById('verifPenolakanBanner');
         if (_vpb) { _vpb.style.display = 'none'; _vpb.innerHTML = ''; }
       } else {
         _ppBanner.innerHTML = `<span class="material-icons" style="color:#0891b2;font-size:16px;flex-shrink:0">info</span>
           <span style="font-size:12.5px;color:#0c4a6e">Menampilkan semua <b>${inds.length} indikator</b>.</span>`;
         _ppBanner.style.display = 'flex';
-        const _ppCatatanWrap = document.getElementById('ppCatatanWrap');
-        if (_ppCatatanWrap) _ppCatatanWrap.style.display = 'none';
+        const _ppCatatanWrap3 = document.getElementById('ppCatatanWrap');
+        if (_ppCatatanWrap3) { _ppCatatanWrap3.dataset.mode = ''; _ppCatatanWrap3.style.display = 'none'; }
         const _vpb = document.getElementById('verifPenolakanBanner');
         if (_vpb) { _vpb.style.display = 'none'; _vpb.innerHTML = ''; }
       }
@@ -3452,17 +3454,13 @@ async function openVerifikasi(idUsulan) {
               _reVerifBanner.style.display = 'flex';
             }
           }
-          // kapusCatatanWrap: set mode reVerif dan sembunyikan dulu
-          // akan muncul dinamis lewat setIndVerif() saat Kapus memilih 'setuju' (menyanggah PP)
+          // kapusCatatanWrap: hanya aktif saat re-verif dari PP atau Admin (bukan dari Operator)
+          // Kapus perlu beri tanggapan ke PP hanya saat menyanggah PP — bukan saat Operator re-submit
           const _kapusCatatanWrap = document.getElementById('kapusCatatanWrap');
           if (_kapusCatatanWrap) {
-            if (_isKapusReVerif) {
-              _kapusCatatanWrap.dataset.mode = 'reVerif'; // tandai agar setIndVerif tahu
-              _kapusCatatanWrap.style.display = 'none';   // tersembunyi dulu, muncul saat ada yg setuju
-            } else {
-              _kapusCatatanWrap.dataset.mode = '';
-              _kapusCatatanWrap.style.display = 'none';
-            }
+            const _needsCatatan = _isKapusReVerif && _isPPLoop;
+            _kapusCatatanWrap.dataset.mode = _needsCatatan ? 'reVerif' : '';
+            _kapusCatatanWrap.style.display = 'none'; // selalu hidden dulu, muncul via setIndVerif
           }
         } else {
           _reVerifBanner.style.display = 'none';

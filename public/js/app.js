@@ -360,11 +360,6 @@ function startApp() {
     btnEPTT.style.display = rolesBolehTT.includes(currentUser.role) ? '' : 'none';
   }
 
-  // Popup notifikasi periode untuk Operator saat login
-  if (currentUser.role === 'Operator') {
-    setTimeout(() => showPeriodeLoginPopup(), 800);
-  }
-
   // Popup notifikasi tanda tangan untuk Kepala Puskesmas, Pengelola Program, dan Admin
   const rolesBolehTT2 = ['Kepala Puskesmas', 'Pengelola Program', 'Admin'];
   if (rolesBolehTT2.includes(currentUser.role)) {
@@ -372,58 +367,6 @@ function startApp() {
   }
 }
 
-async function showPeriodeLoginPopup() {
-  try {
-    const periodeList = await API.get('periode');
-    const aktifList = (periodeList || []).filter(p => p.isAktifToday);
-    if (!aktifList.length) return;
-
-    const periodesHtml = aktifList.map(aktif => `
-      <div style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden">
-        <div style="background:linear-gradient(135deg,#0d9488,#06b6d4);padding:8px 14px;color:white;font-weight:700;font-size:14px">
-          ${aktif.namaBulan} ${aktif.tahun}
-        </div>
-        <div style="display:flex;gap:0">
-          <div style="flex:1;display:flex;align-items:center;gap:8px;padding:10px 14px;background:#f0fdf9;border-right:1px solid #e2e8f0">
-            <span class="material-icons" style="color:#0d9488;font-size:18px;flex-shrink:0">login</span>
-            <div>
-              <div style="font-size:10px;color:#64748b;font-weight:600;text-transform:uppercase">Dibuka</div>
-              <div style="font-size:12.5px;font-weight:700;color:#0f172a">${formatDate(aktif.tanggalMulai)} ${aktif.jamMulai||'08:00'} WITA</div>
-            </div>
-          </div>
-          <div style="flex:1;display:flex;align-items:center;gap:8px;padding:10px 14px;background:#fef2f2">
-            <span class="material-icons" style="color:#ef4444;font-size:18px;flex-shrink:0">logout</span>
-            <div>
-              <div style="font-size:10px;color:#64748b;font-weight:600;text-transform:uppercase">Ditutup</div>
-              <div style="font-size:12.5px;font-weight:700;color:#0f172a">${formatDate(aktif.tanggalSelesai)} ${aktif.jamSelesai||'17:00'} WITA</div>
-            </div>
-          </div>
-        </div>
-        ${aktif.notifOperator ? `<div style="display:flex;align-items:flex-start;gap:8px;padding:8px 14px;background:#fffbeb;border-top:1px solid #fcd34d"><span style="font-size:16px;flex-shrink:0">📢</span><div style="font-size:12px;color:#0f172a;line-height:1.5">${aktif.notifOperator}</div></div>` : ''}
-      </div>`).join('');
-
-    const popup = document.createElement('div');
-    popup.id = 'periodePopup';
-    popup.style.cssText = `position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9998;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px);animation:fadeIn 0.3s ease`;
-    popup.innerHTML = `
-      <div style="background:white;border-radius:16px;width:min(960px,calc(100vw - 32px));max-height:calc(100vh - 48px);overflow:hidden;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(0,0,0,0.3);animation:authIn 0.3s ease">
-        <div style="background:linear-gradient(135deg,#0d9488,#06b6d4);padding:16px 20px;color:white;flex-shrink:0">
-          <div style="display:flex;align-items:center;gap:10px">
-            <span class="material-icons" style="font-size:22px">notifications_active</span>
-            <span style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px">Informasi Periode Input</span>
-          </div>
-        </div>
-        <div style="padding:16px 20px;overflow-y:auto;flex:1">
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin-bottom:12px">${periodesHtml}</div>
-          <button onclick="document.getElementById('periodePopup').remove()" style="width:100%;margin-top:4px;height:42px;background:linear-gradient(135deg,#0d9488,#06b6d4);border:none;border-radius:10px;color:white;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">
-            <span style="display:flex;align-items:center;justify-content:center;gap:6px"><span class="material-icons" style="font-size:18px">check</span>Mengerti, Tutup</span>
-          </button>
-        </div>
-      </div>`;
-    popup.addEventListener('click', e => { if (e.target === popup) popup.remove(); });
-    document.body.appendChild(popup);
-  } catch(e) { /* silent fail */ }
-}
 
 
 async function showTandaTanganLoginPopup() {

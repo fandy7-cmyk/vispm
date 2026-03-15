@@ -3498,14 +3498,19 @@ async function openVerifikasi(idUsulan) {
     let _bermasalahNos = [];
     if (currentUser.role === 'Admin') {
       const penolakanList = detail.penolakanIndikator || [];
-      // re-verif Admin: hanya jika ditolak_oleh='Admin' (eksplisit) DAN ada penolakan aktif
-      const adaPenolakanAktif = penolakanList.length > 0 && detail.ditolakOleh === 'Admin';
-      if (adaPenolakanAktif) {
-        _bermasalahNos = penolakanList.filter(p => !p.aksi || p.aksi === 'tolak').map(p => parseInt(p.noIndikator || p.no_indikator));
+      // re-verif Admin: cukup cek ditolakOleh='Admin'
+      // Jika ada penolakan aktif (aksi IS NULL/tolak) → filter indikator bermasalah saja
+      // Jika PP semua sanggah (aksi='sanggah') → penolakanList kosong → tampilkan semua indikator
+      if (detail.ditolakOleh === 'Admin') {
+        _isAdminReVerif = true;
+        _bermasalahNos = penolakanList
+          .filter(p => !p.aksi || p.aksi === 'tolak')
+          .map(p => parseInt(p.noIndikator || p.no_indikator));
         if (_bermasalahNos.length > 0) {
+          // Ada indikator yang masih bermasalah → filter
           displayInds = inds.filter(i => _bermasalahNos.includes(parseInt(i.no)));
-          _isAdminReVerif = true;
         }
+        // Jika _bermasalahNos kosong (semua PP sanggah) → tampilkan semua indikator
       }
       const _reVerifBanner = document.getElementById('verifReVerifBanner');
       if (_reVerifBanner) {

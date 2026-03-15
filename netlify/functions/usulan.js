@@ -1393,6 +1393,10 @@ async function respondPenolakan(pool, body) {
       [idUsulan]
     );
     await logAktivitas(pool, email, 'Pengelola Program', 'Sanggah Selesai', idUsulan, 'Semua pengelola sanggah → ke Admin');
+    // FIX (a): Catat log "Re-verifikasi" agar muncul di riwayat aktivitas
+    // saat PP menyetujui setelah siklus Admin tolak → Kapus approve → PP respond
+    await logAktivitas(pool, email, 'Pengelola Program', 'Re-verifikasi', idUsulan,
+      'Semua indikator disetujui — catatan: data sudah diperbaiki oleh kapus');
     return ok({ message: 'Semua pengelola program menyampaikan sanggahan. Diteruskan ke Admin.', selesai: true, aksi: 'sanggah' });
   }
 

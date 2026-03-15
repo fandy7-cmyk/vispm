@@ -843,24 +843,34 @@ function renderAdminDashboard(el, d) {
 }
 
 function renderStatusSummary(d) {
-  const total = d.totalUsulan || 0;
-  const selesai = d.selesai || 0;
+  const total    = d.totalUsulan || 0;
+  const selesai  = d.selesai || 0;
   const menunggu = d.menunggu || 0;
-  const ditolak = Math.max(0, total - selesai - menunggu);
-  const pct = total > 0 ? Math.round((selesai / total) * 100) : 0;
+  const ditolak  = Math.max(0, total - selesai - menunggu);
+  const sudahBerjalan = selesai + menunggu;
+  const pctSelesai   = total > 0 ? Math.round((selesai       / total) * 100) : 0;
+  const pctBerjalan  = total > 0 ? Math.round((sudahBerjalan / total) * 100) : 0;
   const items = [
-    { label: 'Selesai', val: selesai, color: '#10b981', bg: '#ecfdf5' },
-    { label: 'Dalam Proses', val: menunggu, color: '#f59e0b', bg: '#fffbeb' },
-    { label: 'Ditolak/Draft', val: ditolak, color: '#ef4444', bg: '#fef2f2' },
+    { label: 'Selesai',       val: selesai,  color: '#10b981', bg: '#ecfdf5' },
+    { label: 'Dalam Proses',  val: menunggu, color: '#f59e0b', bg: '#fffbeb' },
+    { label: 'Ditolak/Draft', val: ditolak,  color: '#ef4444', bg: '#fef2f2' },
   ];
   return `
     <div style="margin-bottom:14px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
         <span style="font-size:12px;color:var(--text-light);font-weight:600">Tingkat Penyelesaian</span>
-        <span style="font-size:18px;font-weight:900;color:#10b981;font-family:'JetBrains Mono',monospace">${pct}%</span>
+        <div style="display:flex;align-items:center;gap:6px">
+          ${pctSelesai > 0 ? `<span style="font-size:11px;font-weight:700;color:#10b981;font-family:'JetBrains Mono',monospace">${pctSelesai}% selesai</span>` : ''}
+          <span style="font-size:18px;font-weight:900;color:#0d9488;font-family:'JetBrains Mono',monospace">${pctBerjalan}%</span>
+        </div>
       </div>
-      <div style="height:8px;background:#e2e8f0;border-radius:99px;overflow:hidden">
-        <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#0d9488,#10b981);border-radius:99px;transition:width 0.6s ease"></div>
+      <div style="height:8px;background:#e2e8f0;border-radius:99px;overflow:hidden;position:relative">
+        <div style="position:absolute;left:0;top:0;height:100%;width:${pctBerjalan}%;background:linear-gradient(90deg,#a7f3d0,#6ee7b7);border-radius:99px;transition:width 0.6s ease"></div>
+        <div style="position:absolute;left:0;top:0;height:100%;width:${pctSelesai}%;background:linear-gradient(90deg,#0d9488,#10b981);border-radius:99px;transition:width 0.6s ease"></div>
+      </div>
+      <div style="display:flex;gap:12px;margin-top:5px">
+        <span style="font-size:10px;color:#10b981;font-weight:600;display:flex;align-items:center;gap:3px"><span style="width:8px;height:8px;border-radius:2px;background:#10b981;display:inline-block"></span>Selesai</span>
+        <span style="font-size:10px;color:#0d9488;font-weight:600;display:flex;align-items:center;gap:3px"><span style="width:8px;height:8px;border-radius:2px;background:#6ee7b7;display:inline-block"></span>Dalam Proses</span>
       </div>
     </div>
     <div style="display:flex;flex-direction:column;gap:8px">
@@ -871,6 +881,7 @@ function renderStatusSummary(d) {
         </div>`).join('')}
     </div>`;
 }
+
 
 function renderPKMProgressTable(rows) {
   const el = document.getElementById('pkmProgressTable');
@@ -901,7 +912,8 @@ function renderPKMProgressTable(rows) {
       <th style="min-width:120px">Progress</th>
     </tr></thead>
     <tbody>${pkms.map(p => {
-      const pct = p.total > 0 ? Math.round((p.selesai / p.total) * 100) : 0;
+      const pctS = p.total > 0 ? Math.round((p.selesai / p.total) * 100) : 0;
+      const pctP = p.total > 0 ? Math.round(((p.selesai + p.menunggu) / p.total) * 100) : 0;
       return `<tr>
         <td style="font-weight:600;font-size:13px">${p.nama}</td>
         <td style="text-align:center">${p.total}</td>
@@ -910,10 +922,11 @@ function renderPKMProgressTable(rows) {
         <td style="text-align:center"><span style="color:#ef4444;font-weight:700">${p.ditolak}</span></td>
         <td>
           <div style="display:flex;align-items:center;gap:6px">
-            <div style="flex:1;height:6px;background:#e2e8f0;border-radius:99px;overflow:hidden">
-              <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#0d9488,#10b981);border-radius:99px"></div>
+            <div style="flex:1;height:6px;background:#e2e8f0;border-radius:99px;overflow:hidden;position:relative">
+              <div style="position:absolute;left:0;top:0;height:100%;width:${pctP}%;background:linear-gradient(90deg,#a7f3d0,#6ee7b7);border-radius:99px"></div>
+              <div style="position:absolute;left:0;top:0;height:100%;width:${pctS}%;background:linear-gradient(90deg,#0d9488,#10b981);border-radius:99px"></div>
             </div>
-            <span style="font-size:11px;font-weight:700;color:#0d9488;min-width:28px;text-align:right">${pct}%</span>
+            <span style="font-size:11px;font-weight:700;color:#0d9488;min-width:28px;text-align:right">${pctS > 0 ? pctS : pctP}%</span>
           </div>
         </td>
       </tr>`;
@@ -922,13 +935,16 @@ function renderPKMProgressTable(rows) {
 }
 
 function renderOperatorStatusSummary(rows) {
-  const total = rows.length;
+  const total   = rows.length;
   if (total === 0) return `<div class="empty-state" style="padding:16px"><span class="material-icons">inbox</span><p>Belum ada usulan</p></div>`;
-  const selesai  = rows.filter(u => u.statusGlobal === 'Selesai').length;
-  const ditolak  = rows.filter(u => u.statusGlobal === 'Ditolak').length;
-  const proses   = rows.filter(u => !['Selesai','Ditolak','Draft'].includes(u.statusGlobal)).length;
-  const draft    = rows.filter(u => u.statusGlobal === 'Draft').length;
-  const pct      = total > 0 ? Math.round((selesai / total) * 100) : 0;
+  const selesai = rows.filter(u => u.statusGlobal === 'Selesai').length;
+  const ditolak = rows.filter(u => u.statusGlobal === 'Ditolak').length;
+  const proses  = rows.filter(u => !['Selesai','Ditolak','Draft'].includes(u.statusGlobal)).length;
+  const draft   = rows.filter(u => u.statusGlobal === 'Draft').length;
+  // Dual bar: selesai (hijau tua) + sudah diajukan/dalam proses (hijau muda)
+  const sudahDiajukan = selesai + proses;
+  const pctSelesai    = total > 0 ? Math.round((selesai       / total) * 100) : 0;
+  const pctDiajukan   = total > 0 ? Math.round((sudahDiajukan / total) * 100) : 0;
   const items = [
     { label: 'Selesai',      val: selesai, color: '#10b981', bg: '#ecfdf5' },
     { label: 'Dalam Proses', val: proses,  color: '#f59e0b', bg: '#fffbeb' },
@@ -937,12 +953,20 @@ function renderOperatorStatusSummary(rows) {
   ];
   return `
     <div style="margin-bottom:14px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
         <span style="font-size:12px;color:var(--text-light);font-weight:600">Tingkat Penyelesaian</span>
-        <span style="font-size:18px;font-weight:900;color:#10b981;font-family:'JetBrains Mono',monospace">${pct}%</span>
+        <div style="display:flex;align-items:center;gap:6px">
+          ${pctSelesai > 0 ? `<span style="font-size:11px;font-weight:700;color:#10b981;font-family:'JetBrains Mono',monospace">${pctSelesai}% selesai</span>` : ''}
+          <span style="font-size:18px;font-weight:900;color:#0d9488;font-family:'JetBrains Mono',monospace">${pctDiajukan}%</span>
+        </div>
       </div>
-      <div style="height:8px;background:#e2e8f0;border-radius:99px;overflow:hidden">
-        <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#0d9488,#10b981);border-radius:99px;transition:width 0.6s ease"></div>
+      <div style="height:8px;background:#e2e8f0;border-radius:99px;overflow:hidden;position:relative">
+        <div style="position:absolute;left:0;top:0;height:100%;width:${pctDiajukan}%;background:linear-gradient(90deg,#a7f3d0,#6ee7b7);border-radius:99px;transition:width 0.6s ease"></div>
+        <div style="position:absolute;left:0;top:0;height:100%;width:${pctSelesai}%;background:linear-gradient(90deg,#0d9488,#10b981);border-radius:99px;transition:width 0.6s ease"></div>
+      </div>
+      <div style="display:flex;gap:12px;margin-top:5px">
+        <span style="font-size:10px;color:#10b981;font-weight:600;display:flex;align-items:center;gap:3px"><span style="width:8px;height:8px;border-radius:2px;background:#10b981;display:inline-block"></span>Selesai</span>
+        <span style="font-size:10px;color:#0d9488;font-weight:600;display:flex;align-items:center;gap:3px"><span style="width:8px;height:8px;border-radius:2px;background:#6ee7b7;display:inline-block"></span>Sudah diajukan</span>
       </div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
@@ -961,7 +985,12 @@ function renderKapusStatusSummary(rows) {
   const menungguKapus = rows.filter(u => u.statusGlobal === 'Menunggu Kepala Puskesmas').length;
   const proses  = rows.filter(u => !['Selesai','Ditolak','Draft','Menunggu Kepala Puskesmas'].includes(u.statusGlobal)).length;
   const ditolak = rows.filter(u => u.statusGlobal === 'Ditolak').length;
-  const pct     = total > 0 ? Math.round((selesai / total) * 100) : 0;
+  // FIX (b): Hitung dua segmen progress bar:
+  // - Selesai (hijau tua) = sudah final
+  // - Sudah melewati Kapus/lanjut ke PP atau Admin (hijau muda) = sudah diverifikasi Kapus
+  const sudahKapus = selesai + proses; // sudah lewat tahap Kapus
+  const pctSelesai = total > 0 ? Math.round((selesai    / total) * 100) : 0;
+  const pctProses  = total > 0 ? Math.round((sudahKapus / total) * 100) : 0;
   const items = [
     { label: 'Selesai',           val: selesai,        color: '#10b981', bg: '#ecfdf5' },
     { label: 'Menunggu Saya',     val: menungguKapus,  color: '#f59e0b', bg: '#fffbeb' },
@@ -970,12 +999,20 @@ function renderKapusStatusSummary(rows) {
   ];
   return `
     <div style="margin-bottom:14px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-        <span style="font-size:12px;color:var(--text-light);font-weight:600">Tingkat Penyelesaian PKM</span>
-        <span style="font-size:18px;font-weight:900;color:#10b981;font-family:'JetBrains Mono',monospace">${pct}%</span>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <span style="font-size:12px;color:var(--text-light);font-weight:600">Progress PKM</span>
+        <div style="display:flex;align-items:center;gap:6px">
+          ${pctSelesai > 0 ? `<span style="font-size:11px;font-weight:700;color:#10b981;font-family:'JetBrains Mono',monospace">${pctSelesai}% selesai</span>` : ''}
+          <span style="font-size:18px;font-weight:900;color:#0d9488;font-family:'JetBrains Mono',monospace">${pctProses}%</span>
+        </div>
       </div>
-      <div style="height:8px;background:#e2e8f0;border-radius:99px;overflow:hidden">
-        <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#0d9488,#10b981);border-radius:99px;transition:width 0.6s ease"></div>
+      <div style="height:8px;background:#e2e8f0;border-radius:99px;overflow:hidden;position:relative">
+        <div style="position:absolute;left:0;top:0;height:100%;width:${pctProses}%;background:linear-gradient(90deg,#a7f3d0,#6ee7b7);border-radius:99px;transition:width 0.6s ease"></div>
+        <div style="position:absolute;left:0;top:0;height:100%;width:${pctSelesai}%;background:linear-gradient(90deg,#0d9488,#10b981);border-radius:99px;transition:width 0.6s ease"></div>
+      </div>
+      <div style="display:flex;gap:12px;margin-top:5px">
+        <span style="font-size:10px;color:#10b981;font-weight:600;display:flex;align-items:center;gap:3px"><span style="width:8px;height:8px;border-radius:2px;background:#10b981;display:inline-block"></span>Selesai</span>
+        <span style="font-size:10px;color:#0d9488;font-weight:600;display:flex;align-items:center;gap:3px"><span style="width:8px;height:8px;border-radius:2px;background:#6ee7b7;display:inline-block"></span>Sudah diverifikasi Kapus</span>
       </div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
@@ -1023,7 +1060,7 @@ function renderOperatorDashboard(el, d) {
         + (pr.notif_operator ? `<div style="display:flex;align-items:flex-start;gap:8px;padding:8px 14px;background:#fffbeb;border-top:1px solid #fcd34d"><span style="color:#d97706;display:flex;flex-shrink:0;margin-top:1px">${_svgNotif}</span><div style="font-size:12px;color:#0f172a;line-height:1.5">${pr.notif_operator}</div></div>` : "")
         + `</div>`;
     }).join("");
-    periodeBanner = `<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:10px">${items}</div>`;
+    periodeBanner = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px">${items}</div>`;
   } else {
     periodeBanner = `
       <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:10px">
@@ -1234,7 +1271,7 @@ function renderPeriodeBanner(periodeList) {
       ${notif ? `<div style="display:flex;align-items:flex-start;gap:8px;padding:8px 14px;background:#fffbeb;border-top:1px solid #fcd34d"><span style="color:#d97706;display:flex;flex-shrink:0;margin-top:1px">${svgNotif}</span><div style="font-size:12px;color:#0f172a;line-height:1.5">${notif}</div></div>` : ''}
     </div>`;
   }).join('');
-  return `<div style="margin-bottom:14px"><div class="card" style="margin:0"><div class="card-header-bar"><span class="card-title" style="display:flex;align-items:center;gap:7px"><span style="color:#0d9488;display:flex">${svgCal}</span> Periode Input Aktif</span></div><div class="card-body"><div style="display:flex;flex-wrap:wrap;justify-content:center;gap:10px">${items}</div></div></div></div>`;
+  return `<div style="margin-bottom:14px"><div class="card" style="margin:0"><div class="card-header-bar"><span class="card-title" style="display:flex;align-items:center;gap:7px"><span style="color:#0d9488;display:flex">${svgCal}</span> Periode Input Aktif</span></div><div class="card-body"><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px">${items}</div></div></div></div>`;
 }
 
 function renderKepalasDashboard(el, d) {
@@ -1695,7 +1732,7 @@ async function renderInput() {
         + (not ? `<div style="display:flex;align-items:flex-start;gap:8px;padding:8px 14px;background:#fffbeb;border-top:1px solid #fcd34d"><span style="color:#d97706;display:flex;flex-shrink:0;margin-top:1px">${_bSvgNoti}</span><div style="font-size:12px;color:#0f172a;line-height:1.5">${not}</div></div>` : '')
         + `</div>`;
     }).join('');
-    periodeBanner = `<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-bottom:14px">${items}</div>`;
+    periodeBanner = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-bottom:14px">${items}</div>`;
   } else {
     periodeBanner = `
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-bottom:4px">
@@ -6163,6 +6200,7 @@ function renderAuditTrailPage(page) {
         <th style="width:120px">Role</th>
         <th>Detail</th>
         <th style="width:110px">IP Address</th>
+        <th style="width:150px">Lokasi</th>
       </tr></thead>
       <tbody>${pageData.map(r => {
         const ac = (r.action||'').toUpperCase();
@@ -6176,6 +6214,9 @@ function renderAuditTrailPage(page) {
           <td style="font-size:12px;color:#64748b">${r.user_role||'-'}</td>
           <td style="font-size:12px;max-width:280px;word-break:break-word">${r.detail||'-'}</td>
           <td style="font-size:11px;color:#94a3b8">${r.ip_address||'-'}</td>
+          <td style="font-size:11px;color:#64748b">${r.lokasi
+            ? `<span style="display:flex;align-items:center;gap:4px"><span class="material-icons" style="font-size:12px;color:#0d9488">location_on</span>${r.lokasi}</span>`
+            : '<span style="color:#cbd5e1">—</span>'}</td>
         </tr>`;
       }).join('')}
       </tbody>
@@ -6186,11 +6227,11 @@ function renderAuditTrailPage(page) {
 function exportAuditTrail() {
   const data = window._auditTrailData;
   if (!data || !data.length) return toast('Tidak ada data untuk diekspor', 'warning');
-  const headers = ['Waktu','Modul','Aksi','Email','Nama','Role','Detail','IP Address'];
+  const headers = ['Waktu','Modul','Aksi','Email','Nama','Role','Detail','IP Address','Lokasi'];
   const rows = data.map(r => [
     formatDateTime(r.created_at), r.module||'', r.action||'',
     r.user_email||'', r.user_nama||'', r.user_role||'',
-    r.detail||'', r.ip_address||''
+    r.detail||'', r.ip_address||'', r.lokasi||''
   ]);
   _downloadExcel('Audit_Trail', headers, rows);
 }

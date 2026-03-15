@@ -1379,15 +1379,16 @@ async function respondPenolakan(pool, body) {
   );
 
   // Cek PP yang masih perlu respond:
-  // Ambil semua no_indikator bermasalah (aksi IS NULL = belum direspon)
-  const penolakanAktif = await pool.query(
-    `SELECT no_indikator FROM penolakan_indikator WHERE id_usulan=$1 AND aksi IS NULL`,
+  // Ambil SEMUA no_indikator bermasalah dari penolakan (semua aksi — termasuk yang sudah direspon)
+  // untuk menentukan siapa saja PP yang perlu respond
+  const semuaPenolakan = await pool.query(
+    `SELECT no_indikator FROM penolakan_indikator WHERE id_usulan=$1`,
     [idUsulan]
   );
-  const nosAktif = penolakanAktif.rows.map(r => parseInt(r.no_indikator));
+  const nosBermasalah = semuaPenolakan.rows.map(r => parseInt(r.no_indikator));
 
   // Cari semua VP (selain PP yang baru saja respond) yang aksesnya overlap dengan indikator bermasalah
-  // dan statusnya belum Selesai
+  // dan statusnya belum Selesai — artinya belum respond
   const semuaVP = await pool.query(
     `SELECT email_program, indikator_akses, status FROM verifikasi_program
      WHERE id_usulan=$1 AND LOWER(email_program) != LOWER($2) AND status != 'Selesai'`,
@@ -1396,8 +1397,8 @@ async function respondPenolakan(pool, body) {
 
   const masihMenunggu = semuaVP.rows.filter(vp => {
     const akses = (vp.indikator_akses || '').split(',').map(s => parseInt(s.trim())).filter(Boolean);
-    if (akses.length === 0) return nosAktif.length > 0; // PP akses semua → selalu terkena
-    return akses.some(n => nosAktif.includes(n));
+    if (akses.length === 0) return nosBermasalah.length > 0; // PP akses semua → selalu terkena
+    return akses.some(n => nosBermasalah.includes(n));
   }).length;
 
   if (masihMenunggu > 0) {

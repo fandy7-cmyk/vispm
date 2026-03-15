@@ -3498,11 +3498,14 @@ async function openVerifikasi(idUsulan) {
     let _bermasalahNos = [];
     if (currentUser.role === 'Admin') {
       const penolakanList = detail.penolakanIndikator || [];
-      const adaPenolakanAktif = penolakanList.length > 0 && !!detail.ditolakOleh;
+      // re-verif Admin: hanya jika ditolak_oleh='Admin' (eksplisit) DAN ada penolakan aktif
+      const adaPenolakanAktif = penolakanList.length > 0 && detail.ditolakOleh === 'Admin';
       if (adaPenolakanAktif) {
         _bermasalahNos = penolakanList.filter(p => !p.aksi || p.aksi === 'tolak').map(p => parseInt(p.noIndikator || p.no_indikator));
-        displayInds = inds.filter(i => _bermasalahNos.includes(parseInt(i.no)));
-        _isAdminReVerif = true;
+        if (_bermasalahNos.length > 0) {
+          displayInds = inds.filter(i => _bermasalahNos.includes(parseInt(i.no)));
+          _isAdminReVerif = true;
+        }
       }
       const _reVerifBanner = document.getElementById('verifReVerifBanner');
       if (_reVerifBanner) {

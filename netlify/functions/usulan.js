@@ -854,14 +854,17 @@ async function verifProgram(pool, body) {
     const headerCheck = await pool.query('SELECT ditolak_oleh FROM usulan_header WHERE id_usulan=$1', [idUsulan]);
     const ditolakOleh = headerCheck.rows[0]?.ditolak_oleh;
 
-    // Deteksi re-verifikasi Admin: bisa via ditolak_oleh='Admin' (langsung Admin→PP)
-    // ATAU via penolakan_indikator dengan email_program IS NOT NULL (Admin→PP→Kapus→Operator→Kapus→PP)
-    // Di skenario kedua, ditolak_oleh='Pengelola Program' tapi asal penolakan tetap dari Admin
+    // Deteksi re-verifikasi Admin:
+    // 1. Langsung: ditolak_oleh='Admin' (Admin→PP langsung)
+    // 2. Via berjenjang: Admin→PP→Kapus→Operator→Kapus→PP
+    //    Setelah siklus ini, ditolak_oleh='Admin' sudah di-set oleh verifProgram (piAdminCheck baru)
+    // PENTING: hanya cek record yang masih aktif (aksi IS NULL) agar data lama tidak salah deteksi
     const piAdminCheck = await pool.query(
-      `SELECT COUNT(*) as ct FROM penolakan_indikator WHERE id_usulan=$1`,
+      `SELECT COUNT(*) as ct FROM penolakan_indikator WHERE id_usulan=$1 AND aksi IS NULL`,
       [idUsulan]
     );
-    const isReVerifAdmin = ditolakOleh === 'Admin' || parseInt(piAdminCheck.rows[0]?.ct) > 0;
+    // isReVerifAdmin hanya true jika ditolak_oleh eksplisit 'Admin' DAN masih ada penolakan aktif
+    const isReVerifAdmin = ditolakOleh === 'Admin' && parseInt(piAdminCheck.rows[0]?.ct) > 0;
 
     if (isReVerifAdmin) {
       // Re-verif Admin: teruskan kembali ke Admin, pertahankan ditolak_oleh dan penolakan_indikator

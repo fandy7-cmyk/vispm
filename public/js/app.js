@@ -794,27 +794,12 @@ function renderStatusSummary(d) {
   const selesai  = d.selesai || 0;
   const menunggu = d.menunggu || 0;
   const ditolak  = Math.max(0, total - selesai - menunggu);
-  const sudahBerjalan = selesai + menunggu;
-  const pctSelesai   = total > 0 ? Math.round((selesai       / total) * 100) : 0;
-  const pctBerjalan  = total > 0 ? Math.round((sudahBerjalan / total) * 100) : 0;
   const items = [
     { label: 'Selesai',       val: selesai,  color: '#10b981', bg: '#ecfdf5' },
     { label: 'Dalam Proses',  val: menunggu, color: '#f59e0b', bg: '#fffbeb' },
     { label: 'Ditolak/Draft', val: ditolak,  color: '#ef4444', bg: '#fef2f2' },
   ];
   return `
-    <div style="margin-bottom:14px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-        <span style="font-size:12px;color:var(--text-light);font-weight:600">Tingkat Penyelesaian</span>
-      </div>
-      <div style="height:20px;background:#e2e8f0;border-radius:99px;overflow:hidden;position:relative">
-        <div style="position:absolute;left:0;top:0;height:100%;width:${pctBerjalan}%;background:linear-gradient(90deg,#a7f3d0,#6ee7b7);border-radius:99px;transition:width 0.6s ease"></div>
-        <div style="position:absolute;left:0;top:0;height:100%;width:${pctSelesai}%;background:linear-gradient(90deg,#0d9488,#10b981);border-radius:99px;transition:width 0.6s ease"></div>
-        <div style="position:absolute;left:calc(${pctBerjalan}% - 4px);top:50%;transform:translate(-100%,-50%);font-size:11px;font-weight:800;color:white;text-shadow:0 0 4px rgba(0,0,0,0.5);font-family:'JetBrains Mono',monospace;white-space:nowrap;padding-right:4px">
-          ${pctBerjalan}%
-        </div>
-      </div>
-    </div>
     <div style="display:flex;flex-direction:column;gap:8px">
       ${items.map(it => `
         <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:${it.bg};border-radius:8px;border-left:3px solid ${it.color}">
@@ -851,26 +836,16 @@ function renderPKMProgressTable(rows) {
       <th style="text-align:center">Selesai</th>
       <th style="text-align:center">Proses</th>
       <th style="text-align:center">Ditolak</th>
-      <th style="min-width:120px">Progress</th>
+
     </tr></thead>
     <tbody>${pkms.map(p => {
-      const pctS = p.total > 0 ? Math.round((p.selesai / p.total) * 100) : 0;
-      const pctP = p.total > 0 ? Math.round(((p.selesai + p.menunggu) / p.total) * 100) : 0;
       return `<tr>
         <td style="font-weight:600;font-size:13px">${p.nama}</td>
         <td style="text-align:center">${p.total}</td>
         <td style="text-align:center"><span style="color:#10b981;font-weight:700">${p.selesai}</span></td>
         <td style="text-align:center"><span style="color:#f59e0b;font-weight:700">${p.menunggu}</span></td>
         <td style="text-align:center"><span style="color:#ef4444;font-weight:700">${p.ditolak}</span></td>
-        <td>
-          <div style="height:18px;background:#e2e8f0;border-radius:99px;overflow:hidden;position:relative;min-width:80px">
-            <div style="position:absolute;left:0;top:0;height:100%;width:${pctP}%;background:linear-gradient(90deg,#a7f3d0,#6ee7b7);border-radius:99px"></div>
-            <div style="position:absolute;left:0;top:0;height:100%;width:${pctS}%;background:linear-gradient(90deg,#0d9488,#10b981);border-radius:99px"></div>
-            <div style="position:absolute;left:calc(${pctP}% - 4px);top:50%;transform:translate(-100%,-50%);font-size:10px;font-weight:800;color:white;text-shadow:0 0 4px rgba(0,0,0,0.5);font-family:'JetBrains Mono',monospace;white-space:nowrap;padding-right:4px">
-              ${pctP > 0 ? pctP+'%' : ''}
-            </div>
-          </div>
-        </td>
+
       </tr>`;
     }).join('')}</tbody>
   </table>`;
@@ -884,11 +859,6 @@ function renderOperatorStatusSummary(rows) {
   const proses  = rows.filter(u => !['Selesai','Ditolak','Draft'].includes(u.statusGlobal)).length;
   const draft   = rows.filter(u => u.statusGlobal === 'Draft').length;
   // Dual bar: selesai (hijau tua) + sudah diajukan/dalam proses (hijau muda)
-  const sudahDiajukan = selesai + proses;
-  // Hitung dari usulan aktif (exclude Draft) agar Draft tidak mengecilkan progress
-  const aktif = total - draft;
-  const pctSelesai  = aktif > 0 ? Math.round((selesai       / aktif) * 100) : 0;
-  const pctDiajukan = aktif > 0 ? Math.round((sudahDiajukan / aktif) * 100) : 0;
   const items = [
     { label: 'Selesai',      val: selesai, color: '#10b981', bg: '#ecfdf5' },
     { label: 'Dalam Proses', val: proses,  color: '#f59e0b', bg: '#fffbeb' },
@@ -896,18 +866,6 @@ function renderOperatorStatusSummary(rows) {
     { label: 'Draft',        val: draft,   color: '#94a3b8', bg: '#f8fafc' },
   ];
   return `
-    <div style="margin-bottom:14px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-        <span style="font-size:12px;color:var(--text-light);font-weight:600">Tingkat Penyelesaian</span>
-      </div>
-      <div style="height:20px;background:#e2e8f0;border-radius:99px;overflow:hidden;position:relative">
-        <div style="position:absolute;left:0;top:0;height:100%;width:${pctDiajukan}%;background:linear-gradient(90deg,#a7f3d0,#6ee7b7);border-radius:99px;transition:width 0.6s ease"></div>
-        <div style="position:absolute;left:0;top:0;height:100%;width:${pctSelesai}%;background:linear-gradient(90deg,#0d9488,#10b981);border-radius:99px;transition:width 0.6s ease"></div>
-        <div style="position:absolute;left:calc(${pctDiajukan}% - 4px);top:50%;transform:translate(-100%,-50%);font-size:11px;font-weight:800;color:white;text-shadow:0 0 4px rgba(0,0,0,0.5);font-family:'JetBrains Mono',monospace;white-space:nowrap;padding-right:4px">
-          ${pctDiajukan}%
-        </div>
-      </div>
-    </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
       ${items.map(it => `
         <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:${it.bg};border-radius:8px;border-left:3px solid ${it.color}">
@@ -927,9 +885,6 @@ function renderKapusStatusSummary(rows) {
   // FIX (b): Hitung dua segmen progress bar:
   // - Selesai (hijau tua) = sudah final
   // - Sudah melewati Kapus/lanjut ke PP atau Admin (hijau muda) = sudah diverifikasi Kapus
-  const sudahKapus = selesai + proses; // sudah lewat tahap Kapus
-  const pctSelesai = total > 0 ? Math.round((selesai    / total) * 100) : 0;
-  const pctProses  = total > 0 ? Math.round((sudahKapus / total) * 100) : 0;
   const items = [
     { label: 'Selesai',           val: selesai,        color: '#10b981', bg: '#ecfdf5' },
     { label: 'Menunggu Saya',     val: menungguKapus,  color: '#f59e0b', bg: '#fffbeb' },
@@ -937,18 +892,6 @@ function renderKapusStatusSummary(rows) {
     { label: 'Ditolak',           val: ditolak,        color: '#ef4444', bg: '#fef2f2' },
   ];
   return `
-    <div style="margin-bottom:14px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-        <span style="font-size:12px;color:var(--text-light);font-weight:600">Progress PKM</span>
-      </div>
-      <div style="height:20px;background:#e2e8f0;border-radius:99px;overflow:hidden;position:relative">
-        <div style="position:absolute;left:0;top:0;height:100%;width:${pctProses}%;background:linear-gradient(90deg,#a7f3d0,#6ee7b7);border-radius:99px;transition:width 0.6s ease"></div>
-        <div style="position:absolute;left:0;top:0;height:100%;width:${pctSelesai}%;background:linear-gradient(90deg,#0d9488,#10b981);border-radius:99px;transition:width 0.6s ease"></div>
-        <div style="position:absolute;left:calc(${pctProses}% - 4px);top:50%;transform:translate(-100%,-50%);font-size:11px;font-weight:800;color:white;text-shadow:0 0 4px rgba(0,0,0,0.5);font-family:'JetBrains Mono',monospace;white-space:nowrap;padding-right:4px">
-          ${pctProses}%
-        </div>
-      </div>
-    </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
       ${items.map(it => `
         <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:${it.bg};border-radius:8px;border-left:3px solid ${it.color}">

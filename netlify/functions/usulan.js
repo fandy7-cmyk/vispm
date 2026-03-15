@@ -1437,13 +1437,14 @@ async function respondPenolakan(pool, body) {
     [idUsulan, nomorDitolak]
   );
 
-  // Kembalikan ke Kapus untuk re-verifikasi berjenjang — pertahankan ditolak_oleh='Admin'
-  // agar Kapus tahu asal penolakan dan bisa membenarkan (→ Operator) atau menyanggah (→ PP)
+  // Kembalikan ke Kapus untuk re-verifikasi berjenjang
+  // Set ditolak_oleh='Pengelola Program' agar frontend tahu ini loop PP↔Kapus
+  // (backend verifKapus tetap bisa deteksi konteks Admin via piCheckPP: email_program IS NOT NULL)
   await pool.query(
     `UPDATE usulan_header SET
        status_global='Menunggu Kepala Puskesmas', is_locked=true,
        status_kapus='Menunggu', status_program='Menunggu',
-       ditolak_oleh='Admin',
+       ditolak_oleh='Pengelola Program',
        admin_catatan=$1
      WHERE id_usulan=$2`,
     [`PP membenarkan — indikator bermasalah: ${nomorDitolak.join(',')}`, idUsulan]

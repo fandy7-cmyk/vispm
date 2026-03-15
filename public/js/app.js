@@ -1454,6 +1454,20 @@ function renderUsulanTable(rows, role) {
           </div>`;
         })() : ''}
 
+        ${/* ── PP: menunggu Kapus setelah PP tolak ── */
+        (role === 'program' && u.statusGlobal === 'Menunggu Kepala Puskesmas' && u.penolakanIndikator && u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'reset').length) ? (() => {
+          const aktif = u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'reset');
+          const myAkses = currentUser.indikatorAkses || [];
+          const filtered = myAkses.length > 0 ? aktif.filter(p => myAkses.includes(parseInt(p.noIndikator))) : aktif;
+          if (!filtered.length) return '';
+          const isPPMembenarkan = u.ditolakOleh === 'Admin';
+          return `<div style="margin-top:4px;display:inline-flex;align-items:center;gap:4px;flex-wrap:wrap;background:#fef9c3;border:1px solid #fde047;border-radius:5px;padding:2px 7px">
+            <span class="material-icons" style="font-size:12px;color:#ca8a04">${isPPMembenarkan ? 'assignment_return' : 'pending'}</span>
+            <span style="font-size:10.5px;color:#92400e;font-weight:600">${isPPMembenarkan ? 'Sudah dibenarkan' : 'Sudah ditolak'} — menunggu Kapus</span>
+            ${filtered.map(p=>`<span style="background:#fecaca;color:#7f1d1d;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700">#${p.noIndikator}</span>`).join('')}
+          </div>`;
+        })() : ''}
+
         ${/* ── KAPUS: sudah verif, menunggu PP/Admin ── */
         (role === 'kepala-puskesmas' && u.statusKapus === 'Selesai' && u.ditolakOleh && u.penolakanIndikator && u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak').length && ['Menunggu Pengelola Program','Menunggu Admin'].includes(u.statusGlobal)) ? (() => {
           const aktif = u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak');
@@ -3253,6 +3267,8 @@ function _updateVerifTTBanner(ttOk, role) {
 async function openVerifikasi(idUsulan) {
   verifCurrentUsulan = idUsulan;
   window.verifCurrentUsulan = idUsulan;
+  window._verifDitolakOleh = '';
+  window._verifIsPPReVerif  = false;
   document.getElementById('verifModalId').textContent = idUsulan;
 
   showModal('verifikasiModal');
@@ -3317,8 +3333,6 @@ async function openVerifikasi(idUsulan) {
         : penolakanAktif.map(p => parseInt(p.no_indikator));
 
       if (penolakanNosSaya.length > 0) {
-        // Re-verifikasi: hanya tampilkan indikator bermasalah yang jadi tanggung jawab PP ini
-        // PP yang tidak punya indikator bermasalah tidak seharusnya muncul di sini
         displayInds = inds.filter(i => penolakanNosSaya.includes(parseInt(i.no)));
         _isPPFiltered = true;
         _isPPReVerif = true;
@@ -3328,6 +3342,10 @@ async function openVerifikasi(idUsulan) {
         _isPPFiltered = true;
       }
     }
+
+    // Simpan state ke window agar submitIndVerifikasi bisa baca
+    window._verifDitolakOleh  = detail.ditolakOleh || '';
+    window._verifIsPPReVerif  = _isPPReVerif;
 
     // Banner info PP
     const _ppBanner = document.getElementById('verifReVerifBanner');
@@ -3796,31 +3814,60 @@ async function submitIndVerifikasi(idUsulan, displayInds, role) {
     }
   }
 
+  // Tentukan action dan payload berdasarkan konteks
+  // PP saat respond penolakan Admin (ditolakOleh='Admin' & _isPPReVerif):
+  //   → respond-penolakan dengan responList (sanggah/tolak per penolakan)
+  // Semua lainnya → verif-kapus / verif-program / verif-admin
+  const _isRespondPenolakan = role === 'Pengelola Program'
+    && window._verifDitolakOleh === 'Admin'
+    && window._verifIsPPReVerif === true;
+
   const actionMap = { 'Kepala Puskesmas': 'verif-kapus', 'Pengelola Program': 'verif-program', 'Admin': 'verif-admin' };
-  const action = actionMap[role];
+  const action = _isRespondPenolakan ? 'respond-penolakan' : actionMap[role];
   if (!action) return toast('Role tidak dikenali', 'error');
 
   const catatanKapus = role === 'Kepala Puskesmas' ? (document.getElementById('kapusCatatanInput')?.value?.trim() || '') : undefined;
   if (role === 'Kepala Puskesmas' && document.getElementById('kapusCatatanWrap')?.style.display !== 'none') {
-    // Catatan wajib hanya saat menyanggah (ada indikator setuju) — bukan saat membenarkan (semua tolak)
     const _adaSetuju = indikatorList.some(i => i.aksi === 'setuju');
     if (_adaSetuju && !catatanKapus) return toast('Catatan / Tanggapan wajib diisi saat menyanggah penolakan PP', 'warning');
   }
-  // Validasi catatan wajib untuk PP saat re-verif dari Admin
+
   const catatanProgram = role === 'Pengelola Program' ? (document.getElementById('ppCatatanInput')?.value?.trim() || '') : undefined;
-  if (role === 'Pengelola Program' && document.getElementById('ppCatatanWrap')?.style.display !== 'none') {
-    // Catatan wajib hanya saat menyanggah Admin (ada indikator setuju)
-    // Saat membenarkan Admin (semua tolak) → tidak wajib, alasan per indikator sudah cukup
+  if (!_isRespondPenolakan && role === 'Pengelola Program' && document.getElementById('ppCatatanWrap')?.style.display !== 'none') {
     const adaYangSetuju = indikatorList.some(i => i.aksi === 'setuju');
     if (adaYangSetuju && !catatanProgram) return toast('Catatan / Sanggahan wajib diisi saat menyanggah penolakan Admin', 'warning');
   }
 
+  // Untuk respond-penolakan: ubah format dari indikatorList → responList
+  // setuju = sanggah (tidak setuju dengan Admin), tolak = membenarkan (setuju dengan Admin)
+  // catatan wajib diisi untuk semua
+  if (_isRespondPenolakan) {
+    for (const item of indikatorList) {
+      const catatan = item.aksi === 'tolak' ? item.alasan : (catatanProgram || '');
+      if (!catatan || !catatan.trim()) return toast(`Isi catatan untuk indikator #${item.noIndikator}`, 'warning');
+    }
+  }
+
   setLoading(true);
   try {
-    const payload = { idUsulan, email: currentUser.email, indikatorList };
-    if (catatanKapus !== undefined) payload.catatanKapus = catatanKapus;
-    if (catatanProgram !== undefined) payload.catatanProgram = catatanProgram;
-    const result = await API.post('usulan?action=' + action, payload);
+    let payload, result;
+    if (_isRespondPenolakan) {
+      // respond-penolakan: konversi indikatorList → responList
+      // aksi 'setuju' → 'sanggah' (PP tidak setuju Admin)
+      // aksi 'tolak'  → 'tolak'   (PP membenarkan Admin)
+      const responList = indikatorList.map(i => ({
+        noIndikator: i.noIndikator,
+        aksi: i.aksi === 'setuju' ? 'sanggah' : 'tolak',
+        catatan: i.aksi === 'tolak' ? i.alasan : (catatanProgram || 'Sanggahan PP')
+      }));
+      payload = { idUsulan, email: currentUser.email, responList };
+      result = await API.post('usulan?action=respond-penolakan', payload);
+    } else {
+      payload = { idUsulan, email: currentUser.email, indikatorList };
+      if (catatanKapus !== undefined) payload.catatanKapus = catatanKapus;
+      if (catatanProgram !== undefined) payload.catatanProgram = catatanProgram;
+      result = await API.post('usulan?action=' + action, payload);
+    }
     toast(result?.message || 'Verifikasi berhasil disimpan', 'success');
     setTimeout(() => {
       closeModal('verifikasiModal');

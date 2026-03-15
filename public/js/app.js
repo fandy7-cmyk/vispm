@@ -810,7 +810,7 @@ function renderStatusSummary(d) {
       <div style="height:20px;background:#e2e8f0;border-radius:99px;overflow:hidden;position:relative">
         <div style="position:absolute;left:0;top:0;height:100%;width:${pctBerjalan}%;background:linear-gradient(90deg,#a7f3d0,#6ee7b7);border-radius:99px;transition:width 0.6s ease"></div>
         <div style="position:absolute;left:0;top:0;height:100%;width:${pctSelesai}%;background:linear-gradient(90deg,#0d9488,#10b981);border-radius:99px;transition:width 0.6s ease"></div>
-        <div style="position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:11px;font-weight:800;color:${pctBerjalan > 60 ? 'white' : '#0d9488'};font-family:'JetBrains Mono',monospace;white-space:nowrap">
+        <div style="position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:11px;font-weight:800;color:white;text-shadow:0 0 3px rgba(0,0,0,0.4);font-family:'JetBrains Mono',monospace;white-space:nowrap">
           ${pctSelesai === pctBerjalan ? pctSelesai : (pctSelesai > 0 ? pctSelesai+'% / ' : '') + pctBerjalan}%
         </div>
       </div>
@@ -866,7 +866,7 @@ function renderPKMProgressTable(rows) {
           <div style="height:18px;background:#e2e8f0;border-radius:99px;overflow:hidden;position:relative;min-width:80px">
             <div style="position:absolute;left:0;top:0;height:100%;width:${pctP}%;background:linear-gradient(90deg,#a7f3d0,#6ee7b7);border-radius:99px"></div>
             <div style="position:absolute;left:0;top:0;height:100%;width:${pctS}%;background:linear-gradient(90deg,#0d9488,#10b981);border-radius:99px"></div>
-            <div style="position:absolute;right:6px;top:50%;transform:translateY(-50%);font-size:10px;font-weight:800;color:${pctP > 60 ? 'white' : '#0d9488'};font-family:'JetBrains Mono',monospace;white-space:nowrap">
+            <div style="position:absolute;right:6px;top:50%;transform:translateY(-50%);font-size:10px;font-weight:800;color:white;text-shadow:0 0 3px rgba(0,0,0,0.4);font-family:'JetBrains Mono',monospace;white-space:nowrap">
               ${pctS === pctP ? pctS : (pctS > 0 ? pctS+'%/' : '') + pctP}%
             </div>
           </div>
@@ -901,7 +901,7 @@ function renderOperatorStatusSummary(rows) {
       <div style="height:20px;background:#e2e8f0;border-radius:99px;overflow:hidden;position:relative">
         <div style="position:absolute;left:0;top:0;height:100%;width:${pctDiajukan}%;background:linear-gradient(90deg,#a7f3d0,#6ee7b7);border-radius:99px;transition:width 0.6s ease"></div>
         <div style="position:absolute;left:0;top:0;height:100%;width:${pctSelesai}%;background:linear-gradient(90deg,#0d9488,#10b981);border-radius:99px;transition:width 0.6s ease"></div>
-        <div style="position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:11px;font-weight:800;color:${pctDiajukan > 60 ? 'white' : '#0d9488'};font-family:'JetBrains Mono',monospace;white-space:nowrap">
+        <div style="position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:11px;font-weight:800;color:white;text-shadow:0 0 3px rgba(0,0,0,0.4);font-family:'JetBrains Mono',monospace;white-space:nowrap">
           ${pctSelesai === pctDiajukan ? pctSelesai : (pctSelesai > 0 ? pctSelesai+'% / ' : '') + pctDiajukan}%
         </div>
       </div>
@@ -942,7 +942,7 @@ function renderKapusStatusSummary(rows) {
       <div style="height:20px;background:#e2e8f0;border-radius:99px;overflow:hidden;position:relative">
         <div style="position:absolute;left:0;top:0;height:100%;width:${pctProses}%;background:linear-gradient(90deg,#a7f3d0,#6ee7b7);border-radius:99px;transition:width 0.6s ease"></div>
         <div style="position:absolute;left:0;top:0;height:100%;width:${pctSelesai}%;background:linear-gradient(90deg,#0d9488,#10b981);border-radius:99px;transition:width 0.6s ease"></div>
-        <div style="position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:11px;font-weight:800;color:${pctProses > 60 ? 'white' : '#0d9488'};font-family:'JetBrains Mono',monospace;white-space:nowrap">
+        <div style="position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:11px;font-weight:800;color:white;text-shadow:0 0 3px rgba(0,0,0,0.4);font-family:'JetBrains Mono',monospace;white-space:nowrap">
           ${pctSelesai === pctProses ? pctSelesai : (pctSelesai > 0 ? pctSelesai+'% / ' : '') + pctProses}%
         </div>
       </div>

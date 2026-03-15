@@ -903,56 +903,7 @@ function renderKapusStatusSummary(rows) {
 
 function renderOperatorDashboard(el, d) {
   const periodeList = d.periodeAktifList || (d.periodeAktif ? [d.periodeAktif] : []);
-  const p = periodeList[0] || null;
-
-  // Hitung label stat card Periode Aktif
   const periodeLabel = periodeList.length > 0 ? periodeList.length : '-';
-
-  let periodeBanner = "";
-  if (periodeList.length > 0) {
-    const _svgCal = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>';
-    const _svgOpen = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
-    const _svgClose = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
-    const _svgNotif = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>';
-    const items = periodeList.map((pr, idx) => {
-      const jamMulai = pr.jam_mulai || "08:00";
-      const jamSelesai = pr.jam_selesai || "17:00";
-      const timerId = `periodeTimer_${idx}`;
-      // Hitung deadline: tanggal_selesai + jam_selesai di timezone WITA (UTC+8)
-      const _tglRaw2 = pr.tanggal_selesai || '';
-      const _tglDate2 = _tglRaw2 ? new Date(_tglRaw2) : null;
-      const deadlineWITA = (_tglDate2 && !isNaN(_tglDate2)) ? (() => {
-        const [jsH2, jsM2] = jamSelesai.split(':').map(Number);
-        return new Date(Date.UTC(_tglDate2.getUTCFullYear(), _tglDate2.getUTCMonth(), _tglDate2.getUTCDate(), jsH2-8, jsM2));
-      })() : null;
-      return `<div style="border:1.5px solid #a7f3d0;border-radius:10px;overflow:hidden;background:white;box-shadow:0 1px 4px rgba(13,148,136,0.08)">`
-        + `<div style="background:linear-gradient(135deg,#0d9488,#06b6d4);padding:8px 14px;color:white;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:space-between;gap:7px">`
-        + `<span style="display:flex;align-items:center;gap:7px"><span style="opacity:0.9;display:flex">${_svgCal}</span> Periode Aktif: ${pr.nama_bulan} ${pr.tahun}</span>`
-        + `<span id="${timerId}" style="font-size:11px;font-weight:700;background:rgba(0,0,0,0.2);padding:3px 8px;border-radius:20px;letter-spacing:0.3px;font-family:'JetBrains Mono',monospace;white-space:nowrap">--:--:--</span>`
-        + `</div>`
-        + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:0">`
-        + `<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:#f0fdf9;border-right:1px solid #d1fae5"><span style="color:#0d9488;display:flex;flex-shrink:0">${_svgOpen}</span><div><div style="font-size:10px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.4px">Dibuka</div><div style="font-size:12px;font-weight:700;color:#0f172a">${formatDate(pr.tanggal_mulai)} ${jamMulai} WITA</div></div></div>`
-        + `<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:#fef2f2"><span style="color:#ef4444;display:flex;flex-shrink:0">${_svgClose}</span><div><div style="font-size:10px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.4px">Ditutup</div><div style="font-size:12px;font-weight:700;color:#0f172a">${formatDate(pr.tanggal_selesai)} ${jamSelesai} WITA</div></div></div>`
-        + `</div>`
-        + (pr.notif_operator ? `<div style="display:flex;align-items:flex-start;gap:8px;padding:8px 14px;background:#fffbeb;border-top:1px solid #fcd34d"><span style="color:#d97706;display:flex;flex-shrink:0;margin-top:1px">${_svgNotif}</span><div style="font-size:12px;color:#0f172a;line-height:1.5">${pr.notif_operator}</div></div>` : "")
-        + `</div>`;
-    }).join("");
-    periodeBanner = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px">${items}</div>`;
-  } else {
-    periodeBanner = `
-      <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:10px">
-        <div style="background:linear-gradient(135deg,#fffbeb,#fef3c7);border:1.5px solid #fcd34d;border-radius:12px;padding:16px 18px;display:flex;align-items:center;gap:14px;box-shadow:0 2px 8px rgba(245,158,11,0.10)">
-          <div style="width:42px;height:42px;border-radius:10px;background:#fef9c3;border:1.5px solid #fde68a;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-            <span class="material-icons" style="font-size:22px;color:#d97706">event_busy</span>
-          </div>
-          <div>
-            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#92400e;margin-bottom:2px">Periode Input</div>
-            <div style="font-size:13px;font-weight:700;color:#78350f">Tidak Ada Periode Aktif</div>
-            <div style="font-size:11px;color:#b45309;margin-top:2px">Hubungi Admin untuk membuka periode.</div>
-          </div>
-        </div>
-      </div>`;
-  }
 
   el.innerHTML = `
     <div class="stats-grid">
@@ -961,7 +912,7 @@ function renderOperatorDashboard(el, d) {
       ${statCard("orange","pending","Dalam Proses", d.menunggu)}
       <div class="stat-card stat-card-v2" style="background:linear-gradient(135deg,#0891b2,#06b6d4);border:none;padding:0;overflow:hidden;display:flex;flex-direction:column;justify-content:space-between">
         <div style="padding:12px 14px 6px 14px;flex:1;display:flex;flex-direction:column;justify-content:center">
-          <div id="dashPeriodeLabel" style="font-size:26px;font-weight:900;color:rgba(255,255,255,0.95);line-height:1;font-family:'JetBrains Mono',monospace;letter-spacing:-1px">${periodeLabel}</div>
+          <div style="font-size:26px;font-weight:900;color:rgba(255,255,255,0.95);line-height:1;font-family:'JetBrains Mono',monospace;letter-spacing:-1px">${periodeLabel}</div>
         </div>
         <div style="padding:6px 14px 9px 14px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid rgba(255,255,255,0.15)">
           <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.9)">Periode Aktif</div>
@@ -969,7 +920,7 @@ function renderOperatorDashboard(el, d) {
         </div>
       </div>
     </div>
-    <div id="dashPeriodeBanner" style="margin-bottom:14px">${periodeBanner}</div>
+    ${renderPeriodeBanner(periodeList)}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:stretch;margin-bottom:14px">
       <div class="card" style="margin:0;display:flex;flex-direction:column">
         <div class="card-header-bar">
@@ -996,97 +947,14 @@ function renderOperatorDashboard(el, d) {
       <div class="card-body" style="padding:0" id="recentTable"></div>
     </div>`;
 
-  // Mulai timer countdown periode — setelah DOM di-render
-  setTimeout(() => {
-    window._periodeTimers = window._periodeTimers || [];
-    window._periodeTimers.forEach(t => clearInterval(t));
-    window._periodeTimers = [];
-    periodeList.forEach((pr, idx) => {
-      const jamSelesai = pr.jam_selesai || '17:00';
-      // Parse tanggal_selesai — bisa ISO string atau YYYY-MM-DD dari PostgreSQL
-      const _tglRaw = pr.tanggal_selesai || '';
-      const _tglDate = _tglRaw ? new Date(_tglRaw) : null;
-      if (!_tglDate || isNaN(_tglDate)) return;
-      const thnS = _tglDate.getUTCFullYear();
-      const blnS = _tglDate.getUTCMonth(); // sudah 0-based
-      const tglS = _tglDate.getUTCDate();
-      const [jsH, jsM] = jamSelesai.split(':').map(Number);
-      // Deadline: tanggal_selesai jam_selesai WITA (UTC+8)
-      const deadline = new Date(Date.UTC(thnS, blnS, tglS, jsH-8, jsM));
-      const getEl = () => document.getElementById('periodeTimer_' + idx);
-      const tick = () => {
-        const el2 = getEl();
-        if (!el2) { clearInterval(tid); return; }
-        const diff = deadline - Date.now();
-        if (diff <= 0) {
-          el2.textContent = 'Ditutup';
-          el2.style.background = 'rgba(239,68,68,0.35)';
-          clearInterval(tid);
-          return;
-        }
-        const h = Math.floor(diff / 3600000);
-        const m = Math.floor((diff % 3600000) / 60000);
-        const s = Math.floor((diff % 60000) / 1000);
-        const hh = String(h).padStart(2,'0');
-        const mm = String(m).padStart(2,'0');
-        const ss = String(s).padStart(2,'0');
-        el2.textContent = h >= 24
-          ? Math.floor(h/24) + 'h ' + String(h%24).padStart(2,'0') + ':' + mm + ':' + ss
-          : hh + ':' + mm + ':' + ss;
-        el2.style.background = diff < 3600000 ? 'rgba(239,68,68,0.4)' : 'rgba(0,0,0,0.2)';
-      };
-      let tid;
-      tid = setInterval(tick, 1000);
-      tick();
-      window._periodeTimers.push(tid);
-    });
-  }, 0);
-
   API.getUsulan({ email_operator: currentUser.email }).then(rows => {
     document.getElementById("recentTable").innerHTML = renderUsulanTable(rows.slice(0, 5), "operator");
-    // Render status summary
     const el2 = document.getElementById("operatorStatusSummary");
     if (el2) el2.innerHTML = renderOperatorStatusSummary(rows);
   }).catch(() => {
     const el2 = document.getElementById("recentTable");
     if (el2) el2.innerHTML = `<div class="empty-state" style="padding:32px"><span class="material-icons">inbox</span><p>Belum ada data usulan</p></div>`;
   });
-
-  // Fallback: jika periodeAktifList tidak disertakan di data dashboard, fetch langsung
-  if (!periodeList.length) {
-    API.get('periode').then(allPeriode => {
-      const aktif = (Array.isArray(allPeriode) ? allPeriode : []).filter(p => p.isAktifToday);
-      if (!aktif.length) return;
-      // Update stat card - tampilkan jumlah periode aktif
-      const labelEl = document.getElementById('dashPeriodeLabel');
-      if (labelEl) labelEl.textContent = aktif.length;
-      // Update banner
-      const bannerEl = document.getElementById('dashPeriodeBanner');
-      if (bannerEl) {
-        const _svgCal = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>';
-        const _svgOpen = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
-        const _svgClose = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
-        const _svgNotif = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>';
-        const items = aktif.map(p => {
-          const nm = p.namaBulan || p.nama_bulan || '';
-          const jm = p.jamMulai || p.jam_mulai || '08:00';
-          const js = p.jamSelesai || p.jam_selesai || '17:00';
-          const mul = formatDate(p.tanggalMulai || p.tanggal_mulai);
-          const sel = formatDate(p.tanggalSelesai || p.tanggal_selesai);
-          const not = p.notifOperator || p.notif_operator || '';
-          return `<div style="border:1.5px solid #a7f3d0;border-radius:10px;overflow:hidden;background:white;box-shadow:0 1px 4px rgba(13,148,136,0.08)">`
-            + `<div style="background:linear-gradient(135deg,#0d9488,#06b6d4);padding:8px 14px;color:white;font-weight:700;font-size:13px;display:flex;align-items:center;gap:7px"><span style="opacity:0.9;display:flex">${_svgCal}</span> Periode Aktif: ${nm} ${p.tahun}</div>`
-            + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:0">`
-            + `<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:#f0fdf9;border-right:1px solid #d1fae5"><span style="color:#0d9488;display:flex;flex-shrink:0">${_svgOpen}</span><div><div style="font-size:10px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.4px">Dibuka</div><div style="font-size:12px;font-weight:700;color:#0f172a">${mul} ${jm} WITA</div></div></div>`
-            + `<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:#fef2f2"><span style="color:#ef4444;display:flex;flex-shrink:0">${_svgClose}</span><div><div style="font-size:10px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.4px">Ditutup</div><div style="font-size:12px;font-weight:700;color:#0f172a">${sel} ${js} WITA</div></div></div>`
-            + `</div>`
-            + (not ? `<div style="display:flex;align-items:flex-start;gap:8px;padding:8px 14px;background:#fffbeb;border-top:1px solid #fcd34d"><span style="color:#d97706;display:flex;flex-shrink:0;margin-top:1px">${_svgNotif}</span><div style="font-size:12px;color:#0f172a;line-height:1.5">${not}</div></div>` : '')
-            + `</div>`;
-        }).join('');
-        bannerEl.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px">${items}</div>`;
-      }
-    }).catch(() => {});
-  }
 }
 
 async function downloadLaporanDashboardOperator() {
@@ -1116,7 +984,7 @@ function renderPeriodeBanner(periodeList) {
   const svgOpen = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
   const svgClose = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
   const svgNotif = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>';
-  const items = periodeList.map(p => {
+  const items = periodeList.map((p, idx) => {
     const nm = p.namaBulan || p.nama_bulan || '';
     const thn = p.tahun || '';
     const mulai = formatDate(p.tanggalMulai || p.tanggal_mulai);
@@ -1124,10 +992,11 @@ function renderPeriodeBanner(periodeList) {
     const jm = p.jamMulai || p.jam_mulai || '08:00';
     const js = p.jamSelesai || p.jam_selesai || '17:00';
     const notif = p.notifOperator || p.notif_operator || '';
+    const timerId = `periodeTimer_${idx}`;
     return `<div style="border:1.5px solid #a7f3d0;border-radius:10px;overflow:hidden;background:white;box-shadow:0 1px 4px rgba(13,148,136,0.08)">
-      <div style="background:linear-gradient(135deg,#0d9488,#06b6d4);padding:8px 14px;color:white;font-weight:700;font-size:13px;display:flex;align-items:center;gap:7px">
-        <span style="opacity:0.9;display:flex">${svgCal}</span>
-        Periode Aktif: ${nm} ${thn}
+      <div style="background:linear-gradient(135deg,#0d9488,#06b6d4);padding:8px 14px;color:white;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:space-between;gap:7px">
+        <span style="display:flex;align-items:center;gap:7px"><span style="opacity:0.9;display:flex">${svgCal}</span> Periode Aktif: ${nm} ${thn}</span>
+        <span id="${timerId}" style="font-size:11px;font-weight:700;background:rgba(0,0,0,0.2);padding:3px 8px;border-radius:20px;letter-spacing:0.3px;font-family:'JetBrains Mono',monospace;white-space:nowrap">--:--:--</span>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:0">
         <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:#f0fdf9;border-right:1px solid #d1fae5">
@@ -1148,19 +1017,52 @@ function renderPeriodeBanner(periodeList) {
       ${notif ? `<div style="display:flex;align-items:flex-start;gap:8px;padding:8px 14px;background:#fffbeb;border-top:1px solid #fcd34d"><span style="color:#d97706;display:flex;flex-shrink:0;margin-top:1px">${svgNotif}</span><div style="font-size:12px;color:#0f172a;line-height:1.5">${notif}</div></div>` : ''}
     </div>`;
   }).join('');
-  return `<div style="margin-bottom:14px"><div class="card" style="margin:0"><div class="card-header-bar"><span class="card-title" style="display:flex;align-items:center;gap:7px"><span style="color:#0d9488;display:flex">${svgCal}</span> Periode Input Aktif</span></div><div class="card-body"><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px">${items}</div></div></div></div>`;
+  const html = `<div style="margin-bottom:14px"><div class="card" style="margin:0"><div class="card-header-bar"><span class="card-title" style="display:flex;align-items:center;gap:7px"><span style="color:#0d9488;display:flex">${svgCal}</span> Periode Input Aktif</span></div><div class="card-body"><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px">${items}</div></div></div></div>`;
+
+  // Jalankan timer setelah HTML di-render ke DOM
+  setTimeout(() => {
+    window._periodeTimers = window._periodeTimers || [];
+    window._periodeTimers.forEach(t => clearInterval(t));
+    window._periodeTimers = [];
+    periodeList.forEach((p, idx) => {
+      const js = p.jamSelesai || p.jam_selesai || '17:00';
+      const _tglRaw = p.tanggalSelesai || p.tanggal_selesai || '';
+      const _tglDate = _tglRaw ? new Date(_tglRaw) : null;
+      if (!_tglDate || isNaN(_tglDate)) return;
+      const [jsH, jsM] = js.split(':').map(Number);
+      const deadline = new Date(Date.UTC(_tglDate.getUTCFullYear(), _tglDate.getUTCMonth(), _tglDate.getUTCDate(), jsH - 8, jsM));
+      const getEl = () => document.getElementById('periodeTimer_' + idx);
+      const tick = () => {
+        const el = getEl();
+        if (!el) { clearInterval(tid); return; }
+        const diff = deadline - Date.now();
+        if (diff <= 0) { el.textContent = 'Ditutup'; el.style.background = 'rgba(239,68,68,0.35)'; clearInterval(tid); return; }
+        const h = Math.floor(diff / 3600000);
+        const m = Math.floor((diff % 3600000) / 60000);
+        const s = Math.floor((diff % 60000) / 1000);
+        const mm = String(m).padStart(2,'0'), ss = String(s).padStart(2,'0');
+        el.textContent = h >= 24
+          ? Math.floor(h/24) + 'h ' + String(h%24).padStart(2,'0') + ':' + mm + ':' + ss
+          : String(h).padStart(2,'0') + ':' + mm + ':' + ss;
+        el.style.background = diff < 3600000 ? 'rgba(239,68,68,0.4)' : 'rgba(0,0,0,0.2)';
+      };
+      let tid;
+      tid = setInterval(tick, 1000);
+      tick();
+      window._periodeTimers.push(tid);
+    });
+  }, 0);
+
+  return html;
 }
 
 function renderKepalasDashboard(el, d) {
-  const periodeList = d.periodeAktifList || (d.periodeAktif ? [d.periodeAktif] : []);
-
   el.innerHTML = `
     <div class="stats-grid">
       ${statCard('orange','pending','Menunggu Verifikasi', d.menunggu)}
       ${statCard('green','check_circle','Sudah Diverifikasi', d.terverifikasi)}
       ${statCard('blue','assignment','Total Usulan PKM Saya', d.total)}
     </div>
-    ${renderPeriodeBanner(periodeList)}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:stretch;margin-bottom:14px">
       <div class="card" style="margin:0;display:flex;flex-direction:column">
         <div class="card-header-bar">
@@ -1201,7 +1103,6 @@ function renderKepalasDashboard(el, d) {
 }
 
 function renderProgramDashboard(el, d) {
-  const periodeList = d.periodeAktifList || (d.periodeAktif ? [d.periodeAktif] : []);
   // Ringkasan indikator tanggung jawab PP
   const aksesArr = (currentUser.indikatorAkses || []);
   // Ambil nama indikator dari master jika tersedia (allIndList dari halaman master)

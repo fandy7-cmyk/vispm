@@ -763,7 +763,7 @@ async function verifKapus(pool, body) {
     [alasanGabungan, idUsulan]
   );
   await logAktivitas(pool, email, 'Kepala Puskesmas', logAksiTolak, idUsulan,
-    konteksLog + ' | Indikator bermasalah: ' + nomorTolak.join(',') + ' — ' + alasanGabungan);
+    konteksLog + ' | Indikator bermasalah ' + alasanGabungan);
   return ok({ message: 'Indikator bermasalah dikembalikan ke Operator untuk diperbaiki.', nomorTolak });
 }
 
@@ -980,7 +980,7 @@ async function verifProgram(pool, body) {
   );
   if (indDitolak.length) {
     await logAktivitas(pool, email, 'Pengelola Program', 'Kembalikan', idUsulan,
-      'Indikator bermasalah: ' + indDitolak.join(',') + ' — dikembalikan ke Kepala Puskesmas' + (alasanGabungan ? ' | Catatan: ' + alasanGabungan : ''));
+      'Indikator bermasalah ' + alasanGabungan + ' — dikembalikan ke Kepala Puskesmas');
   }
   return ok({ message: 'Indikator bermasalah dikembalikan ke Kepala Puskesmas untuk re-verifikasi.', allDone: true });
 }
@@ -1096,7 +1096,7 @@ async function verifAdmin(pool, body) {
     [alasanGabungan, idUsulan]
   );
   await logAktivitas(pool, email, 'Admin', 'Tolak', idUsulan,
-    'Indikator bermasalah: ' + nomorTolak.join(', ') + ' — dikembalikan ke Pengelola Program | ' + alasanGabungan);
+    'Indikator bermasalah ' + alasanGabungan + ' — dikembalikan ke Pengelola Program');
   return ok({ message: 'Usulan dikembalikan ke Pengelola Program untuk re-verifikasi.', nomorTolak });
 }
 
@@ -1200,7 +1200,7 @@ async function rejectUsulan(pool, body) {
       [alasanGabungan, idUsulan]
     );
     await logAktivitas(pool, email, 'Admin', 'Tolak', idUsulan,
-      `Indikator bermasalah: ${nomorList.join(', ')} — dikembalikan ke Pengelola Program | ${alasanGabungan}`);
+      `Indikator bermasalah ${alasanGabungan} — dikembalikan ke Pengelola Program`);
     return ok({ message: 'Usulan dikembalikan ke Pengelola Program untuk re-verifikasi.', nomorTolak: nomorList });
   }
 
@@ -1320,7 +1320,7 @@ async function rejectUsulan(pool, body) {
         [idUsulan]
       );
       await logAktivitas(pool, email, 'Pengelola Program', 'Tolak', idUsulan,
-        `Indikator bermasalah: ${nomorBermasalah.join(', ')} — dikembalikan ke Admin untuk re-verifikasi`);
+        `Indikator bermasalah ${nomorBermasalah.map(n=>'#'+n).join(', ')} — dikembalikan ke Admin untuk re-verifikasi`);
       return ok({ message: 'Indikator bermasalah dikembalikan ke Admin untuk re-verifikasi.', allDone: true });
     }
 
@@ -1331,7 +1331,7 @@ async function rejectUsulan(pool, body) {
       [idUsulan]
     );
     await logAktivitas(pool, email, 'Pengelola Program', 'Tolak', idUsulan,
-      `Indikator bermasalah: ${nomorBermasalah.join(', ')} — re-verifikasi dari Kepala Puskesmas`);
+      `Indikator bermasalah ${nomorBermasalah.map(n=>'#'+n).join(', ')} — re-verifikasi dari Kepala Puskesmas`);
     return ok({ message: 'Indikator bermasalah dikembalikan untuk re-verifikasi dari Kepala Puskesmas.', allDone: true });
   }
 
@@ -1457,7 +1457,7 @@ async function respondPenolakan(pool, body) {
        ditolak_oleh='Pengelola Program',
        admin_catatan=$1
      WHERE id_usulan=$2`,
-    [`PP membenarkan — indikator bermasalah: ${nomorDitolak.join(',')}`, idUsulan]
+    [`PP membenarkan — indikator bermasalah ${nomorDitolak.map(n=>'#'+n).join(', ')}`, idUsulan]
   );
 
   // Log: PP Membenarkan — semua pihak bisa lihat di riwayat aktivitas

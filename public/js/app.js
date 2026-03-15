@@ -804,20 +804,15 @@ function renderStatusSummary(d) {
   ];
   return `
     <div style="margin-bottom:14px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
         <span style="font-size:12px;color:var(--text-light);font-weight:600">Tingkat Penyelesaian</span>
-        <div style="display:flex;align-items:center;gap:6px">
-          ${(pctSelesai > 0 && pctSelesai < pctBerjalan) ? `<span style="font-size:11px;font-weight:700;color:#10b981;font-family:'JetBrains Mono',monospace">${pctSelesai}% selesai</span>` : ''}
-          <span style="font-size:18px;font-weight:900;color:#0d9488;font-family:'JetBrains Mono',monospace">${pctSelesai === pctBerjalan ? pctSelesai : pctBerjalan}%</span>
-        </div>
       </div>
-      <div style="height:8px;background:#e2e8f0;border-radius:99px;overflow:hidden;position:relative">
+      <div style="height:20px;background:#e2e8f0;border-radius:99px;overflow:hidden;position:relative">
         <div style="position:absolute;left:0;top:0;height:100%;width:${pctBerjalan}%;background:linear-gradient(90deg,#a7f3d0,#6ee7b7);border-radius:99px;transition:width 0.6s ease"></div>
         <div style="position:absolute;left:0;top:0;height:100%;width:${pctSelesai}%;background:linear-gradient(90deg,#0d9488,#10b981);border-radius:99px;transition:width 0.6s ease"></div>
-      </div>
-      <div style="display:flex;gap:12px;margin-top:5px">
-        <span style="font-size:10px;color:#10b981;font-weight:600;display:flex;align-items:center;gap:3px"><span style="width:8px;height:8px;border-radius:2px;background:#10b981;display:inline-block"></span>Selesai</span>
-        <span style="font-size:10px;color:#0d9488;font-weight:600;display:flex;align-items:center;gap:3px"><span style="width:8px;height:8px;border-radius:2px;background:#6ee7b7;display:inline-block"></span>Dalam Proses</span>
+        <div style="position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:11px;font-weight:800;color:${pctBerjalan > 60 ? 'white' : '#0d9488'};font-family:'JetBrains Mono',monospace;white-space:nowrap">
+          ${pctSelesai === pctBerjalan ? pctSelesai : (pctSelesai > 0 ? pctSelesai+'% / ' : '') + pctBerjalan}%
+        </div>
       </div>
     </div>
     <div style="display:flex;flex-direction:column;gap:8px">
@@ -868,12 +863,12 @@ function renderPKMProgressTable(rows) {
         <td style="text-align:center"><span style="color:#f59e0b;font-weight:700">${p.menunggu}</span></td>
         <td style="text-align:center"><span style="color:#ef4444;font-weight:700">${p.ditolak}</span></td>
         <td>
-          <div style="display:flex;align-items:center;gap:6px">
-            <div style="flex:1;height:6px;background:#e2e8f0;border-radius:99px;overflow:hidden;position:relative">
-              <div style="position:absolute;left:0;top:0;height:100%;width:${pctP}%;background:linear-gradient(90deg,#a7f3d0,#6ee7b7);border-radius:99px"></div>
-              <div style="position:absolute;left:0;top:0;height:100%;width:${pctS}%;background:linear-gradient(90deg,#0d9488,#10b981);border-radius:99px"></div>
+          <div style="height:18px;background:#e2e8f0;border-radius:99px;overflow:hidden;position:relative;min-width:80px">
+            <div style="position:absolute;left:0;top:0;height:100%;width:${pctP}%;background:linear-gradient(90deg,#a7f3d0,#6ee7b7);border-radius:99px"></div>
+            <div style="position:absolute;left:0;top:0;height:100%;width:${pctS}%;background:linear-gradient(90deg,#0d9488,#10b981);border-radius:99px"></div>
+            <div style="position:absolute;right:6px;top:50%;transform:translateY(-50%);font-size:10px;font-weight:800;color:${pctP > 60 ? 'white' : '#0d9488'};font-family:'JetBrains Mono',monospace;white-space:nowrap">
+              ${pctS === pctP ? pctS : (pctS > 0 ? pctS+'%/' : '') + pctP}%
             </div>
-            <span style="font-size:11px;font-weight:700;color:#0d9488;min-width:28px;text-align:right">${pctS > 0 ? pctS : pctP}%</span>
           </div>
         </td>
       </tr>`;
@@ -900,20 +895,15 @@ function renderOperatorStatusSummary(rows) {
   ];
   return `
     <div style="margin-bottom:14px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
         <span style="font-size:12px;color:var(--text-light);font-weight:600">Tingkat Penyelesaian</span>
-        <div style="display:flex;align-items:center;gap:6px">
-          ${(pctSelesai > 0 && pctSelesai < pctDiajukan) ? `<span style="font-size:11px;font-weight:700;color:#10b981;font-family:'JetBrains Mono',monospace">${pctSelesai}% selesai</span>` : ''}
-          <span style="font-size:18px;font-weight:900;color:#0d9488;font-family:'JetBrains Mono',monospace">${pctSelesai === pctDiajukan ? pctSelesai : pctDiajukan}%</span>
-        </div>
       </div>
-      <div style="height:8px;background:#e2e8f0;border-radius:99px;overflow:hidden;position:relative">
+      <div style="height:20px;background:#e2e8f0;border-radius:99px;overflow:hidden;position:relative">
         <div style="position:absolute;left:0;top:0;height:100%;width:${pctDiajukan}%;background:linear-gradient(90deg,#a7f3d0,#6ee7b7);border-radius:99px;transition:width 0.6s ease"></div>
         <div style="position:absolute;left:0;top:0;height:100%;width:${pctSelesai}%;background:linear-gradient(90deg,#0d9488,#10b981);border-radius:99px;transition:width 0.6s ease"></div>
-      </div>
-      <div style="display:flex;gap:12px;margin-top:5px">
-        <span style="font-size:10px;color:#10b981;font-weight:600;display:flex;align-items:center;gap:3px"><span style="width:8px;height:8px;border-radius:2px;background:#10b981;display:inline-block"></span>Selesai</span>
-        <span style="font-size:10px;color:#0d9488;font-weight:600;display:flex;align-items:center;gap:3px"><span style="width:8px;height:8px;border-radius:2px;background:#6ee7b7;display:inline-block"></span>Sudah diajukan</span>
+        <div style="position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:11px;font-weight:800;color:${pctDiajukan > 60 ? 'white' : '#0d9488'};font-family:'JetBrains Mono',monospace;white-space:nowrap">
+          ${pctSelesai === pctDiajukan ? pctSelesai : (pctSelesai > 0 ? pctSelesai+'% / ' : '') + pctDiajukan}%
+        </div>
       </div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
@@ -946,20 +936,15 @@ function renderKapusStatusSummary(rows) {
   ];
   return `
     <div style="margin-bottom:14px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
         <span style="font-size:12px;color:var(--text-light);font-weight:600">Progress PKM</span>
-        <div style="display:flex;align-items:center;gap:6px">
-          ${(pctSelesai > 0 && pctSelesai < pctProses) ? `<span style="font-size:11px;font-weight:700;color:#10b981;font-family:'JetBrains Mono',monospace">${pctSelesai}% selesai</span>` : ''}
-          <span style="font-size:18px;font-weight:900;color:#0d9488;font-family:'JetBrains Mono',monospace">${pctSelesai === pctProses ? pctSelesai : pctProses}%</span>
-        </div>
       </div>
-      <div style="height:8px;background:#e2e8f0;border-radius:99px;overflow:hidden;position:relative">
+      <div style="height:20px;background:#e2e8f0;border-radius:99px;overflow:hidden;position:relative">
         <div style="position:absolute;left:0;top:0;height:100%;width:${pctProses}%;background:linear-gradient(90deg,#a7f3d0,#6ee7b7);border-radius:99px;transition:width 0.6s ease"></div>
         <div style="position:absolute;left:0;top:0;height:100%;width:${pctSelesai}%;background:linear-gradient(90deg,#0d9488,#10b981);border-radius:99px;transition:width 0.6s ease"></div>
-      </div>
-      <div style="display:flex;gap:12px;margin-top:5px">
-        <span style="font-size:10px;color:#10b981;font-weight:600;display:flex;align-items:center;gap:3px"><span style="width:8px;height:8px;border-radius:2px;background:#10b981;display:inline-block"></span>Selesai</span>
-        <span style="font-size:10px;color:#0d9488;font-weight:600;display:flex;align-items:center;gap:3px"><span style="width:8px;height:8px;border-radius:2px;background:#6ee7b7;display:inline-block"></span>Sudah diverifikasi Kapus</span>
+        <div style="position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:11px;font-weight:800;color:${pctProses > 60 ? 'white' : '#0d9488'};font-family:'JetBrains Mono',monospace;white-space:nowrap">
+          ${pctSelesai === pctProses ? pctSelesai : (pctSelesai > 0 ? pctSelesai+'% / ' : '') + pctProses}%
+        </div>
       </div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">

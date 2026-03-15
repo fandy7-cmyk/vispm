@@ -892,7 +892,7 @@ function renderKapusStatusSummary(rows) {
     { label: 'Ditolak',           val: ditolak,        color: '#ef4444', bg: '#fef2f2' },
   ];
   return `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+    <div style="display:flex;flex-direction:column;gap:8px">
       ${items.map(it => `
         <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:${it.bg};border-radius:8px;border-left:3px solid ${it.color}">
           <span style="font-size:12px;font-weight:600;color:var(--text)">${it.label}</span>
@@ -1073,7 +1073,7 @@ function renderKepalasDashboard(el, d) {
       </div>
       <div class="card" style="margin:0;display:flex;flex-direction:column">
         <div class="card-header-bar">
-          <span class="card-title"><span class="material-icons">donut_large</span>Progress PKM Saya</span>
+          <span class="card-title"><span class="material-icons">donut_large</span>Progress Puskesmas</span>
         </div>
         <div class="card-body" style="padding:12px 14px;flex:1" id="kapusStatusSummary">
           <div class="empty-state" style="padding:16px"><span class="material-icons">hourglass_empty</span></div>

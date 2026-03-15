@@ -277,6 +277,8 @@ function startApp() {
     }
   }
   document.getElementById('sidebarAvatar').textContent = (currentUser.nama || 'U')[0].toUpperCase();
+  const _topbarAv = document.getElementById('topbarAvatar');
+  if (_topbarAv) _topbarAv.textContent = (currentUser.nama || 'U')[0].toUpperCase();
   const dropNameEl = document.getElementById('topbarDropName');
   if (dropNameEl) dropNameEl.textContent = currentUser.nama || currentUser.email;
   const dropMetaEl = document.getElementById('topbarDropMeta');
@@ -4054,6 +4056,8 @@ async function saveEditProfil() {
     // Update tampilan
     document.getElementById('sidebarName').textContent = nama;
     document.getElementById('sidebarAvatar').textContent = nama[0].toUpperCase();
+    const _topbarAv2 = document.getElementById('topbarAvatar');
+    if (_topbarAv2) _topbarAv2.textContent = nama[0].toUpperCase();
     const dropNameEl = document.getElementById('topbarDropName');
     if (dropNameEl) dropNameEl.textContent = nama;
     toast('Profil berhasil diperbarui!', 'success');

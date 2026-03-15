@@ -810,8 +810,8 @@ function renderStatusSummary(d) {
       <div style="height:20px;background:#e2e8f0;border-radius:99px;overflow:hidden;position:relative">
         <div style="position:absolute;left:0;top:0;height:100%;width:${pctBerjalan}%;background:linear-gradient(90deg,#a7f3d0,#6ee7b7);border-radius:99px;transition:width 0.6s ease"></div>
         <div style="position:absolute;left:0;top:0;height:100%;width:${pctSelesai}%;background:linear-gradient(90deg,#0d9488,#10b981);border-radius:99px;transition:width 0.6s ease"></div>
-        <div style="position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:11px;font-weight:800;color:white;text-shadow:0 0 3px rgba(0,0,0,0.4);font-family:'JetBrains Mono',monospace;white-space:nowrap">
-          ${pctSelesai === pctBerjalan ? pctSelesai : (pctSelesai > 0 ? pctSelesai+'% / ' : '') + pctBerjalan}%
+        <div style="position:absolute;left:calc(${pctBerjalan}% - 4px);top:50%;transform:translate(-100%,-50%);font-size:11px;font-weight:800;color:white;text-shadow:0 0 4px rgba(0,0,0,0.5);font-family:'JetBrains Mono',monospace;white-space:nowrap;padding-right:4px">
+          ${pctBerjalan}%
         </div>
       </div>
     </div>
@@ -866,8 +866,8 @@ function renderPKMProgressTable(rows) {
           <div style="height:18px;background:#e2e8f0;border-radius:99px;overflow:hidden;position:relative;min-width:80px">
             <div style="position:absolute;left:0;top:0;height:100%;width:${pctP}%;background:linear-gradient(90deg,#a7f3d0,#6ee7b7);border-radius:99px"></div>
             <div style="position:absolute;left:0;top:0;height:100%;width:${pctS}%;background:linear-gradient(90deg,#0d9488,#10b981);border-radius:99px"></div>
-            <div style="position:absolute;right:6px;top:50%;transform:translateY(-50%);font-size:10px;font-weight:800;color:white;text-shadow:0 0 3px rgba(0,0,0,0.4);font-family:'JetBrains Mono',monospace;white-space:nowrap">
-              ${pctS === pctP ? pctS : (pctS > 0 ? pctS+'%/' : '') + pctP}%
+            <div style="position:absolute;left:calc(${pctP}% - 4px);top:50%;transform:translate(-100%,-50%);font-size:10px;font-weight:800;color:white;text-shadow:0 0 4px rgba(0,0,0,0.5);font-family:'JetBrains Mono',monospace;white-space:nowrap;padding-right:4px">
+              ${pctP > 0 ? pctP+'%' : ''}
             </div>
           </div>
         </td>
@@ -885,8 +885,10 @@ function renderOperatorStatusSummary(rows) {
   const draft   = rows.filter(u => u.statusGlobal === 'Draft').length;
   // Dual bar: selesai (hijau tua) + sudah diajukan/dalam proses (hijau muda)
   const sudahDiajukan = selesai + proses;
-  const pctSelesai    = total > 0 ? Math.round((selesai       / total) * 100) : 0;
-  const pctDiajukan   = total > 0 ? Math.round((sudahDiajukan / total) * 100) : 0;
+  // Hitung dari usulan aktif (exclude Draft) agar Draft tidak mengecilkan progress
+  const aktif = total - draft;
+  const pctSelesai  = aktif > 0 ? Math.round((selesai       / aktif) * 100) : 0;
+  const pctDiajukan = aktif > 0 ? Math.round((sudahDiajukan / aktif) * 100) : 0;
   const items = [
     { label: 'Selesai',      val: selesai, color: '#10b981', bg: '#ecfdf5' },
     { label: 'Dalam Proses', val: proses,  color: '#f59e0b', bg: '#fffbeb' },
@@ -901,8 +903,8 @@ function renderOperatorStatusSummary(rows) {
       <div style="height:20px;background:#e2e8f0;border-radius:99px;overflow:hidden;position:relative">
         <div style="position:absolute;left:0;top:0;height:100%;width:${pctDiajukan}%;background:linear-gradient(90deg,#a7f3d0,#6ee7b7);border-radius:99px;transition:width 0.6s ease"></div>
         <div style="position:absolute;left:0;top:0;height:100%;width:${pctSelesai}%;background:linear-gradient(90deg,#0d9488,#10b981);border-radius:99px;transition:width 0.6s ease"></div>
-        <div style="position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:11px;font-weight:800;color:white;text-shadow:0 0 3px rgba(0,0,0,0.4);font-family:'JetBrains Mono',monospace;white-space:nowrap">
-          ${pctSelesai === pctDiajukan ? pctSelesai : (pctSelesai > 0 ? pctSelesai+'% / ' : '') + pctDiajukan}%
+        <div style="position:absolute;left:calc(${pctDiajukan}% - 4px);top:50%;transform:translate(-100%,-50%);font-size:11px;font-weight:800;color:white;text-shadow:0 0 4px rgba(0,0,0,0.5);font-family:'JetBrains Mono',monospace;white-space:nowrap;padding-right:4px">
+          ${pctDiajukan}%
         </div>
       </div>
     </div>
@@ -942,8 +944,8 @@ function renderKapusStatusSummary(rows) {
       <div style="height:20px;background:#e2e8f0;border-radius:99px;overflow:hidden;position:relative">
         <div style="position:absolute;left:0;top:0;height:100%;width:${pctProses}%;background:linear-gradient(90deg,#a7f3d0,#6ee7b7);border-radius:99px;transition:width 0.6s ease"></div>
         <div style="position:absolute;left:0;top:0;height:100%;width:${pctSelesai}%;background:linear-gradient(90deg,#0d9488,#10b981);border-radius:99px;transition:width 0.6s ease"></div>
-        <div style="position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:11px;font-weight:800;color:white;text-shadow:0 0 3px rgba(0,0,0,0.4);font-family:'JetBrains Mono',monospace;white-space:nowrap">
-          ${pctSelesai === pctProses ? pctSelesai : (pctSelesai > 0 ? pctSelesai+'% / ' : '') + pctProses}%
+        <div style="position:absolute;left:calc(${pctProses}% - 4px);top:50%;transform:translate(-100%,-50%);font-size:11px;font-weight:800;color:white;text-shadow:0 0 4px rgba(0,0,0,0.5);font-family:'JetBrains Mono',monospace;white-space:nowrap;padding-right:4px">
+          ${pctProses}%
         </div>
       </div>
     </div>

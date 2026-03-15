@@ -683,10 +683,20 @@ async function verifKapus(pool, body) {
       }
     }
 
-    const logDetailKapus = isReVerif
-      ? `Re-verifikasi disetujui — diteruskan ke Pengelola Program${catatanKapus && catatanKapus !== 'Semua indikator disetujui' ? ' | Catatan: ' + catatanKapus : ''}`
-      : 'Semua indikator disetujui';
-    await logAktivitas(pool, email, 'Kepala Puskesmas', 'Approve', idUsulan, logDetailKapus);
+    let logAksiKapus, logDetailKapus;
+    if (isReVerifPP) {
+      // Kapus setuju semua = MENYANGGAH PP → teruskan ke PP ulang
+      logAksiKapus  = 'Kapus Menyanggah';
+      logDetailKapus = `Menyanggah penolakan Pengelola Program — diteruskan ke PP${catatanKapus && catatanKapus !== 'Semua indikator disetujui' ? ' | Catatan: ' + catatanKapus : ''}`;
+    } else if (isReVerifAdmin) {
+      // Kapus setuju semua dalam konteks re-verif Admin → teruskan ke PP
+      logAksiKapus  = 'Approve';
+      logDetailKapus = `Re-verifikasi disetujui — diteruskan ke Pengelola Program${catatanKapus && catatanKapus !== 'Semua indikator disetujui' ? ' | Catatan: ' + catatanKapus : ''}`;
+    } else {
+      logAksiKapus  = 'Approve';
+      logDetailKapus = 'Semua indikator disetujui';
+    }
+    await logAktivitas(pool, email, 'Kepala Puskesmas', logAksiKapus, idUsulan, logDetailKapus);
     return ok({ message: 'Semua indikator disetujui — diteruskan ke Pengelola Program.' });
   }
 
@@ -737,10 +747,14 @@ async function verifKapus(pool, body) {
   const isReVerifPPKapusTolak = ditolakOlehKapusTolak === 'Pengelola Program';
   const isReVerifAdminKapusTolak = ditolakOlehKapusTolak === 'Admin';
 
+  // Tentukan aksi log dan pesan berdasarkan konteks re-verifikasi
+  const logAksiTolak = (isReVerifPPKapusTolak || isReVerifAdminKapusTolak)
+    ? 'Kapus Membenarkan'
+    : 'Tolak';
   const konteksLog = isReVerifPPKapusTolak
-    ? 'Membenarkan penolakan Pengelola Program — dikembalikan ke Operator'
+    ? 'Membenarkan penolakan Pengelola Program — dikembalikan ke Operator untuk perbaikan data'
     : isReVerifAdminKapusTolak
-      ? 'Membenarkan penolakan Admin — dikembalikan ke Operator'
+      ? 'Membenarkan penolakan Admin (via PP) — dikembalikan ke Operator untuk perbaikan data'
       : 'Dikembalikan ke Operator';
 
   await pool.query(
@@ -748,7 +762,7 @@ async function verifKapus(pool, body) {
      ditolak_oleh='Kepala Puskesmas', kapus_approved_by=NULL, kapus_catatan=$1 WHERE id_usulan=$2`,
     [alasanGabungan, idUsulan]
   );
-  await logAktivitas(pool, email, 'Kepala Puskesmas', 'Tolak', idUsulan,
+  await logAktivitas(pool, email, 'Kepala Puskesmas', logAksiTolak, idUsulan,
     konteksLog + ' | Indikator bermasalah: ' + nomorTolak.join(',') + ' — ' + alasanGabungan);
   return ok({ message: 'Indikator bermasalah dikembalikan ke Operator untuk diperbaiki.', nomorTolak });
 }
@@ -1400,14 +1414,15 @@ async function respondPenolakan(pool, body) {
     return ok({ message: 'Semua pengelola program menyampaikan sanggahan. Diteruskan ke Admin.', selesai: true, aksi: 'sanggah' });
   }
 
-  // Ada yang tolak → reset indikator yang ditolak, kembalikan ke Operator
+  // Ada yang tolak → PP membenarkan Admin → berjenjang ke Kapus dulu
+  // Alur: PP membenarkan → Kapus re-verif → (Kapus tolak = membenarkan → Operator perbaiki)
   const ditolakRows = await pool.query(
     `SELECT no_indikator FROM penolakan_indikator WHERE id_usulan=$1 AND aksi='tolak'`,
     [idUsulan]
   );
   const nomorDitolak = ditolakRows.rows.map(r => r.no_indikator);
 
-  // Reset hanya indikator yang ditolak di usulan_indikator
+  // Reset indikator bermasalah di usulan_indikator
   for (const no of nomorDitolak) {
     await pool.query(
       `UPDATE usulan_indikator SET status='Draft', approved_by=NULL, approved_role=NULL, approved_at=NULL, catatan=NULL
@@ -1416,26 +1431,33 @@ async function respondPenolakan(pool, body) {
     );
   }
 
-  // Kembalikan ke Kepala Puskesmas untuk re-verifikasi berjenjang (hanya indikator bermasalah)
-  await pool.query(
-    `UPDATE usulan_header SET
-       status_global='Menunggu Kepala Puskesmas', is_locked=true,
-       status_kapus='Menunggu', status_program='Menunggu',
-       ditolak_oleh='Pengelola Program',
-       admin_catatan=$1
-     WHERE id_usulan=$2`,
-    [`Indikator direset: ${nomorDitolak.join(',')}`, idUsulan]
-  );
-
-  // Catat nomor indikator yang perlu diverif ulang
+  // Catat aksi='reset' agar Kapus tahu indikator mana yang bermasalah
   await pool.query(
     `UPDATE penolakan_indikator SET aksi='reset' WHERE id_usulan=$1 AND no_indikator=ANY($2)`,
     [idUsulan, nomorDitolak]
   );
 
-  await logAktivitas(pool, email, 'Pengelola Program', 'Tolak Ke Operator', idUsulan,
-    `Indikator ${nomorDitolak.join(',')} dikembalikan ke operator`);
-  return ok({ message: 'Usulan dikembalikan ke Operator untuk perbaikan indikator yang bermasalah.', selesai: true, aksi: 'tolak', nomorDitolak });
+  // Kembalikan ke Kapus untuk re-verifikasi berjenjang — pertahankan ditolak_oleh='Admin'
+  // agar Kapus tahu asal penolakan dan bisa membenarkan (→ Operator) atau menyanggah (→ PP)
+  await pool.query(
+    `UPDATE usulan_header SET
+       status_global='Menunggu Kepala Puskesmas', is_locked=true,
+       status_kapus='Menunggu', status_program='Menunggu',
+       ditolak_oleh='Admin',
+       admin_catatan=$1
+     WHERE id_usulan=$2`,
+    [`PP membenarkan — indikator bermasalah: ${nomorDitolak.join(',')}`, idUsulan]
+  );
+
+  // Log: PP Membenarkan — semua pihak bisa lihat di riwayat aktivitas
+  const alasanPP = ditolakRows.rows.map(r => {
+    const pi = responList.find(x => parseInt(x.noIndikator) === parseInt(r.no_indikator));
+    return pi ? `#${r.no_indikator}: ${pi.catatan}` : `#${r.no_indikator}`;
+  }).join(' | ');
+  await logAktivitas(pool, email, 'Pengelola Program', 'PP Membenarkan', idUsulan,
+    `Membenarkan penolakan Admin — diteruskan ke Kepala Puskesmas | Indikator: ${nomorDitolak.join(',')} | ${alasanPP}`);
+
+  return ok({ message: 'PP membenarkan penolakan Admin — diteruskan ke Kepala Puskesmas untuk re-verifikasi.', selesai: true, aksi: 'tolak', nomorDitolak });
 }
 
 

@@ -14,9 +14,12 @@ async function runMigrations(pool) {
       user_role   VARCHAR(100),
       detail      TEXT,
       ip_address  VARCHAR(50),
+      lokasi      VARCHAR(255),
       meta        JSONB
     )
   `).catch(() => {});
+  // FIX (d): Tambah kolom lokasi jika tabel sudah ada tapi belum punya kolom ini
+  await pool.query(`ALTER TABLE audit_trail ADD COLUMN IF NOT EXISTS lokasi VARCHAR(255)`).catch(() => {});
   await Promise.all([
     pool.query(`CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_trail(created_at DESC)`).catch(() => {}),
     pool.query(`CREATE INDEX IF NOT EXISTS idx_audit_module  ON audit_trail(module)`).catch(() => {}),
@@ -63,7 +66,7 @@ exports.handler = async (event) => {
 
       const whereStr = where.length ? 'WHERE ' + where.join(' AND ') : '';
       const result = await pool.query(
-        `SELECT id, created_at, module, action, user_email, user_nama, user_role, detail, ip_address
+        `SELECT id, created_at, module, action, user_email, user_nama, user_role, detail, ip_address, lokasi
          FROM audit_trail ${whereStr}
          ORDER BY created_at DESC
          LIMIT 1000`,
@@ -84,11 +87,26 @@ exports.handler = async (event) => {
         || event.headers?.['x-real-ip']
         || '-';
 
+      // FIX (d): Lookup lokasi berdasarkan IP menggunakan ip-api.com (gratis, tanpa API key)
+      // Hanya dilakukan saat action LOGIN agar tidak memperlambat semua log
+      let lokasi = null;
+      if (action.toUpperCase() === 'LOGIN' && ip && ip !== '-' && ip !== '::1' && !ip.startsWith('127.') && !ip.startsWith('192.168.') && !ip.startsWith('10.')) {
+        try {
+          const geoRes = await fetch(`http://ip-api.com/json/${ip}?fields=status,city,regionName,country,isp`, { signal: AbortSignal.timeout(2500) });
+          const geo = await geoRes.json();
+          if (geo.status === 'success') {
+            lokasi = [geo.city, geo.regionName, geo.country].filter(Boolean).join(', ');
+          }
+        } catch (_) {
+          // Gagal lookup → biarkan null, jangan gagalkan log
+        }
+      }
+
       await pool.query(
-        `INSERT INTO audit_trail (module, action, user_email, user_nama, user_role, detail, ip_address, meta)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+        `INSERT INTO audit_trail (module, action, user_email, user_nama, user_role, detail, ip_address, meta, lokasi)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
         [module, action.toUpperCase(), userEmail||null, userNama||null, userRole||null,
-         detail||null, ip, meta ? JSON.stringify(meta) : null]
+         detail||null, ip, meta ? JSON.stringify(meta) : null, lokasi||null]
       );
       return ok({ message: 'Log berhasil dicatat' });
     }

@@ -857,14 +857,13 @@ async function verifProgram(pool, body) {
     // Deteksi re-verifikasi Admin:
     // 1. Langsung: ditolak_oleh='Admin' (Admin→PP langsung)
     // 2. Via berjenjang: Admin→PP→Kapus→Operator→Kapus→PP
-    //    Setelah siklus ini, ditolak_oleh='Admin' sudah di-set oleh verifProgram (piAdminCheck baru)
-    // PENTING: hanya cek record yang masih aktif (aksi IS NULL) agar data lama tidak salah deteksi
-    const piAdminCheck = await pool.query(
-      `SELECT COUNT(*) as ct FROM penolakan_indikator WHERE id_usulan=$1 AND aksi IS NULL`,
-      [idUsulan]
-    );
-    // isReVerifAdmin hanya true jika ditolak_oleh eksplisit 'Admin' DAN masih ada penolakan aktif
-    const isReVerifAdmin = ditolakOleh === 'Admin' && parseInt(piAdminCheck.rows[0]?.ct) > 0;
+    // isReVerifAdmin: cukup cek ditolak_oleh='Admin' saja
+    // ditolak_oleh='Admin' hanya di-set secara eksplisit oleh:
+    // 1. verifAdmin tolak (Admin→PP)
+    // 2. respondPenolakan sanggah semua (PP→Admin)
+    // 3. verifProgram re-verif semua setuju (PP→Admin)
+    // Tidak perlu cek penolakan_indikator karena aksinya bisa IS NULL atau 'sanggah'
+    const isReVerifAdmin = ditolakOleh === 'Admin';
 
     if (isReVerifAdmin) {
       // Re-verif Admin: teruskan kembali ke Admin, pertahankan ditolak_oleh dan penolakan_indikator

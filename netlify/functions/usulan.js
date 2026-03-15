@@ -117,7 +117,7 @@ async function getUsulanList(pool, params) {
       : Promise.resolve({ rows: [] }),
     params.email_program && ids.length > 0
       ? pool.query(
-          `SELECT id_usulan, no_indikator FROM penolakan_indikator WHERE id_usulan=ANY($1) AND (aksi IS NULL OR aksi='tolak')`,
+          `SELECT id_usulan, no_indikator FROM penolakan_indikator WHERE id_usulan=ANY($1) AND (aksi IS NULL OR aksi='tolak' OR aksi='reset')`,
           [ids]
         ).catch(() => ({ rows: [] }))
       : Promise.resolve({ rows: [] }),
@@ -204,7 +204,7 @@ async function getUsulanDetail(pool, idUsulan) {
     [idUsulan]
   );
   const piResult = await pool.query(
-    `SELECT * FROM penolakan_indikator WHERE id_usulan=$1 AND (aksi IS NULL OR aksi='tolak') ORDER BY no_indikator`,
+    `SELECT * FROM penolakan_indikator WHERE id_usulan=$1 AND (aksi IS NULL OR aksi='tolak' OR aksi='reset') ORDER BY no_indikator`,
     [idUsulan]
   ).catch(() => ({ rows: [] }));
   const detail = mapHeader(result.rows[0]);
@@ -640,7 +640,7 @@ async function verifKapus(pool, body) {
         [idUsulan]
       ).catch(() => {});
       const piRows = await pool.query(
-        `SELECT no_indikator FROM penolakan_indikator WHERE id_usulan=$1 AND (aksi IS NULL OR aksi='tolak')`,
+        `SELECT no_indikator FROM penolakan_indikator WHERE id_usulan=$1 AND (aksi IS NULL OR aksi='tolak' OR aksi='reset')`,
         [idUsulan]
       );
       const nomorBermasalahReVerif = piRows.rows.map(r => parseInt(r.no_indikator));

@@ -1064,7 +1064,7 @@ function renderOperatorDashboard(el, d) {
         + (pr.notif_operator ? `<div style="display:flex;align-items:flex-start;gap:8px;padding:8px 14px;background:#fffbeb;border-top:1px solid #fcd34d"><span style="color:#d97706;display:flex;flex-shrink:0;margin-top:1px">${_svgNotif}</span><div style="font-size:12px;color:#0f172a;line-height:1.5">${pr.notif_operator}</div></div>` : "")
         + `</div>`;
     }).join("");
-    periodeBanner = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px">${items}</div>`;
+    periodeBanner = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px">${items}</div>`;
   } else {
     periodeBanner = `
       <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:10px">
@@ -1210,7 +1210,7 @@ function renderOperatorDashboard(el, d) {
             + (not ? `<div style="display:flex;align-items:flex-start;gap:8px;padding:8px 14px;background:#fffbeb;border-top:1px solid #fcd34d"><span style="color:#d97706;display:flex;flex-shrink:0;margin-top:1px">${_svgNotif}</span><div style="font-size:12px;color:#0f172a;line-height:1.5">${not}</div></div>` : '')
             + `</div>`;
         }).join('');
-        bannerEl.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px">${items}</div>`;
+        bannerEl.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px">${items}</div>`;
       }
     }).catch(() => {});
   }
@@ -1275,7 +1275,7 @@ function renderPeriodeBanner(periodeList) {
       ${notif ? `<div style="display:flex;align-items:flex-start;gap:8px;padding:8px 14px;background:#fffbeb;border-top:1px solid #fcd34d"><span style="color:#d97706;display:flex;flex-shrink:0;margin-top:1px">${svgNotif}</span><div style="font-size:12px;color:#0f172a;line-height:1.5">${notif}</div></div>` : ''}
     </div>`;
   }).join('');
-  return `<div style="margin-bottom:14px"><div class="card" style="margin:0"><div class="card-header-bar"><span class="card-title" style="display:flex;align-items:center;gap:7px"><span style="color:#0d9488;display:flex">${svgCal}</span> Periode Input Aktif</span></div><div class="card-body"><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px">${items}</div></div></div></div>`;
+  return `<div style="margin-bottom:14px"><div class="card" style="margin:0"><div class="card-header-bar"><span class="card-title" style="display:flex;align-items:center;gap:7px"><span style="color:#0d9488;display:flex">${svgCal}</span> Periode Input Aktif</span></div><div class="card-body"><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px">${items}</div></div></div></div>`;
 }
 
 function renderKepalasDashboard(el, d) {
@@ -1781,10 +1781,10 @@ async function renderInput() {
         + (not ? `<div style="display:flex;align-items:flex-start;gap:8px;padding:8px 14px;background:#fffbeb;border-top:1px solid #fcd34d"><span style="color:#d97706;display:flex;flex-shrink:0;margin-top:1px">${_bSvgNoti}</span><div style="font-size:12px;color:#0f172a;line-height:1.5">${not}</div></div>` : '')
         + `</div>`;
     }).join('');
-    periodeBanner = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-bottom:14px">${items}</div>`;
+    periodeBanner = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin-bottom:14px">${items}</div>`;
   } else {
     periodeBanner = `
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-bottom:4px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin-bottom:4px">
         <div style="background:linear-gradient(135deg,#fffbeb,#fef3c7);border:1.5px solid #fcd34d;border-radius:12px;padding:16px 18px;display:flex;align-items:center;gap:14px;box-shadow:0 2px 8px rgba(245,158,11,0.10)">
           <div style="width:42px;height:42px;border-radius:10px;background:#fef9c3;border:1.5px solid #fde68a;display:flex;align-items:center;justify-content:center;flex-shrink:0">
             <span class="material-icons" style="font-size:22px;color:#d97706">event_busy</span>
@@ -5656,7 +5656,7 @@ async function renderPeriode(el) {
       </div>
       <div class="card-body">
         <div class="info-card info"><span class="material-icons">info</span><div class="info-card-text">Periode aktif ditandai dengan warna hijau. Operator hanya bisa input pada periode yang aktif dan dalam rentang tanggal yang ditentukan.</div></div>
-        <div id="periodeGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;margin-top:16px"></div>
+        <div id="periodeGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin-top:16px"></div>
       </div>
     </div>
 

@@ -46,6 +46,8 @@ exports.handler = async (event) => {
     if (method === 'POST' && path === 'verif-admin')   return await verifAdmin(pool, body);
     if (method === 'POST' && path === 'reject') return await rejectUsulan(pool, body);
     if (method === 'GET'  && path === 'log') return await getLogAktivitas(pool, params.id);
+    if (method === 'GET'  && path === 'penolakan') return await getPenolakanIndikator(pool, params);
+    if (method === 'POST' && path === 'respond-penolakan') return await respondPenolakan(pool, body);
     if (method === 'PUT' && path === 'drive-folder') return await saveDriveFolder(pool, body);
     if (method === 'POST' && path === 'admin-reset') return await adminResetUsulan(pool, body);
     if (method === 'POST' && path === 'restore-verif') return await restoreVerifStatus(pool, body);

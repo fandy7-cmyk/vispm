@@ -3410,9 +3410,10 @@ async function openVerifikasi(idUsulan) {
       // Jika penolakanList kosong = verifikasi pertama kali → tampilkan semua
       // Banner info re-verifikasi Kapus (gunakan elemen yang sama dengan PP banner)
       const _reVerifBanner = document.getElementById('verifReVerifBanner');
+      // _isPPLoop dideklarasikan di luar if(_reVerifBanner) agar accessible untuk kapusCatatanWrap
+      const _isPPLoop = _isKapusReVerif && (detail.ditolakOleh === 'Pengelola Program');
       if (_reVerifBanner) {
         if (_isKapusReVerif) {
-          const _isPPLoop = detail.ditolakOleh === 'Pengelola Program';
           const _opCatatan = !_isPPLoop ? (detail.operatorCatatan || '') : '';
           if (_isPPLoop) {
             // Loop PP→Kapus: PP tolak, dikembalikan ke Kapus untuk re-verifikasi
@@ -3456,18 +3457,17 @@ async function openVerifikasi(idUsulan) {
               _reVerifBanner.style.display = 'flex';
             }
           }
-          // kapusCatatanWrap: hanya aktif saat re-verif dari PP atau Admin (bukan dari Operator)
-          // Kapus perlu beri tanggapan ke PP hanya saat menyanggah PP — bukan saat Operator re-submit
+          // kapusCatatanWrap: hanya aktif saat loop PP↔Kapus (menyanggah PP)
           const _kapusCatatanWrap = document.getElementById('kapusCatatanWrap');
           if (_kapusCatatanWrap) {
             const _needsCatatan = _isKapusReVerif && _isPPLoop;
             _kapusCatatanWrap.dataset.mode = _needsCatatan ? 'reVerif' : '';
-            _kapusCatatanWrap.style.display = 'none'; // selalu hidden dulu, muncul via setIndVerif
+            _kapusCatatanWrap.style.display = 'none'; // selalu hidden, muncul via setIndVerif saat klik Setuju
           }
         } else {
           _reVerifBanner.style.display = 'none';
           const _kapusCatatanWrap = document.getElementById('kapusCatatanWrap');
-          if (_kapusCatatanWrap) _kapusCatatanWrap.style.display = 'none';
+          if (_kapusCatatanWrap) { _kapusCatatanWrap.dataset.mode = ''; _kapusCatatanWrap.style.display = 'none'; }
           const _vpb2 = document.getElementById('verifPenolakanBanner');
           if (_vpb2) { _vpb2.style.display = 'none'; _vpb2.innerHTML = ''; }
         }

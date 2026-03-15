@@ -852,12 +852,21 @@ async function verifProgram(pool, body) {
     const headerCheck = await pool.query('SELECT ditolak_oleh FROM usulan_header WHERE id_usulan=$1', [idUsulan]);
     const ditolakOleh = headerCheck.rows[0]?.ditolak_oleh;
 
-    if (ditolakOleh === 'Admin') {
-      // Re-verif Admin: teruskan kembali ke Admin, penolakan_indikator tetap ada untuk dibaca Admin
-      // ditolak_oleh JANGAN di-clear di sini — Admin butuh ini untuk deteksi re-verifikasi
+    // Deteksi re-verifikasi Admin: bisa via ditolak_oleh='Admin' (langsung Admin→PP)
+    // ATAU via penolakan_indikator dengan email_program IS NOT NULL (Admin→PP→Kapus→Operator→Kapus→PP)
+    // Di skenario kedua, ditolak_oleh='Pengelola Program' tapi asal penolakan tetap dari Admin
+    const piAdminCheck = await pool.query(
+      `SELECT COUNT(*) as ct FROM penolakan_indikator WHERE id_usulan=$1`,
+      [idUsulan]
+    );
+    const isReVerifAdmin = ditolakOleh === 'Admin' || parseInt(piAdminCheck.rows[0]?.ct) > 0;
+
+    if (isReVerifAdmin) {
+      // Re-verif Admin: teruskan kembali ke Admin, pertahankan ditolak_oleh dan penolakan_indikator
+      // agar Admin tahu ini re-verifikasi dan bisa baca catatan PP
       await pool.query(
         `UPDATE usulan_header SET status_program='Selesai', status_global='Menunggu Admin',
-         status_kapus='Selesai' WHERE id_usulan=$1`, [idUsulan]
+         status_kapus='Selesai', ditolak_oleh='Admin' WHERE id_usulan=$1`, [idUsulan]
       );
       return ok({ message: 'Semua pengelola program menyetujui — usulan diteruskan kembali ke Admin.', allDone: true });
     } else {
@@ -1400,9 +1409,10 @@ async function respondPenolakan(pool, body) {
   const jumlahTolak = parseInt(adaTolak.rows[0].ct);
 
   if (jumlahTolak === 0) {
-    // Semua sanggah → langsung ke Admin
+    // Semua sanggah → langsung ke Admin, pertahankan ditolak_oleh='Admin' agar Admin tahu re-verifikasi
     await pool.query(
-      `UPDATE usulan_header SET status_global='Menunggu Admin', status_program='Selesai', status_final='Menunggu'
+      `UPDATE usulan_header SET status_global='Menunggu Admin', status_program='Selesai', status_final='Menunggu',
+       ditolak_oleh='Admin'
        WHERE id_usulan=$1`,
       [idUsulan]
     );

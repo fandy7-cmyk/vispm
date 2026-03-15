@@ -1082,7 +1082,7 @@ function renderKepalasDashboard(el, d) {
     </div>
     <div class="card" style="margin-top:0">
       <div class="card-header-bar">
-        <span class="card-title"><span class="material-icons">history</span>Riwayat Semua Usulan PKM Saya</span>
+        <span class="card-title"><span class="material-icons">history</span>Riwayat Semua Usulan</span>
         <button class="btn btn-secondary btn-sm" onclick="loadPage('verifikasi')"><span class="material-icons">arrow_forward</span>Lihat Semua</button>
       </div>
       <div class="card-body" style="padding:0" id="kapusAllTable"></div>

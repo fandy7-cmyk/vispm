@@ -1436,30 +1436,19 @@ async function rejectUsulan(pool, body) {
       // VP yang menolak tapi tidak terkena indikator bermasalah → biarkan Ditolak
     }
 
-    // Tentukan arah: jika konteks re-verif Admin → kembali ke Admin; jika normal → ke Kapus
+    // PP tolak SELALU ke Kapus dulu (berjenjang), terlepas dari konteks penolakan (Admin atau PP).
+    // ditolak_oleh dipertahankan agar setelah Kapus approve, sistem tahu harus ke mana.
     const headerDirReject = await pool.query('SELECT ditolak_oleh FROM usulan_header WHERE id_usulan=$1', [idUsulan]);
-    const ditolakOlehDirReject = headerDirReject.rows[0]?.ditolak_oleh;
+    const ditolakOlehDirReject = headerDirReject.rows[0]?.ditolak_oleh || 'Pengelola Program';
 
-    if (ditolakOlehDirReject === 'Admin') {
-      await pool.query(
-        `UPDATE usulan_header SET status_global='Menunggu Admin', status_kapus='Selesai',
-         status_program='Menunggu', is_locked=true WHERE id_usulan=$1`,
-        [idUsulan]
-      );
-      await logAktivitas(pool, email, 'Pengelola Program', 'Tolak', idUsulan,
-        `Indikator bermasalah ${nomorBermasalah.map(n=>'#'+n).join(', ')} — dikembalikan ke Admin untuk re-verifikasi`);
-      return ok({ message: 'Indikator bermasalah dikembalikan ke Admin untuk re-verifikasi.', allDone: true });
-    }
-
-    // Normal / loop PP↔Kapus: PP tolak → ke Kapus
     await pool.query(
       `UPDATE usulan_header SET status_global='Menunggu Kepala Puskesmas', status_kapus='Menunggu',
-       status_program='Menunggu', ditolak_oleh='Pengelola Program', is_locked=true WHERE id_usulan=$1`,
-      [idUsulan]
+       status_program='Menunggu', ditolak_oleh=$2, is_locked=true WHERE id_usulan=$1`,
+      [idUsulan, ditolakOlehDirReject]
     );
-    await logAktivitas(pool, email, 'Pengelola Program', 'Tolak', idUsulan,
-      `Indikator bermasalah ${nomorBermasalah.map(n=>'#'+n).join(', ')} — re-verifikasi dari Kepala Puskesmas`);
-    return ok({ message: 'Indikator bermasalah dikembalikan untuk re-verifikasi dari Kepala Puskesmas.', allDone: true });
+    await logAktivitas(pool, email, 'Pengelola Program', 'Kembalikan', idUsulan,
+      `Indikator bermasalah ${nomorBermasalah.map(n=>'#'+n).join(', ')} — dikembalikan ke Kepala Puskesmas untuk re-verifikasi`);
+    return ok({ message: 'Indikator bermasalah dikembalikan ke Kepala Puskesmas untuk re-verifikasi.', allDone: true });
   }
 
   return err('Role tidak diizinkan untuk reject', 403);

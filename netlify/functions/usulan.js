@@ -456,7 +456,7 @@ async function submitUsulan(pool, body) {
   const isDitolakMode = statusSaatIni === 'Ditolak';
   if (isDitolakMode) {
     const penolakanResult = await pool.query(
-      'SELECT no_indikator FROM penolakan_indikator WHERE id_usulan=$1', [idUsulan]
+      `SELECT no_indikator FROM penolakan_indikator WHERE id_usulan=$1 AND (aksi IS NULL OR aksi='tolak')`, [idUsulan]
     ).catch(() => ({ rows: [] }));
     const bermasalahNos = penolakanResult.rows.map(r => r.no_indikator);
     if (bermasalahNos.length > 0) {
@@ -776,7 +776,7 @@ async function verifKapus(pool, body) {
       logDetailKapus = `Re-verifikasi disetujui — diteruskan ke Pengelola Program${catatanKapus && catatanKapus !== 'Semua indikator disetujui' ? ' | Catatan: ' + catatanKapus : ''}`;
     } else {
       logAksiKapus  = 'Approve';
-      logDetailKapus = 'Semua indikator disetujui';
+      logDetailKapus = catatanKapus && catatanKapus !== 'Semua indikator disetujui' ? `Semua indikator disetujui | Catatan: ${catatanKapus}` : 'Semua indikator disetujui';
     }
     await logAktivitas(pool, email, 'Kepala Puskesmas', logAksiKapus, idUsulan, logDetailKapus);
     return ok({ message: 'Semua indikator disetujui — diteruskan ke Pengelola Program.' });

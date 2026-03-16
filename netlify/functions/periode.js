@@ -30,15 +30,24 @@ exports.handler = async (event) => {
       query += ' ORDER BY tahun, bulan';
       const result = await pool.query(query, qParams);
 
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      // Gunakan tanggal WITA (UTC+8) sebagai string "YYYY-MM-DD" untuk perbandingan
+      // Netlify server berjalan di UTC — tanpa konversi ini, hari bisa off-by-one
+      const nowWita = new Date(Date.now() + 8 * 3600000);
+      const todayStr = nowWita.toISOString().slice(0, 10); // "YYYY-MM-DD" dalam WITA
+
+      // Helper: ambil tanggal dari nilai DB sebagai string WITA
+      const toDateStr = (val) => {
+        if (!val) return '';
+        const d = new Date(val);
+        const wita = new Date(d.getTime() + 8 * 3600000);
+        return wita.toISOString().slice(0, 10);
+      };
 
       // Auto-update expired periods to Tidak Aktif
       for (const r of result.rows) {
         if (r.status === 'Aktif') {
-          const selesai = new Date(r.tanggal_selesai);
-          selesai.setHours(23, 59, 59, 999);
-          if (today > selesai) {
+          const selesaiStr = toDateStr(r.tanggal_selesai);
+          if (todayStr > selesaiStr) {
             await pool.query(`UPDATE periode_input SET status='Tidak Aktif' WHERE id=$1`, [r.id]);
             r.status = 'Tidak Aktif';
           }
@@ -46,10 +55,9 @@ exports.handler = async (event) => {
       }
 
       return ok(result.rows.map(r => {
-        const mulai = new Date(r.tanggal_mulai);
-        const selesai = new Date(r.tanggal_selesai);
-        selesai.setHours(23, 59, 59, 999);
-        const isAktifToday = r.status === 'Aktif' && today >= mulai && today <= selesai;
+        const mulaiStr   = toDateStr(r.tanggal_mulai);
+        const selesaiStr = toDateStr(r.tanggal_selesai);
+        const isAktifToday = r.status === 'Aktif' && todayStr >= mulaiStr && todayStr <= selesaiStr;
         return {
           id: r.id, tahun: r.tahun, bulan: r.bulan,
           namaBulan: r.nama_bulan,
@@ -97,10 +105,10 @@ exports.handler = async (event) => {
       const r = await pool.query('SELECT id, status, tanggal_mulai, tanggal_selesai FROM periode_input WHERE tahun=$1 AND bulan=$2', [parseInt(tahun), parseInt(bulan)]);
       if (!r.rows.length) return err('Periode tidak ditemukan');
       const p = r.rows[0];
-      const today = new Date(); today.setHours(0,0,0,0);
-      const mulai = new Date(p.tanggal_mulai);
-      const selesai = new Date(p.tanggal_selesai); selesai.setHours(23,59,59,999);
-      if (p.status === 'Aktif' && today >= mulai && today <= selesai) {
+      const _nw = new Date(Date.now() + 8*3600000);
+      const _td = _nw.toISOString().slice(0,10);
+      const _ds = (v) => { const d = new Date(new Date(v).getTime()+8*3600000); return d.toISOString().slice(0,10); };
+      if (p.status === 'Aktif' && _td >= _ds(p.tanggal_mulai) && _td <= _ds(p.tanggal_selesai)) {
         return err('Tidak dapat menghapus periode yang sedang aktif hari ini');
       }
       await pool.query('DELETE FROM periode_input WHERE tahun=$1 AND bulan=$2', [parseInt(tahun), parseInt(bulan)]);

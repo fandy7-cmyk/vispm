@@ -16,7 +16,7 @@ async function renderCatatanThread(elId, idUsulan, currentRole) {
     const data = await API.getLogAktivitas(idUsulan);
     logs = (data.logs || []).filter(l => {
       if (!AKSI_CHAT.includes(l.aksi) || !l.detail || !l.detail.trim()) return false;
-      if (l.aksi === 'Approve') return !APPROVE_SKIP.includes(l.detail.trim());
+      if (l.aksi === 'Approve') return !APPROVE_SKIP.includes(l.detail.trim()) || l.detail.includes('Catatan:') || l.detail.includes('Re-verifikasi') || l.detail.includes('Menyanggah');
       return true;
     });
   } catch(e) { return; }

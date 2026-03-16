@@ -54,16 +54,13 @@ body { font-family: 'Plus Jakarta Sans', sans-serif; background: linear-gradient
   display: flex; align-items: center; justify-content: center;
   background: url('/bg.jpg') center/cover no-repeat;
 }
-#authScreen::before {
-  content: ''; position: absolute; inset: 0;
-  background: linear-gradient(135deg, rgba(5,40,30,0.72) 0%, rgba(13,148,136,0.38) 50%, rgba(6,182,212,0.28) 100%);
-}
+
 .auth-modal {
   position: relative; z-index: 1;
   display: flex; border-radius: 20px; overflow: hidden;
   width: 880px; max-width: calc(100vw - 32px);
   max-height: calc(100vh - 48px);
-  box-shadow: 0 32px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.08);
+  box-shadow: 0 40px 100px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.12);
   animation: authIn 0.4s cubic-bezier(0.34,1.56,0.64,1);
 }
 @keyframes authIn {

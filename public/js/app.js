@@ -5747,8 +5747,8 @@ document.addEventListener('click', (e) => {
 
 // Enter key on auth
 // ============== IDLE AUTO LOGOUT ==============
-const IDLE_TIMEOUT      = 30 * 60 * 1000; // 30 menit idle → logout
-const IDLE_WARN_BEFORE  =  2 * 60 * 1000; // tampilkan warning 2 menit sebelum logout
+const IDLE_TIMEOUT      =  5 * 60 * 1000; // 5 menit idle → logout
+const IDLE_WARN_BEFORE  = 30 * 1000; // tampilkan warning 30 detik sebelum logout
 let _idleTimer     = null;
 let _idleWarnTimer = null;
 let _idleCountdown = null;

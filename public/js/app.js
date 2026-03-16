@@ -1836,21 +1836,10 @@ async function createUsulan() {
       toast(`Periode ${namaBulanTxt} ${tahun} tidak aktif. Pilih periode yang sudah dibuka oleh Admin.`, 'error');
       return;
     }
-    // Cek rentang tanggal dan jam hari ini dalam WITA (UTC+8), konsisten dengan validasi server
-    const nowWita = new Date(new Date().getTime() + 8 * 60 * 60000);
-    const todayWitaStr = nowWita.toISOString().slice(0, 10); // "YYYY-MM-DD"
-    if (periodeValid.tanggalMulai && periodeValid.tanggalSelesai) {
-      const mulaiStr   = periodeValid.tanggalMulai.toString().slice(0, 10);
-      const selesaiStr = periodeValid.tanggalSelesai.toString().slice(0, 10);
-      if (todayWitaStr < mulaiStr) {
-        toast(`Periode ${namaBulanTxt} ${tahun} belum dibuka. Mulai input: ${formatDate(periodeValid.tanggalMulai)}`, 'warning');
-        return;
-      }
-      if (todayWitaStr > selesaiStr) {
-        toast(`Periode ${namaBulanTxt} ${tahun} sudah ditutup pada ${formatDate(periodeValid.tanggalSelesai)}. Hubungi Admin.`, 'warning');
-        return;
-      }
-      // Validasi jam dinonaktifkan — cukup validasi tanggal
+    // Validasi tanggal dilakukan server (isAktifToday) — cukup cek flag itu
+    if (!periodeValid.isAktifToday) {
+      toast(`Periode ${namaBulanTxt} ${tahun} sudah ditutup pada ${formatDate(periodeValid.tanggalSelesai)}. Hubungi Admin.`, 'warning');
+      return;
     }
   }
 

@@ -2,6 +2,11 @@
 // No. 8: Hipertensi, No. 9: Diabetes Melitus
 const INDIKATOR_TARGET_KUNCI = [8, 9];
 
+// Validasi teks: harus mengandung minimal 1 huruf atau angka (bukan hanya simbol/spasi)
+function isValidText(str) {
+  return str && /[a-zA-Z0-9\u00C0-\u024F]/.test(str.trim());
+}
+
 // ============== CATATAN THREAD HELPER ==============
 // Render riwayat catatan sebagai zigzag timeline (5 per baris), collapse by default
 async function renderCatatanThread(elId, idUsulan, currentRole) {
@@ -795,7 +800,7 @@ function renderAdminDashboard(el, d) {
         </div>
       </div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:stretch">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:stretch;margin-bottom:14px">
       <div class="card" style="margin:0">
         <div class="card-header-bar">
           <span class="card-title"><span class="material-icons">pending_actions</span>Menunggu Verifikasi Admin</span>
@@ -815,6 +820,39 @@ function renderAdminDashboard(el, d) {
           </button>
         </div>
         <div class="card-body" style="padding:0" id="pkmProgressTable">
+          <div class="empty-state" style="padding:32px"><span class="material-icons">hourglass_empty</span><p>Memuat...</p></div>
+        </div>
+      </div>
+    </div>
+    <div class="card" style="margin:0">
+      <div class="card-header-bar" style="flex-wrap:wrap;gap:8px">
+        <span class="card-title"><span class="material-icons">history</span>Semua Usulan Terbaru</span>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-left:auto">
+          <input id="adminAllSearch" type="text" placeholder="Cari ID / Puskesmas..."
+            oninput="filterAdminAllUsulan()"
+            style="border:1px solid #e2e8f0;border-radius:7px;padding:5px 10px;font-size:12px;width:150px;outline:none;font-family:inherit;color:var(--text)" />
+          <select id="adminAllFilterPKM" onchange="filterAdminAllUsulan()"
+            style="border:1px solid #e2e8f0;border-radius:7px;padding:5px 10px;font-size:12px;outline:none;font-family:inherit;background:white;color:var(--text)">
+            <option value="">Semua Puskesmas</option>
+          </select>
+          <select id="adminAllFilterTahun" onchange="filterAdminAllUsulan()"
+            style="border:1px solid #e2e8f0;border-radius:7px;padding:5px 10px;font-size:12px;outline:none;font-family:inherit;background:white;color:var(--text)">
+            <option value="">Semua Tahun</option>
+          </select>
+          <select id="adminAllFilterStatus" onchange="filterAdminAllUsulan()"
+            style="border:1px solid #e2e8f0;border-radius:7px;padding:5px 10px;font-size:12px;outline:none;font-family:inherit;background:white;color:var(--text)">
+            <option value="">Semua Status</option>
+            <option value="Draft">Draft</option>
+            <option value="Menunggu Kepala Puskesmas">Menunggu Kepala Puskesmas</option>
+            <option value="Menunggu Pengelola Program">Menunggu Pengelola Program</option>
+            <option value="Menunggu Admin">Menunggu Admin</option>
+            <option value="Selesai">Selesai</option>
+            <option value="Ditolak">Ditolak</option>
+          </select>
+        </div>
+      </div>
+      <div class="card-body" style="padding:0">
+        <div id="adminAllUsulanTable">
           <div class="empty-state" style="padding:32px"><span class="material-icons">hourglass_empty</span><p>Memuat...</p></div>
         </div>
       </div>
@@ -838,6 +876,68 @@ function renderAdminDashboard(el, d) {
   API.getUsulan({ tahun: CURRENT_YEAR }).then(rows => {
     renderPKMProgressTable(rows);
   }).catch(() => {});
+
+  // Load semua usulan terbaru (Admin)
+  loadAdminAllUsulan();
+}
+
+// ===== ADMIN: SEMUA USULAN =====
+let _adminAllUsulanData = [];
+
+async function loadAdminAllUsulan() {
+  const el = document.getElementById('adminAllUsulanTable');
+  if (!el) return;
+  el.innerHTML = `<div class="empty-state" style="padding:32px"><span class="material-icons" style="animation:spin 0.8s linear infinite">refresh</span><p>Memuat data...</p></div>`;
+  try {
+    const rows = await API.getUsulan({});
+    _adminAllUsulanData = rows || [];
+    renderAdminAllUsulanTable(_adminAllUsulanData);
+    // Populate filter puskesmas
+    const pkmSet = [...new Set(_adminAllUsulanData.map(u => u.namaPKM || u.kodePKM).filter(Boolean))].sort();
+    const pkmSel = document.getElementById('adminAllFilterPKM');
+    if (pkmSel) {
+      pkmSel.innerHTML = `<option value="">Semua Puskesmas</option>` + pkmSet.map(p => `<option value="${p}">${p}</option>`).join('');
+    }
+    // Populate filter tahun
+    const tahunSet = [...new Set(_adminAllUsulanData.map(u => u.tahun).filter(Boolean))].sort((a,b) => b - a);
+    const tahunSel = document.getElementById('adminAllFilterTahun');
+    if (tahunSel) {
+      tahunSel.innerHTML = `<option value="">Semua Tahun</option>` + tahunSet.map(t => `<option value="${t}">${t}</option>`).join('');
+    }
+  } catch(e) {
+    el.innerHTML = `<div class="empty-state" style="padding:32px"><span class="material-icons">inbox</span><p>Gagal memuat data</p></div>`;
+  }
+}
+
+function filterAdminAllUsulan() {
+  const pkmVal    = (document.getElementById('adminAllFilterPKM')?.value    || '').toLowerCase();
+  const statusVal = (document.getElementById('adminAllFilterStatus')?.value  || '').toLowerCase();
+  const tahunVal  = (document.getElementById('adminAllFilterTahun')?.value   || '');
+  const searchVal = (document.getElementById('adminAllSearch')?.value  || '').toLowerCase();
+
+  const filtered = _adminAllUsulanData.filter(u => {
+    const nama = (u.namaPKM || u.kodePKM || '').toLowerCase();
+    const status = (u.statusGlobal || '').toLowerCase();
+    const tahun  = String(u.tahun || '');
+    const id     = (u.idUsulan || '').toLowerCase();
+    const periode = (u.namaBulan || '').toLowerCase();
+    if (pkmVal    && !nama.includes(pkmVal))       return false;
+    if (statusVal && !status.includes(statusVal))  return false;
+    if (tahunVal  && tahun !== tahunVal)            return false;
+    if (searchVal && !id.includes(searchVal) && !nama.includes(searchVal) && !periode.includes(searchVal)) return false;
+    return true;
+  });
+  renderAdminAllUsulanTable(filtered);
+}
+
+function renderAdminAllUsulanTable(rows) {
+  const el = document.getElementById('adminAllUsulanTable');
+  if (!el) return;
+  if (!rows || !rows.length) {
+    el.innerHTML = `<div class="empty-state" style="padding:32px"><span class="material-icons">search_off</span><p>Tidak ada data yang sesuai filter</p></div>`;
+    return;
+  }
+  el.innerHTML = renderUsulanTable(rows, 'admin');
 }
 
 function renderStatusSummary(d) {
@@ -1122,6 +1222,41 @@ function renderPeriodeBanner(periodeList) {
   return html;
 }
 
+function renderPeriodeVerifBanner(periodeList) {
+  // Cari periode yang punya data verifikasi
+  const p = (periodeList || []).find(r => r.tanggal_mulai_verif || r.tanggalMulaiVerif);
+  if (!p) return ''; // tidak ada periode verifikasi diset
+
+  const mulai = p.tanggal_mulai_verif || p.tanggalMulaiVerif;
+  const selesai = p.tanggal_selesai_verif || p.tanggalSelesaiVerif;
+  const isAktif = p.isVerifToday;
+
+  const mulaiStr = mulai ? new Date(mulai).toLocaleDateString('id-ID', { timeZone:'Asia/Makassar', day:'2-digit', month:'long', year:'numeric' }) : '-';
+  const selesaiStr = selesai ? new Date(selesai).toLocaleDateString('id-ID', { timeZone:'Asia/Makassar', day:'2-digit', month:'long', year:'numeric' }) : '-';
+
+  if (isAktif) {
+    return `<div style="margin-bottom:14px;padding:10px 16px;background:#f0fdf4;border:1.5px solid #86efac;border-radius:10px;display:flex;align-items:center;gap:10px">
+      <span class="material-icons" style="color:#16a34a;font-size:20px">verified_user</span>
+      <div>
+        <div style="font-size:12px;font-weight:700;color:#15803d">Periode Verifikasi Aktif</div>
+        <div style="font-size:11px;color:#166534">${mulaiStr} — ${selesaiStr}</div>
+      </div>
+    </div>`;
+  } else {
+    // Cek apakah belum mulai atau sudah lewat
+    const now = new Date(Date.now() + 8*3600000).toISOString().slice(0,10);
+    const mulaiDs = mulai ? new Date(new Date(mulai).getTime()+8*3600000).toISOString().slice(0,10) : '9999';
+    const belumMulai = now < mulaiDs;
+    return `<div style="margin-bottom:14px;padding:10px 16px;background:#fef2f2;border:1.5px solid #fca5a5;border-radius:10px;display:flex;align-items:center;gap:10px">
+      <span class="material-icons" style="color:#dc2626;font-size:20px">lock</span>
+      <div>
+        <div style="font-size:12px;font-weight:700;color:#b91c1c">${belumMulai ? 'Periode Verifikasi Belum Dibuka' : 'Periode Verifikasi Sudah Ditutup'}</div>
+        <div style="font-size:11px;color:#991b1b">Jadwal: ${mulaiStr} — ${selesaiStr}</div>
+      </div>
+    </div>`;
+  }
+}
+
 function renderKepalasDashboard(el, d) {
   el.innerHTML = `
     <div class="stats-grid">
@@ -1129,6 +1264,7 @@ function renderKepalasDashboard(el, d) {
       ${statCard('green','check_circle','Sudah Diverifikasi', d.terverifikasi)}
       ${statCard('blue','assignment','Total Usulan PKM Saya', d.total)}
     </div>
+    ${renderPeriodeVerifBanner(d.periodeAktifList || [])}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:stretch;margin-bottom:14px">
       <div class="card" style="margin:0;display:flex;flex-direction:column">
         <div class="card-header-bar">
@@ -1199,6 +1335,7 @@ function renderProgramDashboard(el, d) {
       ${statCard('green','check_circle','Sudah Diverifikasi', d.terverifikasi)}
       ${statCard('blue','assignment','Total Ditugaskan', d.total)}
     </div>
+    ${renderPeriodeVerifBanner([{ isVerifToday: d.isVerifToday, tanggal_mulai_verif: d.tanggalMulaiVerif, tanggal_selesai_verif: d.tanggalSelesaiVerif }])}
     <div class="card" style="border-left:3px solid var(--primary);margin-bottom:14px" id="ppIndikatorInfoCard">
       <div class="card-body" style="padding:10px 16px;display:flex;align-items:center;gap:8px">
         <span class="material-icons" style="color:var(--primary);font-size:18px">info</span>
@@ -2729,6 +2866,11 @@ async function submitUsulanFromModal() {
       if (_opCatatan) _opCatatan.focus();
       return;
     }
+    if (!isValidText(_opCatatan.value)) {
+      toast('Catatan/Sanggahan harus mengandung teks yang bermakna', 'error');
+      if (_opCatatan) _opCatatan.focus();
+      return;
+    }
   }
   showConfirm({
     title: isResubmit ? 'Ajukan Ulang' : 'Submit Usulan',
@@ -3878,6 +4020,7 @@ async function submitIndVerifikasi(idUsulan, displayInds, role) {
     if (isTolak) {
       const alasan = document.getElementById(`pgAlasan_${i.no}`)?.value?.trim();
       if (!alasan) return toast(`Isi alasan penolakan untuk indikator #${i.no}`, 'warning');
+      if (!isValidText(alasan)) return toast(`Alasan penolakan indikator #${i.no} harus mengandung teks yang bermakna`, 'warning');
       indikatorList.push({ noIndikator: i.no, aksi: 'tolak', alasan });
     } else {
       indikatorList.push({ noIndikator: i.no, aksi: 'setuju' });
@@ -3900,12 +4043,14 @@ async function submitIndVerifikasi(idUsulan, displayInds, role) {
   if (role === 'Kepala Puskesmas' && document.getElementById('kapusCatatanWrap')?.style.display !== 'none') {
     const _adaSetuju = indikatorList.some(i => i.aksi === 'setuju');
     if (_adaSetuju && !catatanKapus) return toast('Catatan / Tanggapan wajib diisi saat menyanggah penolakan PP', 'warning');
+    if (_adaSetuju && catatanKapus && !isValidText(catatanKapus)) return toast('Catatan / Tanggapan harus mengandung teks yang bermakna', 'warning');
   }
 
   const catatanProgram = role === 'Pengelola Program' ? (document.getElementById('ppCatatanInput')?.value?.trim() || '') : undefined;
   if (!_isRespondPenolakan && role === 'Pengelola Program' && document.getElementById('ppCatatanWrap')?.style.display !== 'none') {
     const adaYangSetuju = indikatorList.some(i => i.aksi === 'setuju');
     if (adaYangSetuju && !catatanProgram) return toast('Catatan / Sanggahan wajib diisi saat menyanggah penolakan Admin', 'warning');
+    if (adaYangSetuju && catatanProgram && !isValidText(catatanProgram)) return toast('Catatan / Sanggahan harus mengandung teks yang bermakna', 'warning');
   }
 
   // Untuk respond-penolakan: ubah format dari indikatorList → responList
@@ -3915,6 +4060,7 @@ async function submitIndVerifikasi(idUsulan, displayInds, role) {
     for (const item of indikatorList) {
       const catatan = item.aksi === 'tolak' ? item.alasan : (catatanProgram || '');
       if (!catatan || !catatan.trim()) return toast(`Isi catatan untuk indikator #${item.noIndikator}`, 'warning');
+      if (!isValidText(catatan)) return toast(`Catatan untuk indikator #${item.noIndikator} harus mengandung teks yang bermakna`, 'warning');
     }
   }
 
@@ -5566,16 +5712,29 @@ async function renderPeriode(el) {
             <div class="form-group"><label>Tahun</label><select class="form-control" id="pTahun">${yearOptions(currentTahun)}</select></div>
             <div class="form-group"><label>Bulan</label><select class="form-control" id="pBulan">${bulanOptions(CURRENT_BULAN)}</select></div>
           </div>
-          <div class="form-row">
-            <div class="form-group"><label>Tanggal Mulai</label><input type="date" class="form-control" id="pMulai"></div>
-            <div class="form-group"><label>Jam Mulai</label><input type="time" class="form-control" id="pJamMulai" value="08:00"></div>
+          <div style="margin:4px 0 8px;padding:8px 12px;background:#eff6ff;border-radius:8px;border:1px solid #bfdbfe">
+            <div style="font-size:12px;font-weight:700;color:#1d4ed8;margin-bottom:8px;display:flex;align-items:center;gap:6px">
+              <span class="material-icons" style="font-size:15px">edit_calendar</span>Periode Input (Operator)
+            </div>
+            <div class="form-row" style="margin-bottom:8px">
+              <div class="form-group" style="margin-bottom:0"><label>Tanggal Mulai</label><input type="date" class="form-control" id="pMulai"></div>
+              <div class="form-group" style="margin-bottom:0"><label>Jam Mulai</label><input type="time" class="form-control" id="pJamMulai" value="08:00"></div>
+            </div>
+            <div class="form-row" style="margin-bottom:0">
+              <div class="form-group" style="margin-bottom:0"><label>Tanggal Selesai</label><input type="date" class="form-control" id="pSelesai"></div>
+              <div class="form-group" style="margin-bottom:0"><label>Jam Selesai</label><input type="time" class="form-control" id="pJamSelesai" value="17:00"></div>
+            </div>
           </div>
-          <div class="form-row">
-            <div class="form-group"><label>Tanggal Selesai</label><input type="date" class="form-control" id="pSelesai"></div>
-            <div class="form-group"><label>Jam Selesai</label><input type="time" class="form-control" id="pJamSelesai" value="17:00"></div>
-          </div>
-          <div class="form-group"><label>Notifikasi untuk Operator</label>
-            <textarea class="form-control" id="pNotif" rows="2" placeholder="Contoh: Input data SPM bulan Maret dibuka hingga 28 Maret 2026 pukul 17.00 WITA"></textarea>
+
+          <div style="margin:8px 0 6px;padding:8px 12px;background:#f0fdf4;border-radius:8px;border:1px solid #bbf7d0">
+            <div style="font-size:12px;font-weight:700;color:#15803d;margin-bottom:8px;display:flex;align-items:center;gap:6px">
+              <span class="material-icons" style="font-size:15px">verified_user</span>Periode Verifikasi (Kapus & Pengelola Program)
+            </div>
+            <div class="form-row" style="margin-bottom:0">
+              <div class="form-group" style="margin-bottom:0"><label>Tanggal Mulai Verifikasi</label><input type="date" class="form-control" id="pMulaiVerif"></div>
+              <div class="form-group" style="margin-bottom:0"><label>Tanggal Selesai Verifikasi</label><input type="date" class="form-control" id="pSelesaiVerif"></div>
+            </div>
+            <div style="font-size:11px;color:#16a34a;margin-top:6px">Kosongkan jika tidak ingin membatasi waktu verifikasi.</div>
           </div>
           <div class="form-group"><label>Status</label>
             <select class="form-control" id="pStatus">
@@ -5618,7 +5777,6 @@ async function loadPeriodeGrid() {
         const _svgCal  = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>';
         const _svgOpen = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
         const _svgClose= '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
-        const _svgNotif= '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>';
         const jm  = p.jamMulai   || '08:00';
         const js  = p.jamSelesai || '17:00';
         return `<div style="border:1.5px solid #a7f3d0;border-radius:10px;overflow:hidden;background:white;box-shadow:0 1px 4px rgba(13,148,136,0.08);cursor:pointer" onclick="editPeriode(${p.tahun},${p.bulan})">
@@ -5638,7 +5796,7 @@ async function loadPeriodeGrid() {
               <div style="font-size:12px;font-weight:700;color:#0f172a">${formatDate(p.tanggalSelesai)} ${js} WITA</div></div>
             </div>
           </div>
-          ${p.notifOperator ? `<div style="display:flex;align-items:flex-start;gap:8px;padding:8px 14px;background:#fffbeb;border-top:1px solid #fcd34d"><span style="color:#d97706;display:flex;flex-shrink:0;margin-top:1px">${_svgNotif}</span><div style="font-size:12px;color:#0f172a;line-height:1.5">${p.notifOperator}</div></div>` : ''}
+          ${p.tanggalMulaiVerif ? `<div style="display:flex;align-items:center;gap:8px;padding:8px 14px;background:#f0fdf4;border-top:1px solid #bbf7d0"><span class="material-icons" style="font-size:15px;color:#15803d">verified_user</span><div style="font-size:12px;color:#15803d"><span style="font-weight:700">Verifikasi:</span> ${formatDate(p.tanggalMulaiVerif)} — ${formatDate(p.tanggalSelesaiVerif)}</div></div>` : ''}
         </div>`;
       }
 
@@ -5655,7 +5813,7 @@ async function loadPeriodeGrid() {
         <div style="font-size:12px;color:var(--text-light);display:flex;flex-direction:column;gap:3px">
           <div>Mulai: ${formatDate(p.tanggalMulai)}${p.jamMulai ? ` pukul ${p.jamMulai}` : ''}</div>
           <div>Selesai: ${formatDate(p.tanggalSelesai)}${p.jamSelesai ? ` pukul ${p.jamSelesai}` : ''}</div>
-          ${p.notifOperator ? `<div style="margin-top:6px;padding:5px 8px;background:rgba(13,148,136,0.08);border-radius:6px;color:var(--text-md);font-size:11px;border-left:3px solid var(--primary)"><span style="font-weight:600">Notif:</span> ${p.notifOperator}</div>` : ''}
+          ${p.tanggalMulaiVerif ? `<div style="margin-top:6px;padding:5px 8px;background:#f0fdf4;border-radius:6px;font-size:11px;border-left:3px solid #16a34a;color:#15803d"><span style="font-weight:600">Verifikasi:</span> ${formatDate(p.tanggalMulaiVerif)} — ${formatDate(p.tanggalSelesaiVerif)}</div>` : ''}
         </div>
       </div>`;
     }).join('');
@@ -5674,8 +5832,9 @@ async function openPeriodeModal() {
   document.getElementById('pSelesai').value = '';
   document.getElementById('pJamMulai').value = '08:00';
   document.getElementById('pJamSelesai').value = '17:00';
-  document.getElementById('pNotif').value = '';
   document.getElementById('pStatus').value = 'Aktif';
+  document.getElementById('pMulaiVerif').value = '';
+  document.getElementById('pSelesaiVerif').value = '';
   showModal('periodeModal');
 }
 
@@ -5695,8 +5854,9 @@ async function editPeriode(tahun, bulan) {
     document.getElementById('pSelesai').value = p.tanggalSelesai ? p.tanggalSelesai.toString().substr(0, 10) : '';
     document.getElementById('pJamMulai').value = p.jamMulai || '08:00';
     document.getElementById('pJamSelesai').value = p.jamSelesai || '17:00';
-    document.getElementById('pNotif').value = p.notifOperator || '';
     document.getElementById('pStatus').value = p.status;
+    document.getElementById('pMulaiVerif').value = p.tanggalMulaiVerif ? p.tanggalMulaiVerif.toString().substr(0, 10) : '';
+    document.getElementById('pSelesaiVerif').value = p.tanggalSelesaiVerif ? p.tanggalSelesaiVerif.toString().substr(0, 10) : '';
     showModal('periodeModal');
   } catch (e) { openPeriodeModal(); }
 }
@@ -5729,12 +5889,15 @@ async function savePeriode() {
   const tanggalSelesai = document.getElementById('pSelesai').value;
   const jamMulai = document.getElementById('pJamMulai').value || '08:00';
   const jamSelesai = document.getElementById('pJamSelesai').value || '17:00';
-  const notifOperator = document.getElementById('pNotif').value.trim();
   const status = document.getElementById('pStatus').value;
+  const tanggalMulaiVerif = document.getElementById('pMulaiVerif').value || null;
+  const tanggalSelesaiVerif = document.getElementById('pSelesaiVerif').value || null;
   if (!tanggalMulai || !tanggalSelesai) return toast('Tanggal mulai dan selesai harus diisi', 'error');
+  if (tanggalMulaiVerif && !tanggalSelesaiVerif) return toast('Tanggal selesai verifikasi harus diisi', 'error');
+  if (!tanggalMulaiVerif && tanggalSelesaiVerif) return toast('Tanggal mulai verifikasi harus diisi', 'error');
   setLoading(true);
   try {
-    await API.savePeriode({ tahun, bulan, namaBulan: BULAN_NAMA[bulan], tanggalMulai, tanggalSelesai, jamMulai, jamSelesai, notifOperator, status });
+    await API.savePeriode({ tahun, bulan, namaBulan: BULAN_NAMA[bulan], tanggalMulai, tanggalSelesai, jamMulai, jamSelesai, tanggalMulaiVerif, tanggalSelesaiVerif, status });
     toast('Periode berhasil disimpan', 'success');
     closeModal('periodeModal');
     loadPeriodeGrid();

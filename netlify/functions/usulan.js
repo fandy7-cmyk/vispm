@@ -26,6 +26,11 @@ async function runMigrations(pool) {
   _migrated = true;
 }
 
+// Validasi teks: harus mengandung minimal 1 huruf atau angka (bukan hanya simbol/spasi)
+function isValidText(str) {
+  return str && /[a-zA-Z0-9\u00C0-\u024F\u4e00-\u9fff]/.test(str.trim());
+}
+
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors();
   const pool = getPool();
@@ -638,6 +643,25 @@ async function verifKapus(pool, body) {
   if (row.status_global !== 'Menunggu Kepala Puskesmas') return err('Usulan tidak dalam status Menunggu Kepala Puskesmas');
   if (row.kapus_pkm && row.kode_pkm !== row.kapus_pkm) return err('Anda hanya dapat memverifikasi usulan dari puskesmas Anda sendiri');
 
+  // Cek periode verifikasi
+  const hdrVerif = await pool.query(`SELECT tahun, bulan FROM usulan_header WHERE id_usulan=$1`, [idUsulan]);
+  if (hdrVerif.rows.length) {
+    const { tahun, bulan } = hdrVerif.rows[0];
+    const pvRes = await pool.query(
+      `SELECT tanggal_mulai_verif, tanggal_selesai_verif FROM periode_input WHERE tahun=$1 AND bulan=$2 AND status='Aktif'`,
+      [tahun, bulan]
+    ).catch(() => ({ rows: [] }));
+    if (pvRes.rows.length && pvRes.rows[0].tanggal_mulai_verif && pvRes.rows[0].tanggal_selesai_verif) {
+      const nowWita = new Date(Date.now() + 8 * 3600000);
+      const todayStr = nowWita.toISOString().slice(0, 10);
+      const toDs = (v) => { const d = new Date(new Date(v).getTime() + 8*3600000); return d.toISOString().slice(0,10); };
+      const mulaiVerif  = toDs(pvRes.rows[0].tanggal_mulai_verif);
+      const selesaiVerif = toDs(pvRes.rows[0].tanggal_selesai_verif);
+      if (todayStr < mulaiVerif) return err(`Periode verifikasi belum dibuka. Dibuka mulai ${new Date(pvRes.rows[0].tanggal_mulai_verif).toLocaleDateString('id-ID')}.`);
+      if (todayStr > selesaiVerif) return err(`Periode verifikasi sudah ditutup pada ${new Date(pvRes.rows[0].tanggal_selesai_verif).toLocaleDateString('id-ID')}.`);
+    }
+  }
+
   const adaTolak = indikatorList.some(i => i.aksi === 'tolak');
 
   // Simpan catatan/alasan setuju per indikator (opsional)
@@ -882,15 +906,31 @@ async function verifProgram(pool, body) {
   if (!_roleCheckPP.rows.length || !['Pengelola Program','Program'].includes(_roleCheckPP.rows[0].role))
     return err('Akses ditolak', 403);
 
-  const headerRes = await pool.query('SELECT status_global, ditolak_oleh FROM usulan_header WHERE id_usulan=$1', [idUsulan]);
+  const headerRes = await pool.query('SELECT status_global, ditolak_oleh, tahun, bulan FROM usulan_header WHERE id_usulan=$1', [idUsulan]);
   if (!headerRes.rows.length) return err('Usulan tidak ditemukan');
   if (!['Menunggu Pengelola Program','Ditolak'].includes(headerRes.rows[0].status_global))
     return err('Usulan tidak dalam tahap verifikasi program');
 
+  // Cek periode verifikasi
+  const { tahun: tahunVP, bulan: bulanVP } = headerRes.rows[0];
+  const pvResVP = await pool.query(
+    `SELECT tanggal_mulai_verif, tanggal_selesai_verif FROM periode_input WHERE tahun=$1 AND bulan=$2 AND status='Aktif'`,
+    [tahunVP, bulanVP]
+  ).catch(() => ({ rows: [] }));
+  if (pvResVP.rows.length && pvResVP.rows[0].tanggal_mulai_verif && pvResVP.rows[0].tanggal_selesai_verif) {
+    const nowWita = new Date(Date.now() + 8 * 3600000);
+    const todayStr = nowWita.toISOString().slice(0, 10);
+    const toDs = (v) => { const d = new Date(new Date(v).getTime() + 8*3600000); return d.toISOString().slice(0,10); };
+    const mulaiVerif   = toDs(pvResVP.rows[0].tanggal_mulai_verif);
+    const selesaiVerif = toDs(pvResVP.rows[0].tanggal_selesai_verif);
+    if (todayStr < mulaiVerif) return err(`Periode verifikasi belum dibuka. Dibuka mulai ${new Date(pvResVP.rows[0].tanggal_mulai_verif).toLocaleDateString('id-ID')}.`);
+    if (todayStr > selesaiVerif) return err(`Periode verifikasi sudah ditutup pada ${new Date(pvResVP.rows[0].tanggal_selesai_verif).toLocaleDateString('id-ID')}.`);
+  }
+
   // Validasi: catatan PP wajib hanya pada re-verifikasi dari Admin, jika ada indikator yang disetujui
   const isReVerifAdmin = headerRes.rows[0].ditolak_oleh === 'Admin';
   const adaYangSetuju = indikatorList.some(i => i.aksi === 'setuju');
-  if (isReVerifAdmin && adaYangSetuju && !catatanProgram?.trim()) return err('Catatan / Sanggahan wajib diisi jika ada indikator yang disetujui');
+  if (isReVerifAdmin && adaYangSetuju && !isValidText(catatanProgram)) return err('Catatan / Sanggahan wajib diisi dengan teks yang bermakna jika ada indikator yang disetujui');
 
   const vpCheck = await pool.query(
     'SELECT id, status, indikator_akses FROM verifikasi_program WHERE id_usulan=$1 AND LOWER(email_program)=LOWER($2)',
@@ -1228,6 +1268,7 @@ async function rejectUsulan(pool, body) {
   const { idUsulan, email, role, alasan, indikatorList } = body;
   // indikatorList: array { noIndikator, alasan } — untuk Admin & Pengelola Program
   if (!alasan && !indikatorList) return err('Alasan penolakan wajib diisi');
+  if (alasan && !isValidText(alasan)) return err('Alasan penolakan harus mengandung teks yang bermakna');
 
   if (role === 'Kepala Puskesmas') {
     // Kepala Puskesmas tolak global → VP hanya reset yang memegang indikator bermasalah
@@ -1474,6 +1515,7 @@ async function respondPenolakan(pool, body) {
   // Simpan respon per indikator
   for (const item of responList) {
     if (!item.catatan || !item.catatan.trim()) return err(`Catatan wajib diisi untuk indikator ${item.noIndikator}`);
+    if (!isValidText(item.catatan)) return err(`Catatan untuk indikator ${item.noIndikator} harus mengandung teks yang bermakna`);
     await pool.query(
       `UPDATE penolakan_indikator SET aksi=$1, catatan_program=$2, email_program=$3, responded_at=NOW()
        WHERE id_usulan=$4 AND no_indikator=$5`,
@@ -1483,15 +1525,19 @@ async function respondPenolakan(pool, body) {
       idUsulan, `Indikator ${item.noIndikator}: ${item.catatan.trim()}`);
   }
 
-  // Update status VP user ini sudah respond + simpan sanggahan gabungan ke verifikasi_program
-  // Gabungkan semua catatan per indikator yang PP ini respond
+  // Update status VP user ini sudah respond + simpan ke verifikasi_program.
+  // sanggahan = catatan gabungan per indikator (untuk ditampilkan di UI)
+  // catatan   = aksi respon PP ini ('tolak' atau 'sanggah') — dipakai untuk deteksi
+  //             saat semua PP selesai respond, agar tidak bergantung pada penolakan_indikator
+  //             yang bisa ter-overwrite jika banyak PP merespon indikator yang sama.
   const sanggahanGabungan = responList
     .map(item => `Ind.${item.noIndikator}: ${item.catatan.trim()}`)
     .join(' | ');
+  const aksiRespon = responList.some(i => i.aksi === 'tolak') ? 'tolak' : 'sanggah';
   await pool.query(
-    `UPDATE verifikasi_program SET status='Selesai', verified_at=NOW(), sanggahan=$3
+    `UPDATE verifikasi_program SET status='Selesai', verified_at=NOW(), sanggahan=$3, catatan=$4
      WHERE id_usulan=$1 AND LOWER(email_program)=LOWER($2)`,
-    [idUsulan, email, sanggahanGabungan]
+    [idUsulan, email, sanggahanGabungan, aksiRespon]
   );
 
   // Cek PP yang masih perlu respond:
@@ -1522,12 +1568,15 @@ async function respondPenolakan(pool, body) {
     return ok({ message: 'Respon tersimpan. Menunggu Pengelola Program lain.', selesai: false });
   }
 
-  // Semua sudah respond — cek ada yang 'tolak' tidak
-  const adaTolak = await pool.query(
-    `SELECT COUNT(*) as ct FROM penolakan_indikator WHERE id_usulan=$1 AND aksi='tolak'`,
+  // Semua sudah respond — cek ada yang 'tolak' tidak.
+  // FIX: Cek dari verifikasi_program.catatan (aksi respon per PP), BUKAN dari
+  // penolakan_indikator.aksi yang bisa ter-overwrite jika banyak PP merespon
+  // indikator yang sama (karena UNIQUE constraint hanya per id_usulan+no_indikator).
+  const vpRespon = await pool.query(
+    `SELECT catatan FROM verifikasi_program WHERE id_usulan=$1 AND status='Selesai'`,
     [idUsulan]
   );
-  const jumlahTolak = parseInt(adaTolak.rows[0].ct);
+  const jumlahTolak = vpRespon.rows.filter(r => r.catatan === 'tolak').length;
 
   if (jumlahTolak === 0) {
     // Semua sanggah → langsung ke Admin, pertahankan ditolak_oleh='Admin' agar Admin tahu re-verifikasi

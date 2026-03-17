@@ -795,38 +795,49 @@ function renderAdminDashboard(el, d) {
         </div>
       </div>
     </div>
-    <div class="card">
-      <div class="card-header-bar">
-        <span class="card-title"><span class="material-icons">local_hospital</span>Progress per Puskesmas</span>
-        <button class="btn btn-secondary btn-sm" onclick="loadPage('verifikasi')">
-          <span class="material-icons">arrow_forward</span>Lihat Semua Usulan
-        </button>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:stretch">
+      <div class="card" style="margin:0">
+        <div class="card-header-bar">
+          <span class="card-title"><span class="material-icons">pending_actions</span>Menunggu Verifikasi Admin</span>
+          <button class="btn btn-secondary btn-sm" onclick="loadPage('verifikasi')">
+            <span class="material-icons">arrow_forward</span>Lihat Semua
+          </button>
+        </div>
+        <div class="card-body" style="padding:0">
+          <div id="adminPendingTable"><div class="empty-state" style="padding:32px"><span class="material-icons">hourglass_empty</span><p>Memuat...</p></div></div>
+        </div>
       </div>
-      <div class="card-body" style="padding:0" id="pkmProgressTable">
-        <div class="empty-state" style="padding:32px"><span class="material-icons">hourglass_empty</span><p>Memuat...</p></div>
-      </div>
-    </div>
-    <div class="card">
-      <div class="card-header-bar">
-        <span class="card-title"><span class="material-icons">history</span>Usulan Terbaru</span>
-        <button class="btn btn-secondary btn-sm" onclick="loadPage('verifikasi')">
-          <span class="material-icons">arrow_forward</span>Lihat Semua
-        </button>
-      </div>
-      <div class="card-body" style="padding:0">
-        <div id="recentTable"><div class="empty-state" style="padding:32px"><span class="material-icons">hourglass_empty</span><p>Memuat...</p></div></div>
+      <div class="card" style="margin:0">
+        <div class="card-header-bar">
+          <span class="card-title"><span class="material-icons">local_hospital</span>Progress per Puskesmas</span>
+          <button class="btn btn-secondary btn-sm" onclick="loadPage('verifikasi')">
+            <span class="material-icons">arrow_forward</span>Lihat Semua Usulan
+          </button>
+        </div>
+        <div class="card-body" style="padding:0" id="pkmProgressTable">
+          <div class="empty-state" style="padding:32px"><span class="material-icons">hourglass_empty</span><p>Memuat...</p></div>
+        </div>
       </div>
     </div>`;
 
-  // Load recent usulan
-  API.getUsulan({ tahun: CURRENT_YEAR }).then(rows => {
-    document.getElementById('recentTable').innerHTML = renderUsulanTable(rows.slice(0, 10), 'admin');
-    // Render progress per PKM dari data usulan
-    renderPKMProgressTable(rows);
+  // Load usulan menunggu Admin
+  API.getUsulan({ awaiting_admin: 'true' }).then(rows => {
+    const el = document.getElementById('adminPendingTable');
+    if (!el) return;
+    if (!rows || !rows.length) {
+      el.innerHTML = `<div class="empty-state" style="padding:32px"><span class="material-icons">check_circle</span><p>Tidak ada usulan yang menunggu verifikasi</p></div>`;
+      return;
+    }
+    el.innerHTML = renderUsulanTable(rows, 'admin');
   }).catch(() => {
-    const el = document.getElementById('recentTable');
-    if (el) el.innerHTML = `<div class="empty-state" style="padding:32px"><span class="material-icons">inbox</span><p>Belum ada data usulan</p></div>`;
+    const el = document.getElementById('adminPendingTable');
+    if (el) el.innerHTML = `<div class="empty-state" style="padding:32px"><span class="material-icons">inbox</span><p>Gagal memuat data</p></div>`;
   });
+
+  // Load progress per PKM
+  API.getUsulan({ tahun: CURRENT_YEAR }).then(rows => {
+    renderPKMProgressTable(rows);
+  }).catch(() => {});
 }
 
 function renderStatusSummary(d) {

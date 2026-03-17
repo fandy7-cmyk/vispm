@@ -2071,8 +2071,9 @@ async function openIndikatorModal(idUsulan) {
         <td style="text-align:center;font-size:12.5px;color:#475569">${ind.sasaranTahunan > 0 ? ind.sasaranTahunan : '<span style="color:#cbd5e1">-</span>'}</td>
         <td style="text-align:center">
           ${isLocked ? `<span>${ind.target}</span>` : `<input type="number" id="t-${ind.no}" value="${ind.target}" min="0" step="1"
+            ${!INDIKATOR_TARGET_KUNCI.includes(ind.no) && ind.sasaranTahunan > 0 ? `max="${ind.sasaranTahunan}"` : ''}
             style="width:72px;border:1.5px solid var(--border);border-radius:6px;padding:3px 6px;font-size:13px;text-align:center"
-            title="Target sasaran layanan (bilangan bulat)"
+            title="Target sasaran layanan (bilangan bulat${!INDIKATOR_TARGET_KUNCI.includes(ind.no) && ind.sasaranTahunan > 0 ? ', maks ' + ind.sasaranTahunan : ''})"
             onchange="saveIndikator(${ind.no})" oninput="previewSPM(${ind.no})"
             onkeypress="return event.charCode>=48&&event.charCode<=57">`}
         </td>
@@ -2667,6 +2668,17 @@ async function downloadBukti(idx) {
 async function saveIndikator(noIndikator) {
   const target  = parseFloat(document.getElementById(`t-${noIndikator}`)?.value) || 0;
   const capaian = parseFloat(document.getElementById(`c-${noIndikator}`)?.value) || 0;
+
+  // Validasi: target bulan tidak boleh melebihi target tahunan (kecuali indikator #8 & #9)
+  if (!INDIKATOR_TARGET_KUNCI.includes(noIndikator)) {
+    const sasaran = parseInt(document.getElementById(`sasaran-${noIndikator}`)?.value) || 0;
+    if (sasaran > 0 && target > sasaran) {
+      const tEl = document.getElementById(`t-${noIndikator}`);
+      if (tEl) tEl.value = sasaran;
+      toast(`Target Bulan Ini Indikator ${noIndikator} tidak boleh melebihi Target Tahunan (${sasaran})`, 'warning');
+      return;
+    }
+  }
 
   try {
     // Kirim update — tanpa linkFile supaya link yg sudah ada tidak terhapus

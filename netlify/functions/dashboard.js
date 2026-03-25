@@ -67,7 +67,7 @@ async function operatorStats(pool, email) {
 
   // Periode aktif — ambil semua
   const periodeResult = await pool.query(
-    `SELECT tahun, bulan, nama_bulan, tanggal_mulai, tanggal_selesai, jam_mulai, jam_selesai
+    `SELECT tahun, bulan, nama_bulan, tanggal_mulai, tanggal_selesai, jam_mulai, jam_selesai, notif_operator
      FROM periode_input
      WHERE status='Aktif' AND tanggal_mulai <= CURRENT_DATE AND tanggal_selesai >= CURRENT_DATE
      ORDER BY tahun, bulan`
@@ -95,25 +95,18 @@ async function kapusStats(pool, kodePKM) {
       [kodePKM]
     ),
     pool.query(
-      `SELECT tahun, bulan, nama_bulan, tanggal_mulai, tanggal_selesai, jam_mulai, jam_selesai, tanggal_mulai_verif, tanggal_selesai_verif
+      `SELECT tahun, bulan, nama_bulan, tanggal_mulai, tanggal_selesai, jam_mulai, jam_selesai, notif_operator
        FROM periode_input
        WHERE status='Aktif' AND tanggal_mulai <= CURRENT_DATE AND tanggal_selesai >= CURRENT_DATE
        ORDER BY tahun, bulan`
     )
   ]);
   const s = result.rows[0];
-  const _nowWita = new Date(Date.now() + 8 * 3600000);
-  const _todayStr = _nowWita.toISOString().slice(0, 10);
-  const _toDs = (v) => { if (!v) return ''; const d = new Date(new Date(v).getTime() + 8*3600000); return d.toISOString().slice(0,10); };
   return ok({
     menunggu: parseInt(s.menunggu) || 0,
     terverifikasi: parseInt(s.terverifikasi) || 0,
     total: parseInt(s.total) || 0,
-    periodeAktifList: periodeResult.rows.map(r => ({
-      ...r,
-      isVerifToday: !!r.tanggal_mulai_verif && !!r.tanggal_selesai_verif
-        && _todayStr >= _toDs(r.tanggal_mulai_verif) && _todayStr <= _toDs(r.tanggal_selesai_verif)
-    }))
+    periodeAktifList: periodeResult.rows
   });
 }
 
@@ -172,28 +165,10 @@ async function programStats(pool, email) {
   }
 
   const s = totalResult.rows[0];
-
-  // Ambil periode verifikasi aktif untuk PP
-  const pvResult = await pool.query(
-    `SELECT tanggal_mulai_verif, tanggal_selesai_verif
-     FROM periode_input
-     WHERE status='Aktif' AND tanggal_mulai <= CURRENT_DATE AND tanggal_selesai >= CURRENT_DATE
-     ORDER BY tahun, bulan LIMIT 1`
-  ).catch(() => ({ rows: [] }));
-  const pv = pvResult.rows[0] || {};
-  const _nowWita2 = new Date(Date.now() + 8 * 3600000);
-  const _todayStr2 = _nowWita2.toISOString().slice(0, 10);
-  const _toDs2 = (v) => { if (!v) return ''; const d = new Date(new Date(v).getTime() + 8*3600000); return d.toISOString().slice(0,10); };
-  const isVerifToday = !!pv.tanggal_mulai_verif && !!pv.tanggal_selesai_verif
-    && _todayStr2 >= _toDs2(pv.tanggal_mulai_verif) && _todayStr2 <= _toDs2(pv.tanggal_selesai_verif);
-
   return ok({
     menunggu,
     terverifikasi: parseInt(s.terverifikasi) || 0,
-    total: parseInt(s.total) || 0,
-    isVerifToday,
-    tanggalMulaiVerif: pv.tanggal_mulai_verif || null,
-    tanggalSelesaiVerif: pv.tanggal_selesai_verif || null
+    total: parseInt(s.total) || 0
   });
 }
 

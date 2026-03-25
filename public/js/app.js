@@ -2,11 +2,6 @@
 // No. 8: Hipertensi, No. 9: Diabetes Melitus
 const INDIKATOR_TARGET_KUNCI = [8, 9];
 
-// Validasi teks: harus mengandung minimal 1 huruf atau angka (bukan hanya simbol/spasi)
-function isValidText(str) {
-  return str && /[a-zA-Z0-9\u00C0-\u024F]/.test(str.trim());
-}
-
 // ============== CATATAN THREAD HELPER ==============
 // Render riwayat catatan sebagai zigzag timeline (5 per baris), collapse by default
 async function renderCatatanThread(elId, idUsulan, currentRole) {
@@ -21,7 +16,7 @@ async function renderCatatanThread(elId, idUsulan, currentRole) {
     const data = await API.getLogAktivitas(idUsulan);
     logs = (data.logs || []).filter(l => {
       if (!AKSI_CHAT.includes(l.aksi) || !l.detail || !l.detail.trim()) return false;
-      if (l.aksi === 'Approve') return !APPROVE_SKIP.includes(l.detail.trim()) || l.detail.includes('Catatan:') || l.detail.includes('Re-verifikasi') || l.detail.includes('Menyanggah');
+      if (l.aksi === 'Approve') return !APPROVE_SKIP.includes(l.detail.trim());
       return true;
     });
   } catch(e) { return; }
@@ -34,26 +29,13 @@ async function renderCatatanThread(elId, idUsulan, currentRole) {
     'Pengelola Program': { color:'#7c3aed', bg:'#f5f3ff', border:'#c4b5fd' },
     'Admin':             { color:'#dc2626', bg:'#fef2f2', border:'#fca5a5' },
   };
-  const aksiConfig = {
-    'Submit':            { icon:'send',           label:'Diajukan' },
-    'Ajukan Ulang':      { icon:'restart_alt',    label:'Ajukan Ulang' },
-    'Approve':           { icon:'check_circle',   label:'Disetujui' },
-    'Approve Final':     { icon:'verified',       label:'Final Disetujui' },
-    'Re-verifikasi':     { icon:'update',         label:'Re-verifikasi' },
-    'Tolak':             { icon:'cancel',         label:'Ditolak' },
-    'Tolak (sebagian)':  { icon:'remove_circle',  label:'Tolak Sebagian' },
-    'Tolak Indikator':   { icon:'cancel',         label:'Tolak Indikator' },
-    'Tolak Ke Operator': { icon:'reply',          label:'Tolak Ke Operator' },
-    'Kembalikan':        { icon:'undo',           label:'Dikembalikan' },
-    'Sanggah':           { icon:'gavel',          label:'Sanggah' },
-    'Sanggah Selesai':   { icon:'check_circle',   label:'Sanggah Selesai' },
-    'PP Membenarkan':    { icon:'fact_check',    label:'PP Setuju Tolak' },
-    'Kapus Membenarkan': { icon:'how_to_reg',     label:'Kapus Setuju Tolak' },
-    'Kapus Menyanggah':  { icon:'gavel',          label:'Kapus Tidak Setuju' },
-    'Reset':             { icon:'restart_alt',    label:'Direset Admin' },
-    'Restore Verif':     { icon:'restore',        label:'Dipulihkan' },
+  const aksiIcon = {
+    'Tolak':'cancel','Tolak (sebagian)':'remove_circle','Sanggah':'gavel',
+    'Sanggah Selesai':'check_circle','Ajukan Ulang':'restart_alt',
+    'Kembalikan':'undo','Tolak Ke Operator':'reply','Tolak Indikator':'cancel',
+    'Approve':'check_circle','Re-verifikasi':'update',
+    'PP Membenarkan':'thumb_down_alt','Kapus Membenarkan':'thumb_down_alt','Kapus Menyanggah':'gavel',
   };
-  const aksiIcon = Object.fromEntries(Object.entries(aksiConfig).map(([k,v]) => [k, v.icon]));
   function fmtDT(ts) {
     const d = new Date(ts), o = { timeZone:'Asia/Makassar' };
     const tgl = d.toLocaleDateString('id-ID',{...o,day:'2-digit',month:'2-digit',year:'numeric'});
@@ -73,27 +55,23 @@ async function renderCatatanThread(elId, idUsulan, currentRole) {
     const icon = aksiIcon[log.aksi] || 'chat';
     const nama = log.user_nama || log.user_email;
     const cardId = pfx + '_' + idx;
-    // Warna badge aksi — ambil dari aksiConfig, fallback ke role color
-    const _aksiColorMap = {
-      'Submit':            { c:'#0d9488', b:'#f0fdf9' },
-      'Ajukan Ulang':      { c:'#0d9488', b:'#f0fdf9' },
-      'Approve':           { c:'#16a34a', b:'#f0fdf4' },
-      'Approve Final':     { c:'#16a34a', b:'#f0fdf4' },
-      'Re-verifikasi':     { c:'#0891b2', b:'#ecfeff' },
-      'Tolak':             { c:'#dc2626', b:'#fef2f2' },
-      'Tolak (sebagian)':  { c:'#d97706', b:'#fffbeb' },
-      'Tolak Indikator':   { c:'#dc2626', b:'#fef2f2' },
-      'Tolak Ke Operator': { c:'#dc2626', b:'#fef2f2' },
-      'Kembalikan':        { c:'#7c3aed', b:'#f5f3ff' },
-      'Sanggah':           { c:'#7c3aed', b:'#f5f3ff' },
-      'Sanggah Selesai':   { c:'#16a34a', b:'#f0fdf4' },
-      'PP Membenarkan':    { c:'#dc2626', b:'#fef2f2' },
-      'Kapus Membenarkan': { c:'#d97706', b:'#fffbeb' },
-      'Kapus Menyanggah':  { c:'#d97706', b:'#fffbeb' },
-      'Reset':             { c:'#d97706', b:'#fffbeb' },
-      'Restore Verif':     { c:'#6366f1', b:'#fff7ed' },
+    // Warna badge aksi — berbeda dari warna role agar mudah dibedakan
+    const aksiColorMap = {
+      'Tolak':           { c:'#dc2626', b:'#fef2f2' },
+      'Tolak (sebagian)':{ c:'#d97706', b:'#fffbeb' },
+      'Tolak Indikator': { c:'#dc2626', b:'#fef2f2' },
+      'Tolak Ke Operator':{ c:'#dc2626', b:'#fef2f2' },
+      'Kembalikan':      { c:'#7c3aed', b:'#f5f3ff' },
+      'Approve':         { c:'#059669', b:'#ecfdf5' },
+      'Re-verifikasi':   { c:'#0891b2', b:'#ecfeff' },
+      'Ajukan Ulang':    { c:'#2563eb', b:'#eff6ff' },
+      'Sanggah':         { c:'#7c3aed', b:'#f5f3ff' },
+      'Sanggah Selesai': { c:'#059669', b:'#ecfdf5' },
+      'PP Membenarkan':   { c:'#dc2626', b:'#fef2f2' },
+      'Kapus Membenarkan':{ c:'#dc2626', b:'#fef2f2' },
+      'Kapus Menyanggah': { c:'#7c3aed', b:'#f5f3ff' },
     };
-    const aksiClr = _aksiColorMap[log.aksi] || { c:cfg.color, b:cfg.bg };
+    const aksiClr = aksiColorMap[log.aksi] || { c:cfg.color, b:cfg.bg };
 
     html += `<div style="border:1.5px solid ${aksiClr.c}55;border-radius:8px;background:${aksiClr.b};overflow:hidden">
       <!-- header: selalu tampil, klik toggle -->
@@ -114,7 +92,7 @@ async function renderCatatanThread(elId, idUsulan, currentRole) {
           <div style="font-size:11.5px;font-weight:700;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nama}</div>
           <div style="font-size:10.5px;color:#64748b;margin-bottom:3px">${log.role}</div>
           <div style="font-size:10.5px;font-weight:700;color:${aksiClr.c};background:white;border:1px solid ${aksiClr.c}60;border-radius:20px;padding:1px 6px;display:inline-flex;align-items:center;gap:2px">
-            <span class="material-icons" style="font-size:11px">${icon}</span>${(aksiConfig[log.aksi]||{label:log.aksi}).label}
+            <span class="material-icons" style="font-size:11px">${icon}</span>${log.aksi}
           </div>
         </div>
       </div>
@@ -178,27 +156,6 @@ function formatTS(ts) {
   return `${tgl} | ${jam} WITA`;
 }
 
-// ============== HEADER INFO STRIP ==============
-// Render info header modal jadi 1 baris horizontal kompak
-function renderHeaderInfo(detail) {
-  const items = [
-    { label: 'Puskesmas', value: `<span style="font-size:13.5px;font-weight:600;color:var(--text-dark)">${detail.namaPKM}</span>` },
-    { label: 'Periode', value: `<span style="font-size:13.5px;font-weight:600;color:var(--text-dark)">${detail.namaBulan} ${detail.tahun}</span>` },
-    { label: 'Status', value: statusBadge(detail.statusGlobal) },
-    { label: 'Dibuat Oleh', value: `<span style="font-size:13px;font-weight:600;color:var(--text-dark)">${detail.namaPembuat || detail.createdBy || '-'}</span><div style="font-size:10.5px;color:var(--text-light);margin-top:1px">${formatTS(detail.createdAt)}</div>` },
-    { label: 'Indeks Beban Kerja', value: `<span style="font-family:'JetBrains Mono';font-size:13.5px;font-weight:600;color:var(--text-dark)">${parseFloat(detail.indeksBeban||0).toFixed(2)}</span>` },
-    { label: 'Indeks Kesulitan Wilayah', value: `<span style="font-family:'JetBrains Mono';font-size:13.5px;font-weight:600;color:var(--text-dark)">${parseFloat(detail.indeksKesulitan||0).toFixed(2)}</span>` },
-    { label: 'Indeks SPM', value: `<span style="font-family:'JetBrains Mono';font-size:15px;font-weight:800;color:var(--primary)">${parseFloat(detail.indeksSPM||0).toFixed(2)}</span>` },
-  ];
-  return `<div style="background:white;border:1px solid #e2e8f0;border-radius:10px;padding:8px 0;display:flex;align-items:center;gap:0;width:100%;margin-bottom:14px">
-    ${items.map((item, i) => `
-      <div style="padding:6px 16px;flex:1;min-width:0;${i<items.length-1?'border-right:1px solid #e2e8f0;':''}">
-        <div style="font-size:10px;color:var(--text-light);font-weight:600;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:3px;white-space:nowrap">${item.label}</div>
-        <div>${item.value}</div>
-      </div>`).join('')}
-  </div>`;
-}
-
 let currentUser = null;
 let currentPage = '';
 let pageData = {}; // cache per page
@@ -249,7 +206,7 @@ async function doLogin() {
   try {
     const user = await API.login(email, password);
     currentUser = user;
-    sessionStorage.setItem('spm_user', JSON.stringify(user));
+    localStorage.setItem('spm_user', JSON.stringify(user));
     // Catat log login
     API.logAudit({ module: 'auth', action: 'LOGIN', userEmail: user.email, userNama: user.nama, userRole: user.role, detail: 'Login berhasil' });
     startApp();
@@ -279,7 +236,7 @@ function doLogout() {
     title: 'Keluar dari Sistem',
     message: 'Yakin ingin keluar dari sistem?',
     type: 'warning',
-    onConfirm: () => { if(currentUser) API.logAudit({module:'auth',action:'LOGOUT',userEmail:currentUser.email,userNama:currentUser.nama,userRole:currentUser.role,detail:'Logout manual'}); currentUser = null; sessionStorage.removeItem('spm_user'); try { sessionStorage.removeItem('spm_last_page'); } catch(e) {} location.reload(); }
+    onConfirm: () => { if(currentUser) API.logAudit({module:'auth',action:'LOGOUT',userEmail:currentUser.email,userNama:currentUser.nama,userRole:currentUser.role,detail:'Logout manual'}); currentUser = null; localStorage.removeItem('spm_user'); try { sessionStorage.removeItem('spm_last_page'); } catch(e) {} location.reload(); }
   });
 }
 
@@ -770,10 +727,10 @@ async function renderDashboard() {
 function renderAdminDashboard(el, d) {
   el.innerHTML = `
     <div class="stats-grid">
-      ${statCard('blue','assignment','Total Usulan', d.totalUsulan, d.totalUsulan > 0 ? `${d.selesai} selesai · ${d.menunggu} proses` : 'Belum ada usulan')}
-      ${statCard('green','check_circle','Selesai', d.selesai, d.totalUsulan > 0 ? `${Math.round((d.selesai/d.totalUsulan)*100)}% dari total` : '-')}
-      ${statCard('orange','pending','Menunggu Verifikasi', d.menunggu, d.menunggu > 0 ? 'Perlu tindakan' : 'Semua tertangani')}
-      ${statCard('purple','local_hospital','Puskesmas Aktif', d.puskesmasAktif, 'Terdaftar & aktif')}
+      ${statCard('blue','assignment','Total Usulan', d.totalUsulan)}
+      ${statCard('green','check_circle','Selesai', d.selesai)}
+      ${statCard('orange','pending','Menunggu', d.menunggu)}
+      ${statCard('purple','local_hospital','Puskesmas Aktif', d.puskesmasAktif)}
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:stretch;margin-bottom:14px">
       <div class="card" style="margin:0;display:flex;flex-direction:column">
@@ -800,144 +757,38 @@ function renderAdminDashboard(el, d) {
         </div>
       </div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:stretch;margin-bottom:14px">
-      <div class="card" style="margin:0">
-        <div class="card-header-bar">
-          <span class="card-title"><span class="material-icons">pending_actions</span>Menunggu Verifikasi Admin</span>
-          <button class="btn btn-secondary btn-sm" onclick="loadPage('verifikasi')">
-            <span class="material-icons">arrow_forward</span>Lihat Semua
-          </button>
-        </div>
-        <div class="card-body" style="padding:0">
-          <div id="adminPendingTable"><div class="empty-state" style="padding:32px"><span class="material-icons">hourglass_empty</span><p>Memuat...</p></div></div>
-        </div>
+    <div class="card">
+      <div class="card-header-bar">
+        <span class="card-title"><span class="material-icons">local_hospital</span>Progress per Puskesmas</span>
+        <button class="btn btn-secondary btn-sm" onclick="loadPage('verifikasi')">
+          <span class="material-icons">arrow_forward</span>Lihat Semua Usulan
+        </button>
       </div>
-      <div class="card" style="margin:0">
-        <div class="card-header-bar">
-          <span class="card-title"><span class="material-icons">local_hospital</span>Progress per Puskesmas</span>
-          <button class="btn btn-secondary btn-sm" onclick="loadPage('verifikasi')">
-            <span class="material-icons">arrow_forward</span>Lihat Semua Usulan
-          </button>
-        </div>
-        <div class="card-body" style="padding:0" id="pkmProgressTable">
-          <div class="empty-state" style="padding:32px"><span class="material-icons">hourglass_empty</span><p>Memuat...</p></div>
-        </div>
+      <div class="card-body" style="padding:0" id="pkmProgressTable">
+        <div class="empty-state" style="padding:32px"><span class="material-icons">hourglass_empty</span><p>Memuat...</p></div>
       </div>
     </div>
-    <div class="card" style="margin:0">
-      <div class="card-header-bar" style="flex-wrap:wrap;gap:8px">
-        <span class="card-title"><span class="material-icons">history</span>Semua Usulan Terbaru</span>
-        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-left:auto">
-          <input id="adminAllSearch" type="text" placeholder="Cari ID / Puskesmas..."
-            oninput="filterAdminAllUsulan()"
-            style="border:1px solid #e2e8f0;border-radius:7px;padding:5px 10px;font-size:12px;width:150px;outline:none;font-family:inherit;color:var(--text)" />
-          <select id="adminAllFilterPKM" onchange="filterAdminAllUsulan()"
-            style="border:1px solid #e2e8f0;border-radius:7px;padding:5px 10px;font-size:12px;outline:none;font-family:inherit;background:white;color:var(--text)">
-            <option value="">Semua Puskesmas</option>
-          </select>
-          <select id="adminAllFilterTahun" onchange="filterAdminAllUsulan()"
-            style="border:1px solid #e2e8f0;border-radius:7px;padding:5px 10px;font-size:12px;outline:none;font-family:inherit;background:white;color:var(--text)">
-            <option value="">Semua Tahun</option>
-          </select>
-          <select id="adminAllFilterStatus" onchange="filterAdminAllUsulan()"
-            style="border:1px solid #e2e8f0;border-radius:7px;padding:5px 10px;font-size:12px;outline:none;font-family:inherit;background:white;color:var(--text)">
-            <option value="">Semua Status</option>
-            <option value="Draft">Draft</option>
-            <option value="Menunggu Kepala Puskesmas">Menunggu Kepala Puskesmas</option>
-            <option value="Menunggu Pengelola Program">Menunggu Pengelola Program</option>
-            <option value="Menunggu Admin">Menunggu Admin</option>
-            <option value="Selesai">Selesai</option>
-            <option value="Ditolak">Ditolak</option>
-          </select>
-        </div>
+    <div class="card">
+      <div class="card-header-bar">
+        <span class="card-title"><span class="material-icons">history</span>Usulan Terbaru</span>
+        <button class="btn btn-secondary btn-sm" onclick="loadPage('verifikasi')">
+          <span class="material-icons">arrow_forward</span>Lihat Semua
+        </button>
       </div>
       <div class="card-body" style="padding:0">
-        <div id="adminAllUsulanTable">
-          <div class="empty-state" style="padding:32px"><span class="material-icons">hourglass_empty</span><p>Memuat...</p></div>
-        </div>
+        <div id="recentTable"><div class="empty-state" style="padding:32px"><span class="material-icons">hourglass_empty</span><p>Memuat...</p></div></div>
       </div>
     </div>`;
 
-  // Load usulan menunggu Admin
-  API.getUsulan({ awaiting_admin: 'true' }).then(rows => {
-    const el = document.getElementById('adminPendingTable');
-    if (!el) return;
-    if (!rows || !rows.length) {
-      el.innerHTML = `<div class="empty-state" style="padding:32px"><span class="material-icons">check_circle</span><p>Tidak ada usulan yang menunggu verifikasi</p></div>`;
-      return;
-    }
-    el.innerHTML = renderUsulanTable(rows, 'admin');
-  }).catch(() => {
-    const el = document.getElementById('adminPendingTable');
-    if (el) el.innerHTML = `<div class="empty-state" style="padding:32px"><span class="material-icons">inbox</span><p>Gagal memuat data</p></div>`;
-  });
-
-  // Load progress per PKM
+  // Load recent usulan
   API.getUsulan({ tahun: CURRENT_YEAR }).then(rows => {
+    document.getElementById('recentTable').innerHTML = renderUsulanTable(rows.slice(0, 10), 'admin');
+    // Render progress per PKM dari data usulan
     renderPKMProgressTable(rows);
-  }).catch(() => {});
-
-  // Load semua usulan terbaru (Admin)
-  loadAdminAllUsulan();
-}
-
-// ===== ADMIN: SEMUA USULAN =====
-let _adminAllUsulanData = [];
-
-async function loadAdminAllUsulan() {
-  const el = document.getElementById('adminAllUsulanTable');
-  if (!el) return;
-  el.innerHTML = `<div class="empty-state" style="padding:32px"><span class="material-icons" style="animation:spin 0.8s linear infinite">refresh</span><p>Memuat data...</p></div>`;
-  try {
-    const rows = await API.getUsulan({});
-    _adminAllUsulanData = rows || [];
-    renderAdminAllUsulanTable(_adminAllUsulanData);
-    // Populate filter puskesmas
-    const pkmSet = [...new Set(_adminAllUsulanData.map(u => u.namaPKM || u.kodePKM).filter(Boolean))].sort();
-    const pkmSel = document.getElementById('adminAllFilterPKM');
-    if (pkmSel) {
-      pkmSel.innerHTML = `<option value="">Semua Puskesmas</option>` + pkmSet.map(p => `<option value="${p}">${p}</option>`).join('');
-    }
-    // Populate filter tahun
-    const tahunSet = [...new Set(_adminAllUsulanData.map(u => u.tahun).filter(Boolean))].sort((a,b) => b - a);
-    const tahunSel = document.getElementById('adminAllFilterTahun');
-    if (tahunSel) {
-      tahunSel.innerHTML = `<option value="">Semua Tahun</option>` + tahunSet.map(t => `<option value="${t}">${t}</option>`).join('');
-    }
-  } catch(e) {
-    el.innerHTML = `<div class="empty-state" style="padding:32px"><span class="material-icons">inbox</span><p>Gagal memuat data</p></div>`;
-  }
-}
-
-function filterAdminAllUsulan() {
-  const pkmVal    = (document.getElementById('adminAllFilterPKM')?.value    || '').toLowerCase();
-  const statusVal = (document.getElementById('adminAllFilterStatus')?.value  || '').toLowerCase();
-  const tahunVal  = (document.getElementById('adminAllFilterTahun')?.value   || '');
-  const searchVal = (document.getElementById('adminAllSearch')?.value  || '').toLowerCase();
-
-  const filtered = _adminAllUsulanData.filter(u => {
-    const nama = (u.namaPKM || u.kodePKM || '').toLowerCase();
-    const status = (u.statusGlobal || '').toLowerCase();
-    const tahun  = String(u.tahun || '');
-    const id     = (u.idUsulan || '').toLowerCase();
-    const periode = (u.namaBulan || '').toLowerCase();
-    if (pkmVal    && !nama.includes(pkmVal))       return false;
-    if (statusVal && !status.includes(statusVal))  return false;
-    if (tahunVal  && tahun !== tahunVal)            return false;
-    if (searchVal && !id.includes(searchVal) && !nama.includes(searchVal) && !periode.includes(searchVal)) return false;
-    return true;
+  }).catch(() => {
+    const el = document.getElementById('recentTable');
+    if (el) el.innerHTML = `<div class="empty-state" style="padding:32px"><span class="material-icons">inbox</span><p>Belum ada data usulan</p></div>`;
   });
-  renderAdminAllUsulanTable(filtered);
-}
-
-function renderAdminAllUsulanTable(rows) {
-  const el = document.getElementById('adminAllUsulanTable');
-  if (!el) return;
-  if (!rows || !rows.length) {
-    el.innerHTML = `<div class="empty-state" style="padding:32px"><span class="material-icons">search_off</span><p>Tidak ada data yang sesuai filter</p></div>`;
-    return;
-  }
-  el.innerHTML = renderUsulanTable(rows, 'admin');
 }
 
 function renderStatusSummary(d) {
@@ -987,25 +838,16 @@ function renderPKMProgressTable(rows) {
       <th style="text-align:center">Selesai</th>
       <th style="text-align:center">Proses</th>
       <th style="text-align:center">Ditolak</th>
-      <th style="min-width:120px">Progres</th>
+
     </tr></thead>
     <tbody>${pkms.map(p => {
-      const pct = p.total > 0 ? Math.round((p.selesai / p.total) * 100) : 0;
-      const barColor = pct >= 80 ? '#10b981' : pct >= 50 ? '#f59e0b' : '#ef4444';
       return `<tr>
         <td style="font-weight:600;font-size:13px">${p.nama}</td>
         <td style="text-align:center">${p.total}</td>
         <td style="text-align:center"><span style="color:#10b981;font-weight:700">${p.selesai}</span></td>
         <td style="text-align:center"><span style="color:#f59e0b;font-weight:700">${p.menunggu}</span></td>
         <td style="text-align:center"><span style="color:#ef4444;font-weight:700">${p.ditolak}</span></td>
-        <td>
-          <div style="display:flex;align-items:center;gap:7px">
-            <div style="flex:1;height:6px;border-radius:99px;background:#e2e8f0;overflow:hidden">
-              <div style="height:100%;width:${pct}%;background:${barColor};border-radius:99px;transition:width 0.6s ease"></div>
-            </div>
-            <span style="font-size:11px;font-weight:700;color:${barColor};min-width:30px;text-align:right">${pct}%</span>
-          </div>
-        </td>
+
       </tr>`;
     }).join('')}</tbody>
   </table>`;
@@ -1190,13 +1032,7 @@ function renderPeriodeBanner(periodeList) {
       const _tglDate = _tglRaw ? new Date(_tglRaw) : null;
       if (!_tglDate || isNaN(_tglDate)) return;
       const [jsH, jsM] = js.split(':').map(Number);
-      // Ambil tanggal dalam WITA (+8) — hindari off-by-one jika DB simpan UTC midnight
-      const _witaMs = _tglDate.getTime() + 8 * 3600000;
-      const _witaDate = new Date(_witaMs);
-      const _tglWITA = _witaDate.getUTCFullYear() + '-'
-        + String(_witaDate.getUTCMonth()+1).padStart(2,'0') + '-'
-        + String(_witaDate.getUTCDate()).padStart(2,'0');
-      const deadline = new Date(_tglWITA + 'T' + String(jsH).padStart(2,'0') + ':' + String(jsM).padStart(2,'0') + ':00+08:00');
+      const deadline = new Date(Date.UTC(_tglDate.getUTCFullYear(), _tglDate.getUTCMonth(), _tglDate.getUTCDate(), jsH - 8, jsM));
       const getEl = () => document.getElementById('periodeTimer_' + idx);
       const tick = () => {
         const el = getEl();
@@ -1222,41 +1058,6 @@ function renderPeriodeBanner(periodeList) {
   return html;
 }
 
-function renderPeriodeVerifBanner(periodeList) {
-  // Cari periode yang punya data verifikasi
-  const p = (periodeList || []).find(r => r.tanggal_mulai_verif || r.tanggalMulaiVerif);
-  if (!p) return ''; // tidak ada periode verifikasi diset
-
-  const mulai = p.tanggal_mulai_verif || p.tanggalMulaiVerif;
-  const selesai = p.tanggal_selesai_verif || p.tanggalSelesaiVerif;
-  const isAktif = p.isVerifToday;
-
-  const mulaiStr = mulai ? new Date(mulai).toLocaleDateString('id-ID', { timeZone:'Asia/Makassar', day:'2-digit', month:'long', year:'numeric' }) : '-';
-  const selesaiStr = selesai ? new Date(selesai).toLocaleDateString('id-ID', { timeZone:'Asia/Makassar', day:'2-digit', month:'long', year:'numeric' }) : '-';
-
-  if (isAktif) {
-    return `<div style="margin-bottom:14px;padding:10px 16px;background:#f0fdf4;border:1.5px solid #86efac;border-radius:10px;display:flex;align-items:center;gap:10px">
-      <span class="material-icons" style="color:#16a34a;font-size:20px">verified_user</span>
-      <div>
-        <div style="font-size:12px;font-weight:700;color:#15803d">Periode Verifikasi Aktif</div>
-        <div style="font-size:11px;color:#166534">${mulaiStr} — ${selesaiStr}</div>
-      </div>
-    </div>`;
-  } else {
-    // Cek apakah belum mulai atau sudah lewat
-    const now = new Date(Date.now() + 8*3600000).toISOString().slice(0,10);
-    const mulaiDs = mulai ? new Date(new Date(mulai).getTime()+8*3600000).toISOString().slice(0,10) : '9999';
-    const belumMulai = now < mulaiDs;
-    return `<div style="margin-bottom:14px;padding:10px 16px;background:#fef2f2;border:1.5px solid #fca5a5;border-radius:10px;display:flex;align-items:center;gap:10px">
-      <span class="material-icons" style="color:#dc2626;font-size:20px">lock</span>
-      <div>
-        <div style="font-size:12px;font-weight:700;color:#b91c1c">${belumMulai ? 'Periode Verifikasi Belum Dibuka' : 'Periode Verifikasi Sudah Ditutup'}</div>
-        <div style="font-size:11px;color:#991b1b">Jadwal: ${mulaiStr} — ${selesaiStr}</div>
-      </div>
-    </div>`;
-  }
-}
-
 function renderKepalasDashboard(el, d) {
   el.innerHTML = `
     <div class="stats-grid">
@@ -1264,7 +1065,6 @@ function renderKepalasDashboard(el, d) {
       ${statCard('green','check_circle','Sudah Diverifikasi', d.terverifikasi)}
       ${statCard('blue','assignment','Total Usulan PKM Saya', d.total)}
     </div>
-    ${renderPeriodeVerifBanner(d.periodeAktifList || [])}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:stretch;margin-bottom:14px">
       <div class="card" style="margin:0;display:flex;flex-direction:column">
         <div class="card-header-bar">
@@ -1335,7 +1135,6 @@ function renderProgramDashboard(el, d) {
       ${statCard('green','check_circle','Sudah Diverifikasi', d.terverifikasi)}
       ${statCard('blue','assignment','Total Ditugaskan', d.total)}
     </div>
-    ${renderPeriodeVerifBanner([{ isVerifToday: d.isVerifToday, tanggal_mulai_verif: d.tanggalMulaiVerif, tanggal_selesai_verif: d.tanggalSelesaiVerif }])}
     <div class="card" style="border-left:3px solid var(--primary);margin-bottom:14px" id="ppIndikatorInfoCard">
       <div class="card-body" style="padding:10px 16px;display:flex;align-items:center;gap:8px">
         <span class="material-icons" style="color:var(--primary);font-size:18px">info</span>
@@ -1417,65 +1216,45 @@ function statCard(color, icon, label, value, sub = null) {
     red:    'linear-gradient(135deg,#dc2626,#f87171)',
   };
   const grad = gradients[color] || gradients.blue;
-  return `<div class="stat-card stat-card-v2" style="background:${grad};border:none;padding:10px 14px;overflow:hidden;display:flex;flex-direction:column;justify-content:space-between;cursor:default;position:relative">
-    <span class="material-icons" style="position:absolute;right:-4px;bottom:-4px;font-size:50px;color:rgba(255,255,255,0.12);pointer-events:none;user-select:none">${icon}</span>
-    <div style="display:flex;align-items:center;gap:7px;margin-bottom:5px">
-      <div style="width:24px;height:24px;border-radius:6px;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;flex-shrink:0">
-        <span class="material-icons" style="font-size:13px;color:#fff">${icon}</span>
-      </div>
-      <div style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.85)">${label}</div>
+  return `<div class="stat-card stat-card-v2" style="background:${grad};border:none;padding:0;overflow:hidden;display:flex;flex-direction:column;justify-content:space-between;cursor:default">
+    <div style="padding:12px 14px 6px 14px;flex:1;display:flex;flex-direction:column;justify-content:center">
+      <div style="font-size:26px;font-weight:900;color:rgba(255,255,255,0.95);line-height:1;font-family:'JetBrains Mono',monospace;letter-spacing:-1px">${value ?? 0}</div>
+      ${sub !== null ? `<div style="font-size:10px;color:rgba(255,255,255,0.75);margin-top:2px;font-weight:500">${sub}</div>` : ''}
     </div>
-    <div>
-      <div style="font-size:22px;font-weight:900;color:#fff;line-height:1;font-family:'JetBrains Mono',monospace;letter-spacing:-1px">${value ?? 0}</div>
-      ${sub !== null ? `<div style="font-size:10px;color:rgba(255,255,255,0.6);margin-top:2px;font-weight:500">${sub}</div>` : ''}
+    <div style="padding:6px 14px 9px 14px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid rgba(255,255,255,0.15)">
+      <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.9);letter-spacing:0.2px">${label}</div>
+      <span class="material-icons" style="font-size:15px;color:rgba(255,255,255,0.6)">${icon}</span>
     </div>
   </div>`;
 }
 
 function renderChart(data) {
-  const ALL_MONTHS = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Ags','Sep','Okt','Nov','Des'];
-  const dataMap = {};
-  (data || []).forEach(d => { dataMap[d.bulan] = d.total || 0; });
-  const full = ALL_MONTHS.map(b => ({ bulan: b, total: dataMap[b] || 0 }));
-  const max = Math.max(...full.map(d => d.total), 1);
-  const bars = full.map((d, i) => {
-    const targetH = Math.max((d.total / max) * 90, d.total > 0 ? 6 : 0);
-    const isEmpty = d.total === 0;
-    return `<div class="chart-bar-wrap" style="position:relative">
-      <div class="chart-bar-val" style="color:${isEmpty ? 'transparent' : 'var(--text)'};min-height:14px">${d.total}</div>
-      <div class="chart-bar chart-bar-anim"
-        data-target="${targetH}"
-        style="height:0px;background:${isEmpty ? 'linear-gradient(180deg,#e2e8f0,#cbd5e1)' : 'linear-gradient(180deg,#0d9488,#06b6d4)'};opacity:${isEmpty ? '0.45' : '1'}"
-        title="${d.bulan}: ${d.total} usulan"></div>
-      <div class="chart-bar-lbl" style="color:${isEmpty ? 'var(--text-xlight)' : 'var(--text-light)'}">${d.bulan}</div>
-      ${!isEmpty ? `<div class="chart-tooltip">${d.bulan}<br><b>${d.total}</b> usulan</div>` : ''}
-    </div>`;
-  }).join('');
-  setTimeout(() => {
-    document.querySelectorAll('.chart-bar-anim').forEach((el, i) => {
-      const target = parseFloat(el.dataset.target) || 0;
-      setTimeout(() => {
-        el.style.transition = 'height 0.45s cubic-bezier(.22,.61,.36,1)';
-        el.style.height = target + 'px';
-      }, i * 30);
-    });
-  }, 60);
-  return `<div class="chart-container" style="min-height:130px;padding:8px 0 4px;justify-content:space-between;gap:4px">${bars}</div>`;
+  if (!data || data.length === 0) return `<div class="empty-state"><p>Belum ada data chart</p></div>`;
+  const max = Math.max(...data.map(d => d.total || 0), 1);
+  return `<div class="chart-container" style="min-height:120px;padding:8px 0 4px;justify-content:center">${data.map(d => `
+    <div class="chart-bar-wrap">
+      <div class="chart-bar-val">${d.total}</div>
+      <div class="chart-bar" style="height:${Math.max(((d.total || 0) / max) * 90, 4)}px" title="${d.bulan}: ${d.total} usulan"></div>
+      <div class="chart-bar-lbl">${d.bulan}</div>
+    </div>`).join('')}</div>`;
 }
 
 function renderDonutChart(selesai, proses, ditolak) {
   const total = selesai + proses + ditolak;
   if (total === 0) return '';
-  const cx = 54, cy = 54, r = 40;
+  // SVG donut: cx=70,cy=70,r=52, stroke-width=18
+  const cx = 70, cy = 70, r = 52;
   const circ = 2 * Math.PI * r;
   const pctSelesai = selesai / total;
   const pctProses  = proses  / total;
   const pctDitolak = ditolak / total;
+  // Segmen: mulai dari atas (-90deg = -PI/2)
   const seg = (pct) => pct * circ;
-  const gap = 2;
+  const gap = 2; // px gap antar segmen
   const dSelesai = seg(pctSelesai);
   const dProses  = seg(pctProses);
   const dDitolak = seg(pctDitolak);
+  // offset: rotate -90deg = transform rotate(-90 cx cy)
   const offSelesai = 0;
   const offProses  = dSelesai + gap;
   const offDitolak = dSelesai + gap + dProses + gap;
@@ -1485,42 +1264,34 @@ function renderDonutChart(selesai, proses, ditolak) {
     { val: ditolak, d: dDitolak, off: offDitolak, color: '#ef4444', label: 'Ditolak/Draft' },
   ].filter(s => s.val > 0);
   const pct = total > 0 ? Math.round((selesai / total) * 100) : 0;
-  const uid = 'donut_' + Math.random().toString(36).slice(2,7);
-  // Render dengan stroke-dasharray = 0 dulu, animasikan setelah mount
-  const svgSegs = segments.map((s, i) =>
-    `<circle id="${uid}_seg${i}" cx="${cx}" cy="${cy}" r="${r}"
-      fill="none" stroke="${s.color}" stroke-width="13"
-      stroke-dasharray="0 ${circ}"
+  const svgSegs = segments.map(s =>
+    `<circle cx="${cx}" cy="${cy}" r="${r}"
+      fill="none" stroke="${s.color}" stroke-width="18"
+      stroke-dasharray="${s.d - gap} ${circ - s.d + gap}"
       stroke-dashoffset="${-(s.off)}"
       transform="rotate(-90 ${cx} ${cy})"
-      style="transition:stroke-dasharray 0.6s cubic-bezier(.4,0,.2,1) ${i*0.12}s"
-      data-d="${s.d}" data-gap="${gap}" data-circ="${circ}"/>`
+      style="transition:all 0.4s ease"/>`
   ).join('');
   const legend = segments.map(s =>
     `<div style="display:flex;align-items:center;gap:5px;font-size:11px">
-      <div style="width:7px;height:7px;border-radius:50%;background:${s.color};flex-shrink:0"></div>
+      <div style="width:8px;height:8px;border-radius:50%;background:${s.color};flex-shrink:0"></div>
       <span style="color:var(--text-light)">${s.label}</span>
       <span style="font-weight:700;color:var(--text);margin-left:2px">${s.val}</span>
     </div>`
   ).join('');
-  setTimeout(() => {
-    segments.forEach((s, i) => {
-      const el = document.getElementById(`${uid}_seg${i}`);
-      if (el) el.setAttribute('stroke-dasharray', `${s.d - gap} ${circ - s.d + gap}`);
-    });
-  }, 80);
-  return `<div style="display:flex;align-items:center;gap:12px;padding:4px 0">
-    <svg width="108" height="108" viewBox="0 0 108 108" style="flex-shrink:0">
-      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#e2e8f0" stroke-width="13"/>
+  return `<div style="display:flex;align-items:center;gap:16px;padding:8px 0 4px">
+    <svg width="140" height="140" viewBox="0 0 140 140" style="flex-shrink:0">
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#e2e8f0" stroke-width="18"/>
       ${svgSegs}
-      <text x="${cx}" y="${cy + 5}" text-anchor="middle" font-size="15" font-weight="900"
+      <text x="${cx}" y="${cy - 6}" text-anchor="middle" font-size="18" font-weight="900"
         fill="var(--text)" font-family="'JetBrains Mono',monospace">${pct}%</text>
-
+      <text x="${cx}" y="${cy + 12}" text-anchor="middle" font-size="9" fill="var(--text-light)"
+        font-family="inherit">selesai</text>
     </svg>
-    <div style="display:flex;flex-direction:column;gap:6px;flex:1">
-      <div style="font-size:10px;font-weight:600;color:var(--text-light);text-transform:uppercase;letter-spacing:0.4px">Total Usulan</div>
-      <div style="font-size:24px;font-weight:900;color:var(--text);font-family:'JetBrains Mono',monospace;line-height:1">${total}</div>
-      <div style="display:flex;flex-direction:column;gap:5px;margin-top:2px">${legend}</div>
+    <div style="display:flex;flex-direction:column;gap:8px;flex:1">
+      <div style="font-size:11px;font-weight:600;color:var(--text-light);text-transform:uppercase;letter-spacing:0.4px">Total Usulan</div>
+      <div style="font-size:28px;font-weight:900;color:var(--text);font-family:'JetBrains Mono',monospace;line-height:1">${total}</div>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px">${legend}</div>
     </div>
   </div>`;
 }
@@ -1587,7 +1358,7 @@ function renderUsulanTable(rows, role) {
         ${statusBadge(u.statusGlobal)}
         ${(role === 'admin' && u.ditolakOleh === 'Admin') ? (() => {
           const sg = u.statusGlobal;
-          const nos = (u.penolakanIndikator || []).filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'sanggah').map(p => `<span style="background:#fecaca;color:#7f1d1d;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700">#${p.noIndikator}</span>`).join(' ');
+          const nos = (u.penolakanIndikator || []).filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'reset').map(p => `<span style="background:#fecaca;color:#7f1d1d;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700">#${p.noIndikator}</span>`).join(' ');
           const indBadge = nos ? `<span style="margin-left:4px">${nos}</span>` : '';
           if (sg === 'Menunggu Pengelola Program')
             return `<div style="margin-top:4px;background:#fff7ed;border:1px solid #fed7aa;border-radius:5px;padding:3px 7px"><div style="display:inline-flex;align-items:center;gap:4px"><span class="material-icons" style="font-size:12px;color:#ea580c">replay</span><span style="font-size:10.5px;color:#c2410c;font-weight:600">Re-verifikasi PP</span>${indBadge}</div></div>`;
@@ -1604,7 +1375,7 @@ function renderUsulanTable(rows, role) {
             <span style="font-size:10.5px;color:#dc2626;font-weight:600">Indikator bermasalah:</span>
             ${(() => {
               const myAkses = currentUser.indikatorAkses || [];
-              const aktif = u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'sanggah');
+              const aktif = u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'reset');
               const filtered = myAkses.length > 0 ? aktif.filter(p => myAkses.includes(parseInt(p.noIndikator))) : aktif;
               return filtered.map(p => `<span style="background:#fecaca;color:#7f1d1d;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700">#${p.noIndikator}</span>`).join('');
             })()}
@@ -1615,7 +1386,7 @@ function renderUsulanTable(rows, role) {
             <span style="font-size:10.5px;color:#dc2626;font-weight:600">Perlu re-verifikasi:</span>
             ${(() => {
               const myAkses = currentUser.indikatorAkses || [];
-              const aktif = u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'sanggah');
+              const aktif = u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'reset');
               const filtered = myAkses.length > 0 ? aktif.filter(p => myAkses.includes(parseInt(p.noIndikator))) : aktif;
               return filtered.map(p => `<span style="background:#fecaca;color:#7f1d1d;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700">#${p.noIndikator}</span>`).join('');
             })()}
@@ -1637,8 +1408,10 @@ function renderUsulanTable(rows, role) {
             }</span>
             ${u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'reset').map(p => `<span style="background:#fecaca;color:#7f1d1d;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700">#${p.noIndikator}</span>`).join('')}
           </div>` : ''}
-        ${(role === 'kepala-puskesmas' && u.statusGlobal === 'Menunggu Kepala Puskesmas' && u.ditolakOleh && u.penolakanIndikator && u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'sanggah').length) ? (() => {
-          const aktif = u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'sanggah');
+        ${(role === 'kepala-puskesmas' && u.statusGlobal === 'Menunggu Kepala Puskesmas' && u.ditolakOleh && u.penolakanIndikator && u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'reset').length) ? (() => {
+          // FIX (c): tampilkan notif re-verifikasi untuk Kapus dari sumber manapun (PP atau Admin)
+          const aktif = u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'reset');
+          const sumber = u.ditolakOleh === 'Admin' ? 'Admin' : 'Pengelola Program';
           const bgColor = u.ditolakOleh === 'Admin' ? '#fff7ed' : '#fef2f2';
           const bdColor = u.ditolakOleh === 'Admin' ? '#fed7aa' : '#fca5a5';
           const txColor = u.ditolakOleh === 'Admin' ? '#c2410c' : '#dc2626';
@@ -1655,8 +1428,8 @@ function renderUsulanTable(rows, role) {
           </div>` : ''}
 
         ${/* ── PP: menunggu verifikasi Kapus (setelah PP tolak/membenarkan) ── */
-        (role === 'program' && u.statusGlobal === 'Menunggu Kepala Puskesmas' && u.penolakanIndikator && u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'sanggah').length) ? (() => {
-          const aktif = u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'sanggah');
+        (role === 'program' && u.statusGlobal === 'Menunggu Kepala Puskesmas' && u.penolakanIndikator && u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'reset').length) ? (() => {
+          const aktif = u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'reset');
           const myAkses = currentUser.indikatorAkses || [];
           const filtered = myAkses.length > 0 ? aktif.filter(p => myAkses.includes(parseInt(p.noIndikator))) : aktif;
           if (!filtered.length) return '';
@@ -1669,8 +1442,8 @@ function renderUsulanTable(rows, role) {
         })() : ''}
 
         ${/* ── PP: Kapus menyanggah → PP perlu verif ulang ── */
-        (role === 'program' && u.ditolakOleh === 'Pengelola Program' && u.statusGlobal === 'Menunggu Pengelola Program' && !u.sudahVerif && u.penolakanIndikator && u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'sanggah').length) ? (() => {
-          const aktif = u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'sanggah');
+        (role === 'program' && u.ditolakOleh === 'Pengelola Program' && u.statusGlobal === 'Menunggu Pengelola Program' && !u.sudahVerif && u.penolakanIndikator && u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'reset').length) ? (() => {
+          const aktif = u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'reset');
           const myAkses = currentUser.indikatorAkses || [];
           const filtered = myAkses.length > 0 ? aktif.filter(p => myAkses.includes(parseInt(p.noIndikator))) : aktif;
           if (!filtered.length) return '';
@@ -1682,8 +1455,8 @@ function renderUsulanTable(rows, role) {
         })() : ''}
 
         ${/* ── PP: menunggu Kapus setelah PP tolak ── */
-        (role === 'program' && u.statusGlobal === 'Menunggu Kepala Puskesmas' && u.penolakanIndikator && u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'sanggah').length) ? (() => {
-          const aktif = u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'sanggah');
+        (role === 'program' && u.statusGlobal === 'Menunggu Kepala Puskesmas' && u.penolakanIndikator && u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'reset').length) ? (() => {
+          const aktif = u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'reset');
           const myAkses = currentUser.indikatorAkses || [];
           const filtered = myAkses.length > 0 ? aktif.filter(p => myAkses.includes(parseInt(p.noIndikator))) : aktif;
           if (!filtered.length) return '';
@@ -1696,8 +1469,8 @@ function renderUsulanTable(rows, role) {
         })() : ''}
 
         ${/* ── KAPUS: sudah verif, menunggu PP/Admin ── */
-        (role === 'kepala-puskesmas' && u.statusKapus === 'Selesai' && u.ditolakOleh && u.penolakanIndikator && u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'sanggah').length && ['Menunggu Pengelola Program','Menunggu Admin'].includes(u.statusGlobal)) ? (() => {
-          const aktif = u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'sanggah');
+        (role === 'kepala-puskesmas' && u.statusKapus === 'Selesai' && u.ditolakOleh && u.penolakanIndikator && u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'reset').length && ['Menunggu Pengelola Program','Menunggu Admin'].includes(u.statusGlobal)) ? (() => {
+          const aktif = u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'reset');
           const arahLabel = u.statusGlobal === 'Menunggu Admin' ? '→ Admin' : '→ Pengelola Program';
           return `<div style="margin-top:4px;display:inline-flex;align-items:center;gap:4px;flex-wrap:wrap;background:#f0fdf4;border:1px solid #86efac;border-radius:5px;padding:2px 7px">
             <span class="material-icons" style="font-size:12px;color:#16a34a">check_circle</span>
@@ -1859,12 +1632,7 @@ async function renderInput() {
       const tglDate = tglRaw ? new Date(tglRaw) : null;
       if (!tglDate || isNaN(tglDate)) return;
       const [jsH, jsM] = js.split(':').map(Number);
-      const _witaMs2 = tglDate.getTime() + 8 * 3600000;
-      const _witaDate2 = new Date(_witaMs2);
-      const _tglWITA2 = _witaDate2.getUTCFullYear() + '-'
-        + String(_witaDate2.getUTCMonth()+1).padStart(2,'0') + '-'
-        + String(_witaDate2.getUTCDate()).padStart(2,'0');
-      const deadline = new Date(_tglWITA2 + 'T' + String(jsH).padStart(2,'0') + ':' + String(jsM).padStart(2,'0') + ':00+08:00');
+      const deadline = new Date(Date.UTC(tglDate.getUTCFullYear(), tglDate.getUTCMonth(), tglDate.getUTCDate(), jsH-8, jsM));
       const getEl = () => document.getElementById('inputPeriodeTimer_' + idx);
       const tick = () => {
         const el2 = getEl();
@@ -1984,10 +1752,21 @@ async function createUsulan() {
       toast(`Periode ${namaBulanTxt} ${tahun} tidak aktif. Pilih periode yang sudah dibuka oleh Admin.`, 'error');
       return;
     }
-    // Validasi tanggal dilakukan server (isAktifToday) — cukup cek flag itu
-    if (!periodeValid.isAktifToday) {
-      toast(`Periode ${namaBulanTxt} ${tahun} sudah ditutup pada ${formatDate(periodeValid.tanggalSelesai)}. Hubungi Admin.`, 'warning');
-      return;
+    // Cek rentang tanggal dan jam hari ini dalam WITA (UTC+8), konsisten dengan validasi server
+    const nowWita = new Date(new Date().getTime() + 8 * 60 * 60000);
+    const todayWitaStr = nowWita.toISOString().slice(0, 10); // "YYYY-MM-DD"
+    if (periodeValid.tanggalMulai && periodeValid.tanggalSelesai) {
+      const mulaiStr   = periodeValid.tanggalMulai.toString().slice(0, 10);
+      const selesaiStr = periodeValid.tanggalSelesai.toString().slice(0, 10);
+      if (todayWitaStr < mulaiStr) {
+        toast(`Periode ${namaBulanTxt} ${tahun} belum dibuka. Mulai input: ${formatDate(periodeValid.tanggalMulai)}`, 'warning');
+        return;
+      }
+      if (todayWitaStr > selesaiStr) {
+        toast(`Periode ${namaBulanTxt} ${tahun} sudah ditutup pada ${formatDate(periodeValid.tanggalSelesai)}. Hubungi Admin.`, 'warning');
+        return;
+      }
+      // Validasi jam dinonaktifkan — cukup validasi tanggal
     }
   }
 
@@ -2148,9 +1927,8 @@ async function openIndikatorModal(idUsulan) {
       const penolakanList = detail.penolakanIndikator || [];
 
       if (penolakanList.length > 0) {
-        // Hanya aksi=NULL/tolak/reset yang perlu diperbaiki Operator
-        // aksi='kapus-setuju' tidak ditampilkan — itu hanya marker internal untuk PP
-        penolakanList.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'reset').forEach(p => {
+        // PP atau Admin — data ada di tabel penolakan_indikator
+        penolakanList.forEach(p => {
           const no = parseInt(p.no_indikator);
           bermasalahNos.push(no);
           alasanMap[no] = p.alasan || '-';
@@ -2208,9 +1986,8 @@ async function openIndikatorModal(idUsulan) {
         <td style="text-align:center;font-size:12.5px;color:#475569">${ind.sasaranTahunan > 0 ? ind.sasaranTahunan : '<span style="color:#cbd5e1">-</span>'}</td>
         <td style="text-align:center">
           ${isLocked ? `<span>${ind.target}</span>` : `<input type="number" id="t-${ind.no}" value="${ind.target}" min="0" step="1"
-            ${!INDIKATOR_TARGET_KUNCI.includes(ind.no) && ind.sasaranTahunan > 0 ? `max="${ind.sasaranTahunan}"` : ''}
             style="width:72px;border:1.5px solid var(--border);border-radius:6px;padding:3px 6px;font-size:13px;text-align:center"
-            title="Target sasaran layanan (bilangan bulat${!INDIKATOR_TARGET_KUNCI.includes(ind.no) && ind.sasaranTahunan > 0 ? ', maks ' + ind.sasaranTahunan : ''})"
+            title="Target sasaran layanan (bilangan bulat)"
             onchange="saveIndikator(${ind.no})" oninput="previewSPM(${ind.no})"
             onkeypress="return event.charCode>=48&&event.charCode<=57">`}
         </td>
@@ -2806,17 +2583,6 @@ async function saveIndikator(noIndikator) {
   const target  = parseFloat(document.getElementById(`t-${noIndikator}`)?.value) || 0;
   const capaian = parseFloat(document.getElementById(`c-${noIndikator}`)?.value) || 0;
 
-  // Validasi: target bulan tidak boleh melebihi target tahunan (kecuali indikator #8 & #9)
-  if (!INDIKATOR_TARGET_KUNCI.includes(noIndikator)) {
-    const sasaran = parseInt(document.getElementById(`sasaran-${noIndikator}`)?.value) || 0;
-    if (sasaran > 0 && target > sasaran) {
-      const tEl = document.getElementById(`t-${noIndikator}`);
-      if (tEl) tEl.value = sasaran;
-      toast(`Target Bulan Ini Indikator ${noIndikator} tidak boleh melebihi Target Tahunan (${sasaran})`, 'warning');
-      return;
-    }
-  }
-
   try {
     // Kirim update — tanpa linkFile supaya link yg sudah ada tidak terhapus
     const res = await fetch('/api/usulan?action=indikator', {
@@ -2863,11 +2629,6 @@ async function submitUsulanFromModal() {
     const _opCatatan = document.getElementById('operatorCatatanInput');
     if (!_opCatatan || !_opCatatan.value.trim()) {
       toast('Catatan/Sanggahan untuk Kepala Puskesmas wajib diisi', 'error');
-      if (_opCatatan) _opCatatan.focus();
-      return;
-    }
-    if (!isValidText(_opCatatan.value)) {
-      toast('Catatan/Sanggahan harus mengandung teks yang bermakna', 'error');
       if (_opCatatan) _opCatatan.focus();
       return;
     }
@@ -3123,7 +2884,30 @@ async function viewDetail(idUsulan) {
     <div style="padding:24px;background:white">
       ${rejectionBanner}
       <div style="margin-bottom:16px">${renderStatusBar({...detail, vpProgress: detail.verifikasiProgram ? {total:vp.length,selesai:vp.filter(v=>v.status==='Selesai').length} : null})}</div>
-      ${renderHeaderInfo(detail)}
+      <div class="detail-grid">
+        <div class="detail-item"><label>PUSKESMAS</label><span>${detail.namaPKM}</span></div>
+        <div class="detail-item"><label>Periode</label><span>${detail.namaBulan} ${detail.tahun}</span></div>
+        <div class="detail-item"><label>Status</label><span>${statusBadge(detail.statusGlobal)}</span></div>
+        <div class="detail-item"><label>Dibuat Oleh</label>
+          <span>
+            <div style="font-weight:600">${detail.namaPembuat || detail.createdBy || '-'}</div>
+            <div style="font-size:12px;color:var(--text-light)">${detail.createdBy || ''}</div>
+            <div style="font-size:11px;color:var(--text-xlight)">${formatTS(detail.createdAt)}</div>
+          </span>
+        </div>
+        <div class="detail-item">
+          <label>Indeks Beban Kerja</label>
+          <span style="font-family:'JetBrains Mono';font-weight:700">${parseFloat(detail.indeksBeban||0).toFixed(2)}</span>
+        </div>
+        <div class="detail-item">
+          <label>Indeks Kesulitan Wilayah</label>
+          <span style="font-family:'JetBrains Mono';font-weight:700">${parseFloat(detail.indeksKesulitan||0).toFixed(2)}</span>
+        </div>
+        <div class="detail-item" style="grid-column:span 2">
+          <label>Indeks SPM</label>
+          <span style="font-family:'JetBrains Mono';font-size:16px;color:var(--primary);font-weight:800">${parseFloat(detail.indeksSPM).toFixed(2)}</span>
+        </div>
+      </div>
       ${detail.driveFolderUrl ? `<div style="margin-bottom:12px"><a href="${detail.driveFolderUrl}" target="_blank" class="btn btn-secondary btn-sm"><span class="material-icons" style="font-size:14px">folder_open</span> Lihat Folder Data Dukung Google Drive</a></div>` : ''}
       <div style="font-weight:700;font-size:13.5px;margin-bottom:8px">Detail Indikator</div>
       <div class="table-container">
@@ -3202,23 +2986,20 @@ async function openLogAktivitas(idUsulan) {
     const data = await API.getLogAktivitas(idUsulan);
     const { logs, usulan } = data;
     const aksiConfig = {
-      'Submit':            { color:'#0d9488', bg:'#f0fdf9', icon:'send',           label:'Diajukan' },
-      'Ajukan Ulang':      { color:'#0d9488', bg:'#f0fdf9', icon:'restart_alt',    label:'Ajukan Ulang' },
-      'Approve':           { color:'#16a34a', bg:'#f0fdf4', icon:'check_circle',   label:'Disetujui' },
-      'Approve Final':     { color:'#16a34a', bg:'#f0fdf4', icon:'verified',       label:'Final Disetujui' },
-      'Re-verifikasi':     { color:'#0891b2', bg:'#ecfeff', icon:'update',         label:'Re-verifikasi' },
-      'Tolak':             { color:'#dc2626', bg:'#fef2f2', icon:'cancel',         label:'Ditolak' },
-      'Tolak (sebagian)':  { color:'#d97706', bg:'#fffbeb', icon:'remove_circle',  label:'Tolak Sebagian' },
-      'Tolak Indikator':   { color:'#dc2626', bg:'#fef2f2', icon:'cancel',         label:'Tolak Indikator' },
-      'Tolak Ke Operator': { color:'#dc2626', bg:'#fef2f2', icon:'reply',          label:'Tolak Ke Operator' },
-      'Kembalikan':        { color:'#7c3aed', bg:'#f5f3ff', icon:'undo',           label:'Dikembalikan' },
-      'Sanggah':           { color:'#7c3aed', bg:'#f5f3ff', icon:'gavel',          label:'Sanggah' },
-      'Sanggah Selesai':   { color:'#16a34a', bg:'#f0fdf4', icon:'check_circle',   label:'Sanggah Selesai' },
-      'PP Membenarkan':    { color:'#dc2626', bg:'#fef2f2', icon:'fact_check',       label:'PP Setuju Tolak' },
-      'Kapus Membenarkan': { color:'#d97706', bg:'#fffbeb', icon:'how_to_reg',     label:'Kapus Setuju Tolak' },
-      'Kapus Menyanggah':  { color:'#d97706', bg:'#fffbeb', icon:'gavel',          label:'Kapus Tidak Setuju' },
-      'Reset':             { color:'#d97706', bg:'#fffbeb', icon:'restart_alt',    label:'Direset Admin' },
-      'Restore Verif':     { color:'#6366f1', bg:'#fff7ed', icon:'restore',        label:'Dipulihkan' },
+      'Submit':            { color:'#0d9488', bg:'#f0fdf9', icon:'send',              label:'Diajukan' },
+      'Ajukan Ulang':      { color:'#0d9488', bg:'#f0fdf9', icon:'restart_alt',       label:'Ajukan Ulang' },
+      'Approve':           { color:'#16a34a', bg:'#f0fdf4', icon:'check_circle',      label:'Disetujui' },
+      'Approve Final':     { color:'#16a34a', bg:'#f0fdf4', icon:'verified',          label:'Final Disetujui' },
+      'Re-verifikasi':     { color:'#0891b2', bg:'#ecfeff', icon:'update',              label:'Re-verifikasi' },
+      'Tolak':             { color:'#dc2626', bg:'#fef2f2', icon:'cancel',            label:'Ditolak' },
+      'Tolak (sebagian)':  { color:'#d97706', bg:'#fffbeb', icon:'remove_circle',     label:'Tolak Sebagian' },
+      'Kembalikan':        { color:'#7c3aed', bg:'#f5f3ff', icon:'undo',              label:'Dikembalikan' },
+      'Sanggah':           { color:'#7c3aed', bg:'#f5f3ff', icon:'gavel',            label:'Sanggah' },
+      'PP Membenarkan':    { color:'#dc2626', bg:'#fef2f2', icon:'thumb_down_alt',  label:'PP Membenarkan' },
+      'Kapus Membenarkan': { color:'#dc2626', bg:'#fef2f2', icon:'thumb_down_alt',  label:'Kapus Membenarkan' },
+      'Kapus Menyanggah':  { color:'#7c3aed', bg:'#f5f3ff', icon:'gavel',            label:'Kapus Menyanggah' },
+      'Reset':             { color:'#d97706', bg:'#fffbeb', icon:'restart_alt',       label:'Direset Admin' },
+      'Restore Verif':     { color:'#6366f1', bg:'#fff7ed', icon:'restore',           label:'Dipulihkan' },
     };
     function fmtDT(ts) {
       const d = new Date(ts);
@@ -3522,7 +3303,20 @@ async function openVerifikasi(idUsulan) {
   try {
     const [detail, inds] = await Promise.all([API.getDetailUsulan(idUsulan), API.getIndikatorUsulan(idUsulan)]);
 
-    document.getElementById('verifDetailGrid').innerHTML = renderHeaderInfo(detail);
+    document.getElementById('verifDetailGrid').innerHTML = `
+      <div class="detail-item"><label>PUSKESMAS</label><span>${detail.namaPKM}</span></div>
+      <div class="detail-item"><label>Periode</label><span>${detail.namaBulan} ${detail.tahun}</span></div>
+      <div class="detail-item"><label>Status</label><span>${statusBadge(detail.statusGlobal)}</span></div>
+      <div class="detail-item"><label>Dibuat Oleh</label>
+        <span>
+          <div style="font-weight:600">${detail.namaPembuat || detail.createdBy || '-'}</div>
+          <div style="font-size:12px;color:var(--text-light)">${detail.createdBy || ''}</div>
+          <div style="font-size:11px;color:var(--text-xlight)">${formatTS(detail.createdAt)}</div>
+        </span>
+      </div>
+      <div class="detail-item"><label>Indeks Beban Kerja</label><span style="font-family:'JetBrains Mono'">${parseFloat(detail.indeksBeban||0).toFixed(2)}</span></div>
+      <div class="detail-item"><label>Indeks Kesulitan Wilayah</label><span style="font-family:'JetBrains Mono'">${parseFloat(detail.indeksKesulitan||0).toFixed(2)}</span></div>
+      <div class="detail-item"><label>Indeks SPM</label><span style="font-family:'JetBrains Mono';font-size:16px;font-weight:800;color:var(--primary)">${parseFloat(detail.indeksSPM).toFixed(2)}</span></div>`;
 
     // Filter inds for program role
     let displayInds = inds;
@@ -3532,13 +3326,11 @@ async function openVerifikasi(idUsulan) {
       const myAkses = currentUser.indikatorAkses || [];
 
       // Cek apakah ini re-verifikasi: ada penolakan aktif yang menjadi tanggung jawab PP ini
-      // aksi=NULL/tolak = indikator bermasalah biasa
-      // aksi='kapus-setuju' = disetujui Kapus, PP harus re-verif
-      // aksi='sanggah' = PP lain sudah sanggah, PP ini belum → tetap harus respond
-      const penolakanAktif = (detail.penolakanIndikator || []).filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'kapus-setuju' || p.aksi === 'sanggah');
+      // Hanya penolakan aktif: aksi NULL (belum direspon) atau aksi='tolak'
+      const penolakanAktif = (detail.penolakanIndikator || []).filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'reset');
       const penolakanNosSaya = myAkses.length > 0
-        ? penolakanAktif.filter(p => myAkses.includes(parseInt(p.no_indikator || p.noIndikator))).map(p => parseInt(p.no_indikator || p.noIndikator))
-        : penolakanAktif.map(p => parseInt(p.no_indikator || p.noIndikator));
+        ? penolakanAktif.filter(p => myAkses.includes(parseInt(p.no_indikator))).map(p => parseInt(p.no_indikator))
+        : penolakanAktif.map(p => parseInt(p.no_indikator));
 
       if (penolakanNosSaya.length > 0) {
         displayInds = inds.filter(i => penolakanNosSaya.includes(parseInt(i.no)));
@@ -3628,7 +3420,8 @@ async function openVerifikasi(idUsulan) {
       // Mencegah data penolakan lama dari siklus sebelumnya mempengaruhi tampilan
       const adaPenolakanAktif = penolakanList.length > 0 && !!detail.ditolakOleh;
       if (adaPenolakanAktif) {
-        const bermasalahNos = penolakanList.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'sanggah').map(p => parseInt(p.noIndikator || p.no_indikator));
+        // Ada indikator bermasalah dari penolakan sebelumnya → filter hanya itu
+        const bermasalahNos = penolakanList.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'reset').map(p => parseInt(p.noIndikator || p.no_indikator));
         displayInds = inds.filter(i => bermasalahNos.includes(parseInt(i.no)));
         _isKapusReVerif = true;
       }
@@ -3651,7 +3444,7 @@ async function openVerifikasi(idUsulan) {
             _reVerifBanner.style.display = 'flex';
             // Tampilkan alasan penolakan per indikator dari PP
             const alasanDariPP = (detail.penolakanIndikator || [])
-              .filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'reset' || p.aksi === 'sanggah')
+              .filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'reset')
               .map(p => ({ no: parseInt(p.noIndikator || p.no_indikator), alasan: p.alasan || '-' }));
             renderPenolakanBanner('verifPenolakanBanner', 'Pengelola Program', alasanDariPP);
           } else {
@@ -3706,15 +3499,18 @@ async function openVerifikasi(idUsulan) {
     if (currentUser.role === 'Admin') {
       const penolakanList = detail.penolakanIndikator || [];
       // re-verif Admin: cukup cek ditolakOleh='Admin'
-      // Filter aktif: aksi IS NULL/tolak/reset/sanggah (sanggah = PP sudah respond, Admin verif ulang)
+      // Jika ada penolakan aktif (aksi IS NULL/tolak) → filter indikator bermasalah saja
+      // Jika PP semua sanggah (aksi='sanggah') → penolakanList kosong → tampilkan semua indikator
       if (detail.ditolakOleh === 'Admin') {
         _isAdminReVerif = true;
         _bermasalahNos = penolakanList
-          .filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'reset' || p.aksi === 'sanggah')
+          .filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'reset')
           .map(p => parseInt(p.noIndikator || p.no_indikator));
         if (_bermasalahNos.length > 0) {
+          // Ada indikator yang masih bermasalah → filter
           displayInds = inds.filter(i => _bermasalahNos.includes(parseInt(i.no)));
         }
+        // Jika _bermasalahNos kosong (semua PP sanggah) → tampilkan semua indikator
       }
       const _reVerifBanner = document.getElementById('verifReVerifBanner');
       if (_reVerifBanner) {
@@ -3831,7 +3627,7 @@ async function openVerifikasi(idUsulan) {
     const role = currentUser.role;
     const canAct = !sudahVerifUser && (
       (role === 'Kepala Puskesmas' && detail.statusGlobal === 'Menunggu Kepala Puskesmas') ||
-      (role === 'Pengelola Program' && detail.statusGlobal === 'Menunggu Pengelola Program') ||
+      (role === 'Pengelola Program' && (detail.statusGlobal === 'Menunggu Pengelola Program' || detail.statusGlobal === 'Ditolak')) ||
       (role === 'Admin' && detail.statusGlobal === 'Menunggu Admin')
     );
     // Semua role verifikasi menggunakan sistem per-indikator
@@ -4020,7 +3816,6 @@ async function submitIndVerifikasi(idUsulan, displayInds, role) {
     if (isTolak) {
       const alasan = document.getElementById(`pgAlasan_${i.no}`)?.value?.trim();
       if (!alasan) return toast(`Isi alasan penolakan untuk indikator #${i.no}`, 'warning');
-      if (!isValidText(alasan)) return toast(`Alasan penolakan indikator #${i.no} harus mengandung teks yang bermakna`, 'warning');
       indikatorList.push({ noIndikator: i.no, aksi: 'tolak', alasan });
     } else {
       indikatorList.push({ noIndikator: i.no, aksi: 'setuju' });
@@ -4043,14 +3838,12 @@ async function submitIndVerifikasi(idUsulan, displayInds, role) {
   if (role === 'Kepala Puskesmas' && document.getElementById('kapusCatatanWrap')?.style.display !== 'none') {
     const _adaSetuju = indikatorList.some(i => i.aksi === 'setuju');
     if (_adaSetuju && !catatanKapus) return toast('Catatan / Tanggapan wajib diisi saat menyanggah penolakan PP', 'warning');
-    if (_adaSetuju && catatanKapus && !isValidText(catatanKapus)) return toast('Catatan / Tanggapan harus mengandung teks yang bermakna', 'warning');
   }
 
   const catatanProgram = role === 'Pengelola Program' ? (document.getElementById('ppCatatanInput')?.value?.trim() || '') : undefined;
   if (!_isRespondPenolakan && role === 'Pengelola Program' && document.getElementById('ppCatatanWrap')?.style.display !== 'none') {
     const adaYangSetuju = indikatorList.some(i => i.aksi === 'setuju');
     if (adaYangSetuju && !catatanProgram) return toast('Catatan / Sanggahan wajib diisi saat menyanggah penolakan Admin', 'warning');
-    if (adaYangSetuju && catatanProgram && !isValidText(catatanProgram)) return toast('Catatan / Sanggahan harus mengandung teks yang bermakna', 'warning');
   }
 
   // Untuk respond-penolakan: ubah format dari indikatorList → responList
@@ -4060,7 +3853,6 @@ async function submitIndVerifikasi(idUsulan, displayInds, role) {
     for (const item of indikatorList) {
       const catatan = item.aksi === 'tolak' ? item.alasan : (catatanProgram || '');
       if (!catatan || !catatan.trim()) return toast(`Isi catatan untuk indikator #${item.noIndikator}`, 'warning');
-      if (!isValidText(catatan)) return toast(`Catatan untuk indikator #${item.noIndikator} harus mengandung teks yang bermakna`, 'warning');
     }
   }
 
@@ -4315,7 +4107,7 @@ async function saveEditProfil() {
     currentUser.nama = nama;
     currentUser.nip = nip;
     if (tandaTangan !== undefined) currentUser.tandaTangan = tandaTangan;
-    sessionStorage.setItem('spm_user', JSON.stringify(currentUser));
+    localStorage.setItem('spm_user', JSON.stringify(currentUser));
     // Update tampilan
     document.getElementById('sidebarName').textContent = nama;
     document.getElementById('sidebarAvatar').textContent = nama[0].toUpperCase();
@@ -5712,29 +5504,16 @@ async function renderPeriode(el) {
             <div class="form-group"><label>Tahun</label><select class="form-control" id="pTahun">${yearOptions(currentTahun)}</select></div>
             <div class="form-group"><label>Bulan</label><select class="form-control" id="pBulan">${bulanOptions(CURRENT_BULAN)}</select></div>
           </div>
-          <div style="margin:4px 0 8px;padding:8px 12px;background:#eff6ff;border-radius:8px;border:1px solid #bfdbfe">
-            <div style="font-size:12px;font-weight:700;color:#1d4ed8;margin-bottom:8px;display:flex;align-items:center;gap:6px">
-              <span class="material-icons" style="font-size:15px">edit_calendar</span>Periode Input (Operator)
-            </div>
-            <div class="form-row" style="margin-bottom:8px">
-              <div class="form-group" style="margin-bottom:0"><label>Tanggal Mulai</label><input type="date" class="form-control" id="pMulai"></div>
-              <div class="form-group" style="margin-bottom:0"><label>Jam Mulai</label><input type="time" class="form-control" id="pJamMulai" value="08:00"></div>
-            </div>
-            <div class="form-row" style="margin-bottom:0">
-              <div class="form-group" style="margin-bottom:0"><label>Tanggal Selesai</label><input type="date" class="form-control" id="pSelesai"></div>
-              <div class="form-group" style="margin-bottom:0"><label>Jam Selesai</label><input type="time" class="form-control" id="pJamSelesai" value="17:00"></div>
-            </div>
+          <div class="form-row">
+            <div class="form-group"><label>Tanggal Mulai</label><input type="date" class="form-control" id="pMulai"></div>
+            <div class="form-group"><label>Jam Mulai</label><input type="time" class="form-control" id="pJamMulai" value="08:00"></div>
           </div>
-
-          <div style="margin:8px 0 6px;padding:8px 12px;background:#f0fdf4;border-radius:8px;border:1px solid #bbf7d0">
-            <div style="font-size:12px;font-weight:700;color:#15803d;margin-bottom:8px;display:flex;align-items:center;gap:6px">
-              <span class="material-icons" style="font-size:15px">verified_user</span>Periode Verifikasi (Kapus & Pengelola Program)
-            </div>
-            <div class="form-row" style="margin-bottom:0">
-              <div class="form-group" style="margin-bottom:0"><label>Tanggal Mulai Verifikasi</label><input type="date" class="form-control" id="pMulaiVerif"></div>
-              <div class="form-group" style="margin-bottom:0"><label>Tanggal Selesai Verifikasi</label><input type="date" class="form-control" id="pSelesaiVerif"></div>
-            </div>
-            <div style="font-size:11px;color:#16a34a;margin-top:6px">Kosongkan jika tidak ingin membatasi waktu verifikasi.</div>
+          <div class="form-row">
+            <div class="form-group"><label>Tanggal Selesai</label><input type="date" class="form-control" id="pSelesai"></div>
+            <div class="form-group"><label>Jam Selesai</label><input type="time" class="form-control" id="pJamSelesai" value="17:00"></div>
+          </div>
+          <div class="form-group"><label>Notifikasi untuk Operator</label>
+            <textarea class="form-control" id="pNotif" rows="2" placeholder="Contoh: Input data SPM bulan Maret dibuka hingga 28 Maret 2026 pukul 17.00 WITA"></textarea>
           </div>
           <div class="form-group"><label>Status</label>
             <select class="form-control" id="pStatus">
@@ -5777,6 +5556,7 @@ async function loadPeriodeGrid() {
         const _svgCal  = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>';
         const _svgOpen = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
         const _svgClose= '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+        const _svgNotif= '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>';
         const jm  = p.jamMulai   || '08:00';
         const js  = p.jamSelesai || '17:00';
         return `<div style="border:1.5px solid #a7f3d0;border-radius:10px;overflow:hidden;background:white;box-shadow:0 1px 4px rgba(13,148,136,0.08);cursor:pointer" onclick="editPeriode(${p.tahun},${p.bulan})">
@@ -5796,7 +5576,7 @@ async function loadPeriodeGrid() {
               <div style="font-size:12px;font-weight:700;color:#0f172a">${formatDate(p.tanggalSelesai)} ${js} WITA</div></div>
             </div>
           </div>
-          ${p.tanggalMulaiVerif ? `<div style="display:flex;align-items:center;gap:8px;padding:8px 14px;background:#f0fdf4;border-top:1px solid #bbf7d0"><span class="material-icons" style="font-size:15px;color:#15803d">verified_user</span><div style="font-size:12px;color:#15803d"><span style="font-weight:700">Verifikasi:</span> ${formatDate(p.tanggalMulaiVerif)} — ${formatDate(p.tanggalSelesaiVerif)}</div></div>` : ''}
+          ${p.notifOperator ? `<div style="display:flex;align-items:flex-start;gap:8px;padding:8px 14px;background:#fffbeb;border-top:1px solid #fcd34d"><span style="color:#d97706;display:flex;flex-shrink:0;margin-top:1px">${_svgNotif}</span><div style="font-size:12px;color:#0f172a;line-height:1.5">${p.notifOperator}</div></div>` : ''}
         </div>`;
       }
 
@@ -5813,7 +5593,7 @@ async function loadPeriodeGrid() {
         <div style="font-size:12px;color:var(--text-light);display:flex;flex-direction:column;gap:3px">
           <div>Mulai: ${formatDate(p.tanggalMulai)}${p.jamMulai ? ` pukul ${p.jamMulai}` : ''}</div>
           <div>Selesai: ${formatDate(p.tanggalSelesai)}${p.jamSelesai ? ` pukul ${p.jamSelesai}` : ''}</div>
-          ${p.tanggalMulaiVerif ? `<div style="margin-top:6px;padding:5px 8px;background:#f0fdf4;border-radius:6px;font-size:11px;border-left:3px solid #16a34a;color:#15803d"><span style="font-weight:600">Verifikasi:</span> ${formatDate(p.tanggalMulaiVerif)} — ${formatDate(p.tanggalSelesaiVerif)}</div>` : ''}
+          ${p.notifOperator ? `<div style="margin-top:6px;padding:5px 8px;background:rgba(13,148,136,0.08);border-radius:6px;color:var(--text-md);font-size:11px;border-left:3px solid var(--primary)"><span style="font-weight:600">Notif:</span> ${p.notifOperator}</div>` : ''}
         </div>
       </div>`;
     }).join('');
@@ -5832,9 +5612,8 @@ async function openPeriodeModal() {
   document.getElementById('pSelesai').value = '';
   document.getElementById('pJamMulai').value = '08:00';
   document.getElementById('pJamSelesai').value = '17:00';
+  document.getElementById('pNotif').value = '';
   document.getElementById('pStatus').value = 'Aktif';
-  document.getElementById('pMulaiVerif').value = '';
-  document.getElementById('pSelesaiVerif').value = '';
   showModal('periodeModal');
 }
 
@@ -5854,9 +5633,8 @@ async function editPeriode(tahun, bulan) {
     document.getElementById('pSelesai').value = p.tanggalSelesai ? p.tanggalSelesai.toString().substr(0, 10) : '';
     document.getElementById('pJamMulai').value = p.jamMulai || '08:00';
     document.getElementById('pJamSelesai').value = p.jamSelesai || '17:00';
+    document.getElementById('pNotif').value = p.notifOperator || '';
     document.getElementById('pStatus').value = p.status;
-    document.getElementById('pMulaiVerif').value = p.tanggalMulaiVerif ? p.tanggalMulaiVerif.toString().substr(0, 10) : '';
-    document.getElementById('pSelesaiVerif').value = p.tanggalSelesaiVerif ? p.tanggalSelesaiVerif.toString().substr(0, 10) : '';
     showModal('periodeModal');
   } catch (e) { openPeriodeModal(); }
 }
@@ -5889,15 +5667,12 @@ async function savePeriode() {
   const tanggalSelesai = document.getElementById('pSelesai').value;
   const jamMulai = document.getElementById('pJamMulai').value || '08:00';
   const jamSelesai = document.getElementById('pJamSelesai').value || '17:00';
+  const notifOperator = document.getElementById('pNotif').value.trim();
   const status = document.getElementById('pStatus').value;
-  const tanggalMulaiVerif = document.getElementById('pMulaiVerif').value || null;
-  const tanggalSelesaiVerif = document.getElementById('pSelesaiVerif').value || null;
   if (!tanggalMulai || !tanggalSelesai) return toast('Tanggal mulai dan selesai harus diisi', 'error');
-  if (tanggalMulaiVerif && !tanggalSelesaiVerif) return toast('Tanggal selesai verifikasi harus diisi', 'error');
-  if (!tanggalMulaiVerif && tanggalSelesaiVerif) return toast('Tanggal mulai verifikasi harus diisi', 'error');
   setLoading(true);
   try {
-    await API.savePeriode({ tahun, bulan, namaBulan: BULAN_NAMA[bulan], tanggalMulai, tanggalSelesai, jamMulai, jamSelesai, tanggalMulaiVerif, tanggalSelesaiVerif, status });
+    await API.savePeriode({ tahun, bulan, namaBulan: BULAN_NAMA[bulan], tanggalMulai, tanggalSelesai, jamMulai, jamSelesai, notifOperator, status });
     toast('Periode berhasil disimpan', 'success');
     closeModal('periodeModal');
     loadPeriodeGrid();
@@ -5922,8 +5697,8 @@ document.addEventListener('click', (e) => {
 
 // Enter key on auth
 // ============== IDLE AUTO LOGOUT ==============
-const IDLE_TIMEOUT      =  5 * 60 * 1000; // 5 menit idle → logout
-const IDLE_WARN_BEFORE  = 30 * 1000; // tampilkan warning 30 detik sebelum logout
+const IDLE_TIMEOUT      = 30 * 60 * 1000; // 30 menit idle → logout
+const IDLE_WARN_BEFORE  =  2 * 60 * 1000; // tampilkan warning 2 menit sebelum logout
 let _idleTimer     = null;
 let _idleWarnTimer = null;
 let _idleCountdown = null;
@@ -5991,7 +5766,7 @@ function resetIdleTimer() {
     if (currentUser) {
       _hideIdleWarning();
       currentUser = null;
-      sessionStorage.removeItem('spm_user');
+      localStorage.removeItem('spm_user');
       try { sessionStorage.removeItem('spm_last_page'); } catch(e) {}
       toast('Sesi berakhir karena tidak ada aktivitas. Silakan login kembali.', 'warning');
       setTimeout(() => location.reload(), 2000);
@@ -6013,20 +5788,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Restore session dari localStorage
   try {
-    const saved = sessionStorage.getItem('spm_user');
+    const saved = localStorage.getItem('spm_user');
     if (saved) {
       currentUser = JSON.parse(saved);
       // Normalisasi role lama → nama baru
       const roleMap = { 'Kapus': 'Kepala Puskesmas', 'kapus': 'Kepala Puskesmas', 'Program': 'Pengelola Program' };
       if (roleMap[currentUser.role]) {
         currentUser.role = roleMap[currentUser.role];
-        sessionStorage.setItem('spm_user', JSON.stringify(currentUser)); // update sessionStorage
+        localStorage.setItem('spm_user', JSON.stringify(currentUser)); // update localStorage
       }
       startApp();
       startIdleWatcher();
     }
   } catch(e) {
-    sessionStorage.removeItem('spm_user');
+    localStorage.removeItem('spm_user');
   }
 });
 

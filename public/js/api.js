@@ -69,10 +69,9 @@ const API = {
   buatUsulan: (data) => API.post('usulan?action=buat', data),
   updateIndikatorUsulan: (data) => API.put('usulan?action=indikator', data),
   submitUsulan: (data) => API.post('usulan?action=submit', data),
-  approveKapus: (data) => API.post('usulan?action=approve-kapus', data),
-  approveProgram: (data) => API.post('usulan?action=approve-program', data),
+  verifKapus: (data) => API.post('usulan?action=verif-kapus', data),
   verifProgram: (data) => API.post('usulan?action=verif-program', data),
-  approveAdmin: (data) => API.post('usulan?action=approve-admin', data),
+  verifAdmin: (data) => API.post('usulan?action=verif-admin', data),
   rejectUsulan: (data) => API.post('usulan?action=reject', data),
   getLogAktivitas: (id) => API.get('usulan', { action: 'log', id }),
   getPenolakanIndikator: (idUsulan) => API.get('usulan', { action: 'penolakan', idUsulan }),
@@ -145,7 +144,7 @@ function renderStatusBar(u) {
       vpText: u.statusGlobal === 'Menunggu Pengelola Program' && vp && vp.total > 0 ? vp.selesai + '/' + vp.total : '' },
     { label: 'Admin', icon: 'admin_panel_settings', done: u.statusGlobal === 'Selesai', active: u.statusGlobal === 'Menunggu Admin', rejected: false },
   ];
-  const isDitolak = u.statusGlobal === 'Ditolak';
+  const isDitolak = ['Ditolak', 'Ditolak Sebagian'].includes(u.statusGlobal);
   return `<div style="display:flex;align-items:center;gap:0;padding:4px 0">${steps.map((s, i) => {
     let color = '#cbd5e1', textColor = '#94a3b8', bg = 'white';
     let icon = s.icon;
@@ -195,6 +194,7 @@ function statusBadge(status) {
     'Menunggu Admin': 'badge-primary',
     'Selesai': 'badge-success',
     'Ditolak': 'badge-danger',
+    'Ditolak Sebagian': 'badge-danger',
     'Disetujui': 'badge-success',
     'Menunggu': 'badge-warning'
   };

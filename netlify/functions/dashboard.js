@@ -65,15 +65,42 @@ async function operatorStats(pool, email) {
   );
   const s = result.rows[0];
 
-  // Periode aktif — ambil semua
+  // Ambil semua periode berstatus Aktif — filter jam dilakukan di JS (bukan di SQL)
+  // karena SQL CURRENT_DATE tidak tahu jam_mulai/jam_selesai
   const periodeResult = await pool.query(
-    `SELECT tahun, bulan, nama_bulan, tanggal_mulai, tanggal_selesai, jam_mulai, jam_selesai, notif_operator
-     FROM periode_input
-     WHERE status='Aktif' AND tanggal_mulai <= CURRENT_DATE AND tanggal_selesai >= CURRENT_DATE
-     ORDER BY tahun, bulan`
+    `SELECT tahun, bulan, nama_bulan, tanggal_mulai, tanggal_selesai, jam_mulai, jam_selesai,
+            tanggal_mulai_verif, tanggal_selesai_verif, jam_mulai_verif, jam_selesai_verif
+     FROM periode_input WHERE status='Aktif' ORDER BY tahun, bulan`
   );
-  const periodeAktif = periodeResult.rows.length > 0 ? periodeResult.rows[0] : null;
-  const periodeAktifList = periodeResult.rows;
+
+  // Helper WITA (UTC+8) — cek jam juga, bukan hanya tanggal
+  const _nowWita = new Date(Date.now() + 8 * 3600000);
+  const _todayStr = _nowWita.toISOString().slice(0, 10);
+  const _nowTime  = _nowWita.toISOString().slice(11, 16);
+  const _toDs = (v) => { if (!v) return ''; const d = new Date(new Date(v).getTime() + 8*3600000); return d.toISOString().slice(0,10); };
+  const _inRange = (tM, jM, tS, jS) => {
+    const ms = _toDs(tM), ss = _toDs(tS);
+    if (!ms || !ss) return false;
+    const nowDT = _todayStr + 'T' + _nowTime;
+    return nowDT >= ms + 'T' + (jM || '00:00') && nowDT <= ss + 'T' + (jS || '23:59');
+  };
+
+  const periodeAktifList = periodeResult.rows.map(r => ({
+    ...r,
+    namaBulan: r.nama_bulan,
+    tanggalMulai: r.tanggal_mulai,
+    tanggalSelesai: r.tanggal_selesai,
+    jamMulai: r.jam_mulai || '08:00',
+    jamSelesai: r.jam_selesai || '17:00',
+    tanggalMulaiVerif: r.tanggal_mulai_verif || null,
+    tanggalSelesaiVerif: r.tanggal_selesai_verif || null,
+    jamMulaiVerif: r.jam_mulai_verif || '08:00',
+    jamSelesaiVerif: r.jam_selesai_verif || '17:00',
+    isAktifToday: _inRange(r.tanggal_mulai, r.jam_mulai, r.tanggal_selesai, r.jam_selesai),
+    isVerifToday: !!r.tanggal_mulai_verif && !!r.tanggal_selesai_verif
+      && _inRange(r.tanggal_mulai_verif, r.jam_mulai_verif, r.tanggal_selesai_verif, r.jam_selesai_verif),
+  }));
+  const periodeAktif = periodeAktifList.find(p => p.isAktifToday) || null;
 
   return ok({
     totalUsulan: parseInt(s.total) || 0,
@@ -85,7 +112,7 @@ async function operatorStats(pool, email) {
 }
 
 async function kapusStats(pool, kodePKM) {
-  const [result, periodeResult] = await Promise.all([
+  const [result, periodeResult, usulanPeriodeResult] = await Promise.all([
     pool.query(
       `SELECT
         COUNT(*) FILTER(WHERE status_global='Menunggu Kepala Puskesmas') as menunggu,
@@ -95,18 +122,50 @@ async function kapusStats(pool, kodePKM) {
       [kodePKM]
     ),
     pool.query(
-      `SELECT tahun, bulan, nama_bulan, tanggal_mulai, tanggal_selesai, jam_mulai, jam_selesai, notif_operator
-       FROM periode_input
-       WHERE status='Aktif' AND tanggal_mulai <= CURRENT_DATE AND tanggal_selesai >= CURRENT_DATE
-       ORDER BY tahun, bulan`
+      `SELECT tahun, bulan, nama_bulan, tanggal_mulai, tanggal_selesai, jam_mulai, jam_selesai, tanggal_mulai_verif, tanggal_selesai_verif, jam_mulai_verif, jam_selesai_verif
+       FROM periode_input WHERE status='Aktif' ORDER BY tahun, bulan`
+    ),
+    // Ambil tahun-bulan yang punya usulan untuk PKM ini
+    pool.query(
+      `SELECT DISTINCT tahun, bulan FROM usulan_header WHERE kode_pkm=$1`,
+      [kodePKM]
     )
   ]);
   const s = result.rows[0];
+  // Set tahun-bulan yang ada usulannya — untuk filter periode
+  const usulanSet = new Set(usulanPeriodeResult.rows.map(r => `${r.tahun}-${r.bulan}`));
+  const _nowWita = new Date(Date.now() + 8 * 3600000);
+  const _todayStr = _nowWita.toISOString().slice(0, 10);
+  const _nowTime  = _nowWita.toISOString().slice(11, 16);
+  const _toDs = (v) => { if (!v) return ''; const d = new Date(new Date(v).getTime() + 8*3600000); return d.toISOString().slice(0,10); };
+  const _inRange = (tM, jM, tS, jS) => {
+    const ms = _toDs(tM), ss = _toDs(tS);
+    if (!ms || !ss) return false;
+    const nowDT = _todayStr + 'T' + _nowTime;
+    return nowDT >= ms + 'T' + (jM || '00:00') && nowDT <= ss + 'T' + (jS || '23:59');
+  };
   return ok({
     menunggu: parseInt(s.menunggu) || 0,
     terverifikasi: parseInt(s.terverifikasi) || 0,
     total: parseInt(s.total) || 0,
+    // Hanya tampilkan periode yang ada usulannya untuk PKM ini
     periodeAktifList: periodeResult.rows
+      .filter(r => usulanSet.has(`${r.tahun}-${r.bulan}`))
+      .map(r => ({
+        ...r,
+        namaBulan: r.nama_bulan,
+        tanggalMulai: r.tanggal_mulai,
+        tanggalSelesai: r.tanggal_selesai,
+        jamMulai: r.jam_mulai || '08:00',
+        jamSelesai: r.jam_selesai || '17:00',
+        tanggalMulaiVerif: r.tanggal_mulai_verif || null,
+        tanggalSelesaiVerif: r.tanggal_selesai_verif || null,
+        jamMulaiVerif: r.jam_mulai_verif || '08:00',
+        jamSelesaiVerif: r.jam_selesai_verif || '17:00',
+        isAktifToday: _inRange(r.tanggal_mulai, r.jam_mulai, r.tanggal_selesai, r.jam_selesai),
+        isVerifToday: !!r.tanggal_mulai_verif && !!r.tanggal_selesai_verif
+          && _inRange(r.tanggal_mulai_verif, r.jam_mulai_verif, r.tanggal_selesai_verif, r.jam_selesai_verif),
+      }))
   });
 }
 
@@ -133,12 +192,24 @@ async function programStats(pool, email) {
   );
 
   let menunggu = 0;
+  const indikatorBermasalahPerUsulan = {};
   if (menungguRows.rows.length > 0) {
     // Batch-fetch semua penolakan aktif sekaligus — hindari N+1 query
+    // Ambil baris yang betul-betul bermasalah:
+    // - aksi='tolak'  : PP atau Admin menolak
+    // - aksi='reset'  : PP benarkan Admin → ditolak, perlu perbaikan
+    // - aksi IS NULL AND email_program=email_admin : Kapus menolak (penanda baris Kapus)
+    // JANGAN ambil aksi IS NULL AND email_program!=email_admin (baris PP belum respon, bukan bermasalah)
     const allIds = menungguRows.rows.map(r => r.id_usulan);
     const piAll = await pool.query(
       `SELECT id_usulan, no_indikator FROM penolakan_indikator
-       WHERE id_usulan=ANY($1) AND (aksi IS NULL OR aksi='tolak')`,
+       WHERE id_usulan=ANY($1)
+         AND (
+           -- Baris PP menolak (PP != Admin)
+           (email_program != email_admin AND (aksi='tolak' OR aksi='reset'))
+           -- Baris Admin menolak (email_program = email_admin, aksi='tolak', dibuat_oleh='Admin')
+           OR (dibuat_oleh='Admin' AND aksi='tolak')
+         )`,
       [allIds]
     ).catch(() => ({ rows: [] }));
 
@@ -162,13 +233,88 @@ async function programStats(pool, email) {
         if (adaIrisan) menunggu++;
       }
     }
+
+    // FIX B: Bangun map nomor indikator bermasalah per usulan khusus untuk PP ini.
+    // Dipakai frontend untuk badge "Re-verif: Ind. #1, #2, #5" di card/row usulan.
+    for (const vp of menungguRows.rows) {
+      const semuaNomor = [...new Set(piMap[vp.id_usulan] || [])];
+      if (!semuaNomor.length) continue;
+      const aksesArr = (vp.indikator_akses || '').split(',')
+        .map(n => parseInt(n.trim())).filter(n => !isNaN(n));
+      const relevan = aksesArr.length === 0
+        ? semuaNomor
+        : semuaNomor.filter(n => aksesArr.includes(n));
+      if (relevan.length > 0) {
+        indikatorBermasalahPerUsulan[vp.id_usulan] = relevan.sort((a, b) => a - b);
+      }
+    }
   }
 
   const s = totalResult.rows[0];
+
+  // Ambil semua periode aktif untuk PP — filter jam di JS
+  // Sekaligus ambil tahun-bulan usulan yang ditugaskan ke PP ini
+  const [pvResult, usulanPPResult] = await Promise.all([
+    pool.query(
+      `SELECT tahun, bulan, nama_bulan, tanggal_mulai, tanggal_selesai, jam_mulai, jam_selesai,
+              tanggal_mulai_verif, tanggal_selesai_verif, jam_mulai_verif, jam_selesai_verif
+       FROM periode_input WHERE status='Aktif' ORDER BY tahun, bulan`
+    ).catch(() => ({ rows: [] })),
+    pool.query(
+      `SELECT DISTINCT uh.tahun, uh.bulan
+       FROM verifikasi_program vp
+       JOIN usulan_header uh ON vp.id_usulan = uh.id_usulan
+       WHERE LOWER(vp.email_program)=LOWER($1)`,
+      [email]
+    ).catch(() => ({ rows: [] }))
+  ]);
+  // Set tahun-bulan yang ada usulan untuk PP ini
+  const usulanPPSet = new Set(usulanPPResult.rows.map(r => `${r.tahun}-${r.bulan}`));
+  const _nowWita2 = new Date(Date.now() + 8 * 3600000);
+  const _todayStr2 = _nowWita2.toISOString().slice(0, 10);
+  const _nowTime2  = _nowWita2.toISOString().slice(11, 16);
+  const _toDs2 = (v) => { if (!v) return ''; const d = new Date(new Date(v).getTime() + 8*3600000); return d.toISOString().slice(0,10); };
+  const _inRange2 = (tM, jM, tS, jS) => {
+    const ms = _toDs2(tM), ss = _toDs2(tS);
+    if (!ms || !ss) return false;
+    const nowDT = _todayStr2 + 'T' + _nowTime2;
+    return nowDT >= ms + 'T' + (jM || '00:00') && nowDT <= ss + 'T' + (jS || '23:59');
+  };
+  // Cari periode yang isAktifToday (input aktif sekarang) — ambil pertama
+  const pvAktif = pvResult.rows.find(r => _inRange2(r.tanggal_mulai, r.jam_mulai, r.tanggal_selesai, r.jam_selesai)) || {};
+  const pv = pvAktif;
+  const isVerifToday = !!pv.tanggal_mulai_verif && !!pv.tanggal_selesai_verif
+    && _inRange2(pv.tanggal_mulai_verif, pv.jam_mulai_verif, pv.tanggal_selesai_verif, pv.jam_selesai_verif);
+  // periodeAktifList untuk banner verif — hanya periode yang ada usulan PP ini
+  const periodeAktifList = pvResult.rows
+    .filter(r => usulanPPSet.has(`${r.tahun}-${r.bulan}`))
+    .map(r => ({
+    ...r,
+    namaBulan: r.nama_bulan,
+    tanggalMulai: r.tanggal_mulai,
+    tanggalSelesai: r.tanggal_selesai,
+    jamMulai: r.jam_mulai || '08:00',
+    jamSelesai: r.jam_selesai || '17:00',
+    tanggalMulaiVerif: r.tanggal_mulai_verif || null,
+    tanggalSelesaiVerif: r.tanggal_selesai_verif || null,
+    jamMulaiVerif: r.jam_mulai_verif || '08:00',
+    jamSelesaiVerif: r.jam_selesai_verif || '17:00',
+    isAktifToday: _inRange2(r.tanggal_mulai, r.jam_mulai, r.tanggal_selesai, r.jam_selesai),
+    isVerifToday: !!r.tanggal_mulai_verif && !!r.tanggal_selesai_verif
+      && _inRange2(r.tanggal_mulai_verif, r.jam_mulai_verif, r.tanggal_selesai_verif, r.jam_selesai_verif),
+  }));
+
   return ok({
     menunggu,
     terverifikasi: parseInt(s.terverifikasi) || 0,
-    total: parseInt(s.total) || 0
+    total: parseInt(s.total) || 0,
+    isVerifToday,
+    tanggalMulaiVerif: pv.tanggal_mulai_verif || null,
+    tanggalSelesaiVerif: pv.tanggal_selesai_verif || null,
+    jamMulaiVerif: pv.jam_mulai_verif || '08:00',
+    jamSelesaiVerif: pv.jam_selesai_verif || '17:00',
+    periodeAktifList,
+    indikatorBermasalahPerUsulan
   });
 }
 

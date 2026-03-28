@@ -143,7 +143,6 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
     `SELECT jabatan, nama, nip, tanda_tangan FROM pejabat_penandatangan ORDER BY id`
   ).catch(() => ({ rows: [] }));
   const kasubag = pjResult.rows.find(p => p.jabatan === 'Kepala Sub Bagian Perencanaan') || {};
-  const kadis   = pjResult.rows.find(p => p.jabatan === 'Kepala Dinas Kesehatan PPKB') || {};
 
   // Indikator + target tahunan + realisasi kumulatif semua bulan di tahun ini
   // sisa_target = sasaran_tahunan - realisasi_kumulatif (akurat lintas bulan)
@@ -535,7 +534,6 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
 
     const indeksSpm = parseFloat(h.indeks_spm || 0).toFixed(2);
 
-    const ttdKiri  = pejabatSignBlock(kadis,   'Kepala Dinas Kesehatan PPKB');
     const ttdKanan = pejabatSignBlock(kasubag, 'Kepala Sub Bagian Perencanaan');
 
     return `
@@ -586,7 +584,6 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
       <div style="margin-top:32px">
         <div style="font-size:10px;color:#334155;margin-bottom:6px;text-align:right">Adean, ${fmtDT(h.final_approved_at)}</div>
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:20px">
-          ${ttdKiri}
           ${ttdKanan}
         </div>
       </div>

@@ -19,8 +19,10 @@ exports.handler = async (event) => {
       if (!res.rows.length) return err('User tidak ditemukan');
       const hash = res.rows[0].password_hash;
       if (hash) {
-        let match = (oldPassword === hash);
-        if (!match && bcrypt && hash.startsWith('$2')) {
+        if (!hash.startsWith('$2'))
+          return err('Password akun ini perlu direset. Hubungi Admin untuk reset password.', 401);
+        let match = false;
+        if (bcrypt) {
           try { match = await bcrypt.compare(oldPassword, hash); } catch(e) { match = false; }
         }
         if (!match) return err('Password lama tidak sesuai');
@@ -32,7 +34,13 @@ exports.handler = async (event) => {
 
     // ===== RESET PASSWORD (admin) =====
     if (action === 'reset-password') {
-      if (!newPassword) return err('Password baru diperlukan');
+      if (!email || !newPassword || !targetEmail) return err('Data tidak lengkap');
+      // Verifikasi pemanggil adalah Admin
+      const adminCheck = await pool.query(
+        `SELECT role FROM users WHERE LOWER(email)=LOWER($1) AND aktif=true`, [email.trim()]
+      );
+      if (!adminCheck.rows.length || adminCheck.rows[0].role !== 'Admin')
+        return err('Akses ditolak', 403);
       const newHash = (bcrypt && typeof bcrypt.hash === 'function') ? await bcrypt.hash(newPassword, 10) : newPassword;
       await pool.query('UPDATE users SET password_hash=$1 WHERE LOWER(email)=LOWER($2)', [newHash, targetEmail.trim()]);
       return ok({ message: 'Password berhasil direset' });

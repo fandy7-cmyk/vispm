@@ -1,4 +1,16 @@
 // ============== LAPORAN ==============
+// Per-tab page size overrides (tidak mengubah ITEMS_PER_PAGE global)
+const _PAGE_SIZE_JAB = 12;
+const _PAGE_SIZE_PKM = 12;
+const _PAGE_SIZE_IND = 12;
+function _paginateCustom(rows, page, size) {
+  const total = rows.length;
+  const totalPages = Math.ceil(total / size) || 1;
+  const p = Math.max(1, Math.min(page || 1, totalPages));
+  const start = (p - 1) * size;
+  return { items: rows.slice(start, start + size), page: p, totalPages, total };
+}
+
 // Semua data laporan mentah (sebelum filter bulan/status/pkm)
 let _lapAllData = [];
 
@@ -121,7 +133,7 @@ function _lapRenderTable(data) {
   const selesai = data.filter(r => r.statusGlobal === 'Selesai').length;
   const pending = data.filter(r => !['Selesai','Ditolak'].includes(r.statusGlobal)).length;
   const indeks  = data.filter(r => parseFloat(r.indeksSPM) > 0).map(r => parseFloat(r.indeksSPM));
-  const rataSPM = indeks.length ? (indeks.reduce((a,b)=>a+b,0)/indeks.length).toFixed(3) : '0';
+  const rataSPM = indeks.length ? (indeks.reduce((a,b)=>a+b,0)/indeks.length).toFixed(2) : '0';
 
   document.getElementById('lapStats').innerHTML = `
     ${statCard('blue','assignment','Total Usulan', total)}
@@ -256,9 +268,7 @@ async function renderPejabatTab(el) {
       </div>
     </div>`;
   try {
-    const res = await fetch('/api/pejabat');
-    const data = await res.json();
-    const list = data.success ? data.data : [];
+    const list = await API.get('pejabat').catch(() => []);
     const jabatanList = ['Kepala Sub Bagian Perencanaan'];
     const container = document.getElementById('pejabatList');
     container.innerHTML = jabatanList.map(jab => {
@@ -332,11 +342,7 @@ async function savePejabat(jabatan) {
   if (!nama) { toast('Nama pejabat tidak boleh kosong', 'error'); return; }
   setLoading(true);
   try {
-    await fetch('/api/pejabat', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ jabatan, nama, nip, tandaTangan: tanda_tangan })
-    });
+    await API.post('pejabat', { jabatan, nama, nip, tandaTangan: tanda_tangan });
     toast('Data '+jabatan+' berhasil disimpan!', 'success');
     renderPejabatTab(document.getElementById('masterTabContent'));
     // Auto-refresh tombol verifikasi jika modal verifikasi terbuka (Admin)
@@ -344,7 +350,7 @@ async function savePejabat(jabatan) {
     if (verifModal && verifModal.classList.contains('show')) {
       // Re-cek status TT pejabat dari data terbaru
       try {
-        const pjList = await fetch('/api/pejabat').then(r=>r.json()).then(d=>d.data||[]);
+        const pjList = await API.get('pejabat').catch(() => []);
         const kasubag = pjList.find(p => p.jabatan === 'Kepala Sub Bagian Perencanaan');
         const ttOk = !!(kasubag?.tanda_tangan);
         _updateVerifTTBanner(ttOk, 'Admin');
@@ -599,9 +605,7 @@ function validateEmailInput(input) {
 let _jabatanList = [];
 async function loadJabatanDropdown(selectedList = []) {
   try {
-    const res = await fetch('/api/jabatan');
-    const data = await res.json();
-    _jabatanList = data.success ? data.data : [];
+    _jabatanList = await API.get('jabatan').catch(() => []);
     const container = document.getElementById('jabatanCheckboxList');
     if (!container) return;
     const aktif = _jabatanList.filter(j => j.aktif);
@@ -628,12 +632,7 @@ async function tambahJabatanBaru() {
   const newJab = document.getElementById('uJabatanBaru')?.value.trim();
   if (!newJab) return toast('Ketik nama jabatan baru terlebih dahulu', 'warning');
   try {
-    const res = await fetch('/api/jabatan', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ nama: newJab })
-    });
-    const data = await res.json();
-    if (!data.success) { toast(data.message || 'Gagal menambah jabatan', 'error'); return; }
+    await API.post('jabatan', { nama: newJab });
     toast(`Jabatan "${newJab}" ditambahkan`, 'success');
     document.getElementById('uJabatanBaru').value = '';
     const cur = getSelectedJabatan();
@@ -810,6 +809,14 @@ async function renderJabatan(el) {
       </button>
     </div>
     <div class="card">
+      <div class="card-body" style="padding:12px 16px">
+        <div class="search-row">
+          <div class="search-input-wrap"><span class="material-icons search-icon">search</span><input class="search-input" id="searchJabatan" placeholder="Cari kode atau nama..." oninput="filterJabatan()"></div>
+          <select class="form-control" id="filterJabatanStatus" onchange="filterJabatan()" style="width:140px">
+            <option value="">Semua Status</option><option value="aktif">Aktif</option><option value="nonaktif">Non-aktif</option>
+          </select>
+        </div>
+      </div>
       <div class="card-body" style="padding:0" id="jabatanTable">
         <div class="empty-state" style="padding:32px"><p>Memuat...</p></div>
       </div>
@@ -846,38 +853,52 @@ async function renderJabatan(el) {
   await loadJabatanTable();
 }
 
+function filterJabatan(resetPage = true) {
+  const q = (document.getElementById('searchJabatan')?.value || '').toLowerCase();
+  const fa = document.getElementById('filterJabatanStatus')?.value || '';
+  const filtered = _jabatanAllList.filter(j =>
+    (!q || j.nama.toLowerCase().includes(q)) &&
+    (!fa || (fa === 'aktif' ? j.aktif : !j.aktif))
+  );
+  if (resetPage) _jabPage = 1;
+  _renderJabatanTable(filtered);
+}
+
 let _jabPage = 1;
 async function loadJabatanTable(page) {
   if (page) _jabPage = page;
   try {
-    const res = await fetch('/api/jabatan');
-    const data = await res.json();
-    _jabatanAllList = data.success ? data.data : [];
-    const el = document.getElementById('jabatanTable');
-    if (!el) return;
-
-    if (!_jabatanAllList.length) {
-      el.innerHTML = `<div class="empty-state" style="padding:32px"><span class="material-icons">badge</span><p>Belum ada jabatan. Klik Tambah Jabatan untuk mulai.</p></div>`;
-      return;
-    }
-
-    const { items, page: p, totalPages, total } = paginateData(_jabatanAllList, _jabPage);
-    const rowsHtml = items.map((j, i) => `<tr>
-        <td>${(p-1)*ITEMS_PER_PAGE + i + 1}</td>
-        <td style="font-weight:500">${j.nama}</td>
-        <td>${j.aktif
-          ? '<span style="background:#d1fae5;color:#065f46;padding:2px 10px;border-radius:20px;font-size:12px;font-weight:600">Aktif</span>'
-          : '<span style="background:#f1f5f9;color:#94a3b8;padding:2px 10px;border-radius:20px;font-size:12px;font-weight:600">Non-aktif</span>'}</td>
-        <td>
-          <button class="btn-icon edit" onclick="openJabatanModal(${j.id})" title="Edit"><span class="material-icons">edit</span></button>
-          <button class="btn-icon del" onclick="deleteJabatan(${j.id}, '${j.nama.replace(/'/g, "\'")}')" title="Hapus"><span class="material-icons">delete</span></button>
-        </td>
-      </tr>`).join('');
-    el.innerHTML = '<div class="table-container"><table>'
-      + '<thead><tr><th>No</th><th>Nama Jabatan</th><th>Status</th><th>Aksi</th></tr></thead>'
-      + '<tbody>' + rowsHtml + '</tbody></table></div>'
-      + renderPagination('jabatanTable', total, p, totalPages, 'pg => { _jabPage=pg; loadJabatanTable(); }');
+    _jabatanAllList = await API.get('jabatan').catch(() => []);
+    filterJabatan();
   } catch(e) { toast(e.message, 'error'); }
+}
+
+function _renderJabatanTable(list, page) {
+  if (page) _jabPage = page;
+  const el = document.getElementById('jabatanTable');
+  if (!el) return;
+
+  if (!list.length) {
+    el.innerHTML = `<div class="empty-state" style="padding:32px"><span class="material-icons">badge</span><p>Belum ada jabatan yang sesuai filter.</p></div>`;
+    return;
+  }
+
+  const { items, page: p, totalPages, total } = _paginateCustom(list, _jabPage, _PAGE_SIZE_JAB);
+  const rowsHtml = items.map((j, i) => `<tr>
+      <td>${(p-1)*_PAGE_SIZE_JAB + i + 1}</td>
+      <td style="font-weight:500">${j.nama}</td>
+      <td>${j.aktif
+        ? '<span style="background:#d1fae5;color:#065f46;padding:2px 10px;border-radius:20px;font-size:12px;font-weight:600">Aktif</span>'
+        : '<span style="background:#f1f5f9;color:#94a3b8;padding:2px 10px;border-radius:20px;font-size:12px;font-weight:600">Non-aktif</span>'}</td>
+      <td>
+        <button class="btn-icon edit" onclick="openJabatanModal(${j.id})" title="Edit"><span class="material-icons">edit</span></button>
+        <button class="btn-icon del" onclick="deleteJabatan(${j.id}, '${j.nama.replace(/'/g, "\\'")}')" title="Hapus"><span class="material-icons">delete</span></button>
+      </td>
+    </tr>`).join('');
+  el.innerHTML = '<div class="table-container"><table>'
+    + '<thead><tr><th>No</th><th>Nama Jabatan</th><th>Status</th><th>Aksi</th></tr></thead>'
+    + '<tbody>' + rowsHtml + '</tbody></table></div>'
+    + renderPagination('jabatanTable', total, p, totalPages, 'pg => { _jabPage=pg; filterJabatan(false); }');
 }
 
 let _editJabatanId = null;
@@ -898,17 +919,7 @@ async function saveJabatan() {
   if (!nama) return toast('Nama jabatan wajib diisi', 'error');
 
   try {
-    const res = await fetch('/api/jabatan', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nama, aktif, id: _editJabatanId })
-    });
-    let data = {};
-    try { data = await res.json(); } catch(_) {}
-    if (!res.ok || !data.success) {
-      toast(data.message || 'Nama jabatan sudah ada atau terjadi kesalahan', 'error');
-      return;
-    }
+    await API.post('jabatan', { nama, aktif, id: _editJabatanId });
     toast(`Jabatan "${nama}" berhasil ${_editJabatanId ? 'diperbarui' : 'ditambahkan'}`, 'success');
     closeModal('jabatanModal');
     await loadJabatanTable();
@@ -927,9 +938,7 @@ async function deleteJabatan(id, nama) {
     type: 'danger',
     onConfirm: async () => {
       try {
-        const res = await fetch(`/api/jabatan?id=${id}`, { method: 'DELETE' });
-        const data = await res.json();
-        if (!data.success) return toast(data.message || 'Gagal menghapus', 'error');
+        await API.del(`jabatan?id=${id}`, {});
         toast(`Jabatan "${nama}" berhasil dihapus`, 'success');
         await loadJabatanTable();
       } catch(e) { toast(e.message, 'error'); }
@@ -997,7 +1006,7 @@ function renderPKMTable(pkm, page) {
   if (page) _pkmPage = page;
   const el = document.getElementById('pkmTable');
   if (!el) return;
-  const { items, page: p, totalPages, total } = paginateData(pkm, _pkmPage);
+  const { items, page: p, totalPages, total } = _paginateCustom(pkm, _pkmPage, _PAGE_SIZE_PKM);
   const rowsHtml = items.map(p => {
     const kodeQ = p.kode.replace(/'/g, "\'");
     return '<tr>'
@@ -1126,10 +1135,7 @@ async function loadTargetTahunan() {
   const el = document.getElementById('ttContent');
   el.innerHTML = `<div class="empty-state" style="padding:32px"><p>Memuat...</p></div>`;
   try {
-    const res = await fetch(`/api/target-tahunan?kode_pkm=${kode}&tahun=${tahun}`);
-    const data = await res.json();
-    if (!data.success) throw new Error(data.message);
-    _ttIndikator = data.data;
+    _ttIndikator = await API.get(`target-tahunan`, { kode_pkm: kode, tahun });
 
     const namaPKM = _ttPKM.find(p=>p.kode===kode)?.nama || kode;
     const hasData = _ttIndikator.some(i=>i.sasaran>0);
@@ -1176,13 +1182,7 @@ async function saveTargetTahunan() {
   }));
   setLoading(true);
   try {
-    const res = await fetch('/api/target-tahunan', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ kodePKM: _ttCurrentKode, tahun: parseInt(_ttCurrentTahun), targets })
-    });
-    const data = await res.json();
-    if (!data.success) throw new Error(data.message);
+    await API.post('target-tahunan', { kodePKM: _ttCurrentKode, tahun: parseInt(_ttCurrentTahun), targets });
     toast(`Target tahun ${_ttCurrentTahun} berhasil disimpan ✓`, 'success');
     await loadTargetTahunan();
   } catch(e) { toast(e.message, 'error'); }
@@ -1250,7 +1250,7 @@ function renderIndTable(inds, page) {
   const totalBobot = allIndikator.filter(i => i.aktif).reduce((s, i) => s + (parseInt(i.bobot) || 0), 0);
   const tbEl = document.getElementById('totalBobot');
   if (tbEl) tbEl.textContent = totalBobot;
-  const { items, page: p, totalPages, total } = paginateData(inds, _indPage);
+  const { items, page: p, totalPages, total } = _paginateCustom(inds, _indPage, _PAGE_SIZE_IND);
   const rowsHtml = items.map(i => `<tr>
       <td><span style="font-family:'JetBrains Mono';font-weight:700">${i.no}</span></td>
       <td>${i.nama}</td>
@@ -1620,9 +1620,7 @@ async function hapusPeriode() {
     onConfirm: async () => {
       setLoading(true);
       try {
-        const res = await fetch(`/api/periode?tahun=${_editPeriodeTahun}&bulan=${_editPeriodeBulan}`, { method: 'DELETE' });
-        const data = await res.json();
-        if (!data.success) throw new Error(data.message || 'Gagal menghapus');
+        await API.del(`periode?tahun=${_editPeriodeTahun}&bulan=${_editPeriodeBulan}`, {});
         toast('Periode berhasil dihapus', 'success');
         closeModal('periodeModal');
         loadPeriodeGrid();
@@ -1839,7 +1837,7 @@ function _showIdleWarning() {
       <div id="idleCountdownNum" style="font-size:42px;font-weight:900;color:#d97706;font-family:monospace;margin-bottom:20px">${secs}</div>
       <button onclick="window._resetIdleFromWarning()" style="width:100%;height:44px;background:linear-gradient(135deg,#0d9488,#06b6d4);border:none;border-radius:10px;color:white;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">
         <span style="display:flex;align-items:center;justify-content:center;gap:6px">
-          <span class="material-icons" style="font-size:18px">touch_app</span> Saya Masih Di Sini
+          <span class="material-icons" style="font-size:18px">touch_app</span> Lanjutkan Sesi
         </span>
       </button>
     </div>`;
@@ -2058,10 +2056,7 @@ async function adminResetUsulan(idUsulan) {
     onConfirm: async () => {
       setLoading(true);
       try {
-        await fetch(`/api/usulan?action=admin-reset`, {
-          method: 'POST', headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({ idUsulan, email: currentUser.email })
-        });
+        await API.post('usulan?action=admin-reset', { idUsulan, email: currentUser.email });
         toast(`Usulan ${idUsulan} berhasil direset ke Draft`);
         loadKelolaUsulan();
       } catch(e) { toast(e.message,'error'); } finally { setLoading(false); }
@@ -2076,13 +2071,7 @@ async function adminDeleteUsulan(idUsulan) {
     onConfirm: async () => {
       setLoading(true);
       try {
-        const res = await fetch('/api/usulan', {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ idUsulan })
-        });
-        const data = await res.json();
-        if (!res.ok && !data.success) throw new Error(data.message || data.error || 'Gagal hapus');
+        await API.del('usulan', { idUsulan });
         toast(`Usulan ${idUsulan} berhasil dihapus`);
         loadKelolaUsulan();
       } catch(e) { toast(e.message, 'error'); }
@@ -2100,13 +2089,7 @@ async function restoreVerifAdmin(idUsulan) {
     onConfirm: async () => {
       setLoading(true);
       try {
-        const res = await fetch('/api/usulan?action=restore-verif', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ idUsulan, emailAdmin: currentUser.email })
-        });
-        const data = await res.json();
-        if (!data.success) throw new Error(data.message || 'Gagal memulihkan');
+        await API.post('usulan?action=restore-verif', { idUsulan, emailAdmin: currentUser.email });
         toast('Status verifikasi berhasil dipulihkan ✓', 'success');
         loadKelolaUsulan();
       } catch(e) { toast(e.message, 'error'); }
@@ -2118,18 +2101,35 @@ async function restoreVerifAdmin(idUsulan) {
 
 // ============== MASTER DATA TAB WRAPPERS ==============
 const _masterTabs = [
-  { id: 'users',           icon: 'group',          label: 'Kelola User' },
+  { id: 'users',           icon: 'group',          label: 'User' },
   { id: 'jabatan',         icon: 'badge',           label: 'Jabatan' },
   { id: 'pkm',             icon: 'local_hospital',  label: 'Puskesmas' },
   { id: 'indikator',       icon: 'monitor_heart',   label: 'Indikator' },
   { id: 'periode',         icon: 'event_available', label: 'Periode' },
   { id: 'target-tahunan',  icon: 'track_changes',   label: 'Target Tahunan' },
-  { id: 'pejabat',         icon: 'draw',            label: 'Pejabat Penandatangan' },
+  { id: 'pejabat',         icon: 'draw',            label: 'Pejabat' },
   { id: 'audit-trail',     icon: 'manage_search',   label: 'Audit Trail' },
 ];
 
 
 // ============== AUDIT TRAIL ==============
+// Label tampilan untuk modul dan aksi
+const _AT_MODULE_LABELS = {
+  auth: 'Login / Auth', usulan: 'Usulan', users: 'User',
+  puskesmas: 'Puskesmas', indikator: 'Indikator', periode: 'Periode', settings: 'Pengaturan'
+};
+const _AT_ACTION_LABELS = {
+  LOGIN: 'Login', LOGOUT: 'Logout', CREATE: 'Tambah', UPDATE: 'Ubah', DELETE: 'Hapus',
+  SUBMIT: 'Submit', APPROVE: 'Approve', REJECT: 'Tolak',
+  RESET: 'Reset', RESTORE: 'Restore', VERIFY: 'Verifikasi'
+};
+// Fallback: Title Case jika aksi tidak ada di mapping
+function _atActionLabel(raw) {
+  const key = (raw || '').toUpperCase();
+  if (_AT_ACTION_LABELS[key]) return _AT_ACTION_LABELS[key];
+  return key.charAt(0) + key.slice(1).toLowerCase();
+}
+
 async function renderAuditTrail(el) {
   const target = el || document.getElementById('masterTabContent');
   if (!target) return;
@@ -2160,26 +2160,12 @@ async function renderAuditTrail(el) {
             <label style="font-size:12px;font-weight:600;color:#64748b;display:block;margin-bottom:4px">Modul</label>
             <select class="form-control" id="atModule" style="width:160px">
               <option value="">Semua Modul</option>
-              <option value="auth">Login / Auth</option>
-              <option value="usulan">Usulan</option>
-              <option value="users">User</option>
-              <option value="puskesmas">Puskesmas</option>
-              <option value="indikator">Indikator</option>
-              <option value="periode">Periode</option>
-              <option value="settings">Pengaturan</option>
             </select>
           </div>
           <div>
             <label style="font-size:12px;font-weight:600;color:#64748b;display:block;margin-bottom:4px">Aksi</label>
             <select class="form-control" id="atAction" style="width:140px">
               <option value="">Semua Aksi</option>
-              <option value="LOGIN">Login</option>
-              <option value="CREATE">Tambah</option>
-              <option value="UPDATE">Ubah</option>
-              <option value="DELETE">Hapus</option>
-              <option value="SUBMIT">Submit</option>
-              <option value="APPROVE">Approve</option>
-              <option value="REJECT">Tolak</option>
             </select>
           </div>
           <div style="flex:1;min-width:160px">
@@ -2201,7 +2187,43 @@ async function renderAuditTrail(el) {
       </div>
     </div>`;
 
+  // Isi dropdown modul & aksi dari data nyata (tanpa filter tanggal, limit besar)
+  _populateAuditFilterOptions();
+
   loadAuditTrail();
+}
+
+// Ambil semua data tanpa filter → bangun opsi modul & aksi yang benar-benar ada di DB
+async function _populateAuditFilterOptions() {
+  try {
+    // Ambil sample besar tanpa filter tanggal agar modul/aksi lengkap terdeteksi
+    const all = await API.get('audit-trail', { limit: 5000 });
+    if (!all || !all.length) return;
+
+    const moduleSel = document.getElementById('atModule');
+    const actionSel = document.getElementById('atAction');
+    if (!moduleSel || !actionSel) return;
+
+    // Kumpulkan nilai unik yang benar-benar ada
+    const modules = [...new Set(all.map(r => r.module).filter(Boolean))].sort();
+    const actions = [...new Set(all.map(r => (r.action||'').toUpperCase()).filter(Boolean))].sort();
+
+    // Simpan nilai yang sedang dipilih (jika ada)
+    const curMod = moduleSel.value;
+    const curAct = actionSel.value;
+
+    moduleSel.innerHTML = '<option value="">Semua Modul</option>'
+      + modules.map(m => {
+          const label = _AT_MODULE_LABELS[m] || m;
+          return `<option value="${m}" ${m === curMod ? 'selected' : ''}>${label}</option>`;
+        }).join('');
+
+    actionSel.innerHTML = '<option value="">Semua Aksi</option>'
+      + actions.map(a => {
+          const label = _atActionLabel(a);
+          return `<option value="${a}" ${a === curAct ? 'selected' : ''}>${label}</option>`;
+        }).join('');
+  } catch(_) { /* silent — filter tetap berfungsi walau gagal */ }
 }
 
 async function loadAuditTrail() {
@@ -2243,7 +2265,7 @@ function renderAuditTrailPage(page) {
   const data = window._auditTrailData || [];
   if (!data.length) return;
 
-  const PAGE_SIZE = 11;
+  const PAGE_SIZE = 9;
   const totalPages = Math.ceil(data.length / PAGE_SIZE);
   page = Math.max(1, Math.min(page, totalPages));
   window._auditTrailPage = page;
@@ -2265,7 +2287,6 @@ function renderAuditTrailPage(page) {
         ${disabled ? 'disabled' : ''}>${label}</button>`;
 
     let pages = '';
-    // Always show first, last, current ±2
     const showPages = new Set([1, totalPages, page, page-1, page-2, page+1, page+2].filter(p => p >= 1 && p <= totalPages));
     const sorted = [...showPages].sort((a,b) => a-b);
     let prev = 0;

@@ -57,8 +57,8 @@ async function loadVerifData(status) {
     if (status && status !== 'semua') params.status = status;
   } else if (role === 'Pengelola Program') {
     // Tampilkan semua yang ditugaskan (sudah/belum verifikasi) agar tombol hijau terlihat
-    // Include 'Menunggu Kepala Puskesmas' agar PP bisa lihat status saat usulan dikembalikan ke Kapus
-    params.status_program = 'Menunggu Pengelola Program,Ditolak,Ditolak Sebagian,Selesai,Menunggu Admin,Menunggu Kepala Puskesmas';
+    // Include status re-verifikasi baru agar PP dan Kapus bisa lihat tugasnya
+    params.status_program = 'Menunggu Pengelola Program,Menunggu Re-verifikasi PP,Ditolak,Ditolak Sebagian,Selesai,Menunggu Admin,Menunggu Kepala Puskesmas,Menunggu Re-verifikasi Kepala Puskesmas';
     params.email_program = currentUser.email;
   } else if (role === 'Admin' && status !== 'semua') {
     params.status = status;
@@ -206,6 +206,7 @@ async function openVerifikasi(idUsulan) {
 
     // Simpan state ke window agar submitIndVerifikasi bisa baca
     window._verifDitolakOleh  = detail.ditolakOleh || '';
+    window._verifKonteksPenolakan = detail.konteksPenolakan || '';
     window._verifIsPPReVerif  = _isPPReVerif;
     window._verifIsKapusReVerif = false; // akan di-set ulang di blok Kapus di bawah
     window._verifIsAdminReVerif = false; // akan di-set ulang di blok Admin di bawah
@@ -241,11 +242,32 @@ _ppBanner.innerHTML = `<span class="material-icons" style="color:#f59e0b;font-si
           }
         }
         // Tampilkan alasan penolakan per indikator dari Admin
+        // Sumber utama: detail.adminCatatan (format "#1: alasan | #2: alasan | #3: alasan")
+        // — paling reliable karena langsung dari keputusan Admin, tidak bergantung pada
+        //   penolakan_indikator yang bisa ter-filter/exclude oleh query backend.
+        // Fallback: penolakanIndikator jika adminCatatan kosong.
         if (detail.ditolakOleh === 'Admin') {
-          const myAkses = currentUser.indikatorAkses || [];
-          const alasanDariAdmin = (detail.penolakanIndikator || [])
-            .filter(p => (!p.aksi || p.aksi === 'tolak' || p.aksi === 'reset') && (myAkses.length === 0 || myAkses.includes(parseInt(p.noIndikator || p.no_indikator))))
-            .map(p => ({ no: parseInt(p.noIndikator || p.no_indikator), alasan: p.alasan || '-' }));
+          const alasanMap = {};
+          // Parse dari adminCatatan
+          const adminCatatanStr = detail.adminCatatan || '';
+          if (adminCatatanStr) {
+            adminCatatanStr.split('|').forEach(part => {
+              const m = part.trim().match(/^#(\d+):\s*(.*)/);
+              if (m) alasanMap[parseInt(m[1])] = m[2].trim() || '-';
+            });
+          }
+          // Fallback: dari penolakanIndikator jika adminCatatan tidak lengkap
+          if (!Object.keys(alasanMap).length) {
+            (detail.penolakanIndikator || [])
+              .filter(p => p.dibuat_oleh === 'Admin' && (!p.aksi || p.aksi === 'tolak' || p.aksi === 'reset'))
+              .forEach(p => {
+                const no = parseInt(p.noIndikator || p.no_indikator);
+                if (!alasanMap[no]) alasanMap[no] = p.alasan || '-';
+              });
+          }
+          const alasanDariAdmin = Object.keys(alasanMap)
+            .map(Number).sort((a, b) => a - b)
+            .map(no => ({ no, alasan: alasanMap[no] }));
           renderPenolakanBanner('verifPenolakanBanner', 'Admin', alasanDariAdmin);
         } else {
           // Re-verif dari Kapus — tampilkan catatan Kapus jika ada
@@ -293,7 +315,9 @@ _ppBanner.innerHTML = `<span class="material-icons" style="color:#f59e0b;font-si
       // Re-verifikasi hanya jika ada penolakan AKTIF (ditolak_oleh tidak null)
       // Mencegah data penolakan lama dari siklus sebelumnya mempengaruhi tampilan
       const adaPenolakanAktif = penolakanList.length > 0 && !!detail.ditolakOleh;
-      if (adaPenolakanAktif) {
+      // Tambah: status 'Menunggu Re-verifikasi Kepala Puskesmas' = selalu re-verif Admin
+      const isReVerifAdminKapus = detail.statusGlobal === 'Menunggu Re-verifikasi Kepala Puskesmas';
+      if (adaPenolakanAktif || isReVerifAdminKapus) {
         const bermasalahNos = penolakanList.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'sanggah').map(p => parseInt(p.noIndikator || p.no_indikator));
         displayInds = inds.filter(i => bermasalahNos.includes(parseInt(i.no)));
         _isKapusReVerif = true;
@@ -304,10 +328,32 @@ _ppBanner.innerHTML = `<span class="material-icons" style="color:#f59e0b;font-si
       const _reVerifBanner = document.getElementById('verifReVerifBanner');
       // _isPPLoop dideklarasikan di luar if(_reVerifBanner) agar accessible untuk kapusCatatanWrap
       const _isPPLoop = _isKapusReVerif && (detail.ditolakOleh === 'Pengelola Program');
+      const _isAdminLoop = isReVerifAdminKapus || (detail.ditolakOleh === 'Admin' || detail.konteksPenolakan === 'Admin');
       if (_reVerifBanner) {
         if (_isKapusReVerif) {
-          const _opCatatan = !_isPPLoop ? (detail.operatorCatatan || '') : '';
-          if (_isPPLoop) {
+          const _opCatatan = !_isPPLoop && !_isAdminLoop ? (detail.operatorCatatan || '') : '';
+          if (_isAdminLoop) {
+            // Kapus dikonfirmasi setelah PP selesai re-verif penolakan Admin
+            // Tampilkan catatan/sanggahan PP yang sudah direspond
+            _reVerifBanner.innerHTML = `<div style="width:100%">
+              <div style="display:flex;align-items:center;gap:6px">
+                <span class="material-icons" style="color:#f59e0b;font-size:16px;flex-shrink:0">warning</span>
+                <span style="font-size:12.5px;color:#92400e"><b>Konfirmasi Re-verifikasi</b> — Pengelola Program telah merespons penolakan Admin. Tinjau dan konfirmasi <b>${displayInds.length} indikator</b> ini. Keputusan Anda akan diteruskan ke Admin.</span>
+              </div>
+            </div>`;
+            _reVerifBanner.style.display = 'flex';
+            // Tampilkan alasan penolakan dari Admin
+            const alasanAdmin = (detail.penolakanIndikator || [])
+              .filter(p => !p.aksi || p.aksi === 'tolak')
+              .map(p => ({ no: parseInt(p.noIndikator || p.no_indikator), alasan: p.alasan || '-' }));
+            renderPenolakanBanner('verifPenolakanBanner', 'Admin', alasanAdmin);
+            // kapusCatatanWrap: muncul hanya saat Kapus klik Setuju (mode reVerif)
+            const _kapusCatatanWrap = document.getElementById('kapusCatatanWrap');
+            if (_kapusCatatanWrap) {
+              _kapusCatatanWrap.dataset.mode = 'reVerif';
+              _kapusCatatanWrap.style.display = 'none';
+            }
+          } else if (_isPPLoop) {
             // Loop PP→Kapus: PP tolak, dikembalikan ke Kapus untuk re-verifikasi
             _reVerifBanner.innerHTML = `<div style="width:100%">
               <div style="display:flex;align-items:center;gap:6px">
@@ -349,9 +395,9 @@ _ppBanner.innerHTML = `<span class="material-icons" style="color:#f59e0b;font-si
               _reVerifBanner.style.display = 'flex';
             }
           }
-          // kapusCatatanWrap: hanya aktif saat loop PP↔Kapus (menyanggah PP)
+          // kapusCatatanWrap: aktif saat loop PP↔Kapus (menyanggah PP) atau saat re-verif Admin
           const _kapusCatatanWrap = document.getElementById('kapusCatatanWrap');
-          if (_kapusCatatanWrap) {
+          if (_kapusCatatanWrap && !_isAdminLoop) {
             const _needsCatatan = _isKapusReVerif && _isPPLoop;
             _kapusCatatanWrap.dataset.mode = _needsCatatan ? 'reVerif' : '';
             _kapusCatatanWrap.style.display = 'none'; // selalu hidden, muncul via setIndVerif saat klik Setuju
@@ -530,8 +576,8 @@ _ppBanner.innerHTML = `<span class="material-icons" style="color:#f59e0b;font-si
 
     const role = currentUser.role;
     const canAct = !sudahVerifUser && (
-      (role === 'Kepala Puskesmas' && detail.statusGlobal === 'Menunggu Kepala Puskesmas') ||
-      (role === 'Pengelola Program' && ['Menunggu Pengelola Program', 'Ditolak Sebagian'].includes(detail.statusGlobal)) ||
+      (role === 'Kepala Puskesmas' && ['Menunggu Kepala Puskesmas', 'Menunggu Re-verifikasi Kepala Puskesmas'].includes(detail.statusGlobal)) ||
+      (role === 'Pengelola Program' && ['Menunggu Pengelola Program', 'Menunggu Re-verifikasi PP', 'Ditolak Sebagian'].includes(detail.statusGlobal)) ||
       (role === 'Admin' && detail.statusGlobal === 'Menunggu Admin')
     );
     // Semua role verifikasi menggunakan sistem per-indikator
@@ -574,31 +620,29 @@ _ppBanner.innerHTML = `<span class="material-icons" style="color:#f59e0b;font-si
         //   - Kapus re-verif setelah Operator ajukan ulang (loop Kapus↔Operator)
         //   - Admin re-verif setelah PP sanggah
         const _isKapusPPLoop   = window._verifIsKapusReVerif && window._verifDitolakOleh === 'Pengelola Program';
+        const _isKapusAdminLoop = window._verifIsKapusReVerif && (window._verifDitolakOleh === 'Admin' || window._verifKonteksPenolakan === 'Admin');
         const _isPPRespondMode = window._verifIsPPReVerif; // PP selalu respond penolakan pihak lain
-        const _isSanggahMode   = _isKapusPPLoop || _isPPRespondMode;
+        const _isSanggahMode   = _isKapusPPLoop || _isPPRespondMode; // Kapus Admin loop TIDAK sanggah mode
         const _isReVerifMode   = window._verifIsPPReVerif || window._verifIsKapusReVerif || window._verifIsAdminReVerif;
 
-        // Mode sanggah: 'Sanggah Penolakan' = data sudah benar | 'Akui & Perbaiki' = membenarkan penolakan
-        const _lblApprove = _isSanggahMode ? 'Sanggah Penolakan' : 'Setuju';
-        const _lblReject  = _isSanggahMode ? 'Akui & Perbaiki'   : 'Tolak';
-        const _subApprove = _isSanggahMode ? '<div style="font-size:9.5px;color:#15803d;line-height:1.2;margin-top:1px">Data sudah benar</div>' : '';
-        const _subReject  = _isSanggahMode ? '<div style="font-size:9.5px;color:#b91c1c;line-height:1.2;margin-top:1px">Data perlu diperbaiki</div>' : '';
+        // Mode sanggah: 'Sanggah' = data sudah benar | 'Perbaiki' = membenarkan penolakan
+        const _lblApprove = _isSanggahMode ? 'Sanggah' : 'Setuju';
+        const _lblReject  = _isSanggahMode ? 'Perbaiki'   : 'Tolak';
+
         const _placeholderAlasan = _isSanggahMode ? 'Alasan penolakan diterima (wajib)...' : 'Alasan penolakan (wajib)...';
         verifCol = `
           <td style="text-align:center;padding:6px 8px;min-width:190px">
             <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
               <div style="display:flex;gap:6px">
                 <button id="pgApprove_${i.no}" onclick="setIndVerif(${i.no},'setuju')"
-                  style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:6px;border:1.5px solid #16a34a;background:white;color:#16a34a;font-size:11.5px;font-weight:600;cursor:pointer;transition:all 0.15s;flex-direction:column"
+                  style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:6px;border:1.5px solid #16a34a;background:white;color:#16a34a;font-size:11.5px;font-weight:600;cursor:pointer;transition:all 0.15s"
                   onmouseover="if(!this.dataset.active)this.style.background='#f0fdf4'" onmouseout="if(!this.dataset.active)this.style.background='white'">
-                  <span style="display:inline-flex;align-items:center;gap:4px"><span class="material-icons" style="font-size:14px">check_circle</span> ${_lblApprove}</span>
-                  ${_subApprove}
+                  <span class="material-icons" style="font-size:14px">check_circle</span> ${_lblApprove}
                 </button>
                 <button id="pgReject_${i.no}" onclick="setIndVerif(${i.no},'tolak')"
-                  style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:6px;border:1.5px solid #dc2626;background:white;color:#dc2626;font-size:11.5px;font-weight:600;cursor:pointer;transition:all 0.15s;flex-direction:column"
+                  style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:6px;border:1.5px solid #dc2626;background:white;color:#dc2626;font-size:11.5px;font-weight:600;cursor:pointer;transition:all 0.15s"
                   onmouseover="if(!this.dataset.active)this.style.background='#fef2f2'" onmouseout="if(!this.dataset.active)this.style.background='white'">
-                  <span style="display:inline-flex;align-items:center;gap:4px"><span class="material-icons" style="font-size:14px">cancel</span> ${_lblReject}</span>
-                  ${_subReject}
+                  <span class="material-icons" style="font-size:14px">cancel</span> ${_lblReject}
                 </button>
               </div>
 
@@ -735,8 +779,10 @@ async function submitIndVerifikasi(idUsulan, displayInds, role) {
   const indikatorList = [];
   const _isReVerifMode = window._verifIsPPReVerif || window._verifIsKapusReVerif || window._verifIsAdminReVerif;
   const _isKapusPPLoop2   = window._verifIsKapusReVerif && window._verifDitolakOleh === 'Pengelola Program';
+  // Kapus di re-verif Admin: tombol Setuju/Tolak biasa (bukan Sanggah/Terima)
+  const _isKapusAdminLoop2 = window._verifIsKapusReVerif && (window._verifDitolakOleh === 'Admin' || window._verifKonteksPenolakan === 'Admin');
   const _isPPRespondMode2 = window._verifIsPPReVerif;
-  const _isSanggahMode2   = _isKapusPPLoop2 || _isPPRespondMode2;
+  const _isSanggahMode2   = _isKapusPPLoop2 || _isPPRespondMode2; // Kapus Admin loop TIDAK pakai sanggah mode
   for (const i of displayInds) {
     const isSetuju = document.getElementById(`pgApprove_${i.no}`)?.dataset.active === '1';
     const isTolak  = document.getElementById(`pgReject_${i.no}`)?.dataset.active  === '1';
@@ -756,7 +802,7 @@ async function submitIndVerifikasi(idUsulan, displayInds, role) {
   //   → respond-penolakan dengan responList (sanggah/tolak per penolakan)
   // Semua lainnya → verif-kapus / verif-program / verif-admin
   const _isRespondPenolakan = role === 'Pengelola Program'
-    && window._verifDitolakOleh === 'Admin'
+    && (window._verifDitolakOleh === 'Admin' || window._verifKonteksPenolakan === 'Admin')
     && window._verifIsPPReVerif === true;
 
   const actionMap = { 'Kepala Puskesmas': 'verif-kapus', 'Pengelola Program': 'verif-program', 'Admin': 'verif-admin' };

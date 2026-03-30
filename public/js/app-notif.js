@@ -17,7 +17,8 @@ async function fetchNotifCount() {
     } else if (role === 'Kepala Puskesmas') {
       count = d.menunggu || 0;
     } else if (role === 'Pengelola Program') {
-      count = d.menunggu || 0;
+      const ppList = await API.getUsulan({ email_program: currentUser.email }).catch(() => []);
+      count = (ppList || []).filter(u => ['Menunggu Pengelola Program','Menunggu Re-verifikasi PP'].includes(u.statusGlobal)).length;
     } else if (role === 'Admin') {
       const allUsulan = await API.getUsulan({}).catch(() => []);
       count = (allUsulan || []).filter(u => u.statusGlobal === 'Menunggu Admin').length;
@@ -117,9 +118,10 @@ async function loadNotifPanel() {
       });
     } else if (role === 'Pengelola Program') {
       const list = await API.getUsulan({ email_program: currentUser.email }).catch(() => []);
-      (list || []).filter(u => u.statusGlobal === 'Menunggu Pengelola Program').forEach(u => {
-        items.push({ icon: 'hourglass_top', color: '#2563eb', bg: '#eff6ff',
-          title: `Menunggu Verifikasi Program`,
+      (list || []).filter(u => ['Menunggu Pengelola Program','Menunggu Re-verifikasi PP'].includes(u.statusGlobal)).forEach(u => {
+        const isReVerif = u.statusGlobal === 'Menunggu Re-verifikasi PP';
+        items.push({ icon: isReVerif ? 'replay' : 'hourglass_top', color: isReVerif ? '#ea580c' : '#2563eb', bg: isReVerif ? '#fff7ed' : '#eff6ff',
+          title: isReVerif ? `Re-verifikasi diperlukan` : `Menunggu Verifikasi Program`,
           sub: `${u.idUsulan} · ${u.namaBulan} ${u.tahun}`,
           action: `loadPage('verifikasi')` });
       });

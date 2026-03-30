@@ -97,12 +97,6 @@ function renderAdminDashboard(el, d) {
           <select id="adminAllFilterStatus" onchange="filterAdminAllUsulan()"
             style="border:1px solid var(--border,#e2e8f0);border-radius:7px;padding:5px 10px;font-size:12px;outline:none;font-family:inherit;background:var(--surface,white);color:var(--text)">
             <option value="">Semua Status</option>
-            <option value="Draft">Draft</option>
-            <option value="Menunggu Kepala Puskesmas">Menunggu Kepala Puskesmas</option>
-            <option value="Menunggu Pengelola Program">Menunggu Pengelola Program</option>
-            <option value="Menunggu Admin">Menunggu Admin</option>
-            <option value="Selesai">Selesai</option>
-            <option value="Ditolak">Ditolak</option>
           </select>
         </div>
       </div>
@@ -166,6 +160,15 @@ async function loadAdminAllUsulan() {
     if (tahunSel) {
       tahunSel.innerHTML = `<option value="">Semua Tahun</option>` + tahunSet.map(t => `<option value="${t}">${t}</option>`).join('');
     }
+    // Populate filter status — hanya tampilkan status yang benar-benar ada di data
+    const statusOrder = ['Draft','Menunggu Kepala Puskesmas','Menunggu Pengelola Program','Menunggu Admin','Selesai','Ditolak','Ditolak Sebagian'];
+    const statusSet = new Set(_adminAllUsulanData.map(u => u.statusGlobal).filter(Boolean));
+    const statusSorted = statusOrder.filter(s => statusSet.has(s));
+    statusSet.forEach(s => { if (!statusSorted.includes(s)) statusSorted.push(s); });
+    const statusSel = document.getElementById('adminAllFilterStatus');
+    if (statusSel) {
+      statusSel.innerHTML = `<option value="">Semua Status</option>` + statusSorted.map(s => `<option value="${s}">${s}</option>`).join('');
+    }
   } catch(e) {
     el.innerHTML = `<div class="empty-state" style="padding:32px"><span class="material-icons">inbox</span><p>Gagal memuat data</p></div>`;
   }
@@ -209,14 +212,15 @@ function renderAdminAllUsulanTable(rows) {
 }
 
 function renderStatusSummary(d) {
+  const _dk = document.documentElement.getAttribute('data-theme') === 'dark';
   const total    = d.totalUsulan || 0;
   const selesai  = d.selesai || 0;
   const menunggu = d.menunggu || 0;
   const ditolak  = Math.max(0, total - selesai - menunggu);
   const items = [
-    { label: 'Selesai',       val: selesai,  color: '#10b981', bg: '#ecfdf5' },
-    { label: 'Dalam Proses',  val: menunggu, color: '#f59e0b', bg: '#fffbeb' },
-    { label: 'Ditolak/Draft', val: ditolak,  color: '#ef4444', bg: '#fef2f2' },
+    { label: 'Selesai',       val: selesai,  color: '#10b981', bg: _dk ? 'rgba(16,185,129,0.12)'  : '#ecfdf5' },
+    { label: 'Dalam Proses',  val: menunggu, color: '#f59e0b', bg: _dk ? 'rgba(245,158,11,0.12)'  : '#fffbeb' },
+    { label: 'Ditolak/Draft', val: ditolak,  color: '#ef4444', bg: _dk ? 'rgba(239,68,68,0.12)'   : '#fef2f2' },
   ];
   return `
     <div style="display:flex;flex-direction:column;gap:8px">
@@ -745,10 +749,7 @@ function renderProgramDashboard(el, d) {
               </span>`;
             }).join('')}
           </div>
-          ${_reVerif.size > 0 ? `<div style="display:flex;align-items:center;gap:5px;margin-top:2px;background:#fff7ed;border:1px solid #fed7aa;border-radius:7px;padding:4px 10px">
-            <span class="material-icons" style="font-size:13px;color:#ea580c">warning</span>
-            <span style="font-size:11.5px;color:#9a3412;font-weight:600">${_reVerif.size} indikator perlu re-verifikasi — buka tabel di bawah untuk melanjutkan</span>
-          </div>` : ''}
+
         </div>`
       : `<span style="font-size:12px;color:var(--text-light)">Anda bertanggung jawab atas <strong style="color:var(--primary)">semua indikator</strong></span>`;
     const card = document.getElementById('ppIndikatorInfoCard');
@@ -757,35 +758,45 @@ function renderProgramDashboard(el, d) {
       ${infoHtml}`;
   };
 
-  // Render sementara (tanpa data re-verif) sambil menunggu fetch selesai
-  const _renderInfoCardEarly = (indList) => _renderPPIndikatorInfo(indList, new Set());
-  if (window.allIndList && window.allIndList.length) {
-    _renderInfoCardEarly(window.allIndList);
-  } else {
-    API.getIndikator().then(inds => {
-      window.allIndList = inds;
-      _renderInfoCardEarly(inds);
-    }).catch(() => { _renderInfoCardEarly([]); });
-  }
+  // Fetch indikator dan usulan BERSAMAAN — render info card hanya SEKALI setelah keduanya selesai
+  // (menghilangkan race condition di mana early render tanpa reVerifNos menimpa final render)
+  const _indFetch = window.allIndList && window.allIndList.length
+    ? Promise.resolve(window.allIndList)
+    : API.getIndikator().then(inds => { window.allIndList = inds; return inds; }).catch(() => []);
 
-  API.getUsulan({ status_program: 'Menunggu Pengelola Program,Ditolak,Selesai,Menunggu Admin', email_program: currentUser.email }).then(rows => {
+  Promise.all([
+    _indFetch,
+    API.getUsulan({ status_program: 'Menunggu Pengelola Program,Menunggu Re-verifikasi PP,Ditolak,Ditolak Sebagian,Selesai,Menunggu Admin', email_program: currentUser.email })
+  ]).then(([indList, rows]) => {
     const pending = rows.filter(u => !u.sudahVerif);
     const done = rows.filter(u => u.sudahVerif);
 
-    // Hitung nomor indikator yang perlu re-verifikasi dari semua usulan pending
+    // Hitung nomor indikator yang perlu re-verifikasi
     const myAksesSet = new Set((currentUser.indikatorAkses || []).map(n => parseInt(n)));
+    const myEmail = (currentUser.email || '').toLowerCase();
     const reVerifNos = new Set();
-    pending.forEach(u => {
-      if (u.statusGlobal !== 'Menunggu Pengelola Program') return;
+    // Iterasi semua rows — skenario 'Menunggu Re-verifikasi PP' bisa masuk done
+    // jika sudahVerif salah hitung, atau PP ini sudah respond tapi PP lain belum
+    rows.forEach(u => {
+      if (!['Menunggu Pengelola Program','Menunggu Re-verifikasi PP','Ditolak Sebagian'].includes(u.statusGlobal)) return;
       (u.penolakanIndikator || [])
-        .filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'kapus-ok' || p.aksi === 'reset')
+        .filter(p => {
+          const aksiOk = !p.aksi || p.aksi === 'tolak' || p.aksi === 'kapus-ok' || p.aksi === 'kapus-verif' || p.aksi === 'reset';
+          if (!aksiOk) return false;
+          // Untuk penolakan dari Admin: hanya baris email_program milik PP ini yang belum direspond
+          if ((p.dibuat_oleh || '') === 'Admin') {
+            return (p.emailProgram || p.email_program || '').toLowerCase() === myEmail
+              && !p.responded_at;
+          }
+          return true;
+        })
         .forEach(p => {
           const no = parseInt(p.noIndikator || p.no_indikator);
           if (myAksesSet.size === 0 || myAksesSet.has(no)) reVerifNos.add(no);
         });
     });
-    // Re-render info card dengan data re-verif yang sudah lengkap
-    const indList = window.allIndList || [];
+
+    // Render info card SEKALI dengan data lengkap (indikator + reVerifNos)
     _renderPPIndikatorInfo(indList, reVerifNos);
 
     // Pagination state untuk PP dashboard
@@ -958,7 +969,7 @@ function renderUsulanTable(rows, role) {
     const pdfBtnEarly = getDownloadBtn(u, 20, role, currentUser.indikatorAkses);
     if (role === 'operator') {
       const editBtn = u.statusGlobal === 'Draft' ? `<button class="btn-icon edit" onclick="openIndikatorModal('${u.idUsulan}')" title="Input"><span class="material-icons">edit</span></button>` : '';
-      const canPerbaiki = ['Ditolak','Ditolak Sebagian'].includes(u.statusGlobal) && u.ditolakOleh !== 'Admin';
+      const canPerbaiki = ['Ditolak','Ditolak Sebagian'].includes(u.statusGlobal) && (u.ditolakOleh !== 'Admin' || u.konteksPenolakan === 'KapusTolakAdmin');
       const perbaikiBtn = canPerbaiki
         ? `<button class="btn-icon" onclick="openIndikatorModal('${u.idUsulan}')" title="Perbaiki & Ajukan Ulang" style="background:transparent;border:none;color:#f59e0b"><span class="material-icons" style="font-size:17px">restart_alt</span></button>`
         : `<button class="btn-icon" disabled title="${u.statusGlobal === 'Menunggu Pengelola Program' ? 'Menunggu respon Pengelola Program' : 'Tidak perlu perbaikan'}" style="background:transparent;border:none;color:#cbd5e1;opacity:0.3;cursor:not-allowed"><span class="material-icons" style="font-size:17px">restart_alt</span></button>`;
@@ -967,7 +978,7 @@ function renderUsulanTable(rows, role) {
     // PP dan Admin bisa verif sesuai status global
     const canVerif =
       (role === 'kepala-puskesmas' && u.statusGlobal === 'Menunggu Kepala Puskesmas') ||
-      (role === 'program' && u.statusGlobal === 'Menunggu Pengelola Program') ||
+      (role === 'program' && ['Menunggu Pengelola Program','Menunggu Re-verifikasi PP'].includes(u.statusGlobal)) ||
       (role === 'admin'   && u.statusGlobal === 'Menunggu Admin');
 
     // Sudah verifikasi
@@ -1018,7 +1029,7 @@ function renderUsulanTable(rows, role) {
                 .map(p => parseInt(p.no_indikator || p.noIndikator))
             )].sort((a,b)=>a-b);
             if (nos.length > 0)
-              return ' ' + nos.map(n => `<span style="background:#fecaca;color:#7f1d1d;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700">#${n}</span>`).join(' ');
+              return ' ' + nos.map(n => `<span style="background:#fecaca;color:#7f1d1d;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;white-space:nowrap">#${n}</span>`).join(' ');
           }
           return '';
         })()}
@@ -1036,9 +1047,9 @@ if (_nosAdmin.length === 0 && u.adminCatatan) {
     if (m) _nosAdmin.push(parseInt(m[1]));
   });
 }
-const nos = _nosAdmin.sort((a,b)=>a-b).map(n => `<span style="background:#fecaca;color:#7f1d1d;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700">#${n}</span>`).join(' ');
+const nos = _nosAdmin.sort((a,b)=>a-b).map(n => `<span style="background:#fecaca;color:#7f1d1d;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;white-space:nowrap">#${n}</span>`).join(' ');
           const indBadge = nos ? `<span style="margin-left:4px">${nos}</span>` : '';
-          if (sg === 'Menunggu Pengelola Program')
+          if (sg === 'Menunggu Pengelola Program' || sg === 'Menunggu Re-verifikasi PP')
             return `<div style="margin-top:4px;background:#fff7ed;border:1px solid #fed7aa;border-radius:5px;padding:3px 7px"><div style="display:inline-flex;align-items:center;gap:4px"><span class="material-icons" style="font-size:12px;color:#ea580c">replay</span><span style="font-size:10.5px;color:#c2410c;font-weight:600">Re-verifikasi PP</span>${indBadge}</div></div>`;
           if (sg === 'Menunggu Kepala Puskesmas')
             return `<div style="margin-top:4px;background:#fef9c3;border:1px solid #fde047;border-radius:5px;padding:3px 7px"><div style="display:inline-flex;align-items:center;gap:4px"><span class="material-icons" style="font-size:12px;color:#ca8a04">replay</span><span style="font-size:10.5px;color:#92400e;font-weight:600">Re-verifikasi Kapus</span>${indBadge}</div></div>`;
@@ -1047,28 +1058,42 @@ const nos = _nosAdmin.sort((a,b)=>a-b).map(n => `<span style="background:#fecaca
           }
           return '';
         })() : ''}
-        ${(role === 'program' && u.penolakanIndikator && u.penolakanIndikator.length && ['Ditolak','Ditolak Sebagian'].includes(u.statusGlobal)) ? `
+        ${(role === 'program' && u.penolakanIndikator && u.penolakanIndikator.length && u.statusGlobal === 'Ditolak') ? `
           <div style="margin-top:4px;display:inline-flex;align-items:center;gap:4px;flex-wrap:wrap;background:var(--danger-light,#fef2f2);border:1px solid #fca5a5;border-radius:5px;padding:2px 7px">
-            <span class="material-icons" style="font-size:12px;color:#dc2626">cancel</span>
-            <span style="font-size:10.5px;color:#dc2626;font-weight:600">Indikator bermasalah:</span>
+            <span class="material-icons" style="font-size:12px;color:#dc2626;flex-shrink:0">cancel</span>
+            <span style="font-size:10.5px;color:#dc2626;font-weight:600;white-space:nowrap">Ditolak:</span>
             ${(() => {
               const myAkses = currentUser.indikatorAkses || [];
               const aktif = u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'sanggah');
               const filtered = myAkses.length > 0 ? aktif.filter(p => myAkses.includes(parseInt(p.noIndikator))) : aktif;
-              return [...new Set(filtered.map(p => parseInt(p.noIndikator)))].sort((a,b)=>a-b).map(n=>`<span style="background:#fecaca;color:#7f1d1d;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700">#${n}</span>`).join('');
+              return [...new Set(filtered.map(p => parseInt(p.noIndikator)))].sort((a,b)=>a-b).map(n=>`<span style="background:#fecaca;color:#7f1d1d;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;white-space:nowrap">#${n}</span>`).join('');
             })()}
           </div>` : ''}
-        ${(role === 'program' && u.penolakanIndikator && u.penolakanIndikator.length && u.statusGlobal === 'Menunggu Pengelola Program' && !u.sudahVerif) ? `
+        ${(role === 'program' && u.penolakanIndikator && u.penolakanIndikator.length && ['Menunggu Pengelola Program','Menunggu Re-verifikasi PP','Ditolak Sebagian'].includes(u.statusGlobal) && !u.sudahVerif) ? (() => {
+          const myAkses = currentUser.indikatorAkses || [];
+          // Re-verif dari tolak PP biasa
+          const aktifTolak = u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'reset');
+          const filteredTolak = myAkses.length > 0 ? aktifTolak.filter(p => myAkses.includes(parseInt(p.noIndikator))) : aktifTolak;
+          const nosTolak = [...new Set(filteredTolak.map(p => parseInt(p.noIndikator)))].sort((a,b)=>a-b);
+          // Re-verif dari kapus sanggah (kapus-ok)
+          const aktifKapus = u.penolakanIndikator.filter(p => p.aksi === 'kapus-ok' || p.aksi === 'kapus-verif');
+          const filteredKapus = myAkses.length > 0 ? aktifKapus.filter(p => myAkses.includes(parseInt(p.noIndikator))) : aktifKapus;
+          const nosKapus = [...new Set(filteredKapus.map(p => parseInt(p.noIndikator)))].sort((a,b)=>a-b);
+          const badgeTolak = nosTolak.map(n=>`<span style="background:#fecaca;color:#7f1d1d;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;white-space:nowrap">#${n}</span>`).join('');
+          const badgeKapus = nosKapus.map(n=>`<span style="background:#fecaca;color:#7f1d1d;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;white-space:nowrap">#${n}</span>`).join('');
+          return (nosTolak.length ? `
           <div style="margin-top:4px;display:inline-flex;align-items:center;gap:4px;flex-wrap:wrap;background:var(--danger-light,#fef2f2);border:1px solid #fca5a5;border-radius:5px;padding:2px 7px">
-            <span class="material-icons" style="font-size:12px;color:#dc2626">replay</span>
-            <span style="font-size:10.5px;color:#dc2626;font-weight:600">Perlu re-verifikasi:</span>
-            ${(() => {
-              const myAkses = currentUser.indikatorAkses || [];
-              const aktif = u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'sanggah' || p.aksi === 'kapus-ok' || p.aksi === 'reset');
-              const filtered = myAkses.length > 0 ? aktif.filter(p => myAkses.includes(parseInt(p.noIndikator))) : aktif;
-              return [...new Set(filtered.map(p => parseInt(p.noIndikator)))].sort((a,b)=>a-b).map(n=>`<span style="background:#fecaca;color:#7f1d1d;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700">#${n}</span>`).join('');
-            })()}
-          </div>` : ''}
+            <span class="material-icons" style="font-size:12px;color:#dc2626;flex-shrink:0">replay</span>
+            <span style="font-size:10.5px;color:#dc2626;font-weight:600;white-space:nowrap">Re-verif:</span>
+            ${badgeTolak}
+          </div>` : '')
+          + (nosKapus.length ? `
+          <div style="margin-top:4px;display:inline-flex;align-items:center;gap:4px;flex-wrap:wrap;background:#f5f3ff;border:1px solid #c4b5fd;border-radius:5px;padding:2px 7px">
+            <span class="material-icons" style="font-size:12px;color:#7c3aed;flex-shrink:0">gavel</span>
+            <span style="font-size:10.5px;color:#5b21b6;font-weight:600;white-space:nowrap">Kapus sanggah — re-verif:</span>
+            ${badgeKapus}
+          </div>` : '');
+        })() : ''}
         ${(role === 'operator' && ['Ditolak','Ditolak Sebagian'].includes(u.statusGlobal) && u.ditolakOleh) ? (() => {
           // dari_kapus=TRUE (diset backend) = harus diperbaiki Operator
           // kapus-ok/kapus-setuju = disanggah Kapus, PP yang re-verif — Operator tidak perlu perbaiki
@@ -1083,23 +1108,23 @@ const nos = _nosAdmin.sort((a,b)=>a-b).map(n => `<span style="background:#fecaca
           )].sort((a,b)=>a-b);
           return (nosTolak.length > 0 ? `
           <div style="margin-top:4px;display:inline-flex;align-items:center;gap:5px;flex-wrap:wrap;background:var(--danger-light,#fef2f2);border:1px solid #fca5a5;border-radius:5px;padding:2px 7px">
-            <span class="material-icons" style="font-size:12px;color:#dc2626">cancel</span>
-            <span style="font-size:10.5px;color:#dc2626;font-weight:600">Ditolak oleh ${u.ditolakOleh}</span>
-            ${nosTolak.map(n=>`<span style="background:#fecaca;color:#7f1d1d;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700">#${n}</span>`).join('')}
+            <span class="material-icons" style="font-size:12px;color:#dc2626;flex-shrink:0">cancel</span>
+            <span style="font-size:10.5px;color:#dc2626;font-weight:600;white-space:nowrap">Ditolak — ${u.ditolakOleh}</span>
+            ${nosTolak.map(n=>`<span style="background:#fecaca;color:#7f1d1d;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;white-space:nowrap">#${n}</span>`).join('')}
           </div>` : '')
           + (nosKapusOk.length > 0 ? `
           <div style="margin-top:4px;display:inline-flex;align-items:center;gap:4px;flex-wrap:wrap;background:#fef9c3;border:1px solid #fde047;border-radius:5px;padding:2px 7px">
-            <span class="material-icons" style="font-size:12px;color:#ca8a04">replay</span>
-            <span style="font-size:10.5px;color:#92400e;font-weight:600">Re-verifikasi berlangsung</span>
-            <span style="font-size:10px;color:#78350f;background:#fde68a;border-radius:3px;padding:1px 5px">→ Pengelola Program</span>
-            ${nosKapusOk.map(n=>`<span style="background:#fef08a;color:#78350f;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700">#${n}</span>`).join('')}
+            <span class="material-icons" style="font-size:12px;color:#ca8a04;flex-shrink:0">replay</span>
+            <span style="font-size:10.5px;color:#92400e;font-weight:600;white-space:nowrap">Re-verif berlangsung</span>
+            <span style="font-size:10px;color:#78350f;background:#fde68a;border-radius:3px;padding:1px 5px;white-space:nowrap">→ Pengelola Program</span>
+            ${nosKapusOk.map(n=>`<span style="background:#fef08a;color:#78350f;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;white-space:nowrap">#${n}</span>`).join('')}
           </div>` : '');
         })() : ''}
         ${(role === 'operator' && !['Ditolak','Ditolak Sebagian'].includes(u.statusGlobal) && u.ditolakOleh && ['Menunggu Kepala Puskesmas','Menunggu Pengelola Program','Menunggu Admin'].includes(u.statusGlobal) && u.penolakanIndikator && u.penolakanIndikator.length) ? `
           <div style="margin-top:4px;display:inline-flex;align-items:center;gap:4px;flex-wrap:wrap;background:#fef9c3;border:1px solid #fde047;border-radius:5px;padding:2px 7px">
-            <span class="material-icons" style="font-size:12px;color:#ca8a04">replay</span>
-            <span style="font-size:10.5px;color:#92400e;font-weight:600">Re-verifikasi berlangsung</span>
-            <span style="font-size:10px;color:#78350f;background:#fde68a;border-radius:3px;padding:1px 5px">${
+            <span class="material-icons" style="font-size:12px;color:#ca8a04;flex-shrink:0">replay</span>
+            <span style="font-size:10.5px;color:#92400e;font-weight:600;white-space:nowrap">Re-verif berlangsung</span>
+            <span style="font-size:10px;color:#78350f;background:#fde68a;border-radius:3px;padding:1px 5px;white-space:nowrap">${
               u.statusGlobal === 'Menunggu Kepala Puskesmas' ? '→ Kepala Puskesmas' :
               u.statusGlobal === 'Menunggu Pengelola Program' ? '→ Pengelola Program' :
               u.statusGlobal === 'Menunggu Admin' ? '→ Admin' : ''
@@ -1112,7 +1137,7 @@ const nos = _nosAdmin.sort((a,b)=>a-b).map(n => `<span style="background:#fecaca
                 (!p.aksi || p.aksi === 'tolak' || p.aksi === 'reset')
                 && p.aksi !== 'kapus-ok' && p.aksi !== 'kapus-setuju'
               );
-              return [...new Set(src.map(p => parseInt(p.noIndikator || p.no_indikator)))].sort((a,b)=>a-b).map(n=>`<span style="background:#fecaca;color:#7f1d1d;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700">#${n}</span>`).join('');
+              return [...new Set(src.map(p => parseInt(p.noIndikator || p.no_indikator)))].sort((a,b)=>a-b).map(n=>`<span style="background:#fecaca;color:#7f1d1d;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;white-space:nowrap">#${n}</span>`).join('');
             })()}
           </div>` : ''}
         ${(role === 'kepala-puskesmas' && u.statusGlobal === 'Menunggu Kepala Puskesmas' && u.ditolakOleh && u.penolakanIndikator && u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak').length) ? (() => {
@@ -1122,15 +1147,15 @@ const nos = _nosAdmin.sort((a,b)=>a-b).map(n => `<span style="background:#fecaca
           const bdColor = u.ditolakOleh === 'Admin' ? '#fed7aa' : '#fca5a5';
           const txColor = u.ditolakOleh === 'Admin' ? '#c2410c' : '#dc2626';
           return `<div style="margin-top:4px;display:inline-flex;align-items:center;gap:4px;flex-wrap:wrap;background:${bgColor};border:1px solid ${bdColor};border-radius:5px;padding:2px 7px">
-            <span class="material-icons" style="font-size:12px;color:${txColor}">replay</span>
-            <span style="font-size:10.5px;color:${txColor};font-weight:600">Perlu re-verifikasi:</span>
-            ${[...new Set(aktif.map(p => parseInt(p.noIndikator)))].sort((a,b)=>a-b).map(n=>`<span style="background:#fecaca;color:#7f1d1d;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700">#${n}</span>`).join('')}
+            <span class="material-icons" style="font-size:12px;color:${txColor};flex-shrink:0">replay</span>
+            <span style="font-size:10.5px;color:${txColor};font-weight:600;white-space:nowrap">Re-verif:</span>
+            ${[...new Set(aktif.map(p => parseInt(p.noIndikator)))].sort((a,b)=>a-b).map(n=>`<span style="background:#fecaca;color:#7f1d1d;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;white-space:nowrap">#${n}</span>`).join('')}
           </div>`;
         })() : ''}
         ${(role === 'kepala-puskesmas' && u.statusGlobal === 'Menunggu Kepala Puskesmas' && u.ditolakOleh === 'Kepala Puskesmas') ? `
           <div style="margin-top:4px;display:inline-flex;align-items:center;gap:4px;background:#fef9c3;border:1px solid #fde047;border-radius:5px;padding:2px 7px">
-            <span class="material-icons" style="font-size:12px;color:#ca8a04">replay</span>
-            <span style="font-size:10.5px;color:#92400e;font-weight:600">Re-submit dari Operator</span>
+            <span class="material-icons" style="font-size:12px;color:#ca8a04;flex-shrink:0">replay</span>
+            <span style="font-size:10.5px;color:#92400e;font-weight:600;white-space:nowrap">Re-submit Operator</span>
           </div>` : ''}
 
         ${/* ── PP: menunggu verifikasi Kapus (setelah PP tolak/membenarkan) ── */
@@ -1142,21 +1167,8 @@ const nos = _nosAdmin.sort((a,b)=>a-b).map(n => `<span style="background:#fecaca
           const isPPMembenarkan = u.ditolakOleh === 'Admin';
           return `<div style="margin-top:4px;display:inline-flex;align-items:center;gap:4px;flex-wrap:wrap;background:#fef9c3;border:1px solid #fde047;border-radius:5px;padding:2px 7px">
             <span class="material-icons" style="font-size:12px;color:#ca8a04">${isPPMembenarkan ? 'assignment_return' : 'pending'}</span>
-            <span style="font-size:10.5px;color:#92400e;font-weight:600">${isPPMembenarkan ? 'Sudah dibenarkan' : 'Sudah ditolak'} — menunggu Kapus</span>
-            ${[...new Set(filtered.map(p => parseInt(p.noIndikator)))].sort((a,b)=>a-b).map(n=>`<span style="background:#fecaca;color:#7f1d1d;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700">#${n}</span>`).join('')}
-          </div>`;
-        })() : ''}
-
-        ${/* ── PP: Kapus menyanggah → PP perlu verif ulang ── */
-        (role === 'program' && u.ditolakOleh === 'Pengelola Program' && u.statusGlobal === 'Menunggu Pengelola Program' && !u.sudahVerif && u.penolakanIndikator && u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'sanggah' || p.aksi === 'kapus-ok').length) ? (() => {
-          const aktif = u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'sanggah' || p.aksi === 'kapus-ok');
-          const myAkses = currentUser.indikatorAkses || [];
-          const filtered = myAkses.length > 0 ? aktif.filter(p => myAkses.includes(parseInt(p.noIndikator))) : aktif;
-          if (!filtered.length) return '';
-          return `<div style="margin-top:4px;display:inline-flex;align-items:center;gap:4px;flex-wrap:wrap;background:#f5f3ff;border:1px solid #c4b5fd;border-radius:5px;padding:2px 7px">
-            <span class="material-icons" style="font-size:12px;color:#7c3aed">gavel</span>
-            <span style="font-size:10.5px;color:#5b21b6;font-weight:600">Kapus menyanggah — perlu verif ulang:</span>
-            ${[...new Set(filtered.map(p => parseInt(p.noIndikator)))].sort((a,b)=>a-b).map(n=>`<span style="background:#fecaca;color:#7f1d1d;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700">#${n}</span>`).join('')}
+            <span style="font-size:10.5px;color:#92400e;font-weight:600;white-space:nowrap">${isPPMembenarkan ? 'Dibenarkan' : 'Ditolak'} — tunggu Kapus</span>
+            ${[...new Set(filtered.map(p => parseInt(p.noIndikator)))].sort((a,b)=>a-b).map(n=>`<span style="background:#fecaca;color:#7f1d1d;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;white-space:nowrap">#${n}</span>`).join('')}
           </div>`;
         })() : ''}
 
@@ -1169,8 +1181,8 @@ const nos = _nosAdmin.sort((a,b)=>a-b).map(n => `<span style="background:#fecaca
           const isPPMembenarkan = u.ditolakOleh === 'Admin';
           return `<div style="margin-top:4px;display:inline-flex;align-items:center;gap:4px;flex-wrap:wrap;background:#fef9c3;border:1px solid #fde047;border-radius:5px;padding:2px 7px">
             <span class="material-icons" style="font-size:12px;color:#ca8a04">${isPPMembenarkan ? 'assignment_return' : 'pending'}</span>
-            <span style="font-size:10.5px;color:#92400e;font-weight:600">${isPPMembenarkan ? 'Sudah dibenarkan' : 'Sudah ditolak'} — menunggu Kapus</span>
-            ${[...new Set(filtered.map(p => parseInt(p.noIndikator)))].sort((a,b)=>a-b).map(n=>`<span style="background:#fecaca;color:#7f1d1d;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700">#${n}</span>`).join('')}
+            <span style="font-size:10.5px;color:#92400e;font-weight:600;white-space:nowrap">${isPPMembenarkan ? 'Dibenarkan' : 'Ditolak'} — tunggu Kapus</span>
+            ${[...new Set(filtered.map(p => parseInt(p.noIndikator)))].sort((a,b)=>a-b).map(n=>`<span style="background:#fecaca;color:#7f1d1d;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;white-space:nowrap">#${n}</span>`).join('')}
           </div>`;
         })() : ''}
 
@@ -1181,7 +1193,7 @@ const nos = _nosAdmin.sort((a,b)=>a-b).map(n => `<span style="background:#fecaca
           return `<div style="margin-top:4px;display:inline-flex;align-items:center;gap:4px;flex-wrap:wrap;background:#f0fdf4;border:1px solid #86efac;border-radius:5px;padding:2px 7px">
             <span class="material-icons" style="font-size:12px;color:#16a34a">check_circle</span>
             <span style="font-size:10.5px;color:#15803d;font-weight:600">Sudah diverifikasi ${arahLabel}</span>
-            ${[...new Set(aktif.map(p => parseInt(p.noIndikator)))].sort((a,b)=>a-b).map(n=>`<span style="background:#fecaca;color:#7f1d1d;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700">#${n}</span>`).join('')}
+            ${[...new Set(aktif.map(p => parseInt(p.noIndikator)))].sort((a,b)=>a-b).map(n=>`<span style="background:#fecaca;color:#7f1d1d;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;white-space:nowrap">#${n}</span>`).join('')}
           </div>`;
         })() : ''}
       </td>

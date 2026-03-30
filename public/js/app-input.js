@@ -314,10 +314,8 @@ async function openGDriveFolder(kodePKM, tahun, bulan, namaBulan, idUsulan) {
     const result = await API.get('drive', { kodePKM, tahun, bulan, namaBulan });
     // Save folder URL to DB
     if (idUsulan) {
-      await fetch(`/api/usulan?action=drive-folder`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idUsulan, driveFolderId: result.folderId, driveFolderUrl: result.folderUrl })
-      });
+      await API.put('usulan?action=drive-folder', { idUsulan, driveFolderId: result.folderId, driveFolderUrl: result.folderUrl })
+        .catch(e => console.warn('[drive-folder] Gagal simpan folder URL:', e.message));
     }
     window.open(result.folderUrl, '_blank');
     if (btn) { btn.innerHTML = '<span class="material-icons" style="font-size:15px">folder_open</span> Buka Folder Drive'; btn.disabled = false; }
@@ -699,11 +697,12 @@ async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, tahun
 async function _deleteFromCloudinary(publicId) {
   if (!publicId) return;
   try {
-    await fetch('/.netlify/functions/delete-file', {
+    const res = await fetch('/.netlify/functions/delete-file', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ publicId })
     });
+    if (!res.ok) console.warn('[delete-file] Status tidak OK:', res.status);
   } catch(e) { console.warn('Cloudinary delete warning:', e.message); }
 }
 
@@ -1105,16 +1104,10 @@ async function saveIndikator(noIndikator) {
 
   try {
     // Kirim update — tanpa linkFile supaya link yg sudah ada tidak terhapus
-    const res = await fetch('/api/usulan?action=indikator', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ idUsulan: currentIndikatorUsulan, noIndikator, target, capaian })
-    });
-    const result = await res.json();
-    if (!res.ok) { toast(result.error || 'Gagal simpan', 'error'); return; }
+    const result = await API.put('usulan?action=indikator', { idUsulan: currentIndikatorUsulan, noIndikator, target, capaian });
 
     // Update SPM display langsung dari response (tanpa extra API call)
-    if (result.indeksSPM !== undefined) {
+    if (result?.indeksSPM !== undefined) {
       const spmVal = parseFloat(result.indeksSPM).toFixed(2);
       const topEl = document.getElementById('indModalSPMTop');
       if (topEl) topEl.textContent = spmVal;
@@ -1173,9 +1166,8 @@ async function submitUsulanFromModal() {
 async function doSubmitUsulan(forceSubmit) {
   try {
     setLoading(true);
-    const res = await fetch(`/api/usulan?action=submit`, {
+    const raw = await API.call('usulan?action=submit', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         idUsulan: currentIndikatorUsulan,
         email: currentUser.email,
@@ -1183,10 +1175,9 @@ async function doSubmitUsulan(forceSubmit) {
         catatanOperator: (document.getElementById('operatorCatatanInput')?.value?.trim()) || ''
       })
     });
-    const raw = await res.json();
 
-    // needConfirm: format khusus (bukan lewat ok()), cek duluan
-    if (raw.needConfirm) {
+    // 202 Accepted = needConfirm (bukti belum lengkap, minta konfirmasi)
+    if (raw?.needConfirm) {
       const nos = (raw.missingNos || []).slice().sort((a, b) => a - b).join(', ');
       (raw.missingNos || []).forEach(no => {
         const label = document.getElementById(`uploadLabel-${no}`);
@@ -1196,7 +1187,6 @@ async function doSubmitUsulan(forceSubmit) {
           setTimeout(() => { label.style.boxShadow = ''; label.style.transform = ''; }, 3000);
         }
       });
-      // Pesan konfirmasi sesuai konteks — perbaiki vs submit baru
       const isRepair = !!raw.isDitolak;
       const titleMsg = isRepair ? 'Data Dukung Belum Dilengkapi' : 'Data Dukung Belum Lengkap';
       const bodyMsg = isRepair
@@ -1212,13 +1202,8 @@ async function doSubmitUsulan(forceSubmit) {
     }
 
     // ok() wraps dalam { success: true, data: {...} }
-    // err() wraps dalam { success: false, message: '...' }
-    if (!res.ok || raw.success === false) {
-      toast(raw.message || raw.data?.message || 'Submit gagal', 'error');
-      return;
-    }
-
-    const successMsg = raw.data?.message || 'Usulan berhasil disubmit!';
+    // API.call sudah throw jika !success, jadi sampai sini = sukses
+    const successMsg = raw?.message || raw?.data?.message || 'Usulan berhasil disubmit!';
     toast(' ' + successMsg, 'success');
     closeModal('indikatorModal');
 
@@ -1472,45 +1457,84 @@ async function openLogAktivitas(idUsulan) {
   modal.innerHTML = `
     <div class="modal-card" style="display:flex;flex-direction:column;height:100%;border-radius:0">
       <div class="modal-header">
-        <span class="material-icons">history</span>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary);flex-shrink:0"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         <span>Riwayat Aktivitas</span>
         <button id="btnLogDownloadLog" disabled
           style="opacity:0.35;cursor:not-allowed;background:transparent;border:none;color:#6366f1;width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;margin-left:auto;margin-right:4px;flex-shrink:0"
           title="Download tersedia setelah verifikasi selesai">
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10"/><path d="m8 9 4 4 4-4"/><path d="M4 17c0 2.2 1.8 4 4 4h8c2.2 0 4-1.8 4-4"/></svg>
         </button>
-        <button class="btn-icon" onclick="closeModal('logAktivitasModal')"><span class="material-icons">close</span></button>
+        <button class="btn-icon" onclick="closeModal('logAktivitasModal')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
       </div>
       <div class="modal-body" id="logAktivitasBody" style="padding:20px;flex:1;overflow-y:auto">
-        <div class="empty-state"><span class="material-icons" style="animation:spin 1s linear infinite">refresh</span><p>Memuat riwayat...</p></div>
+        <div class="empty-state"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 1s linear infinite"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg><p>Memuat riwayat...</p></div>
       </div>
     </div>`;
   showModal('logAktivitasModal');
   try {
     const data = await API.getLogAktivitas(idUsulan);
     const { logs, usulan } = data;
+    // SVG icon library untuk Riwayat Aktivitas
+    const _svgIconsLog = {
+      send:         `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>`,
+      restart_alt:  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.95"/></svg>`,
+      check_circle: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`,
+      verified:     `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2"/></svg>`,
+      update:       `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.18-5"/></svg>`,
+      cancel:       `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`,
+      remove_circle:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/></svg>`,
+      cancel_ind:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`,
+      reply:        `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>`,
+      undo:         `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 7 3 3 7 3"/><path d="M3 3l5 5"/><path d="M21 13A9 9 0 0 1 3 13v-3"/></svg>`,
+      undo_pp:      `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>`,
+      gavel:        `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m14 13-8.5 8.5a2.12 2.12 0 0 1-3-3L11 10"/><path d="m16 16 6-6"/><path d="m8 8 6-6"/><path d="m9 7 8 8"/></svg>`,
+      gavel_fin:    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m14 13-8.5 8.5a2.12 2.12 0 0 1-3-3L11 10"/><path d="m16 16 6-6"/><path d="m8 8 6-6"/><path d="m9 7 8 8"/><circle cx="20" cy="4" r="2" fill="currentColor"/></svg>`,
+      fact_check:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>`,
+      how_to_reg:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><polyline points="16 11 18 13 22 9"/></svg>`,
+      question_ans: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><line x1="9" y1="10" x2="15" y2="10"/><line x1="12" y1="7" x2="12" y2="13"/></svg>`,
+      reply_all:    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="7 17 2 12 7 7"/><polyline points="12 17 7 12 12 7"/><path d="M22 18v-2a4 4 0 0 0-4-4H7"/></svg>`,
+      assign_ret:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>`,
+      restore:      `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.06 13a9 9 0 1 0 .49-4.95"/><polyline points="3 3 3 9 9 9"/><line x1="12" y1="7" x2="12" y2="12"/><circle cx="12" cy="15" r="1" fill="currentColor"/></svg>`,
+      info:         `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>`,
+      slash_circle: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>`,
+      konfirmasi:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="m16 11 2 2 4-4"/></svg>`,
+      terima_adm:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg>`,
+      kapus_pp:     `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>`,
+    };
+    function _svgIco(key, size) {
+      const svg = _svgIconsLog[key] || _svgIconsLog.info;
+      return svg.replace('<svg ', `<svg width="${size}" height="${size}" `);
+    }
     const aksiConfig = {
-      'Submit':            { color:'#0d9488', bg:'#f0fdf9', icon:'send',           label:'Diajukan' },
-      'Ajukan Ulang':      { color:'#0d9488', bg:'#f0fdf9', icon:'restart_alt',    label:'Ajukan Ulang' },
-      'Approve':           { color:'#16a34a', bg:'#f0fdf4', icon:'check_circle',   label:'Disetujui' },
-      'Approve Final':     { color:'#16a34a', bg:'#f0fdf4', icon:'verified',       label:'Final Disetujui' },
-      'Re-verifikasi':     { color:'#0891b2', bg:'#ecfeff', icon:'update',         label:'Re-verifikasi' },
-      'Tolak':             { color:'#dc2626', bg:'#fef2f2', icon:'cancel',         label:'Ditolak' },
-      'Tolak (sebagian)':  { color:'#d97706', bg:'#fffbeb', icon:'remove_circle',  label:'Tolak Sebagian' },
-      'Tolak Indikator':   { color:'#dc2626', bg:'#fef2f2', icon:'cancel',         label:'Tolak Indikator' },
-      'Tolak Ke Operator': { color:'#dc2626', bg:'#fef2f2', icon:'reply',          label:'Tolak Ke Operator' },
-      'Kembalikan':        { color:'#7c3aed', bg:'#f5f3ff', icon:'undo',           label:'Dikembalikan' },
-      'Sanggah':           { color:'#7c3aed', bg:'#f5f3ff', icon:'gavel',          label:'Sanggah' },
-      'Sanggah Selesai':   { color:'#7c3aed', bg:'#f5f3ff', icon:'gavel',           label:'PP Sanggah → Admin' },
-      'PP Membenarkan':    { color:'#dc2626', bg:'#fef2f2', icon:'fact_check',       label:'PP Setuju Tolak → Kapus' },
-      'Kapus Membenarkan': { color:'#d97706', bg:'#fffbeb', icon:'how_to_reg',     label:'Kapus Setuju Tolak' },
-      'Kapus Menyanggah':  { color:'#d97706', bg:'#fffbeb', icon:'gavel',          label:'Kapus Tidak Setuju' },
-      'Reset':             { color:'#d97706', bg:'#fffbeb', icon:'restart_alt',    label:'Direset Admin' },
-      'Restore Verif':     { color:'#6366f1', bg:'#fff7ed', icon:'restore',        label:'Dipulihkan' },
-      'Respond Penolakan': { color:'#0891b2', bg:'#ecfeff', icon:'question_answer', label:'Respond Penolakan' },
-      'Sanggah → Admin':    { color:'#7c3aed', bg:'#f5f3ff', icon:'reply_all',       label:'Sanggah → Admin' },
-      'Kembalikan ke PP':  { color:'#7c3aed', bg:'#f5f3ff', icon:'assignment_return', label:'Kembalikan ke PP' },
-      'Benarkan Penolakan Admin': { color:'#dc2626', bg:'#fef2f2', icon:'fact_check', label:'PP Setuju → Ditolak' },
+      'Submit':                   { color:'#0d9488', bg:'#f0fdf9', icon:'send',         label:'Diajukan' },
+      'Ajukan Ulang':             { color:'#0284c7', bg:'#e0f2fe', icon:'restart_alt',  label:'Ajukan Ulang' },
+      'Approve':                  { color:'#16a34a', bg:'#f0fdf4', icon:'check_circle', label:'Disetujui' },
+      'Approve Final':            { color:'#15803d', bg:'#dcfce7', icon:'verified',     label:'Final Disetujui' },
+      'Re-verifikasi':            { color:'#06b6d4', bg:'#ecfeff', icon:'update',       label:'Re-verifikasi' },
+      'Tolak':                    { color:'#dc2626', bg:'#fef2f2', icon:'cancel',       label:'Ditolak' },
+      'Tolak (sebagian)':         { color:'#ea580c', bg:'#fff7ed', icon:'remove_circle',label:'Tolak Sebagian' },
+      'Tolak Indikator':          { color:'#be123c', bg:'#fff1f2', icon:'cancel_ind',   label:'Tolak Indikator' },
+      'Tolak Ke Operator':        { color:'#b91c1c', bg:'#fef2f2', icon:'reply',        label:'Tolak Ke Operator' },
+      'Kembalikan':               { color:'#7c3aed', bg:'#f5f3ff', icon:'undo',         label:'Dikembalikan' },
+      'Sanggah':                  { color:'#9333ea', bg:'#faf5ff', icon:'gavel',        label:'Sanggah' },
+      'Sanggah Selesai':          { color:'#a21caf', bg:'#fdf4ff', icon:'gavel_fin',    label:'PP Sanggah → Admin' },
+      'PP Membenarkan':           { color:'#0f766e', bg:'#f0fdfa', icon:'fact_check',   label:'PP Setuju Tolak → Kapus' },
+      'Kapus Membenarkan':        { color:'#b45309', bg:'#fefce8', icon:'how_to_reg',   label:'Kapus Setuju Tolak' },
+      'Kapus Menyanggah':         { color:'#c2410c', bg:'#fff7ed', icon:'gavel',        label:'Kapus Tidak Setuju' },
+      'Reset':                    { color:'#64748b', bg:'#f8fafc', icon:'restart_alt',  label:'Direset Admin' },
+      'Restore Verif':            { color:'#6366f1', bg:'#eef2ff', icon:'restore',      label:'Dipulihkan' },
+      'Respond Penolakan':        { color:'#2563eb', bg:'#eff6ff', icon:'question_ans', label:'Respond Penolakan' },
+      'Sanggah → Admin':          { color:'#7e22ce', bg:'#f3e8ff', icon:'reply_all',    label:'Sanggah → Admin' },
+      'Sanggah → Kapus':          { color:'#d97706', bg:'#fffbeb', icon:'reply_all',    label:'Sanggah → Kapus' },
+      'Kembalikan ke PP':         { color:'#4f46e5', bg:'#eef2ff', icon:'assign_ret',   label:'Kembalikan ke PP' },
+      'Benarkan Penolakan Admin': { color:'#991b1b', bg:'#fef2f2', icon:'fact_check',   label:'PP Setuju → Ditolak' },
+      'Kapus Sanggah':            { color:'#db2777', bg:'#fdf2f8', icon:'gavel',        label:'Kapus Sanggah' },
+      'Kapus Terima Penolakan':   { color:'#f59e0b', bg:'#fffbeb', icon:'undo',         label:'Kapus Terima Penolakan' },
+      'Selesai':                  { color:'#059669', bg:'#ecfdf5', icon:'verified',     label:'Selesai' },
+      'Tolak Global':             { color:'#450a0a', bg:'#fff1f2', icon:'slash_circle', label:'Ditolak Admin' },
+      'Konfirmasi Re-verif':      { color:'#0369a1', bg:'#e0f2fe', icon:'konfirmasi',   label:'Konfirmasi Re-verif' },
+      'Terima Penolakan Admin':   { color:'#7f1d1d', bg:'#fef2f2', icon:'terima_adm',   label:'Terima Penolakan Admin' },
+      'Dikembalikan':             { color:'#6d28d9', bg:'#ede9fe', icon:'undo',         label:'Dikembalikan' },
     };
     function fmtDT(ts) {
       const d = new Date(ts);
@@ -1522,7 +1546,7 @@ async function openLogAktivitas(idUsulan) {
     const COLS = 10;
     let gridHtml;
     if (!logs.length) {
-      gridHtml = `<div class="empty-state"><span class="material-icons">history_toggle_off</span><p>Belum ada aktivitas</p></div>`;
+      gridHtml = `<div class="empty-state"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/><line x1="2" y1="2" x2="22" y2="22" stroke="#cbd5e1"/></svg><p>Belum ada aktivitas</p></div>`;
     } else {
       // Expand logs: log yang punya 2 tindakan dipecah jadi 2 bubble terpisah
       const expandedLogs = [];
@@ -1558,7 +1582,7 @@ async function openLogAktivitas(idUsulan) {
         }
       });
       // Tambahkan entry aksiConfig untuk bubble synthetic
-      aksiConfig['_KapusSetujuPP'] = { color:'#16a34a', bg:'#f0fdf4', icon:'check_circle', label:'Kapus Setujui → PP' };
+      aksiConfig['_KapusSetujuPP'] = { color:'#15803d', bg:'#dcfce7', icon:'kapus_pp', label:'Kapus Setujui → PP' };
       const rows = [];
       for (let i = 0; i < expandedLogs.length; i += COLS) rows.push(expandedLogs.slice(i, i + COLS));
       let html = '';
@@ -1576,7 +1600,7 @@ async function openLogAktivitas(idUsulan) {
           html += `<div style="position:relative;display:flex;flex-direction:column;align-items:center;flex:1;min-width:0;padding:0 4px">
             <div style="font-size:9.5px;font-weight:800;color:${cfg.color};margin-bottom:3px">#${idx+1}</div>
             <div style="width:40px;height:40px;border-radius:50%;background:${cfg.bg};border:2.5px solid ${cfg.color};display:flex;align-items:center;justify-content:center;flex-shrink:0;z-index:1;box-shadow:0 1px 4px ${cfg.color}33">
-              <span class="material-icons" style="font-size:18px;color:${cfg.color}">${cfg.icon}</span>
+              ${_svgIco(cfg.icon, 18).replace('<svg ', `<svg style="color:${cfg.color}" `)}
             </div>
             <div style="margin-top:5px;display:flex;flex-direction:column;align-items:center;gap:2px;width:100%">
               <span style="font-size:10px;font-weight:700;color:${cfg.color};background:${cfg.bg};padding:1px 7px;border-radius:20px;border:1px solid ${cfg.color};white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis">${cfg.label}</span>
@@ -1596,7 +1620,7 @@ async function openLogAktivitas(idUsulan) {
           html += `<div style="display:flex;${side};padding:0 4px;margin:0">
             <div style="display:flex;flex-direction:column;align-items:center">
               <div style="width:2px;height:20px;background:linear-gradient(to bottom,${lCfg.color}88,#cbd5e1)"></div>
-              <span class="material-icons" style="font-size:15px;color:#94a3b8;margin-top:-2px">arrow_downward</span>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-top:-2px"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
             </div>
           </div>`;
         }
@@ -1625,7 +1649,7 @@ async function openLogAktivitas(idUsulan) {
     }
   } catch(e) {
     const b = document.getElementById('logAktivitasBody');
-    if (b) b.innerHTML = `<div class="empty-state"><span class="material-icons" style="color:#ef4444">error</span><p>Gagal memuat: ${e.message}</p></div>`;
+    if (b) b.innerHTML = `<div class="empty-state"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg><p>Gagal memuat: ${e.message}</p></div>`;
   }
 }
 
@@ -1639,42 +1663,73 @@ async function bukaLaporan(idUsulan, mode, aksesIndikator) {
   // window.open HARUS dipanggil sync sebelum await — agar browser tidak blokir popup
   const pw = window.open('', '_blank');
   if (!pw) { toast('Popup diblokir browser. Izinkan popup untuk situs ini.', 'error'); return; }
+  const _modeSubtitle = { sementara:'Laporan Sementara', final:'Laporan Final', log:'Riwayat Aktivitas' };
+  const _steps = mode === 'log'
+    ? ['Mengambil data log...','Menyusun riwayat aktivitas...','Menyiapkan tampilan...']
+    : ['Mengambil data laporan...','Memuat tanda tangan...','Menyusun halaman...','Menyiapkan cetak...'];
   pw.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Memuat Laporan...</title><style>
     *{margin:0;padding:0;box-sizing:border-box}
-    body{font-family:'Segoe UI',Arial,sans-serif;background:linear-gradient(135deg,#0f172a 0%,#1e293b 50%,#0f172a 100%);display:flex;align-items:center;justify-content:center;height:100vh;overflow:hidden}
-    .card{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:20px;padding:48px 56px;text-align:center;backdrop-filter:blur(12px);box-shadow:0 25px 60px rgba(0,0,0,0.4);max-width:380px;width:90%}
-    .logo-ring{width:80px;height:80px;margin:0 auto 28px;position:relative}
-    .ring{position:absolute;inset:0;border-radius:50%;border:3px solid transparent}
-    .ring-1{border-top-color:#0d9488;animation:spin 1.2s linear infinite}
-    .ring-2{inset:8px;border-right-color:#14b8a6;animation:spin 1.8s linear infinite reverse}
-    .ring-3{inset:16px;border-bottom-color:#5eead4;animation:spin 2.4s linear infinite}
-    .icon{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:26px}
+    body{font-family:'Segoe UI',Arial,sans-serif;background:#0f172a;display:flex;align-items:center;justify-content:center;height:100vh;overflow:hidden}
+    body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 80% 60% at 50% 0%,rgba(13,148,136,0.15) 0%,transparent 70%);pointer-events:none}
+    .card{background:rgba(15,23,42,0.95);border:1px solid rgba(13,148,136,0.25);border-radius:24px;padding:44px 52px;text-align:center;box-shadow:0 0 0 1px rgba(255,255,255,0.04),0 32px 80px rgba(0,0,0,0.6);max-width:400px;width:90%;position:relative;overflow:hidden}
+    .card::before{content:'';position:absolute;top:-1px;left:20%;right:20%;height:1px;background:linear-gradient(90deg,transparent,#0d9488,transparent)}
+    .logo-wrap{width:72px;height:72px;margin:0 auto 24px;position:relative}
+    .pulse{position:absolute;inset:-8px;border-radius:50%;border:1px solid rgba(13,148,136,0.3);animation:pulse 2s ease-out infinite}
+    .pulse2{position:absolute;inset:-16px;border-radius:50%;border:1px solid rgba(13,148,136,0.15);animation:pulse 2s ease-out infinite .6s}
+    .ring-wrap{position:absolute;inset:0}
+    .ring{position:absolute;inset:0;border-radius:50%;border:2.5px solid transparent}
+    .ring-1{border-top-color:#0d9488;animation:spin 1.1s linear infinite}
+    .ring-2{inset:7px;border-right-color:#14b8a6;animation:spin 1.7s linear infinite reverse}
+    .ring-3{inset:14px;border-bottom-color:#5eead4;animation:spin 2.3s linear infinite}
+    .icon-c{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
     @keyframes spin{to{transform:rotate(360deg)}}
-    .title{font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#5eead4;margin-bottom:10px}
-    .subtitle{font-size:18px;font-weight:700;color:white;margin-bottom:6px}
-    .desc{font-size:13px;color:#94a3b8;margin-bottom:32px}
-    .bar-wrap{background:rgba(255,255,255,0.08);border-radius:99px;height:6px;overflow:hidden;margin-bottom:14px}
-    .bar{height:100%;width:0%;background:linear-gradient(90deg,#0d9488,#14b8a6,#5eead4);border-radius:99px;animation:load 3.5s ease-in-out forwards}
-    @keyframes load{0%{width:0%}30%{width:45%}65%{width:72%}85%{width:88%}100%{width:95%}}
-    .status{font-size:12px;color:#64748b;animation:blink 1.8s ease-in-out infinite}
-    @keyframes blink{0%,100%{opacity:.5}50%{opacity:1}}
-    .dots span{animation:dot 1.4s infinite both}
-    .dots span:nth-child(2){animation-delay:.2s}
-    .dots span:nth-child(3){animation-delay:.4s}
-    @keyframes dot{0%,80%,100%{opacity:0}40%{opacity:1}}
-  </style></head><body>
+    @keyframes pulse{0%{transform:scale(1);opacity:.6}100%{transform:scale(1.5);opacity:0}}
+    .badge{display:inline-block;font-size:9px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#0d9488;background:rgba(13,148,136,0.1);border:1px solid rgba(13,148,136,0.3);border-radius:99px;padding:3px 10px;margin-bottom:14px}
+    .title{font-size:22px;font-weight:800;color:white;letter-spacing:-0.3px;margin-bottom:6px}
+    .desc{font-size:12.5px;color:#64748b;margin-bottom:28px;line-height:1.5}
+    .bar-wrap{background:rgba(255,255,255,0.06);border-radius:99px;height:4px;overflow:hidden;margin-bottom:20px;position:relative}
+    .bar{height:100%;width:0%;background:linear-gradient(90deg,#0d9488,#14b8a6,#5eead4);border-radius:99px;animation:load 3.8s cubic-bezier(.4,0,.2,1) forwards;position:relative}
+    .bar::after{content:'';position:absolute;top:0;right:0;width:60px;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.35));animation:shimmer 1.2s ease-in-out infinite}
+    @keyframes load{0%{width:0%}25%{width:38%}55%{width:65%}78%{width:82%}95%{width:93%}100%{width:95%}}
+    @keyframes shimmer{0%{opacity:0}50%{opacity:1}100%{opacity:0}}
+    .steps{display:flex;flex-direction:column;gap:7px;text-align:left}
+    .step{display:flex;align-items:center;gap:8px;font-size:11px;color:#1e3a4a;transition:color .4s}
+    .step.active{color:#5eead4}
+    .step.done{color:#0d9488}
+    .step-dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,0.07);flex-shrink:0;transition:all .4s}
+    .step.active .step-dot{background:#5eead4;box-shadow:0 0 8px #5eead4}
+    .step.done .step-dot{background:#0d9488}
+    .step-check{display:none;font-size:10px}
+    .step.done .step-check{display:inline}
+    .step.done .step-dot{display:none}
+  </style>
+  <script>
+    var _s=${JSON.stringify(_steps)};
+    var _t=[700,1500,2500,3300];
+    _s.forEach(function(s,i){
+      setTimeout(function(){
+        var els=document.querySelectorAll('.step');
+        if(i>0 && els[i-1]){els[i-1].className='step done';}
+        if(els[i]){els[i].className='step active';}
+      },_t[i]||i*900);
+    });
+  <\/script>
+  </head><body>
     <div class="card">
-      <div class="logo-ring">
-        <div class="ring ring-1"></div>
-        <div class="ring ring-2"></div>
-        <div class="ring ring-3"></div>
-        <div class="icon"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#5eead4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10"/><path d="m8 9 4 4 4-4"/><path d="M4 17c0 2.2 1.8 4 4 4h8c2.2 0 4-1.8 4-4"/></svg></div>
+      <div class="logo-wrap">
+        <div class="pulse"></div><div class="pulse2"></div>
+        <div class="ring-wrap">
+          <div class="ring ring-1"></div>
+          <div class="ring ring-2"></div>
+          <div class="ring ring-3"></div>
+        </div>
+        <div class="icon-c"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#5eead4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg></div>
       </div>
-      <div class="title" style="font-size:28px;letter-spacing:6px">VISPM</div>
-      <div class="subtitle">Menyiapkan Laporan</div>
-      <div class="desc">Mohon tunggu, sedang memuat data<span class="dots"><span>.</span><span>.</span><span>.</span></span></div>
+      <div class="badge">VISPM</div>
+      <div class="title">${_modeSubtitle[mode]||'Laporan'}</div>
+      <div class="desc">Mohon tunggu sebentar,<br>sedang menyiapkan dokumen Anda</div>
       <div class="bar-wrap"><div class="bar"></div></div>
-      <div class="status">Mengambil data laporan...</div>
+      <div class="steps">${_steps.map(function(s,i){return '<div class="step'+(i===0?' active':'')+'"><div class="step-dot"></div><span class="step-check">✓</span>'+s+'</div>';}).join('')}</div>
     </div>
   </body></html>`);
 
@@ -1682,7 +1737,9 @@ async function bukaLaporan(idUsulan, mode, aksesIndikator) {
   try {
     let _laporanUrl = `/api/laporan-pdf?id=${idUsulan}&mode=${mode}`;
     if (aksesIndikator && aksesIndikator.length) _laporanUrl += `&akses=${encodeURIComponent(aksesIndikator.join(','))}`;
-    const res = await fetch(_laporanUrl);
+    const _user = (() => { try { return JSON.parse(sessionStorage.getItem('spm_user') || '{}'); } catch(e) { return {}; } })();
+    const _token = _user.sessionToken || '';
+    const res = await fetch(_laporanUrl, { headers: _token ? { 'Authorization': 'Bearer ' + _token } : {} });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const html = await res.text();
     pw.document.open();

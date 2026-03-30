@@ -13,15 +13,16 @@ async function renderCatatanThread(elId, idUsulan, currentRole) {
   const el = document.getElementById(elId);
   if (!el) return;
 
-  const AKSI_CHAT = ['Tolak','Tolak (sebagian)','Sanggah','Sanggah Selesai','Ajukan Ulang','Kembalikan','Tolak Ke Operator','Tolak Indikator','Approve','Re-verifikasi','PP Membenarkan','Kapus Membenarkan','Kapus Menyanggah','Respond Penolakan','Sanggah → Admin','Benarkan Penolakan Admin','Kembalikan ke PP'];
+  const AKSI_CHAT = ['Tolak','Tolak (sebagian)','Sanggah','Sanggah Selesai','Ajukan Ulang','Kembalikan','Dikembalikan','Tolak Ke Operator','Tolak Indikator','Approve','Re-verifikasi','PP Membenarkan','Kapus Membenarkan','Kapus Menyanggah','Respond Penolakan','Sanggah → Admin','Sanggah → Kapus','Benarkan Penolakan Admin','Kembalikan ke PP','Kapus Sanggah','Kapus Terima Penolakan','Selesai','Konfirmasi Re-verif','Terima Penolakan Admin','Tolak Global'];
   const APPROVE_SKIP = ['Semua indikator disetujui'];
 
   let logs = [];
   try {
     const data = await API.getLogAktivitas(idUsulan);
     logs = (data.logs || []).filter(l => {
-      if (!AKSI_CHAT.includes(l.aksi) || !l.detail || !l.detail.trim()) return false;
-      if (l.aksi === 'Approve') return !APPROVE_SKIP.includes(l.detail.trim()) || l.detail.includes('Catatan:') || l.detail.includes('Re-verifikasi') || l.detail.includes('Menyanggah');
+      const _a = (l.aksi || '').trim();
+      if (!AKSI_CHAT.includes(_a) || !l.detail || !l.detail.trim()) return false;
+      if (_a === 'Approve') return !APPROVE_SKIP.includes(l.detail.trim()) || l.detail.includes('Catatan:') || l.detail.includes('Re-verifikasi') || l.detail.includes('Menyanggah');
       return true;
     });
   } catch(e) { return; }
@@ -34,28 +35,70 @@ async function renderCatatanThread(elId, idUsulan, currentRole) {
     'Pengelola Program': { color:'#7c3aed', bg:'#f5f3ff', border:'#c4b5fd' },
     'Admin':             { color:'#dc2626', bg:'#fef2f2', border:'#fca5a5' },
   };
+  // SVG icon library — setiap aksi unik
+  const _svgIcons = {
+    send: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>`,
+    replay: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.95"/></svg>`,
+    check_circle: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`,
+    check_final: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2"/></svg>`,
+    update: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.18-5"/></svg>`,
+    cancel: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`,
+    remove_circle: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/></svg>`,
+    cancel_ind: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`,
+    reply: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>`,
+    undo: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 7 3 3 7 3"/><path d="M3 3l5 5"/><path d="M21 13A9 9 0 0 1 3 13v-3"/></svg>`,
+    undo_pp: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>`,
+    gavel: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m14 13-8.5 8.5a2.12 2.12 0 0 1-3-3L11 10"/><path d="m16 16 6-6"/><path d="m8 8 6-6"/><path d="m9 7 8 8"/></svg>`,
+    gavel_selesai: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m14 13-8.5 8.5a2.12 2.12 0 0 1-3-3L11 10"/><path d="m16 16 6-6"/><path d="m8 8 6-6"/><path d="m9 7 8 8"/><circle cx="20" cy="4" r="2" fill="currentColor"/></svg>`,
+    fact_check: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>`,
+    how_to_reg: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><polyline points="16 11 18 13 22 9"/></svg>`,
+    question_answer: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><line x1="9" y1="10" x2="15" y2="10"/><line x1="12" y1="7" x2="12" y2="13"/></svg>`,
+    reply_all_admin: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="7 17 2 12 7 7"/><polyline points="12 17 7 12 12 7"/><path d="M22 18v-2a4 4 0 0 0-4-4H7"/></svg>`,
+    reply_all_kapus: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="7 17 2 12 7 7"/><polyline points="12 17 7 12 12 7"/><path d="M22 18v-2a4 4 0 0 0-4-4H7"/><circle cx="22" cy="8" r="2" fill="currentColor"/></svg>`,
+    restore: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.06 13a9 9 0 1 0 .49-4.95"/><polyline points="3 3 3 9 9 9"/><line x1="12" y1="7" x2="12" y2="12"/><circle cx="12" cy="15" r="1" fill="currentColor"/></svg>`,
+    reset_admin: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>`,
+    selesai: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></svg>`,
+    konfirmasi: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="m16 11 2 2 4-4"/></svg>`,
+    terima_admin: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg>`,
+    tolak_global: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>`,
+    chat: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`,
+  };
+
+  function _svgIcon(key, size, color) {
+    const svg = _svgIcons[key] || _svgIcons.chat;
+    return svg.replace('<svg ', `<svg width="${size}" height="${size}" style="color:${color}" `);
+  }
+
   const aksiConfig = {
-    'Submit':            { icon:'send',           label:'Diajukan' },
-    'Ajukan Ulang':      { icon:'restart_alt',    label:'Ajukan Ulang' },
-    'Approve':           { icon:'check_circle',   label:'Disetujui' },
-    'Approve Final':     { icon:'verified',       label:'Final Disetujui' },
-    'Re-verifikasi':     { icon:'update',         label:'Re-verifikasi' },
-    'Tolak':             { icon:'cancel',         label:'Ditolak' },
-    'Tolak (sebagian)':  { icon:'remove_circle',  label:'Tolak Sebagian' },
-    'Tolak Indikator':   { icon:'cancel',         label:'Tolak Indikator' },
-    'Tolak Ke Operator': { icon:'reply',          label:'Tolak Ke Operator' },
-    'Kembalikan':        { icon:'undo',           label:'Dikembalikan' },
-    'Sanggah':           { icon:'gavel',          label:'Sanggah' },
-    'Sanggah Selesai':   { icon:'gavel',          label:'PP Sanggah → Admin' },
-    'PP Membenarkan':    { icon:'fact_check',    label:'PP Setuju Tolak → Kapus' },
-    'Kapus Membenarkan': { icon:'how_to_reg',     label:'Kapus Setuju Tolak' },
-    'Kapus Menyanggah':  { icon:'gavel',          label:'Kapus Tidak Setuju' },
-    'Respond Penolakan': { icon:'question_answer',  label:'Respond Penolakan' },
-    'Sanggah → Admin':    { icon:'reply_all',       label:'Sanggah → Admin' },
-    'Kembalikan ke PP':  { icon:'assignment_return', label:'Kembalikan ke PP' },
-    'Benarkan Penolakan Admin': { icon:'fact_check', label:'PP Setuju → Ditolak' },
-    'Reset':             { icon:'restart_alt',    label:'Direset Admin' },
-    'Restore Verif':     { icon:'restore',        label:'Dipulihkan' },
+    'Submit':                   { icon:'send',           label:'Diajukan' },
+    'Ajukan Ulang':             { icon:'replay',         label:'Ajukan Ulang' },
+    'Approve':                  { icon:'check_circle',   label:'Disetujui' },
+    'Approve Final':            { icon:'check_final',    label:'Final Disetujui' },
+    'Re-verifikasi':            { icon:'update',         label:'Re-verifikasi' },
+    'Tolak':                    { icon:'cancel',         label:'Ditolak' },
+    'Tolak (sebagian)':         { icon:'remove_circle',  label:'Tolak Sebagian' },
+    'Tolak Indikator':          { icon:'cancel_ind',     label:'Tolak Indikator' },
+    'Tolak Ke Operator':        { icon:'reply',          label:'Tolak Ke Operator' },
+    'Kembalikan':               { icon:'undo',           label:'Dikembalikan' },
+    'Dikembalikan':             { icon:'undo',           label:'Dikembalikan' },
+    'Sanggah':                  { icon:'gavel',          label:'Sanggah' },
+    'Sanggah Selesai':          { icon:'gavel_selesai',  label:'PP Sanggah → Admin' },
+    'PP Membenarkan':           { icon:'fact_check',     label:'PP Setuju Tolak → Kapus' },
+    'Kapus Membenarkan':        { icon:'how_to_reg',     label:'Kapus Setuju Tolak' },
+    'Kapus Menyanggah':         { icon:'gavel',          label:'Kapus Tidak Setuju' },
+    'Respond Penolakan':        { icon:'question_answer',label:'Respond Penolakan' },
+    'Sanggah → Admin':          { icon:'reply_all_admin',label:'Sanggah → Admin' },
+    'Sanggah → Kapus':          { icon:'reply_all_kapus',label:'Sanggah → Kapus' },
+    'Kembalikan ke PP':         { icon:'undo_pp',        label:'Kembalikan ke PP' },
+    'Kapus Sanggah':            { icon:'gavel',          label:'Kapus Sanggah' },
+    'Kapus Terima Penolakan':   { icon:'undo',           label:'Kapus Terima Penolakan' },
+    'Benarkan Penolakan Admin': { icon:'fact_check',     label:'PP Setuju → Ditolak' },
+    'Reset':                    { icon:'reset_admin',    label:'Direset Admin' },
+    'Restore Verif':            { icon:'restore',        label:'Dipulihkan' },
+    'Selesai':                  { icon:'selesai',        label:'Selesai' },
+    'Konfirmasi Re-verif':      { icon:'konfirmasi',     label:'Konfirmasi Re-verif' },
+    'Terima Penolakan Admin':   { icon:'terima_admin',   label:'Terima Penolakan Admin' },
+    'Tolak Global':             { icon:'tolak_global',   label:'Ditolak Admin' },
   };
   const aksiIcon = Object.fromEntries(Object.entries(aksiConfig).map(([k,v]) => [k, v.icon]));
   function fmtDT(ts) {
@@ -74,7 +117,85 @@ async function renderCatatanThread(elId, idUsulan, currentRole) {
 
 
   function _renderDetailLog(log) {
-    const isRespon = log.aksi === 'Respond Penolakan' || log.aksi === 'Sanggah → Admin' || log.aksi === 'Benarkan Penolakan Admin';
+    const _aksiD = (log.aksi || '').trim();
+    // ── Kapus Terima Penolakan: parse bagian tolak vs sanggah ──
+    if (_aksiD === 'Kapus Terima Penolakan' && log.detail) {
+      // Format: "Konteks | Indikator dikembalikan ke Operator: #4: alasan | #6: alasan | Indikator disanggah Kapus (→ PP re-verif): #1, #3"
+      const detail = log.detail;
+      // Pisahkan konteks (sebelum " | Indikator dikembalikan")
+      const idxKembalikan = detail.indexOf(' | Indikator dikembalikan ke Operator:');
+      const idxDisanggah  = detail.indexOf(' | Indikator disanggah Kapus');
+      const konteks = idxKembalikan >= 0 ? detail.substring(0, idxKembalikan) : (idxDisanggah >= 0 ? detail.substring(0, idxDisanggah) : detail);
+
+      // Bagian tolak: antara "Indikator dikembalikan ke Operator:" dan "Indikator disanggah Kapus"
+      let tolakStr = '';
+      if (idxKembalikan >= 0) {
+        const startTolak = idxKembalikan + ' | Indikator dikembalikan ke Operator:'.length;
+        const endTolak   = idxDisanggah >= 0 ? idxDisanggah : detail.length;
+        tolakStr = detail.substring(startTolak, endTolak).trim();
+      }
+
+      // Bagian sanggah: setelah "Indikator disanggah Kapus (→ PP re-verif):"
+      let sanggahStr = '';
+      if (idxDisanggah >= 0) {
+        const idxColon = detail.indexOf(':', idxDisanggah);
+        if (idxColon >= 0) sanggahStr = detail.substring(idxColon + 1).trim();
+      }
+
+      let html = '';
+      // Konteks baris pertama
+      if (konteks.trim()) {
+        html += '<div style="font-size:11.5px;color:#1e293b;font-weight:600;margin-bottom:6px;line-height:1.4">' + konteks.trim() + '</div>';
+      }
+
+      // Indikator ditolak (dikembalikan ke Operator)
+      if (tolakStr) {
+        html += '<div style="margin-bottom:5px"><div style="font-size:10px;font-weight:700;color:#dc2626;margin-bottom:3px;display:flex;align-items:center;gap:3px"><span class="material-icons" style="font-size:11px">reply</span>Dikembalikan ke Operator</div>';
+        tolakStr.split('|').map(s => s.trim()).filter(Boolean).forEach(part => {
+          const m = part.match(/^#(\d+):\s*(.+)$/);
+          if (m) {
+            html += '<div style="display:flex;align-items:flex-start;gap:5px;padding:2px 0;border-bottom:1px solid #fecaca">'
+                  + '<span style="background:#fef2f2;color:#dc2626;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;flex-shrink:0">#' + m[1] + '</span>'
+                  + '<span style="font-size:11px;color:#334155;line-height:1.4">' + m[2] + '</span>'
+                  + '</div>';
+          } else {
+            html += '<div style="font-size:11px;color:#64748b;padding:2px 0">' + part + '</div>';
+          }
+        });
+        html += '</div>';
+      }
+
+      // Indikator disanggah Kapus (→ PP re-verif)
+      if (sanggahStr) {
+        html += '<div style="margin-top:4px"><div style="font-size:10px;font-weight:700;color:#7c3aed;margin-bottom:3px;display:flex;align-items:center;gap:3px"><span class="material-icons" style="font-size:11px">gavel</span>Disanggah Kapus → PP re-verif</div>';
+        sanggahStr.split(',').map(s => s.trim()).filter(Boolean).forEach(nStr => {
+          const n = nStr.replace(/^#/, '');
+          html += '<span style="display:inline-flex;align-items:center;gap:2px;background:#f5f3ff;color:#7c3aed;border:1px solid #c4b5fd;border-radius:20px;padding:1px 8px;font-size:10px;font-weight:700;margin:2px 2px 0 0">'
+                + '<span class="material-icons" style="font-size:10px">gavel</span>#' + n
+                + '</span>';
+        });
+        html += '</div>';
+      }
+
+      return html || detail;
+    }
+
+    // ── Kapus Sanggah: parse catatan ──
+    if (_aksiD === 'Kapus Sanggah' && log.detail) {
+      const detail = log.detail;
+      const idxCatatan = detail.indexOf(' | Catatan:');
+      const konteks  = idxCatatan >= 0 ? detail.substring(0, idxCatatan) : detail;
+      const catatan  = idxCatatan >= 0 ? detail.substring(idxCatatan + ' | Catatan:'.length).trim() : '';
+      let html = '<div style="font-size:11.5px;color:#1e293b;font-weight:600;margin-bottom:4px;line-height:1.4">' + konteks.trim() + '</div>';
+      if (catatan) {
+        html += '<div style="background:#f5f3ff;border:1px solid #c4b5fd;border-radius:6px;padding:5px 8px;font-size:11px;color:#5b21b6;line-height:1.4">'
+              + '<span class="material-icons" style="font-size:11px;vertical-align:middle;margin-right:3px">comment</span>'
+              + catatan + '</div>';
+      }
+      return html;
+    }
+
+    const isRespon = _aksiD === 'Respond Penolakan' || _aksiD === 'Sanggah → Admin' || _aksiD === 'Benarkan Penolakan Admin';
     if (!isRespon || !log.detail) {
       return log.detail || '';
     }
@@ -106,57 +227,70 @@ async function renderCatatanThread(elId, idUsulan, currentRole) {
     return html;
   }
 
+  // Registry untuk toggle callbacks — hindari SVG bersarang di dalam onclick string
+  if (!window.__ctToggle) window.__ctToggle = {};
+
   logs.forEach((log, idx) => {
+    const _aksi = (log.aksi || '').trim(); // trim whitespace/encoding issues
     const cfg = roleCfg[log.role] || { color:'#64748b', bg:'#f8fafc', border:'#e2e8f0' };
-    const icon = aksiIcon[log.aksi] || 'chat';
+    const icon = aksiIcon[_aksi] || 'chat';
     const nama = log.user_nama || log.user_email;
     const cardId = pfx + '_' + idx;
     // Warna badge aksi — ambil dari aksiConfig, fallback ke role color
     const _aksiColorMap = {
-      'Submit':            { c:'#0d9488', b:'#f0fdf9' },
-      'Ajukan Ulang':      { c:'#0d9488', b:'#f0fdf9' },
-      'Approve':           { c:'#16a34a', b:'#f0fdf4' },
-      'Approve Final':     { c:'#16a34a', b:'#f0fdf4' },
-      'Re-verifikasi':     { c:'#0891b2', b:'#ecfeff' },
-      'Tolak':             { c:'#dc2626', b:'#fef2f2' },
-      'Tolak (sebagian)':  { c:'#d97706', b:'#fffbeb' },
-      'Tolak Indikator':   { c:'#dc2626', b:'#fef2f2' },
-      'Tolak Ke Operator': { c:'#dc2626', b:'#fef2f2' },
-      'Kembalikan':        { c:'#7c3aed', b:'#f5f3ff' },
-      'Sanggah':           { c:'#7c3aed', b:'#f5f3ff' },
-      'Sanggah Selesai':   { c:'#7c3aed', b:'#f5f3ff' },
-      'PP Membenarkan':    { c:'#dc2626', b:'#fef2f2' },
-      'Kapus Membenarkan': { c:'#d97706', b:'#fffbeb' },
-      'Kapus Menyanggah':  { c:'#d97706', b:'#fffbeb' },
-      'Respond Penolakan': { c:'#0891b2', b:'#ecfeff' },
-      'Sanggah → Admin':    { c:'#7c3aed', b:'#f5f3ff' },
-      'Kembalikan ke PP':  { c:'#7c3aed', b:'#f5f3ff' },
-      'Benarkan Penolakan Admin': { c:'#dc2626', b:'#fef2f2' },
-      'Reset':             { c:'#d97706', b:'#fffbeb' },
-      'Restore Verif':     { c:'#6366f1', b:'#fff7ed' },
+      'Submit':                   { c:'#0d9488', b:'#f0fdf9' },   // teal
+      'Ajukan Ulang':             { c:'#0284c7', b:'#e0f2fe' },   // sky blue
+      'Approve':                  { c:'#16a34a', b:'#f0fdf4' },   // green
+      'Approve Final':            { c:'#15803d', b:'#dcfce7' },   // dark green
+      'Re-verifikasi':            { c:'#06b6d4', b:'#ecfeff' },   // cyan
+      'Tolak':                    { c:'#dc2626', b:'#fef2f2' },   // red
+      'Tolak (sebagian)':         { c:'#ea580c', b:'#fff7ed' },   // orange
+      'Tolak Indikator':          { c:'#be123c', b:'#fff1f2' },   // rose
+      'Tolak Ke Operator':        { c:'#b91c1c', b:'#fef2f2' },   // dark red
+      'Kembalikan':               { c:'#7c3aed', b:'#f5f3ff' },   // violet
+      'Dikembalikan':             { c:'#6d28d9', b:'#ede9fe' },   // purple
+      'Sanggah':                  { c:'#9333ea', b:'#faf5ff' },   // purple-600
+      'Sanggah Selesai':          { c:'#a21caf', b:'#fdf4ff' },   // fuchsia
+      'PP Membenarkan':           { c:'#0f766e', b:'#f0fdfa' },   // teal-700
+      'Kapus Membenarkan':        { c:'#b45309', b:'#fefce8' },   // amber-700
+      'Kapus Menyanggah':         { c:'#c2410c', b:'#fff7ed' },   // orange-700
+      'Respond Penolakan':        { c:'#2563eb', b:'#eff6ff' },   // blue
+      'Sanggah → Admin':          { c:'#7e22ce', b:'#f3e8ff' },   // purple-800
+      'Sanggah → Kapus':          { c:'#d97706', b:'#fffbeb' },   // amber
+      'Kembalikan ke PP':         { c:'#4f46e5', b:'#eef2ff' },   // indigo
+      'Kapus Sanggah':            { c:'#db2777', b:'#fdf2f8' },   // pink
+      'Kapus Terima Penolakan':   { c:'#f59e0b', b:'#fffbeb' },   // yellow-amber
+      'Benarkan Penolakan Admin': { c:'#991b1b', b:'#fef2f2' },   // red-800
+      'Reset':                    { c:'#64748b', b:'#f8fafc' },   // slate
+      'Restore Verif':            { c:'#6366f1', b:'#eef2ff' },   // indigo-500
+      'Selesai':                  { c:'#059669', b:'#ecfdf5' },   // emerald
+      'Konfirmasi Re-verif':      { c:'#0369a1', b:'#e0f2fe' },   // sky-700
+      'Terima Penolakan Admin':   { c:'#7f1d1d', b:'#fef2f2' },   // red-900
+      'Tolak Global':             { c:'#450a0a', b:'#fff1f2' },   // darkest red
     };
-    const aksiClr = _aksiColorMap[log.aksi] || { c:cfg.color, b:cfg.bg };
+    const aksiClr = _aksiColorMap[_aksi] || { c:cfg.color, b:cfg.bg };
+
+    const _svgChevronDown = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="${aksiClr.c}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>`;
+    const _svgChevronUp   = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="${aksiClr.c}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>`;
+
+    // Simpan SVG ke registry agar tidak perlu inject ke dalam onclick string
+    window.__ctToggle[cardId] = { up: _svgChevronUp, down: _svgChevronDown };
 
     html += `<div style="border:1.5px solid ${aksiClr.c}55;border-radius:8px;background:${aksiClr.b};overflow:hidden">
       <!-- header: selalu tampil, klik toggle -->
-      <div onclick="(function(){
-        var d=document.getElementById('${cardId}');
-        var arr=document.getElementById('${cardId}_arr');
-        if(d.style.display==='none'){d.style.display='block';arr.textContent='expand_less';}
-        else{d.style.display='none';arr.textContent='expand_more';}
-      })()" style="padding:7px 8px;cursor:pointer;display:flex;align-items:flex-start;gap:6px">
+      <div onclick="__ctToggleFn('${cardId}')" style="padding:7px 8px;cursor:pointer;display:flex;align-items:flex-start;gap:6px">
         <div style="width:28px;height:28px;border-radius:50%;background:white;border:2px solid ${aksiClr.c};display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">
-          <span class="material-icons" style="font-size:14px;color:${aksiClr.c}">${icon}</span>
+          ${_svgIcon(icon, 14, aksiClr.c)}
         </div>
         <div style="flex:1;min-width:0">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:4px">
             <span style="font-size:10px;font-weight:800;color:${aksiClr.c}">#${idx+1}</span>
-            <span id="${cardId}_arr" class="material-icons" style="font-size:12px;color:${aksiClr.c}">expand_more</span>
+            <span id="${cardId}_arr">${_svgChevronDown}</span>
           </div>
           <div style="font-size:11.5px;font-weight:700;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nama}</div>
           <div style="font-size:10.5px;color:#64748b;margin-bottom:3px">${log.role}</div>
-          <div style="font-size:10.5px;font-weight:700;color:${aksiClr.c};background:white;border:1px solid ${aksiClr.c}60;border-radius:20px;padding:1px 6px;display:inline-flex;align-items:center;gap:2px">
-            <span class="material-icons" style="font-size:11px">${icon}</span>${(aksiConfig[log.aksi]||{label:log.aksi}).label}
+          <div style="font-size:10.5px;font-weight:700;color:${aksiClr.c};background:white;border:1px solid ${aksiClr.c}60;border-radius:20px;padding:1px 6px;display:inline-flex;align-items:center;gap:3px">
+            ${_svgIcon(icon, 11, aksiClr.c)}${(aksiConfig[_aksi]||{label:_aksi}).label}
           </div>
         </div>
       </div>
@@ -172,13 +306,24 @@ async function renderCatatanThread(elId, idUsulan, currentRole) {
 
   el.innerHTML = `<div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px;padding:12px 14px">
     <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #e2e8f0">
-      <span class="material-icons" style="font-size:15px;color:#64748b">forum</span>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
       <span style="font-size:12px;font-weight:700;color:#475569">Riwayat Catatan</span>
       <span style="font-size:10px;color:#94a3b8;margin-left:4px">(${logs.length} entri — klik untuk detail)</span>
     </div>
     <div style="width:100%">${html}</div>
   </div>`;
   el.style.display = 'block';
+}
+
+// Toggle helper untuk catatan thread — dipanggil via onclick="__ctToggleFn('id')"
+function __ctToggleFn(cardId) {
+  const d   = document.getElementById(cardId);
+  const arr = document.getElementById(cardId + '_arr');
+  if (!d || !arr) return;
+  const isHidden = d.style.display === 'none';
+  d.style.display = isHidden ? 'block' : 'none';
+  const svgs = (window.__ctToggle || {})[cardId];
+  if (svgs) arr.innerHTML = isHidden ? svgs.up : svgs.down;
 }
 
 // ============== APP STATE ==============
@@ -320,6 +465,7 @@ async function doLogin() {
     setAuthStatus(e.message, 'error');
     btn.disabled = false;
     btn.innerHTML = '<span class="material-icons">login</span> Login';
+    setTimeout(() => setAuthStatus('', ''), 2000);
   }
 }
 
@@ -341,7 +487,7 @@ function doLogout() {
     title: 'Keluar dari Sistem',
     message: 'Yakin ingin keluar dari sistem?',
     type: 'warning',
-    onConfirm: () => { if(currentUser) API.logAudit({module:'auth',action:'LOGOUT',userEmail:currentUser.email,userNama:currentUser.nama,userRole:currentUser.role,detail:'Logout manual'}); currentUser = null; sessionStorage.removeItem('spm_user'); try { sessionStorage.removeItem('spm_last_page'); } catch(e) {} location.reload(); }
+    onConfirm: () => { window._intentionalLogout = true; sessionStorage.removeItem('spm_user'); try { sessionStorage.removeItem('spm_last_page'); } catch(e) {} if(currentUser) { API.logout(); API.logAudit({module:'auth',action:'LOGOUT',userEmail:currentUser.email,userNama:currentUser.nama,userRole:currentUser.role,detail:'Logout manual'}); } currentUser = null; location.reload(); }
   });
 }
 
@@ -488,6 +634,7 @@ async function showTandaTanganLoginPopup() {
     } else if (role === 'Admin') {
       try {
         const pjRes = await fetch('/api/pejabat');
+        if (!pjRes.ok) throw new Error('Gagal load pejabat');
         const pjData = await pjRes.json();
         const pjList = pjData.success ? pjData.data : [];
         // Cek semua pejabat yang terdaftar — jika ada yang belum punya tanda tangan, tampilkan popup

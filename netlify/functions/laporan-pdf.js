@@ -48,8 +48,9 @@ function fmtDT(ts) {
   if (!ts) return '-';
   const d = new Date(ts);
   const o = { timeZone: 'Asia/Makassar' };
-  return `${d.toLocaleDateString('id-ID', { ...o, day:'2-digit', month:'long', year:'numeric' })} | `
-       + `${d.toLocaleTimeString('id-ID', { ...o, hour:'2-digit', minute:'2-digit', hour12:false })} WITA`;
+  const tgl = d.toLocaleDateString('id-ID', { ...o, day:'2-digit', month:'long', year:'numeric' });
+  const jam = d.toLocaleTimeString('id-ID', { ...o, hour:'2-digit', minute:'2-digit', hour12:false }).replace('.', ':');
+  return `${tgl} | ${jam} WITA`;
 }
 
 // ============================================================
@@ -238,10 +239,10 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
       signImg = `<div style="height:80px;display:flex;align-items:center;justify-content:center;margin-bottom:4px">
                    <img src="${tt}" style="max-height:72px;max-width:160px;object-fit:contain">
                  </div>
-                 <div style="font-size:9px;color:#2d7a47;font-weight:700;margin-bottom:2px">✓ Disetujui: ${fmtDT(v.verified_at)}</div>`;
+                 <div style="font-size:9px;color:#2d7a47;font-weight:700;margin-bottom:2px;display:flex;align-items:center;justify-content:center;gap:4px"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"11\" height=\"11\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#2d7a47\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M22 11.08V12a10 10 0 1 1-5.93-9.14\"/><polyline points=\"22 4 12 14.01 9 11.01\"/></svg>Diverifikasi: ${fmtDT(v.verified_at)}</div>`;
     } else {
       signImg = `<div style="display:inline-block;margin-bottom:6px">${approvedBadgeSVG()}</div>
-                 <div style="font-size:9px;color:#2d7a47;font-weight:700;margin-bottom:2px">✓ Disetujui: ${fmtDT(v.verified_at)}</div>`;
+                 <div style="font-size:9px;color:#2d7a47;font-weight:700;margin-bottom:2px;display:flex;align-items:center;justify-content:center;gap:4px"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"11\" height=\"11\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#2d7a47\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M22 11.08V12a10 10 0 1 1-5.93-9.14\"/><polyline points=\"22 4 12 14.01 9 11.01\"/></svg>Diverifikasi: ${fmtDT(v.verified_at)}</div>`;
     }
     return `<div style="text-align:center;min-width:180px;max-width:220px">
       <div style="font-size:10px;color:#334155;margin-bottom:10px;font-weight:600">${jabatan}</div>
@@ -269,10 +270,10 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
       signImg = `<div style="height:80px;display:flex;align-items:center;justify-content:center;margin-bottom:4px">
                    <img src="${tt}" style="max-height:72px;max-width:160px;object-fit:contain">
                  </div>
-                 <div style="font-size:9px;color:#2d7a47;font-weight:700;margin-bottom:2px">✓ Disetujui: ${fmtDT(h.kapus_approved_at)}</div>`;
+                 <div style="font-size:9px;color:#2d7a47;font-weight:700;margin-bottom:2px;display:flex;align-items:center;justify-content:center;gap:4px"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"11\" height=\"11\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#2d7a47\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M22 11.08V12a10 10 0 1 1-5.93-9.14\"/><polyline points=\"22 4 12 14.01 9 11.01\"/></svg>Diverifikasi: ${fmtDT(h.kapus_approved_at)}</div>`;
     } else {
       signImg = `<div style="display:inline-block;margin-bottom:6px">${approvedBadgeSVG()}</div>
-                 <div style="font-size:9px;color:#2d7a47;font-weight:700;margin-bottom:2px">✓ Disetujui: ${fmtDT(h.kapus_approved_at)}</div>`;
+                 <div style="font-size:9px;color:#2d7a47;font-weight:700;margin-bottom:2px;display:flex;align-items:center;justify-content:center;gap:4px"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"11\" height=\"11\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#2d7a47\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M22 11.08V12a10 10 0 1 1-5.93-9.14\"/><polyline points=\"22 4 12 14.01 9 11.01\"/></svg>Diverifikasi: ${fmtDT(h.kapus_approved_at)}</div>`;
     }
     return `<div style="text-align:center;min-width:180px;max-width:220px">
       <div style="font-size:10px;color:#334155;margin-bottom:10px;font-weight:600">Kepala UPTD Puskesmas ${h.nama_puskesmas||h.kode_pkm}</div>
@@ -289,7 +290,7 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
     const tt = ttRaw3.startsWith('data:image') ? (compressBase64Img(ttRaw3) || '') : ttRaw3;
     const ttValid = tt && (tt.startsWith('data:image') || tt.startsWith('http'));
     const tsHtml = h.admin_approved_at
-      ? `<div style="font-size:9px;color:#2d7a47;font-weight:700;margin-bottom:2px">✓ Disetujui: ${fmtDT(h.admin_approved_at)}</div>`
+      ? `<div style="font-size:9px;color:#2d7a47;font-weight:700;margin-bottom:2px;display:flex;align-items:center;justify-content:center;gap:4px"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"11\" height=\"11\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#2d7a47\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M22 11.08V12a10 10 0 1 1-5.93-9.14\"/><polyline points=\"22 4 12 14.01 9 11.01\"/></svg>Diverifikasi: ${fmtDT(h.admin_approved_at)}</div>`
       : '';
     return `<div style="text-align:center;min-width:180px;max-width:220px">
       <div style="font-size:10px;color:#334155;margin-bottom:10px;font-weight:600">${jabatanLabel}</div>
@@ -306,17 +307,21 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
     </div>`;
   }
 
-  function buildSignLayout(slots) {
+  function buildSignLayout(slots, tanggalAdean) {
+    const dateLabel = tanggalAdean
+      ? `<div style="font-size:10px;color:#334155;margin-bottom:6px;text-align:right">${tanggalAdean}</div>`
+      : '';
     const kapus = kapusSignBlock();
     if (isSementara) {
-      return `<div style="display:flex;justify-content:flex-end">${kapus}</div>`;
+      return `<div style="display:flex;justify-content:flex-end"><div style="text-align:center">${dateLabel}${kapus}</div></div>`;
     }
     // Baris 1: slot[0] kiri + kapus kanan (selalu)
+    // dateLabel di atas row, text-align:right → rata kanan sejajar kapus
     // Sisa: 2 per baris, rata tengah
     if (!slots.length) {
-      return `<div style="display:flex;justify-content:flex-end">${kapus}</div>`;
+      return `<div style="display:flex;justify-content:flex-end"><div style="text-align:center">${dateLabel}${kapus}</div></div>`;
     }
-    const row1 = `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:20px">${signBlock(slots[0].v, slots[0].jabatan)}${kapus}</div>`;
+    const row1 = `${dateLabel}<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:20px">${signBlock(slots[0].v, slots[0].jabatan)}${kapus}</div>`;
     const rest = slots.slice(1);
     let extraRows = '';
     for (let i = 0; i < rest.length; i += 2) {
@@ -401,9 +406,11 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
         </thead>
         <tbody>${tabelRows}</tbody>
       </table>
-      <div style="margin-top:28px">
-        <div style="font-size:10px;color:#334155;margin-bottom:6px;text-align:right">Adean, ${fmtDT(h.kapus_approved_at)}</div>
-        <div style="display:flex;justify-content:flex-end">${tanda_tangan_kapus}</div>
+      <div style="margin-top:28px;display:flex;justify-content:flex-end">
+        <div style="text-align:center">
+          <div style="font-size:10px;color:#334155;margin-bottom:6px">Adean, ${fmtDT(h.kapus_approved_at)}</div>
+          ${tanda_tangan_kapus}
+        </div>
       </div>
     </div>`;
 
@@ -432,19 +439,21 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
         <table style="width:100%;margin-bottom:14px;font-size:11px">
           <tr>
             <td style="width:50%;vertical-align:top">
-              <table style="width:100%">
-                <tr><td style="width:110px;padding:2px 0">ID Usulan</td><td style="padding:2px 0">: <strong>${h.id_usulan}</strong></td></tr>
-                <tr><td style="padding:2px 0">Puskesmas</td><td style="padding:2px 0">: ${h.nama_puskesmas||h.kode_pkm}</td></tr>
-                <tr><td style="padding:2px 0">Periode</td><td style="padding:2px 0">: ${bulan} ${h.tahun}</td></tr>
-                <tr><td style="width:110px;padding:2px 0;vertical-align:top;white-space:nowrap">Indikator</td><td style="padding:2px 0;vertical-align:top">: <strong>${ind.nama_indikator||'-'}</strong></td></tr>
+              <table style="width:100%;border-collapse:collapse">
+                <colgroup><col style="width:90px"><col style="width:12px"><col></colgroup>
+                <tr><td style="padding:2px 0;vertical-align:top;white-space:nowrap">ID Usulan</td><td style="padding:2px 0;vertical-align:top">:</td><td style="padding:2px 0;vertical-align:top"><strong>${h.id_usulan}</strong></td></tr>
+                <tr><td style="padding:2px 0;vertical-align:top;white-space:nowrap">Puskesmas</td><td style="padding:2px 0;vertical-align:top">:</td><td style="padding:2px 0;vertical-align:top">${h.nama_puskesmas||h.kode_pkm}</td></tr>
+                <tr><td style="padding:2px 0;vertical-align:top;white-space:nowrap">Periode</td><td style="padding:2px 0;vertical-align:top">:</td><td style="padding:2px 0;vertical-align:top">${bulan} ${h.tahun}</td></tr>
+                <tr><td style="padding:2px 0;vertical-align:top;white-space:nowrap">Indikator</td><td style="padding:2px 0;vertical-align:top">:</td><td style="padding:2px 0;vertical-align:top"><strong>${ind.nama_indikator||'-'}</strong></td></tr>
               </table>
             </td>
             <td style="width:50%;vertical-align:top;padding-left:20px">
-              <table style="width:100%">
-                <tr><td style="width:160px;padding:2px 0">Status</td><td style="padding:2px 0">: ${h.status_global||'Draft'}</td></tr>
-                <tr><td style="padding:2px 0">Indeks Beban Kerja</td><td style="padding:2px 0">: ${parseFloat(h.indeks_beban_kerja||0).toFixed(2)}</td></tr>
-                <tr><td style="padding:2px 0">Indeks Kesulitan Wilayah</td><td style="padding:2px 0">: ${parseFloat(h.indeks_kesulitan_wilayah||0).toFixed(2)}</td></tr>
-                <tr><td style="padding:2px 0">Dicetak</td><td style="padding:2px 0">: ${now}</td></tr>
+              <table style="width:100%;border-collapse:collapse">
+                <colgroup><col style="width:150px"><col style="width:12px"><col></colgroup>
+                <tr><td style="padding:2px 0;vertical-align:top;white-space:nowrap">Status</td><td style="padding:2px 0;vertical-align:top">:</td><td style="padding:2px 0;vertical-align:top">${h.status_global||'Draft'}</td></tr>
+                <tr><td style="padding:2px 0;vertical-align:top;white-space:nowrap">Indeks Beban Kerja</td><td style="padding:2px 0;vertical-align:top">:</td><td style="padding:2px 0;vertical-align:top">${parseFloat(h.indeks_beban_kerja||0).toFixed(2)}</td></tr>
+                <tr><td style="padding:2px 0;vertical-align:top;white-space:nowrap">Indeks Kesulitan Wilayah</td><td style="padding:2px 0;vertical-align:top">:</td><td style="padding:2px 0;vertical-align:top">${parseFloat(h.indeks_kesulitan_wilayah||0).toFixed(2)}</td></tr>
+                <tr><td style="padding:2px 0;vertical-align:top;white-space:nowrap">Dicetak</td><td style="padding:2px 0;vertical-align:top">:</td><td style="padding:2px 0;vertical-align:top">${now}</td></tr>
               </table>
             </td>
           </tr>
@@ -473,8 +482,7 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
         ${catatan?`<div style="margin-bottom:20px;font-size:10px;color:#334155"><strong>Catatan :</strong> ${catatan}</div>`:''}
         <!-- TANDA TANGAN -->
         <div style="margin-top:28px">
-          <div style="font-size:10px;color:#334155;margin-bottom:6px;text-align:right">Adean, ${fmtDT(h.kapus_approved_at)}</div>
-          ${buildSignLayout(slots)}
+          ${buildSignLayout(slots, `Adean, ${fmtDT(h.kapus_approved_at)}`)}
         </div>
       </div>`;
     }).join('');
@@ -582,9 +590,11 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
       </table>
       <!-- TANDA TANGAN PEJABAT -->
       <div style="margin-top:32px">
-        <div style="font-size:10px;color:#334155;margin-bottom:6px;text-align:right">Adean, ${fmtDT(h.final_approved_at)}</div>
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:20px">
-          ${ttdKanan}
+        <div style="display:flex;justify-content:flex-end;align-items:flex-start">
+          <div style="text-align:center">
+            <div style="font-size:10px;color:#334155;margin-bottom:6px">Adean, ${fmtDT(h.admin_approved_at || h.final_approved_at)}</div>
+            ${ttdKanan}
+          </div>
         </div>
       </div>
     </div>`;
@@ -631,19 +641,168 @@ async function generateLaporanLog(pool, idUsulan) {
                + ' | ' + nowDt.toLocaleTimeString('id-ID',{...nowOpt,hour:'2-digit',minute:'2-digit',hour12:false}) + ' WITA';
 
   const aksiColor = {
-    'Submit':'#0d9488','Ajukan Ulang':'#0d9488','Approve':'#16a34a','Approve Final':'#16a34a',
-    'Re-verifikasi':'#0891b2','Tolak':'#dc2626','Tolak (sebagian)':'#ea580c',
-    'Kembalikan':'#ea580c','Sanggah':'#7c3aed','Reset':'#d97706','Restore Verif':'#6366f1'
+    'Submit':                   '#0d9488',   // teal
+    'Ajukan Ulang':             '#0284c7',   // sky blue
+    'Approve':                  '#16a34a',   // green
+    'Approve Final':            '#15803d',   // dark green
+    'Selesai':                  '#059669',   // emerald
+    'Re-verifikasi':            '#06b6d4',   // cyan
+    'Respond Penolakan':        '#2563eb',   // blue
+    'Tolak':                    '#dc2626',   // red
+    'Tolak (sebagian)':         '#ea580c',   // orange
+    'Tolak Indikator':          '#be123c',   // rose
+    'Tolak Ke Operator':        '#b91c1c',   // dark red
+    'Tolak Global':             '#450a0a',   // darkest red
+    'Kembalikan':               '#7c3aed',   // violet
+    'Dikembalikan':             '#6d28d9',   // purple
+    'Kembalikan ke PP':         '#4f46e5',   // indigo
+    'Sanggah':                  '#9333ea',   // purple-600
+    'Sanggah Selesai':          '#a21caf',   // fuchsia
+    'Sanggah → Admin':          '#7e22ce',   // purple-800
+    'Sanggah → Kapus':          '#d97706',   // amber
+    'Kapus Sanggah':            '#db2777',   // pink
+    'Kapus Terima Penolakan':   '#f59e0b',   // yellow-amber
+    'Kapus Membenarkan':        '#b45309',   // amber-700
+    'Kapus Menyanggah':         '#c2410c',   // orange-700
+    'Konfirmasi Re-verif':      '#0369a1',   // sky-700
+    'PP Membenarkan':           '#0f766e',   // teal-700
+    'Benarkan Penolakan Admin': '#991b1b',   // red-800
+    'Terima Penolakan Admin':   '#7f1d1d',   // red-900
+    'Reset':                    '#64748b',   // slate
+    'Restore Verif':            '#6366f1',   // indigo-500
   };
   const aksiLabel = {
-    'Submit':'Diajukan','Ajukan Ulang':'Ajukan Ulang','Approve':'Disetujui','Approve Final':'Final Disetujui',
-    'Re-verifikasi':'Re-verifikasi','Tolak':'Ditolak','Tolak (sebagian)':'Tolak Sebagian',
-    'Kembalikan':'Dikembalikan','Sanggah':'Sanggah','Reset':'Direset Admin','Restore Verif':'Dipulihkan'
+    'Submit':                   'Diajukan',
+    'Ajukan Ulang':             'Ajukan Ulang',
+    'Approve':                  'Disetujui',
+    'Approve Final':            'Final Disetujui',
+    'Selesai':                  'Selesai',
+    'Re-verifikasi':            'Re-verifikasi',
+    'Respond Penolakan':        'Respond Penolakan',
+    'Tolak':                    'Ditolak',
+    'Tolak (sebagian)':         'Tolak Sebagian',
+    'Tolak Indikator':          'Tolak Indikator',
+    'Tolak Ke Operator':        'Tolak Ke Operator',
+    'Tolak Global':             'Ditolak Admin',
+    'Kembalikan':               'Dikembalikan',
+    'Dikembalikan':             'Dikembalikan',
+    'Kembalikan ke PP':         'Kembalikan ke PP',
+    'Sanggah':                  'Sanggah',
+    'Sanggah Selesai':          'PP Sanggah → Admin',
+    'Sanggah → Admin':          'Sanggah → Admin',
+    'Sanggah → Kapus':          'Sanggah → Kapus',
+    'Kapus Sanggah':            'Kapus Sanggah',
+    'Kapus Terima Penolakan':   'Kapus Terima Penolakan',
+    'Kapus Membenarkan':        'Kapus Setuju Tolak',
+    'Kapus Menyanggah':         'Kapus Tidak Setuju',
+    'Konfirmasi Re-verif':      'Konfirmasi Re-verif',
+    'PP Membenarkan':           'PP Setuju Tolak → Kapus',
+    'Benarkan Penolakan Admin': 'PP Setuju → Ditolak',
+    'Terima Penolakan Admin':   'Terima Penolakan Admin',
+    'Reset':                    'Direset Admin',
+    'Restore Verif':            'Dipulihkan',
   };
+
+
+  // SVG inline icons — sinkron dengan Riwayat Aktivitas di app-input.js
+  function aksiSVG(aksi, color) {
+    const s = (path) =>
+      `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle;margin-right:3px;flex-shrink:0">${path}</svg>`;
+    const icons = {
+      // Submit — paper-plane (send)
+      'Submit':
+        s('<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>'),
+      // Ajukan Ulang — counter-clockwise refresh
+      'Ajukan Ulang':
+        s('<polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.95"/>'),
+      // Approve — circle-check dengan ekor luar
+      'Approve':
+        s('<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>'),
+      // Approve Final — circle dengan titik kompas (badge verified)
+      'Approve Final':
+        s('<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2"/>'),
+      // Re-verifikasi — clockwise rotate
+      'Re-verifikasi':
+        s('<polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.18-5"/>'),
+      // Tolak — X circle
+      'Tolak':
+        s('<circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>'),
+      // Tolak sebagian — minus circle
+      'Tolak (sebagian)':
+        s('<circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/>'),
+      // Tolak Indikator — lightning bolt
+      'Tolak Indikator':
+        s('<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>'),
+      // Tolak Ke Operator — reply arrow
+      'Tolak Ke Operator':
+        s('<polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/>'),
+      // Tolak Global — slash circle
+      'Tolak Global':
+        s('<circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>'),
+      // Kembalikan — undo (counter-clockwise with arc)
+      'Kembalikan':
+        s('<polyline points="3 7 3 3 7 3"/><path d="M3 3l5 5"/><path d="M21 13A9 9 0 0 1 3 13v-3"/>'),
+      // Dikembalikan — undo (sama dengan Kembalikan tapi warna berbeda)
+      'Dikembalikan':
+        s('<polyline points="3 7 3 3 7 3"/><path d="M3 3l5 5"/><path d="M21 13A9 9 0 0 1 3 13v-3"/>'),
+      // Kembalikan ke PP — corner-down-left arrow
+      'Kembalikan ke PP':
+        s('<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>'),
+      // Sanggah — gavel
+      'Sanggah':
+        s('<path d="m14 13-8.5 8.5a2.12 2.12 0 0 1-3-3L11 10"/><path d="m16 16 6-6"/><path d="m8 8 6-6"/><path d="m9 7 8 8"/>'),
+      // Sanggah Selesai — gavel + filled dot
+      'Sanggah Selesai':
+        s('<path d="m14 13-8.5 8.5a2.12 2.12 0 0 1-3-3L11 10"/><path d="m16 16 6-6"/><path d="m8 8 6-6"/><path d="m9 7 8 8"/><circle cx="20" cy="4" r="2" fill="currentColor" stroke="none"/>'),
+      // Sanggah → Admin — double reply arrows
+      'Sanggah → Admin':
+        s('<polyline points="7 17 2 12 7 7"/><polyline points="12 17 7 12 12 7"/><path d="M22 18v-2a4 4 0 0 0-4-4H7"/>'),
+      // Sanggah → Kapus — double reply arrows + filled dot
+      'Sanggah → Kapus':
+        s('<polyline points="7 17 2 12 7 7"/><polyline points="12 17 7 12 12 7"/><path d="M22 18v-2a4 4 0 0 0-4-4H7"/><circle cx="22" cy="8" r="2" fill="currentColor" stroke="none"/>'),
+      // Kapus Sanggah — gavel (sama bentuk)
+      'Kapus Sanggah':
+        s('<path d="m14 13-8.5 8.5a2.12 2.12 0 0 1-3-3L11 10"/><path d="m16 16 6-6"/><path d="m8 8 6-6"/><path d="m9 7 8 8"/>'),
+      // Kapus Terima Penolakan — undo
+      'Kapus Terima Penolakan':
+        s('<polyline points="3 7 3 3 7 3"/><path d="M3 3l5 5"/><path d="M21 13A9 9 0 0 1 3 13v-3"/>'),
+      // Respond Penolakan — chat bubble + plus
+      'Respond Penolakan':
+        s('<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><line x1="9" y1="10" x2="15" y2="10"/><line x1="12" y1="7" x2="12" y2="13"/>'),
+      // Kapus Membenarkan — user-check
+      'Kapus Membenarkan':
+        s('<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><polyline points="16 11 18 13 22 9"/>'),
+      // Kapus Menyanggah — gavel (sama tapi warna berbeda)
+      'Kapus Menyanggah':
+        s('<path d="m14 13-8.5 8.5a2.12 2.12 0 0 1-3-3L11 10"/><path d="m16 16 6-6"/><path d="m8 8 6-6"/><path d="m9 7 8 8"/>'),
+      // Konfirmasi Re-verif — user-check
+      'Konfirmasi Re-verif':
+        s('<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="m16 11 2 2 4-4"/>'),
+      // PP Membenarkan — clipboard check
+      'PP Membenarkan':
+        s('<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>'),
+      // Benarkan Penolakan Admin — clipboard check
+      'Benarkan Penolakan Admin':
+        s('<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>'),
+      // Terima Penolakan Admin — rect check
+      'Terima Penolakan Admin':
+        s('<rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/>'),
+      // Selesai — filled circle check
+      'Selesai':
+        s('<path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/>'),
+      // Reset — counter-clockwise double arrow
+      'Reset':
+        s('<path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>'),
+      // Restore Verif — history dengan titik peringatan
+      'Restore Verif':
+        s('<path d="M3.06 13a9 9 0 1 0 .49-4.95"/><polyline points="3 3 3 9 9 9"/><line x1="12" y1="7" x2="12" y2="12"/><circle cx="12" cy="15" r="1" fill="currentColor" stroke="none"/>'),
+    };
+    return icons[aksi] || s('<circle cx="12" cy="12" r="4"/>');
+  }
 
   const theadHtml = `<tr style="background:#1e293b">
     <th style="color:white;font-size:11px;padding:7px 10px;border:1px solid #334155;text-align:center;text-transform:uppercase;width:28px">NO</th>
-    <th style="color:white;font-size:11px;padding:7px 10px;border:1px solid #334155;text-align:center;text-transform:uppercase;width:120px">Aksi</th>
+    <th style="color:white;font-size:11px;padding:7px 10px;border:1px solid #334155;text-align:center;text-transform:uppercase;width:130px">Aksi</th>
     <th style="color:white;font-size:11px;padding:7px 10px;border:1px solid #334155;text-align:center;text-transform:uppercase;width:130px">Nama</th>
     <th style="color:white;font-size:11px;padding:7px 10px;border:1px solid #334155;text-align:center;text-transform:uppercase;width:85px">Role</th>
     <th style="color:white;font-size:11px;padding:7px 10px;border:1px solid #334155;text-align:center;text-transform:uppercase;width:115px">Waktu</th>
@@ -652,14 +811,15 @@ async function generateLaporanLog(pool, idUsulan) {
 
   const logs = logResult.rows;
   const rowsHtml = logs.map((log, i) => {
-    const color = aksiColor[log.aksi] || '#64748b';
-    const label = aksiLabel[log.aksi] || log.aksi;
+    const _aksi = (log.aksi || '').trim();
+    const color = aksiColor[_aksi] || '#64748b';
+    const label = aksiLabel[_aksi] || _aksi;
     const detail = log.detail
       ? `<div style="margin-top:4px;font-size:11px;color:#334155;background:#f8fafc;border-left:3px solid ${color};padding:4px 8px;border-radius:0 4px 4px 0;word-break:break-word">${log.detail}</div>` : '';
     return `<tr style="${i%2===1?'background:#f8fafc':''}">
       <td style="padding:7px 10px;border:1px solid #cbd5e1;text-align:center;font-weight:700;color:${color}">${i+1}</td>
-      <td style="padding:7px 10px;border:1px solid #cbd5e1">
-        <span style="background:${color}18;color:${color};border:1px solid ${color}55;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700;white-space:nowrap">${label}</span>
+      <td style="padding:7px 10px;border:1px solid #cbd5e1;word-break:break-word">
+        <span style="display:inline-flex;align-items:center;font-size:11px;font-weight:700;color:${color}">${aksiSVG(_aksi,color)}${label}</span>
       </td>
       <td style="padding:7px 10px;border:1px solid #cbd5e1;font-weight:600">${log.user_nama||log.user_email}</td>
       <td style="padding:7px 10px;border:1px solid #cbd5e1;color:#64748b">${log.role}</td>

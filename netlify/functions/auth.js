@@ -1,15 +1,54 @@
 const { getPool, ok, err, cors } = require('./db');
+const crypto = require('crypto');
 
 let bcrypt;
 try { bcrypt = require('bcryptjs'); } catch(e) { bcrypt = null; }
 
+const MAX_ATTEMPTS  = 3;   // lockout setelah 3 gagal
+const LOCKOUT_MINS  = 15;  // kunci selama 15 menit
+
+/**
+ * Handler: /api/auth
+ *
+ * POST — Login / Ganti Password / Reset Password (Admin)
+ *   Body (login)          : { email, password }
+ *   Body (change-password): { action:'change-password', email, oldPassword, newPassword }
+ *   Body (reset-password) : { action:'reset-password', email, targetEmail, newPassword }
+ *
+ * Response sukses: { success:true, data: { email, nama, role, kodePKM, ... } }
+ * Response error : { success:false, message }
+ *   401 — Password salah / perlu reset
+ *   403 — Email tidak ditemukan / tidak aktif / akses ditolak
+ *   429 — Akun terkunci karena terlalu banyak percobaan gagal
+ *   500 — Error sistem
+ */
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors();
 
   try {
     const pool = getPool();
+
+    // ── Migrasi kolom brute-force protection (idempoten) ──
+    await Promise.all([
+      pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS login_attempts INT DEFAULT 0`).catch(()=>{}),
+      pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until TIMESTAMPTZ`).catch(()=>{}),
+      pool.query(`
+        CREATE TABLE IF NOT EXISTS user_sessions (
+          id SERIAL PRIMARY KEY,
+          email VARCHAR(255) NOT NULL,
+          token VARCHAR(255) NOT NULL UNIQUE,
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          expires_at TIMESTAMPTZ,
+          device_info TEXT,
+          session_notif VARCHAR(50) DEFAULT NULL
+        )
+      `).catch(()=>{}),
+      pool.query(`CREATE INDEX IF NOT EXISTS idx_user_sessions_email ON user_sessions(email)`).catch(()=>{}),
+      pool.query(`CREATE INDEX IF NOT EXISTS idx_user_sessions_token ON user_sessions(token)`).catch(()=>{}),
+    ]);
+
     const body = JSON.parse(event.body || '{}');
-    const { email, password, action, oldPassword, newPassword, targetEmail } = body;
+    const { email, password, action, oldPassword, newPassword, targetEmail, token } = body;
 
     // ===== CHANGE PASSWORD =====
     if (action === 'change-password') {
@@ -32,6 +71,13 @@ exports.handler = async (event) => {
       return ok({ message: 'Password berhasil diubah' });
     }
 
+
+    // ===== LOGOUT =====
+    if (action === 'logout') {
+      if (!token) return err('Token tidak ditemukan');
+      await pool.query(`DELETE FROM user_sessions WHERE token = $1`, [token]);
+      return ok({ message: 'Logout berhasil' });
+    }
     // ===== RESET PASSWORD (admin) =====
     if (action === 'reset-password') {
       if (!email || !newPassword || !targetEmail) return err('Data tidak lengkap');
@@ -51,10 +97,11 @@ exports.handler = async (event) => {
 
     const result = await pool.query(
       `SELECT u.email, u.nama, u.nip, u.role, u.kode_pkm, u.indikator_akses,
-              u.jabatan, u.aktif, u.password_hash, u.tanda_tangan, p.nama_puskesmas
+              u.jabatan, u.aktif, u.password_hash, u.tanda_tangan, p.nama_puskesmas,
+              u.login_attempts, u.locked_until
        FROM users u
        LEFT JOIN master_puskesmas p ON u.kode_pkm = p.kode_pkm
-       WHERE LOWER(u.email) = LOWER($1) AND u.aktif = true`,
+       WHERE LOWER(u.email) = LOWER($1)`,
       [email.trim()]
     );
 
@@ -64,12 +111,21 @@ exports.handler = async (event) => {
 
     const user = result.rows[0];
 
+    // Cek apakah akun aktif
+    if (!user.aktif) {
+      return err(`Email ${email} tidak terdaftar atau tidak aktif. Hubungi Admin.`, 403);
+    }
+
+    // ── Cek lockout ──
+    if (user.locked_until && new Date() < new Date(user.locked_until)) {
+      const menitSisa = Math.ceil((new Date(user.locked_until) - new Date()) / 60000);
+      return err(`Akun terkunci sementara karena terlalu banyak percobaan login gagal. Coba lagi dalam ${menitSisa} menit.`, 429);
+    }
+
     // Validasi password
     const hash = user.password_hash;
     if (hash) {
       if (!password) return err('Password diperlukan', 401);
-      // FIX Bug #9: Hapus fallback plain-text comparison (security risk).
-      // Jika hash bukan bcrypt ($2...) berarti data lama — tolak dan minta reset password.
       if (!hash.startsWith('$2')) {
         return err('Password akun ini perlu direset. Hubungi Admin untuk reset password.', 401);
       }
@@ -77,8 +133,31 @@ exports.handler = async (event) => {
       if (bcrypt) {
         try { match = await bcrypt.compare(password, hash); } catch(e) { match = false; }
       }
-      if (!match) return err('Email atau password tidak sesuai', 401);
+      if (!match) {
+        // ── Increment login_attempts ──
+        const newAttempts = (parseInt(user.login_attempts) || 0) + 1;
+        if (newAttempts >= MAX_ATTEMPTS) {
+          const lockUntil = new Date(Date.now() + LOCKOUT_MINS * 60 * 1000).toISOString();
+          await pool.query(
+            `UPDATE users SET login_attempts=$1, locked_until=$2 WHERE LOWER(email)=LOWER($3)`,
+            [newAttempts, lockUntil, email.trim()]
+          );
+          return err(`Terlalu banyak percobaan login gagal. Akun dikunci selama ${LOCKOUT_MINS} menit.`, 429);
+        }
+        await pool.query(
+          `UPDATE users SET login_attempts=$1 WHERE LOWER(email)=LOWER($2)`,
+          [newAttempts, email.trim()]
+        );
+        const sisaCoba = MAX_ATTEMPTS - newAttempts;
+        return err(`Email atau password tidak sesuai. Sisa percobaan: ${sisaCoba}.`, 401);
+      }
     }
+
+    // ── Login berhasil — reset attempts ──
+    await pool.query(
+      `UPDATE users SET login_attempts=0, locked_until=NULL WHERE LOWER(email)=LOWER($1)`,
+      [email.trim()]
+    );
 
     // Normalisasi role lama → nama baru
     const roleMap = {
@@ -94,6 +173,32 @@ exports.handler = async (event) => {
       indikatorList = parseIndikatorAkses(user.indikator_akses.toString());
     }
 
+    // ── Buat session token baru ──
+    const sessionToken = crypto.randomUUID();
+    const deviceInfo = (event.headers?.['user-agent'] || '').slice(0, 255);
+
+    // Tandai session lama sebagai 'replaced' (notifikasi untuk device lama)
+    await pool.query(
+      `UPDATE user_sessions SET session_notif='replaced' WHERE LOWER(email)=LOWER($1)`,
+      [email.trim()]
+    );
+
+    // Hapus session lama setelah ditandai (opsional: bisa juga dibiarkan sampai dicek middleware)
+    // Kita simpan 1 session lama selama 5 menit agar device lama sempat dapat notifikasi
+    await pool.query(
+      `DELETE FROM user_sessions
+       WHERE LOWER(email)=LOWER($1)
+         AND (session_notif='replaced' AND created_at < NOW() - INTERVAL '5 minutes')`,
+      [email.trim()]
+    );
+
+    // Insert session baru (expires_at NULL = aktif sampai logout manual)
+    await pool.query(
+      `INSERT INTO user_sessions (email, token, expires_at, device_info)
+       VALUES ($1, $2, NULL, $3)`,
+      [user.email, sessionToken, deviceInfo]
+    );
+
     return ok({
       email: user.email,
       nama: user.nama,
@@ -105,7 +210,8 @@ exports.handler = async (event) => {
       tandaTangan: user.tanda_tangan || '',
       indikatorAkses: indikatorList,
       indikatorAksesString: user.indikator_akses ? user.indikator_akses.toString() : '',
-      needsPassword: !hash
+      needsPassword: !hash,
+      sessionToken,
     });
 
   } catch (e) {

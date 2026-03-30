@@ -1,5 +1,25 @@
 const { getPool, ok, err, cors } = require('./db');
 
+/**
+ * Handler: /api/laporan
+ *
+ * GET — Daftar laporan usulan dengan summary statistik
+ *       Query params:
+ *         tahun         — filter tahun (number)
+ *         bulan         — filter bulan 1-12, atau 'semua'
+ *         kode_pkm      — filter puskesmas, atau 'semua'
+ *         status        — filter status global, atau 'semua'
+ *         email_operator— filter berdasarkan operator pembuat
+ *         limit         — jumlah baris per halaman (default: 1000, max: 5000)
+ *         page          — halaman (default: 1)
+ *
+ *       Response: {
+ *         data: [{ no, idUsulan, kodePKM, namaPKM, tahun, bulan, namaBulan,
+ *                  totalIndikator, indeksSPM, statusGlobal, createdBy, createdAt,
+ *                  finalApprovedBy, finalApprovedAt }],
+ *         summary: { total, selesai, pending, rataSPM }
+ *       }
+ */
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors();
 
@@ -34,6 +54,12 @@ exports.handler = async (event) => {
 
     const whereStr = where.length > 0 ? 'WHERE ' + where.join(' AND ') : '';
 
+    // Pagination — default 1000 (laporan biasanya ingin semua data dalam satu halaman untuk export)
+    // Caller bisa kirim ?limit=50&page=2 untuk paginate di masa depan
+    const limit  = Math.min(parseInt(params.limit)  || 1000, 5000);
+    const page   = Math.max(parseInt(params.page)   || 1, 1);
+    const offset = (page - 1) * limit;
+
     const [dataResult, countResult] = await Promise.all([
       pool.query(
         `SELECT uh.*, p.nama_puskesmas,
@@ -42,7 +68,7 @@ exports.handler = async (event) => {
          LEFT JOIN master_puskesmas p ON uh.kode_pkm = p.kode_pkm
          ${whereStr}
          ORDER BY uh.tahun DESC, uh.bulan DESC, p.nama_puskesmas
-         LIMIT 1000`,
+         LIMIT ${limit} OFFSET ${offset}`,
         qParams
       ),
       pool.query(

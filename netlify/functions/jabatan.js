@@ -1,5 +1,21 @@
-const { getPool, ok, err, cors } = require('./db');
+const { getPool, ok, err, conflict, cors } = require('./db');
 
+/**
+ * Handler: /api/jabatan
+ *
+ * GET    — Daftar jabatan Pengelola Program
+ *           Response: [{ id, nama, aktif }]
+ *
+ * POST   — Tambah jabatan baru (body tanpa id) atau update (body dengan id)
+ *           Body: { nama, aktif, id? }
+ *           409 — Nama jabatan sudah ada
+ *
+ * PUT    — Update jabatan
+ *           Body: { id, nama, aktif }
+ *
+ * DELETE — Hapus jabatan
+ *           Query: ?id=... atau Body: { id }
+ */
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors();
   const pool = getPool();
@@ -35,7 +51,7 @@ exports.handler = async (event) => {
           [nama.trim()]
         );
         if (exists.rows.length > 0) {
-          return err(`Jabatan "${exists.rows[0].nama_jabatan}" sudah ada di daftar. Gunakan nama yang berbeda.`, 400);
+          return conflict(`Jabatan "${exists.rows[0].nama_jabatan}" sudah ada di daftar. Gunakan nama yang berbeda.`);
         }
         const r = await pool.query(
           'INSERT INTO master_jabatan (nama_jabatan, aktif) VALUES ($1, true) RETURNING id',
@@ -56,7 +72,7 @@ exports.handler = async (event) => {
   } catch(e) {
     // Unique constraint violation — nama jabatan sudah ada
     if (e.code === '23505' && e.constraint === 'master_jabatan_nama_jabatan_key') {
-      return err('Nama jabatan sudah ada. Gunakan nama yang berbeda.', 400);
+      return conflict('Nama jabatan sudah ada. Gunakan nama yang berbeda.');
     }
     console.error('Jabatan error:', e);
     return err('Error: ' + e.message, 500);

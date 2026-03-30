@@ -1,4 +1,5 @@
 const { getPool, ok, err, cors } = require('./db');
+const { validateSession } = require('./middleware');
 
 let _migrated = false;
 async function runMigrations(pool) {
@@ -18,7 +19,6 @@ async function runMigrations(pool) {
       meta        JSONB
     )
   `).catch(() => {});
-  // FIX (d): Tambah kolom lokasi jika tabel sudah ada tapi belum punya kolom ini
   await pool.query(`ALTER TABLE audit_trail ADD COLUMN IF NOT EXISTS lokasi VARCHAR(255)`).catch(() => {});
   await Promise.all([
     pool.query(`CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_trail(created_at DESC)`).catch(() => {}),
@@ -28,8 +28,31 @@ async function runMigrations(pool) {
   _migrated = true;
 }
 
+/**
+ * Handler: /api/audit-trail
+ *
+ * GET — Query log aktivitas global
+ *       Query params:
+ *         date_from — tanggal mulai (YYYY-MM-DD)
+ *         date_to   — tanggal akhir (YYYY-MM-DD)
+ *         module    — filter modul (auth, usulan, users, puskesmas, dll)
+ *         action    — filter aksi (LOGIN, CREATE, UPDATE, DELETE, SUBMIT, APPROVE, REJECT)
+ *         user      — filter email atau nama user (LIKE search)
+ *         limit     — baris per halaman (default: 1000, max: 5000)
+ *         page      — halaman (default: 1)
+ *       Response: [{ id, created_at, module, action, user_email, user_nama,
+ *                    user_role, detail, ip_address, lokasi }]
+ *
+ * POST — Tulis log aktivitas baru
+ *        Body: { module, action, userEmail, userNama, userRole, detail, meta? }
+ *        IP address diambil otomatis dari header request.
+ *        Untuk action=LOGIN: lookup lokasi otomatis via ip-api.com
+ */
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors();
+
+  const _authErr = await validateSession(event);
+  if (_authErr) return _authErr;
   const pool = getPool();
   await runMigrations(pool);
 
@@ -65,11 +88,17 @@ exports.handler = async (event) => {
       }
 
       const whereStr = where.length ? 'WHERE ' + where.join(' AND ') : '';
+
+      // Pagination — default 1000 per halaman, max 5000
+      const limitVal  = Math.min(parseInt(p.limit)  || 1000, 5000);
+      const pageVal   = Math.max(parseInt(p.page)   || 1, 1);
+      const offsetVal = (pageVal - 1) * limitVal;
+
       const result = await pool.query(
         `SELECT id, created_at, module, action, user_email, user_nama, user_role, detail, ip_address, lokasi
          FROM audit_trail ${whereStr}
          ORDER BY created_at DESC
-         LIMIT 1000`,
+         LIMIT ${limitVal} OFFSET ${offsetVal}`,
         qp
       );
       return ok(result.rows);
@@ -82,13 +111,10 @@ exports.handler = async (event) => {
 
       if (!module || !action) return err('module dan action diperlukan');
 
-      // Ambil IP dari header
       const ip = event.headers?.['x-forwarded-for']?.split(',')[0]?.trim()
         || event.headers?.['x-real-ip']
         || '-';
 
-      // FIX (d): Lookup lokasi berdasarkan IP menggunakan ip-api.com (gratis, tanpa API key)
-      // Hanya dilakukan saat action LOGIN agar tidak memperlambat semua log
       let lokasi = null;
       if (action.toUpperCase() === 'LOGIN' && ip && ip !== '-' && ip !== '::1' && !ip.startsWith('127.') && !ip.startsWith('192.168.') && !ip.startsWith('10.')) {
         try {

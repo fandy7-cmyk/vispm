@@ -1,8 +1,25 @@
-const { getPool, ok, err, cors } = require('./db');
+const { getPool, ok, err, conflict, cors } = require('./db');
 const bcrypt = require('bcryptjs');
 
 let _migrated = false;
 
+/**
+ * Handler: /api/users
+ *
+ * GET  — Daftar semua user (kecuali Super Admin)
+ *         Response: [{ email, nama, nip, role, kodePKM, namaPKM, indikatorAkses, jabatan, aktif, tandaTangan }]
+ *
+ * POST — Tambah user baru
+ *         Body: { email, nama, nip, role, kodePKM, indikatorAkses, jabatan }
+ *         Password default: 'Balut2026'
+ *         409 — Email sudah terdaftar
+ *
+ * PUT  — Update user (termasuk tanda tangan)
+ *         Body: { email, nama, nip, role, kodePKM, indikatorAkses, jabatan, aktif, tandaTangan? }
+ *
+ * DELETE — Hapus user
+ *         Body: { email }
+ */
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors();
   const pool = getPool();
@@ -31,10 +48,9 @@ exports.handler = async (event) => {
     if (method === 'POST') {
       const { email, nama, nip, role, kodePKM, indikatorAkses, jabatan } = body;
       if (!email || !nama || !role) return err('Email, nama, dan role diperlukan');
-      // Validasi format email server-side
       if (!email.includes('@') || email.split('@').length !== 2) return err('Format email tidak valid');
       const exists = await pool.query('SELECT email FROM users WHERE LOWER(email)=LOWER($1)', [email]);
-      if (exists.rows.length > 0) return err('Email sudah terdaftar di sistem');
+      if (exists.rows.length > 0) return conflict('Email sudah terdaftar di sistem');
       if (role === 'Super Admin') return err('Role Super Admin tidak dapat dibuat melalui sistem.');
       const DEFAULT_PASSWORD = 'Balut2026';
       const hashedPassword = await bcrypt.hash(DEFAULT_PASSWORD, 10);
@@ -48,7 +64,6 @@ exports.handler = async (event) => {
     if (method === 'PUT') {
       const { email, nama, nip, role, kodePKM, indikatorAkses, jabatan, aktif, tandaTangan } = body;
       if (!email) return err('Email diperlukan');
-      // Jika tandaTangan dikirim (termasuk string kosong = hapus), update kolom tanda_tangan
       if (tandaTangan !== undefined) {
         await pool.query(
           `UPDATE users SET nama=$1, nip=$2, role=$3, kode_pkm=$4, indikator_akses=$5, jabatan=$6, aktif=$7, tanda_tangan=$8

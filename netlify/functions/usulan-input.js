@@ -1,4 +1,4 @@
-const { getPool, ok, err, cors } = require('./db');
+const { getPool, ok, err, confirm, cors } = require('./db');
 const { isValidText, parseIndikatorAkses, logAktivitas, mapHeader } = require('./usulan-helpers');
 
 async function buatUsulan(pool, body) {
@@ -221,29 +221,26 @@ async function submitUsulan(pool, body) {
   }
   const missing = indToCheck.filter(r => !r.link_file || r.link_file.trim() === '');
   if (missing.length > 0 && !forceSubmit) {
-    return {
-      statusCode: 200,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-      body: JSON.stringify({
-        success: false, needConfirm: true,
-        isDitolak: isDitolakMode,
-        missingCount: missing.length,
-        missingNos: missing.map(r => r.no_indikator),
-        message: `${missing.length} indikator belum ada file bukti. Tetap submit?`
-      })
-    };
+    return confirm({
+      isDitolak: isDitolakMode,
+      missingCount: missing.length,
+      missingNos: missing.map(r => r.no_indikator),
+      message: `${missing.length} indikator belum ada file bukti. Tetap submit?`
+    });
   }
 
   // Tentukan target dan lakukan reset berdasarkan kondisi penolakan
   const wasKapusDitolak = ditolakOleh === 'Kepala Puskesmas';
   const wasProgramDitolak = ditolakOleh === 'Pengelola Program';
-  const wasAdminDitolak = ditolakOleh === 'Admin';
+  // 'KapusTolakAdmin': Kapus benarkan penolakan Admin → Operator perbaiki → kirim ke Kapus dulu
+  const wasKapusTolakAdmin = ditolakOleh === 'Admin' && konteks_penolakan === 'KapusTolakAdmin';
+  const wasAdminDitolak = ditolakOleh === 'Admin' && !wasKapusTolakAdmin;
 
   let targetStatus = 'Menunggu Kepala Puskesmas';
 
   if (['Ditolak','Ditolak Sebagian'].includes(statusSaatIni)) {
-    if (wasKapusDitolak) {
-      // Kepala Puskesmas menolak → reset semua stage header
+    if (wasKapusDitolak || wasKapusTolakAdmin) {
+      // Kepala Puskesmas menolak (baik langsung maupun benarkan Admin) → reset semua stage header
       targetStatus = 'Menunggu Kepala Puskesmas';
       await pool.query(
         `UPDATE usulan_header SET
@@ -251,6 +248,7 @@ async function submitUsulan(pool, body) {
           kapus_approved_by=NULL, kapus_approved_at=NULL, kapus_catatan=NULL, kapus_catatan_umum=NULL,
           admin_approved_by=NULL, admin_approved_at=NULL, admin_catatan=NULL,
           final_approved_by=NULL, final_approved_at=NULL,
+          ditolak_oleh='Kepala Puskesmas', konteks_penolakan=NULL,
           operator_catatan=$2
          WHERE id_usulan=$1`, [idUsulan, catatanOperator || null]
       );

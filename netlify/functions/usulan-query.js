@@ -12,7 +12,7 @@ async function getUsulanList(pool, params) {
   // Filter khusus Pengelola Program: tampilkan semua usulan yang ditugaskan ke user ini
   // termasuk yang sudah Selesai (untuk tampilkan tombol hijau)
   if (params.status_program && params.email_program) {
-    const ALLOWED_STATUSES = ['Menunggu Pengelola Program','Menunggu Admin','Selesai','Ditolak','Ditolak Sebagian','Draft','Menunggu Kepala Puskesmas'];
+    const ALLOWED_STATUSES = ['Menunggu Pengelola Program','Menunggu Re-verifikasi PP','Menunggu Admin','Menunggu Re-verifikasi Kepala Puskesmas','Selesai','Ditolak','Ditolak Sebagian','Draft','Menunggu Kepala Puskesmas'];
     const statuses = params.status_program.split(',').map(s => s.trim()).filter(s => ALLOWED_STATUSES.includes(s));
     if (statuses.length > 0) {
       const placeholders = statuses.map(() => `$${idx++}`).join(',');
@@ -29,8 +29,14 @@ async function getUsulanList(pool, params) {
   }
 
   const ws = where.length ? 'WHERE ' + where.join(' AND ') : '';
+
+  // Pagination — default limit 500 (cukup untuk skala saat ini), bisa dikirim via params
+  const limit  = Math.min(parseInt(params.limit)  || 500, 1000);
+  const page   = Math.max(parseInt(params.page)   || 1, 1);
+  const offset = (page - 1) * limit;
+
   const result = await pool.query(
-    `SELECT uh.*, p.nama_puskesmas FROM usulan_header uh LEFT JOIN master_puskesmas p ON uh.kode_pkm=p.kode_pkm ${ws} ORDER BY uh.created_at DESC LIMIT 500`,
+    `SELECT uh.*, p.nama_puskesmas FROM usulan_header uh LEFT JOIN master_puskesmas p ON uh.kode_pkm=p.kode_pkm ${ws} ORDER BY uh.created_at DESC LIMIT ${limit} OFFSET ${offset}`,
     qParams
   );
   if (result.rows.length === 0) return ok([]);
@@ -45,7 +51,7 @@ async function getUsulanList(pool, params) {
     ),
     params.email_program
   ? pool.query(
-      `SELECT vp.id_usulan, vp.status, vp.indikator_akses, vp.verified_at, uh.ditolak_oleh, uh.konteks_penolakan
+      `SELECT vp.id_usulan, vp.status, vp.indikator_akses, vp.verified_at, uh.ditolak_oleh, uh.konteks_penolakan, uh.status_global
        FROM verifikasi_program vp
        JOIN usulan_header uh ON vp.id_usulan = uh.id_usulan
        WHERE vp.id_usulan=ANY($1) AND LOWER(vp.email_program)=LOWER($2)`,
@@ -76,13 +82,13 @@ async function getUsulanList(pool, params) {
           [ids, params.email_program]
         ).catch(() => ({ rows: [] }))
       : Promise.resolve({ rows: [] }),
-    ditolakIds.length > 0
+    ids.length > 0
       ? pool.query(
           `SELECT pi.id_usulan, pi.no_indikator, pi.alasan, pi.aksi, pi.catatan_program, pi.email_program, vp.nama_program,
                   -- dari_kapus=TRUE hanya untuk indikator yang HARUS diperbaiki Operator.
                   -- kapus-ok/kapus-setuju = disanggah Kapus → PP re-verif, bukan Operator
                   (
-                    (pi.dibuat_oleh = 'Kapus' AND pi.aksi NOT IN ('kapus-ok','kapus-setuju'))
+                    (pi.dibuat_oleh = 'Kapus' AND (pi.aksi IS NULL OR pi.aksi NOT IN ('kapus-ok','kapus-setuju')))
                     OR (pi.dibuat_oleh IS NULL AND (pi.aksi IS NULL OR pi.aksi = 'tolak' OR pi.aksi = 'reset'))
                     OR (pi.dibuat_oleh = 'PP' AND pi.aksi = 'tolak')
                     OR (pi.dibuat_oleh = 'Admin' AND pi.aksi = 'tolak' AND pi.responded_at IS NULL)
@@ -105,7 +111,7 @@ async function getUsulanList(pool, params) {
                )
              )
            ORDER BY pi.no_indikator`,
-          [ditolakIds]
+          [ids]
         ).catch(() => ({ rows: [] }))
       : Promise.resolve({ rows: [] }),
   ]);
@@ -161,7 +167,9 @@ async function getUsulanList(pool, params) {
         //   TAPI: jika status VP masih Menunggu di sini, berarti PP belum respond → tetap re-verif
         const isReVerifAktif = r.ditolak_oleh === 'Pengelola Program'
           || r.ditolak_oleh === 'Admin'
-          || r.konteks_penolakan === 'Admin';
+          || r.konteks_penolakan === 'Admin'
+          || r.status_global === 'Menunggu Re-verifikasi PP'
+          || r.status_global === 'Menunggu Re-verifikasi Kepala Puskesmas';
         if (isReVerifAktif) {
           // sudahVerif = true hanya jika tidak ada irisan antara indikator bermasalah
           // dengan akses PP ini. Ada irisan = wajib re-verifikasi.
@@ -192,7 +200,10 @@ async function getUsulanList(pool, params) {
   // (1 baris Admin + N baris PP yang pernah respond) karena tidak ada DISTINCT.
   // Sebelum masuk piMap, deduplikasi per (id_usulan, no_indikator):
   //   - Ambil aksi dengan prioritas tertinggi: tolak > NULL > reset > sanggah > kapus-ok
-  //   - dari_kapus: true jika ada SALAH SATU baris yang dari_kapus=true
+  //   - dari_kapus: diambil dari baris aksi='sanggah' jika ada (sanggah override tolak),
+  //     fallback ke .some() dari semua baris. Ini penting agar indikator yang disanggah Kapus
+  //     (aksi='sanggah', dari_kapus=false) tidak dianggap perlu diperbaiki Operator hanya
+  //     karena ada baris tolak lama yang dari_kapus=true untuk indikator yang sama.
   //   - namaProgram: ambil dari baris Admin/Kapus jika ada, fallback ke baris pertama
   const aksiPriority = (aksi) => {
     if (!aksi) return 1;
@@ -215,8 +226,14 @@ async function getUsulanList(pool, params) {
     // Ambil baris dengan aksi prioritas tertinggi
     baris.sort((a, b) => aksiPriority(a.aksi) - aksiPriority(b.aksi));
     const best = baris[0];
-    // dari_kapus: true jika ada salah satu baris dengan dari_kapus=true
-    const dariKapus = baris.some(b => b.dari_kapus === true || b.dari_kapus === 'true');
+    // dari_kapus: jika ada baris aksi='sanggah', pakai nilai dari_kapus baris itu
+    // (selalu false karena sanggah = Kapus override → PP re-verif, bukan Operator).
+    // Tanpa ini, baris tolak lama (dari_kapus=true) dari indikator yang sama
+    // akan membuat indikator sanggahan ikut ditampilkan sebagai "perlu diperbaiki Operator".
+    const sanggahBaris = baris.find(b => b.aksi === 'sanggah');
+    const dariKapus = sanggahBaris
+      ? (sanggahBaris.dari_kapus === true || sanggahBaris.dari_kapus === 'true')
+      : baris.some(b => b.dari_kapus === true || b.dari_kapus === 'true');
     // catatan_program: pakai dari baris paling prioritas (sudah di-aggregate di DB)
     const id = best.id_usulan;
     if (!piMap[id]) piMap[id] = [];

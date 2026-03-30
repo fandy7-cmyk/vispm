@@ -37,6 +37,24 @@ function err(message, code = 400) {
   };
 }
 
+// 409 Conflict — untuk data duplikat (email, kode, nama, dll)
+function conflict(message) {
+  return {
+    statusCode: 409,
+    headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+    body: JSON.stringify({ success: false, message })
+  };
+}
+
+// 202 Accepted — untuk respons yang butuh konfirmasi user sebelum lanjut
+function confirm(data) {
+  return {
+    statusCode: 202,
+    headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+    body: JSON.stringify({ success: false, needConfirm: true, ...data })
+  };
+}
+
 function cors() {
   return {
     statusCode: 200,
@@ -49,4 +67,4 @@ function cors() {
   };
 }
 
-module.exports = { getPool, ok, err, cors };
+module.exports = { getPool, ok, err, conflict, confirm, cors };

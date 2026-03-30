@@ -1,5 +1,21 @@
-const { getPool, ok, err, cors } = require('./db');
+const { getPool, ok, err, conflict, cors } = require('./db');
 
+/**
+ * Handler: /api/puskesmas
+ *
+ * GET    — Daftar puskesmas. Query: ?aktif=true untuk filter aktif saja
+ *           Response: [{ kode, nama, indeks, indeksKesulitan, aktif }]
+ *
+ * POST   — Tambah puskesmas baru
+ *           Body: { kode, nama, indeks, indeksKesulitan, aktif }
+ *           409 — Kode sudah ada
+ *
+ * PUT    — Update puskesmas
+ *           Body: { kode, nama, indeks, indeksKesulitan, aktif }
+ *
+ * DELETE — Hapus puskesmas
+ *           Body: { kode }
+ */
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors();
   const pool = getPool();
@@ -30,7 +46,7 @@ exports.handler = async (event) => {
       const { kode, nama, indeks, indeksKesulitan, aktif } = body;
       if (!kode || !nama) return err('Kode dan nama diperlukan');
       const exists = await pool.query('SELECT kode_pkm FROM master_puskesmas WHERE kode_pkm=$1', [kode]);
-      if (exists.rows.length > 0) return err('Kode puskesmas sudah ada');
+      if (exists.rows.length > 0) return conflict('Kode puskesmas sudah ada');
       await pool.query(
         `INSERT INTO master_puskesmas (kode_pkm, nama_puskesmas, indeks_beban_kerja, indeks_kesulitan_wilayah, aktif)
          VALUES ($1, $2, $3, $4, $5)`,

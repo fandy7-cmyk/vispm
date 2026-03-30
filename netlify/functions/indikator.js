@@ -1,7 +1,23 @@
-const { getPool, ok, err, cors } = require('./db');
+const { getPool, ok, err, conflict, cors } = require('./db');
 
 let _migrated = false;
 
+/**
+ * Handler: /api/indikator
+ *
+ * GET    — Daftar semua indikator
+ *           Response: [{ no, nama, bobot, aktif, catatan }]
+ *
+ * POST   — Tambah indikator baru
+ *           Body: { no, nama, bobot, aktif, catatan }
+ *           409 — Nomor indikator sudah ada
+ *
+ * PUT    — Update indikator
+ *           Body: { no, nama, bobot, aktif, catatan }
+ *
+ * DELETE — Hapus indikator
+ *           Body: { no }
+ */
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors();
 
@@ -30,7 +46,7 @@ exports.handler = async (event) => {
       const { no, nama, bobot, aktif, catatan } = body;
       if (!no || !nama) return err('Nomor dan nama indikator diperlukan');
       const exists = await pool.query('SELECT no_indikator FROM master_indikator WHERE no_indikator=$1', [no]);
-      if (exists.rows.length > 0) return err('Nomor indikator sudah ada');
+      if (exists.rows.length > 0) return conflict('Nomor indikator sudah ada');
       await pool.query(
         'INSERT INTO master_indikator (no_indikator, nama_indikator, bobot, aktif, catatan) VALUES ($1,$2,$3,$4,$5)',
         [parseInt(no), nama, parseInt(bobot)||0, aktif !== false, catatan||null]

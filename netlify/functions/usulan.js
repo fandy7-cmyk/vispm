@@ -1,4 +1,5 @@
 const { getPool, ok, err, cors } = require('./db');
+const { validateSession } = require('./middleware');
 const { getUsulanList, getUsulanDetail, getIndikatorUsulan, getProgramVerifStatus, saveDriveFolder } = require('./usulan-query');
 const { buatUsulan, updateIndikator, submitUsulan } = require('./usulan-input');
 const { verifKapus, verifProgram, verifAdmin, rejectUsulan, getPenolakanIndikator, respondPenolakan } = require('./usulan-verifikasi');
@@ -103,6 +104,9 @@ async function runMigrations(pool) {
 // Validasi teks: harus mengandung minimal 1 huruf atau angka (bukan hanya simbol/spasi)
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors();
+
+  const _authErr = await validateSession(event);
+  if (_authErr) return _authErr;
   const pool = getPool();
   const method = event.httpMethod;
   const params = event.queryStringParameters || {};

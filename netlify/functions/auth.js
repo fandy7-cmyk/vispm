@@ -163,20 +163,10 @@ exports.handler = async (event) => {
     const sessionToken = crypto.randomUUID();
     const deviceInfo = (event.headers?.['user-agent'] || '').slice(0, 255);
 
-    // Tandai session lama sebagai 'replaced' (notifikasi untuk device lama)
-    await pool.query(
-      `UPDATE user_sessions SET session_notif='replaced' WHERE LOWER(email)=LOWER($1)`,
-      [email.trim()]
-    );
-
-    // Hapus session lama setelah ditandai
-    // Simpan 1 session lama selama 5 menit agar device lama sempat dapat notifikasi
-    await pool.query(
-      `DELETE FROM user_sessions
-       WHERE LOWER(email)=LOWER($1)
-         AND (session_notif='replaced' AND created_at < NOW() - INTERVAL '5 minutes')`,
-      [email.trim()]
-    );
+await pool.query(
+  `DELETE FROM user_sessions WHERE LOWER(email)=LOWER($1)`,
+  [email.trim()]
+);
 
     // Insert session baru (expires_at NULL = aktif sampai logout manual)
     await pool.query(

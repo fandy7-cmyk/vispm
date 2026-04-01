@@ -111,4 +111,4 @@ exports.handler = async (event) => {
   }
 };
 
-module.exports = { validateSession };
+exports.validateSession = validateSession;

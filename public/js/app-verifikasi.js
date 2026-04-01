@@ -423,24 +423,58 @@ _ppBanner.innerHTML = `<span class="material-icons" style="color:#f59e0b;font-si
       if (isAdminLoop) {
         _isAdminReVerif = true;
         window._verifIsAdminReVerif = true;
-        // FIX A: deduplikasi per no_indikator — baris penolakan_indikator bisa banyak
-        // (1 baris per PP) untuk no_indikator yang sama, sehingga tanpa deduplikasi
-        // _bermasalahNos akan berisi nomor duplikat dan displayInds melebar dari yang seharusnya.
-        const _seen = new Set();
-        _bermasalahNos = penolakanList
-          .filter(p => {
-            if (!(!p.aksi || p.aksi === 'tolak' || p.aksi === 'reset' || p.aksi === 'sanggah')) return false;
-            const no = parseInt(p.noIndikator || p.no_indikator);
-            if (_seen.has(no)) return false;
-            _seen.add(no);
-            return true;
-          })
-          .map(p => parseInt(p.noIndikator || p.no_indikator));
-        if (_bermasalahNos.length === 0 && detail.adminCatatan) {
+
+        // SUMBER 1 (UTAMA): adminCatatan — paling akurat karena Admin sendiri yang
+        // mengisi ini saat menolak, dan isinya persis indikator yang ditolak putaran ini.
+        // Setelah PP respond, baris penolakan_indikator Admin sudah dihapus dari DB,
+        // sehingga penolakanList tidak bisa diandalkan. adminCatatan tidak berubah.
+        if (detail.adminCatatan) {
+          const _seenAC = new Set();
           (detail.adminCatatan || '').split('|').forEach(part => {
             const m = part.trim().match(/^#(\d+):/);
-            if (m) _bermasalahNos.push(parseInt(m[1]));
+            if (m) _seenAC.add(parseInt(m[1]));
           });
+          _bermasalahNos = [..._seenAC];
+        }
+
+        // SUMBER 2 (FALLBACK): penolakanIndikator — hanya terpakai jika adminCatatan kosong
+        // (misal: data lama sebelum admin_catatan diisi per-putaran).
+        // FIX A: deduplikasi per no_indikator — baris penolakan_indikator bisa banyak
+        // (1 baris per PP) untuk no_indikator yang sama.
+        if (_bermasalahNos.length === 0) {
+          const _seen = new Set();
+          _bermasalahNos = penolakanList
+            .filter(p => {
+              if (!(!p.aksi || p.aksi === 'tolak' || p.aksi === 'reset' || p.aksi === 'sanggah' || p.aksi === 'kapus-verif')) return false;
+              const no = parseInt(p.noIndikator || p.no_indikator);
+              if (_seen.has(no)) return false;
+              _seen.add(no);
+              return true;
+            })
+            .map(p => parseInt(p.noIndikator || p.no_indikator));
+        }
+
+        // SUMBER 3 (FALLBACK TERAKHIR): VP Menunggu — hanya jika dua sumber di atas kosong.
+        // TIDAK dijadikan fallback utama karena VP dengan indikator_akses='' (akses semua)
+        // akan mengembalikan SEMUA indikator, padahal Admin hanya menolak sebagian.
+        if (_bermasalahNos.length === 0) {
+          const vpMenunggu = (detail.verifikasiProgram || []).filter(vp => vp.status === 'Menunggu');
+          const _seenVP = new Set();
+          for (const vp of vpMenunggu) {
+            const aksesArr = (vp.indikator_akses || '').replace(/\s/g,'').split(',').filter(Boolean);
+            // Hanya pakai VP yang punya akses spesifik — skip VP dengan akses semua (indikator_akses='')
+            if (aksesArr.length === 0) continue;
+            for (const a of aksesArr) {
+              if (a.includes('-')) {
+                const [s, e] = a.split('-').map(Number);
+                if (!isNaN(s) && !isNaN(e)) for (let i = s; i <= e; i++) _seenVP.add(i);
+              } else {
+                const n = parseInt(a);
+                if (!isNaN(n) && n > 0) _seenVP.add(n);
+              }
+            }
+          }
+          _bermasalahNos = [..._seenVP];
         }
         if (_bermasalahNos.length > 0) {
           displayInds = inds.filter(i => _bermasalahNos.includes(parseInt(i.no)));

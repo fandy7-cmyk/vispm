@@ -210,7 +210,7 @@ body {
 .auth-right {
   flex: 1; flex-shrink: 0;
   background: var(--surface);
-  padding: var(--sp-2xl) var(--sp-xl);    /* 55px top/bottom, 34px left/right */
+  padding: var(--sp-xl) var(--sp-xl);    /* 34px all sides — lebih kompak & seimbang */
   display: flex; flex-direction: column; justify-content: center;
 }
 .auth-right-logo {
@@ -239,9 +239,9 @@ body {
 }
 .auth-field { margin-bottom: var(--sp-md); }     /* 13px */
 .auth-field label {
-  display: block; font-size: var(--fs-xs); font-weight: 700;
-  color: #475569; margin-bottom: var(--sp-sm);   /* 5px */
-  letter-spacing: 0.3px;
+  display: block; font-size: var(--fs-xs); font-weight: 600;
+  color: var(--text-light); margin-bottom: var(--sp-sm);   /* 5px */
+  letter-spacing: 0.7px;
   text-transform: uppercase;
 }
 .auth-input {
@@ -795,6 +795,9 @@ textarea.form-control { resize: vertical; }
 [data-theme="dark"] .auth-right-sub { color: #94a3b8; }
 [data-theme="dark"] .auth-field label { color: #94a3b8; }
 [data-theme="dark"] .auth-input { background: #0f172a; border-color: #334155; color: #f1f5f9; }
+[data-theme="dark"] .auth-input::placeholder { color: #475569; }
+[data-theme="dark"] .auth-pw-toggle { color: #475569; }
+[data-theme="dark"] .auth-pw-toggle:hover { color: #94a3b8; }
 
 /* Empty state */
 [data-theme="dark"] .empty-state { color: #64748b; }
@@ -1227,7 +1230,10 @@ input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-o
       <p class="auth-right-sub">Masuk menggunakan akun VISPM Anda</p>
       <div class="auth-field">
         <label>Email</label>
-        <input type="email" id="authEmail" class="auth-input" placeholder="email@example.com" autocomplete="email" onkeydown="if(event.key==='Enter')document.getElementById('authPassword').focus()">
+        <div style="position:relative">
+          <span class="material-icons" style="position:absolute;left:13px;top:50%;transform:translateY(-50%);font-size:var(--fs-md);color:var(--text-xlight);pointer-events:none">mail_outline</span>
+          <input type="email" id="authEmail" class="auth-input" placeholder="email@example.com" autocomplete="email" style="padding-left:38px" onkeydown="if(event.key==='Enter')document.getElementById('authPassword').focus()">
+        </div>
       </div>
       <div class="auth-field">
         <label>Password</label>
@@ -1238,11 +1244,18 @@ input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-o
           </button>
         </div>
       </div>
+      <div style="display:flex;justify-content:flex-end;margin-top:-6px;margin-bottom:var(--sp-md)">
+        <button type="button" onclick="showForgotPasswordInfo()" style="background:none;border:none;cursor:pointer;font-size:var(--fs-xs);color:var(--primary);font-family:inherit;font-weight:600;padding:0;line-height:var(--lh-base)">Lupa password?</button>
+      </div>
       <button class="auth-btn" id="authBtn" onclick="doLogin()">
         <span class="material-icons">login</span>
         Login
       </button>
       <div class="auth-status" id="authStatus"></div>
+      <div id="forgotInfoBox" style="display:none;margin-top:var(--sp-md);background:var(--primary-light);border:1px solid rgba(13,148,136,0.2);border-radius:var(--sp-base);padding:var(--sp-base) var(--sp-md);display:none;align-items:flex-start;gap:var(--sp-base)">
+        <span class="material-icons" style="font-size:var(--fs-md);color:var(--primary);flex-shrink:0;margin-top:1px">info</span>
+        <span style="font-size:var(--fs-xs);color:var(--text-md);line-height:var(--lh-base)">Akun dikelola oleh <strong>Admin</strong>. Hubungi Admin jika belum terdaftar atau ingin reset password.</span>
+      </div>
     </div>
   </div>
 </div>
@@ -1569,6 +1582,15 @@ document.addEventListener('DOMContentLoaded', function() {
     e.target.style.outline = 'none';
   }, true);
 });
+
+// Lupa password: tampilkan info di authStatus
+function showForgotPasswordInfo() {
+  const box = document.getElementById('forgotInfoBox');
+  if (!box) return;
+  box.style.display = 'flex';
+  clearTimeout(box._hideTimer);
+  box._hideTimer = setTimeout(() => { box.style.display = 'none'; }, 4000);
+}
 </script>
 </body>
 </html>

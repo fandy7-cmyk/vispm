@@ -362,7 +362,7 @@ function _showSessionExpired(msg) {
       <button class="_seBtn" onclick="this.textContent='Mengalihkan\u2026';this.disabled=true;window.location.reload()">
         Login Kembali
       </button>
-      <p class="_seFooter">VISPM &mdash; Sesi otomatis berakhir</p>
+      <p class="_seFooter">VISPM | Verifikasi Indeks SPM</p>
     </div>`;
   document.body.appendChild(overlay);
 }

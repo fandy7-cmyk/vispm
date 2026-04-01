@@ -21,31 +21,17 @@ const LOCKOUT_MINS  = 15;  // kunci selama 15 menit
  *   403 — Email tidak ditemukan / tidak aktif / akses ditolak
  *   429 — Akun terkunci karena terlalu banyak percobaan gagal
  *   500 — Error sistem
+ *
+ * CATATAN: Migrasi tabel (ALTER TABLE, CREATE TABLE) sudah dipindahkan ke
+ * migration.sql dan dijalankan sekali langsung di Neon SQL Editor.
+ * Jangan tambahkan DDL di sini — setiap request login akan menjalankannya
+ * dan itu yang menyebabkan compute Neon cepat habis.
  */
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors();
 
   try {
     const pool = getPool();
-
-    // ── Migrasi kolom brute-force protection (idempoten) ──
-    await Promise.all([
-      pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS login_attempts INT DEFAULT 0`).catch(()=>{}),
-      pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until TIMESTAMPTZ`).catch(()=>{}),
-      pool.query(`
-        CREATE TABLE IF NOT EXISTS user_sessions (
-          id SERIAL PRIMARY KEY,
-          email VARCHAR(255) NOT NULL,
-          token VARCHAR(255) NOT NULL UNIQUE,
-          created_at TIMESTAMPTZ DEFAULT NOW(),
-          expires_at TIMESTAMPTZ,
-          device_info TEXT,
-          session_notif VARCHAR(50) DEFAULT NULL
-        )
-      `).catch(()=>{}),
-      pool.query(`CREATE INDEX IF NOT EXISTS idx_user_sessions_email ON user_sessions(email)`).catch(()=>{}),
-      pool.query(`CREATE INDEX IF NOT EXISTS idx_user_sessions_token ON user_sessions(token)`).catch(()=>{}),
-    ]);
 
     const body = JSON.parse(event.body || '{}');
     const { email, password, action, oldPassword, newPassword, targetEmail, token } = body;
@@ -71,13 +57,13 @@ exports.handler = async (event) => {
       return ok({ message: 'Password berhasil diubah' });
     }
 
-
     // ===== LOGOUT =====
     if (action === 'logout') {
       if (!token) return err('Token tidak ditemukan');
       await pool.query(`DELETE FROM user_sessions WHERE token = $1`, [token]);
       return ok({ message: 'Logout berhasil' });
     }
+
     // ===== RESET PASSWORD (admin) =====
     if (action === 'reset-password') {
       if (!email || !newPassword || !targetEmail) return err('Data tidak lengkap');
@@ -183,8 +169,8 @@ exports.handler = async (event) => {
       [email.trim()]
     );
 
-    // Hapus session lama setelah ditandai (opsional: bisa juga dibiarkan sampai dicek middleware)
-    // Kita simpan 1 session lama selama 5 menit agar device lama sempat dapat notifikasi
+    // Hapus session lama setelah ditandai
+    // Simpan 1 session lama selama 5 menit agar device lama sempat dapat notifikasi
     await pool.query(
       `DELETE FROM user_sessions
        WHERE LOWER(email)=LOWER($1)

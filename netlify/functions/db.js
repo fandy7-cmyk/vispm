@@ -13,9 +13,10 @@ function getPool() {
     pool = new Pool({
       connectionString: process.env.DATABASE_URL,
       ssl: { rejectUnauthorized: false },
-      max: 5,
-      idleTimeoutMillis: 30000,
+      max: 1,                  // serverless: 1 koneksi cukup per function instance
+      idleTimeoutMillis: 1000, // tutup koneksi idle setelah 1 detik → hemat CU
       connectionTimeoutMillis: 10000,
+      allowExitOnIdle: true,   // izinkan process exit saat idle → penting untuk serverless
     });
   }
   return pool;

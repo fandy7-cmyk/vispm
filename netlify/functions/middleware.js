@@ -55,7 +55,7 @@ async function validateSession(event) {
     // Cek flag notifikasi — session ini sudah digantikan login baru
     if (session.session_notif === 'replaced') {
       await pool.query(`DELETE FROM user_sessions WHERE token = $1`, [token]);
-      return err('Sesi Anda telah berakhir karena akun login di perangkat lain.', 401);
+      return err('Sesi telah berakhir karena akun login di perangkat lain.', 401);
     }
 
     // Session valid — tidak return apapun (null = lanjut)

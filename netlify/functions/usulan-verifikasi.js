@@ -127,7 +127,17 @@ async function verifProgram(pool, body) {
     const ditolakOleh = headerCheck.rows[0]?.ditolak_oleh;
     const konteksPenolakan = headerCheck.rows[0]?.konteks_penolakan;
 
-    const isReVerifAdmin = ditolakOleh === 'Admin' || konteksPenolakan === 'Admin';
+    // Cek sisa baris penolakan Admin yang belum direspons (misal: indikator yang PP sanggah
+    // di putaran sebelumnya, lalu Kapus approve indikator lain dan clear konteks_penolakan).
+    // Jika masih ada, routing tetap ke Admin dengan konteks_penolakan='Admin'.
+    const sisaAdminRows = await pool.query(
+      `SELECT COUNT(*) as ct FROM penolakan_indikator
+       WHERE id_usulan=$1 AND dibuat_oleh='Admin'`,
+      [idUsulan]
+    ).catch(() => ({ rows: [{ ct: 0 }] }));
+    const adaSisaAdmin = parseInt(sisaAdminRows.rows[0]?.ct) > 0;
+
+    const isReVerifAdmin = ditolakOleh === 'Admin' || konteksPenolakan === 'Admin' || adaSisaAdmin;
 
     // PP approve semua → hapus penolakan milik PP saja
     await pool.query(
@@ -328,7 +338,15 @@ async function verifKapus(pool, body) {
     // isReVerifAdmin: HANYA saat status 'Menunggu Re-verifikasi Kepala Puskesmas'
     // (PP sudah selesai re-verif penolakan Admin, Kapus konfirmasi → langsung ke Admin)
     // Kasus lain (KapusTolakAdmin, Kapus tolak biasa) → alur normal lewat PP dulu
-    const isReVerifAdmin = statusGlobalKapus === 'Menunggu Re-verifikasi Kepala Puskesmas';
+    const sisaAdminKapus = await pool.query(
+  `SELECT COUNT(*) as ct FROM penolakan_indikator
+   WHERE id_usulan=$1 AND dibuat_oleh='Admin'`, [idUsulan]
+).catch(() => ({ rows: [{ ct: 0 }] }));
+const adaSisaAdminKapus = parseInt(sisaAdminKapus.rows[0]?.ct) > 0;
+
+const isReVerifAdmin = statusGlobalKapus === 'Menunggu Re-verifikasi Kepala Puskesmas'
+  || konteksPenolakan === 'Admin'
+  || adaSisaAdminKapus;
 
     // AFTER — tangkap juga baris lama dengan aksi='kapus-setuju' (data sebelum patch):
 const piPPCheck = await pool.query(
@@ -349,6 +367,51 @@ const adaSisaPP = parseInt(piPPCheck.rows[0]?.ct) > 0;
     // Kapus hanya konfirmasi → langsung naik ke Admin untuk keputusan final.
     // Alur berjenjang: Admin tolak → PP re-verif → Kapus konfirmasi → Admin final.
     if (isReVerifAdmin) {
+      // PENTING: Re-insert baris penolakan Admin untuk indikator yang PP sanggah.
+      // Saat PP respond (respondPenolakan), semua baris dibuat_oleh='Admin' dihapus dari DB.
+      // Jika ada indikator yang PP sanggah (Kasus 2: campuran akui+sanggah), baris tersebut
+      // tidak pernah di-insert ulang sehingga tabel penolakan_indikator kosong saat Admin buka
+      // modal verifikasi dan Admin melihat semua 12 indikator alih-alih hanya yang bermasalah.
+      // Solusi: insert ulang dari admin_catatan sebagai sumber kebenaran putaran ini.
+      const adminCatatanRow = await pool.query(
+        `SELECT admin_catatan FROM usulan_header WHERE id_usulan=$1`, [idUsulan]
+      );
+      const adminCatatanStr = adminCatatanRow.rows[0]?.admin_catatan || '';
+      const alasanAdminMapKapus = {};
+      adminCatatanStr.split('|').forEach(part => {
+        const m = part.trim().match(/^#(\d+):\s*(.+)$/);
+        if (m) alasanAdminMapKapus[parseInt(m[1])] = m[2].trim();
+      });
+      const nomorDariAdminCatatan = Object.keys(alasanAdminMapKapus).map(Number);
+
+      if (nomorDariAdminCatatan.length > 0) {
+        // Cek baris yang sudah ada agar tidak duplikasi
+        const existingRows = await pool.query(
+          `SELECT DISTINCT no_indikator FROM penolakan_indikator WHERE id_usulan=$1 AND dibuat_oleh='Admin'`,
+          [idUsulan]
+        ).catch(() => ({ rows: [] }));
+        const nomorSudahAda = new Set(existingRows.rows.map(r => parseInt(r.no_indikator)));
+
+        const allPPKonfirmasi = await pool.query(
+          `SELECT email, indikator_akses FROM users WHERE role='Pengelola Program' AND aktif=true`
+        );
+        for (const no of nomorDariAdminCatatan) {
+          if (nomorSudahAda.has(no)) continue;
+          for (const pp of allPPKonfirmasi.rows) {
+            const aksesArr = parseIndikatorAkses(pp.indikator_akses || '');
+            const adaIrisan = aksesArr.length === 0 || aksesArr.includes(no);
+            if (!adaIrisan) continue;
+            await pool.query(
+              `INSERT INTO penolakan_indikator (id_usulan, no_indikator, alasan, email_admin, created_at, aksi, email_program, dibuat_oleh)
+               VALUES ($1,$2,$3,$4,NOW(),'tolak',$5,'Admin')
+               ON CONFLICT (id_usulan, no_indikator, email_program) DO UPDATE
+               SET alasan=$3, email_admin=$4, created_at=NOW(), aksi='tolak', catatan_program=NULL, responded_at=NULL, dibuat_oleh='Admin'`,
+              [idUsulan, no, alasanAdminMapKapus[no] || 'Perlu perbaikan data', email, pp.email]
+            ).catch(() => {});
+          }
+        }
+      }
+
       await pool.query(
         `UPDATE usulan_header SET status_kapus='Selesai', status_global='Menunggu Admin',
          ditolak_oleh=NULL, konteks_penolakan='Admin',
@@ -980,6 +1043,35 @@ async function respondPenolakan(pool, body) {
   // ── KASUS 1: Semua PP menyanggah, tidak ada yang membenarkan ──
   // → Langsung ke Admin untuk re-verifikasi. Tidak perlu lewat Kapus.
   if (adaSanggah && !adaAkui) {
+    // Insert ulang baris penolakan untuk indikator yang disanggah agar Admin tahu
+    // persis indikator mana yang perlu di-re-verifikasi (bukan semua indikator).
+    // Baris Admin sebelumnya sudah dihapus saat PP respond — harus diisi ulang.
+    const adminCatatanForKasus1 = await pool.query(
+      `SELECT admin_catatan FROM usulan_header WHERE id_usulan=$1`, [idUsulan]
+    );
+    const adminCatatanStrK1 = adminCatatanForKasus1.rows[0]?.admin_catatan || '';
+    const alasanAdminMapK1 = {};
+    adminCatatanStrK1.split('|').forEach(part => {
+      const m = part.trim().match(/^#(\d+):\s*(.+)$/);
+      if (m) alasanAdminMapK1[parseInt(m[1])] = m[2];
+    });
+    const allPPForKasus1 = await pool.query(
+      `SELECT email, indikator_akses FROM users WHERE role='Pengelola Program' AND aktif=true`
+    );
+    for (const no of [...nomorDisanggah]) {
+      for (const pp of allPPForKasus1.rows) {
+        const aksesArr = parseIndikatorAkses(pp.indikator_akses || '');
+        const adaIrisan = aksesArr.length === 0 || aksesArr.includes(no);
+        if (!adaIrisan) continue;
+        await pool.query(
+          `INSERT INTO penolakan_indikator (id_usulan, no_indikator, alasan, email_admin, created_at, aksi, email_program, dibuat_oleh)
+           VALUES ($1,$2,$3,$4,NOW(),'tolak',$5,'Admin')
+           ON CONFLICT (id_usulan, no_indikator, email_program) DO UPDATE
+           SET alasan=$3, email_admin=$4, created_at=NOW(), aksi='tolak', catatan_program=NULL, responded_at=NULL, dibuat_oleh='Admin'`,
+          [idUsulan, no, alasanAdminMapK1[no] || 'Disanggah oleh Pengelola Program', email, pp.email]
+        ).catch(() => {});
+      }
+    }
     await pool.query(
       `UPDATE usulan_header SET status_global='Menunggu Admin', status_program='Selesai',
        ditolak_oleh='Admin', konteks_penolakan='Admin' WHERE id_usulan=$1`, [idUsulan]
@@ -1018,20 +1110,27 @@ async function respondPenolakan(pool, body) {
 
     // Hapus penolakan Admin lama untuk indikator yang diakui, insert penolakan baru (dari PP)
     // agar Kapus tahu indikator mana yang perlu dikembalikan ke Operator
-    for (const no of nomorAkuiArr) {
-      await pool.query(
-        `DELETE FROM penolakan_indikator WHERE id_usulan=$1 AND no_indikator=$2`, [idUsulan, no]
-      );
-      await pool.query(
-        `INSERT INTO penolakan_indikator
-           (id_usulan, no_indikator, alasan, email_admin, created_at, aksi, email_program, dibuat_oleh)
-         VALUES ($1,$2,$3,$4,NOW(),'tolak',$5,'PP')
-         ON CONFLICT (id_usulan, no_indikator, email_program) DO UPDATE
-           SET alasan=$3, email_admin=$4, created_at=NOW(), aksi='tolak',
-               catatan_program=NULL, responded_at=NULL, dibuat_oleh='PP'`,
-        [idUsulan, no, alasanAdminMap[no] || 'Dibenarkan oleh Pengelola Program', email, email]
-      );
-    }
+    const allPPForInsert = await pool.query(
+  `SELECT email, indikator_akses FROM users WHERE role='Pengelola Program' AND aktif=true`
+);
+
+for (const no of nomorAkuiArr) {
+  await pool.query(`DELETE FROM penolakan_indikator WHERE id_usulan=$1 AND no_indikator=$2`, [idUsulan, no]);
+  for (const pp of allPPForInsert.rows) {
+    const aksesArr = parseIndikatorAkses(pp.indikator_akses || '');
+    const adaIrisan = aksesArr.length === 0 || aksesArr.includes(no);
+    if (!adaIrisan) continue;
+    await pool.query(
+      `INSERT INTO penolakan_indikator
+         (id_usulan, no_indikator, alasan, email_admin, created_at, aksi, email_program, dibuat_oleh)
+       VALUES ($1,$2,$3,$4,NOW(),'tolak',$5,'PP')
+       ON CONFLICT (id_usulan, no_indikator, email_program) DO UPDATE
+         SET alasan=$3, email_admin=$4, created_at=NOW(), aksi='tolak',
+             catatan_program=NULL, responded_at=NULL, dibuat_oleh='PP'`,
+      [idUsulan, no, alasanAdminMap[no] || 'Dibenarkan oleh Pengelola Program', email, pp.email]
+    );
+  }
+}
 
     // Reset VP yang punya irisan dengan indikator yang diakui → wajib re-verif ulang
     // Ini termasuk PP yang sebelumnya menyanggah — karena ada PP lain yang akui,
@@ -1079,17 +1178,8 @@ async function respondPenolakan(pool, body) {
   // FIX 2: Hapus penolakan_indikator milik Admin agar updateIndikator tidak memblokir
   //         Operator saat ingin mengedit indikator yang bermasalah.
   {
-    const adminCatatanRes = await pool.query(
-      `SELECT admin_catatan FROM usulan_header WHERE id_usulan=$1`, [idUsulan]
-    );
-    const adminCatatanStr = adminCatatanRes.rows[0]?.admin_catatan || '';
-    const nomorDariAdminCatatan = [];
-    adminCatatanStr.split('|').forEach(part => {
-      const m = part.trim().match(/^#(\d+):/);
-      if (m) nomorDariAdminCatatan.push(parseInt(m[1]));
-    });
     // Gabungkan: dari admin_catatan + dari PP ini saat respond
-    const nomorTolak = [...new Set([...nomorDariAdminCatatan, ...nomorDiterimaPP])];
+    const nomorTolak = [...new Set([...nomorDiterimaPP])];
     for (const no of nomorTolak) {
       await pool.query(
         `UPDATE usulan_indikator SET status='Draft', approved_by=NULL, approved_role=NULL, approved_at=NULL, catatan=NULL

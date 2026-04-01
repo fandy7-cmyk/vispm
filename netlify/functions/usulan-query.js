@@ -312,7 +312,7 @@ async function getUsulanDetail(pool, idUsulan) {
      created_at,
      responded_at
    FROM penolakan_indikator
-   WHERE id_usulan=$1 AND (aksi IS NULL OR aksi='tolak' OR aksi='sanggah' OR aksi='reset' OR aksi='kapus-ok')
+   WHERE id_usulan=$1 AND (aksi IS NULL OR aksi='tolak' OR aksi='sanggah' OR aksi='reset' OR aksi='kapus-ok' OR aksi='kapus-verif')
    ORDER BY no_indikator, dibuat_oleh, email_program, CASE aksi WHEN 'tolak' THEN 0 WHEN 'reset' THEN 1 WHEN 'sanggah' THEN 2 ELSE 3 END`,
   [idUsulan]
   ).catch(() => ({ rows: [] }));

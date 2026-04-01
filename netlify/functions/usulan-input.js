@@ -242,16 +242,24 @@ async function submitUsulan(pool, body) {
     if (wasKapusDitolak || wasKapusTolakAdmin) {
       // Kepala Puskesmas menolak (baik langsung maupun benarkan Admin) → reset semua stage header
       targetStatus = 'Menunggu Kepala Puskesmas';
-      await pool.query(
-        `UPDATE usulan_header SET
-          status_kapus='Menunggu', status_program='Menunggu', status_final='Menunggu',
-          kapus_approved_by=NULL, kapus_approved_at=NULL, kapus_catatan=NULL, kapus_catatan_umum=NULL,
-          admin_approved_by=NULL, admin_approved_at=NULL, admin_catatan=NULL,
-          final_approved_by=NULL, final_approved_at=NULL,
-          ditolak_oleh='Kepala Puskesmas', konteks_penolakan=NULL,
-          operator_catatan=$2
-         WHERE id_usulan=$1`, [idUsulan, catatanOperator || null]
-      );
+
+      const sisaAdminCheck = await pool.query(
+  `SELECT COUNT(*) as ct FROM penolakan_indikator
+   WHERE id_usulan=$1 AND dibuat_oleh='Admin'`, [idUsulan]
+).catch(() => ({ rows: [{ ct: 0 }] }));
+const masihAdaAdmin = parseInt(sisaAdminCheck.rows[0]?.ct) > 0;
+
+await pool.query(
+  `UPDATE usulan_header SET
+    status_kapus='Menunggu', status_program='Menunggu', status_final='Menunggu',
+    kapus_approved_by=NULL, kapus_approved_at=NULL, kapus_catatan=NULL, kapus_catatan_umum=NULL,
+    admin_approved_by=NULL, admin_approved_at=NULL,
+    final_approved_by=NULL, final_approved_at=NULL,
+    ditolak_oleh     = CASE WHEN $3 THEN 'Admin' ELSE 'Kepala Puskesmas' END,
+    konteks_penolakan= CASE WHEN $3 THEN 'Admin' ELSE NULL END,
+    operator_catatan=$2
+   WHERE id_usulan=$1`, [idUsulan, catatanOperator || null, masihAdaAdmin]
+);
       
       // Ambil email Kapus yang mencatat persetujuan
       // aksi='kapus-setuju' = data lama, aksi='kapus-ok' = data baru (Kapus sanggah PP)

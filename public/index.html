@@ -1238,7 +1238,8 @@ input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-o
       <div class="auth-field">
         <label>Password</label>
         <div class="auth-pw-wrap">
-          <input type="password" id="authPassword" class="auth-input" placeholder="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+          <span class="material-icons" style="position:absolute;left:13px;top:50%;transform:translateY(-50%);font-size:var(--fs-md);color:var(--text-xlight);pointer-events:none;z-index:1">lock_outline</span>
+          <input type="password" id="authPassword" class="auth-input" placeholder="Password" autocomplete="current-password" style="padding-left:38px" onkeydown="if(event.key==='Enter')doLogin()">
           <button class="auth-pw-toggle" type="button" onclick="toggleAuthPw()" tabindex="-1">
             <span class="material-icons" id="authPwIcon" style="font-size:20px">visibility_off</span>
           </button>

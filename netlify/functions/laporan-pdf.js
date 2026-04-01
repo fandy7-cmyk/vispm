@@ -617,11 +617,12 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
 async function generateLaporanLog(pool, idUsulan) {
   const [logResult, headerResult] = await Promise.all([
     pool.query(
-      `SELECT la.*, u.nama as user_nama,
-      COALESCE(u.role, la.role) as role
-      FROM log_aktivitas la
-      LEFT JOIN users u ON LOWER(u.email)=LOWER(la.user_email)
-      WHERE la.id_usulan=$1 ORDER BY la.timestamp ASC`,
+      `SELECT la.*,
+COALESCE(u.nama, la.user_nama) as user_nama,
+COALESCE(u.role, la.role) as role
+FROM log_aktivitas la
+LEFT JOIN users u ON LOWER(u.email)=LOWER(la.user_email)
+WHERE la.id_usulan=$1 ORDER BY la.timestamp ASC`,
       [idUsulan]
     ),
     

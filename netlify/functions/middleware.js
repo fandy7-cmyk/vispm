@@ -36,7 +36,7 @@ async function validateSession(event) {
     );
 
     if (!result.rows.length) {
-      return err('Sesi tidak valid atau telah berakhir. Silakan login kembali.', 401);
+      return err('Sesi tidak valid atau telah berakhir.', 401);
     }
 
     const session = result.rows[0];

@@ -203,6 +203,8 @@ async function renderMasterData(tab) {
   try {
     if (activeTab === 'pejabat') {
       await renderPejabatTab(tc);
+    } else if (activeTab === 'penandatangan') {
+      await renderPenandatanganTab(tc);
     } else if (activeTab === 'audit-trail') {
       await renderAuditTrail(tc);
     } else {
@@ -2108,6 +2110,7 @@ const _masterTabs = [
   { id: 'periode',         icon: 'event_available', label: 'Periode' },
   { id: 'target-tahunan',  icon: 'track_changes',   label: 'Target Tahunan' },
   { id: 'pejabat',         icon: 'draw',            label: 'Pejabat' },
+  { id: 'penandatangan',   icon: 'assignment_ind',  label: 'Penandatangan' },
   { id: 'audit-trail',     icon: 'manage_search',   label: 'Audit Trail' },
 ];
 
@@ -2609,4 +2612,191 @@ async function _renderIntoTab(renderFn) {
   const tc = document.getElementById('masterTabContent');
   if (!tc) return;
   await renderFn(tc);
+}// ============== TAB: KONFIGURASI PENANDATANGAN PER INDIKATOR ==============
+// Tambahkan tab ini ke _masterTabs di app-master.js:
+// { id: 'penandatangan', icon: 'assignment_ind', label: 'Penandatangan' }
+//
+// Tambahkan case ini di renderMasterData():
+// } else if (activeTab === 'penandatangan') {
+//   await renderPenandatanganTab(tc);
+// }
+
+async function renderPenandatanganTab(el) {
+  const target = el || document.getElementById('masterTabContent');
+  if (!target) return;
+
+  target.innerHTML = `<div class="empty-state"><span class="material-icons" style="animation:spin 1s linear infinite">refresh</span><p>Memuat...</p></div>`;
+
+  try {
+    // Load semua data sekaligus
+    const [indikatorList, jabatanList, savedConfig] = await Promise.all([
+      API.get('indikator'),
+      API.get('jabatan'),
+      API.get('indikator-penandatangan'),
+    ]);
+
+    const inds = (indikatorList || []).filter(i => i.aktif);
+    // Daftar jabatan PP dari master jabatan
+    const jabatanOptions = (jabatanList || []).filter(j => j.aktif).map(j => j.nama);
+
+    target.innerHTML = `
+      <div class="card">
+        <div class="card-header-bar" style="justify-content:space-between">
+          <span class="card-title">
+            <span class="material-icons">assignment_ind</span>
+            Konfigurasi Penandatangan Per Indikator
+          </span>
+          <span style="font-size:12px;color:#64748b">
+            <span class="material-icons" style="font-size:14px;vertical-align:middle">info</span>
+            Urutan jabatan = urutan tanda tangan di laporan PDF
+          </span>
+        </div>
+        <div class="card-body" style="padding:0">
+          <div id="penandatanganList"></div>
+        </div>
+      </div>`;
+
+    const listEl = document.getElementById('penandatanganList');
+
+    // Reset state, isi dari saved config
+    window._penandatanganState = {};
+    listEl.innerHTML = inds.map(ind => {
+      const current = savedConfig[ind.no] || [];
+      const currentJabatan = current.sort((a,b) => a.urutan - b.urutan).map(c => c.jabatan);
+      window._penandatanganState[ind.no] = [...currentJabatan];
+      return _renderPenandatanganRow(ind, currentJabatan, jabatanOptions);
+    }).join('');
+
+  } catch(e) {
+    target.innerHTML = `<div class="empty-state"><span class="material-icons" style="color:#ef4444">error</span><p>${e.message}</p></div>`;
+  }
+}
+
+function _renderPenandatanganRow(ind, currentJabatan, jabatanOptions) {
+  // Checkbox grid — setiap jabatan jadi checkbox, checked = sudah dipilih
+  const checkboxHtml = jabatanOptions.map(j => {
+    const checked = currentJabatan.includes(j);
+    const safeId = `pchk-${ind.no}-${j.replace(/[^a-zA-Z0-9]/g, '_')}`;
+    return `
+      <label for="${safeId}" style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:12px;color:#334155;transition:background .1s"
+        onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='transparent'">
+        <input type="checkbox" id="${safeId}" value="${j}"
+          ${checked ? 'checked' : ''}
+          onchange="_onPenandatanganCheck(${ind.no}, this)"
+          style="width:15px;height:15px;accent-color:#0d9488;cursor:pointer;flex-shrink:0">
+        <span>${j}</span>
+      </label>`;
+  }).join('');
+
+  // Tags urutan yang sudah dipilih
+  const tagsHtml = currentJabatan.map((j, i) => `
+    <div id="ptag-${ind.no}-${i}" style="display:inline-flex;align-items:center;gap:4px;background:#e0f2fe;border:1px solid #7dd3fc;border-radius:20px;padding:3px 10px;font-size:12px;color:#0369a1;font-weight:600;margin:2px">
+      <span style="background:#0369a1;color:white;border-radius:50%;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0">${i+1}</span>
+      ${j}
+      <button onclick="_uncheckPenandatangan(${ind.no}, '${j.replace(/'/g, "\\\'")}', ${i})" style="background:none;border:none;cursor:pointer;color:#0369a1;padding:0;display:flex;line-height:1;margin-left:2px">
+        <span class="material-icons" style="font-size:14px">close</span>
+      </button>
+    </div>`).join('');
+
+  return `
+    <div id="prow-${ind.no}" style="border-bottom:1px solid #f1f5f9">
+      <!-- Header row klik untuk expand/collapse -->
+      <div onclick="_togglePenandatanganRow(${ind.no})"
+        style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;cursor:pointer;user-select:none"
+        onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''">
+        <div style="display:flex;align-items:flex-start;gap:12px;flex:1;min-width:0">
+          <div style="min-width:180px;flex:0 0 180px">
+            <div style="font-weight:700;font-size:13px;color:#0f172a">Indikator ${ind.no}</div>
+            <div style="font-size:12px;color:#64748b;margin-top:2px;line-height:1.4">${ind.nama}</div>
+          </div>
+          <div id="ptags-${ind.no}" style="display:flex;flex-wrap:wrap;gap:2px;align-items:center;flex:1;min-width:0">
+            ${tagsHtml || '<span style="font-size:12px;color:#cbd5e1;font-style:italic">Belum ada penandatangan — klik untuk konfigurasi</span>'}
+          </div>
+        </div>
+        <span class="material-icons" id="pchevron-${ind.no}" style="font-size:20px;color:#94a3b8;flex-shrink:0;margin-left:8px;transition:transform .2s">expand_more</span>
+      </div>
+      <!-- Panel checkbox (collapsed by default) -->
+      <div id="ppanel-${ind.no}" style="display:none;padding:0 20px 16px 20px">
+        <div style="border:1.5px solid #e2e8f0;border-radius:8px;padding:12px;background:#f8fafc;margin-bottom:10px">
+          <div style="font-size:11.5px;font-weight:600;color:#64748b;margin-bottom:8px;display:flex;align-items:center;gap:4px">
+            <span class="material-icons" style="font-size:14px">info</span>
+            Pilih jabatan penandatangan (centang = tampil di laporan). Urutan sesuai tag di atas — hapus &amp; centang ulang untuk mengubah urutan.
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px">
+            ${checkboxHtml}
+          </div>
+        </div>
+        <div style="display:flex;justify-content:flex-end">
+          <button class="btn btn-sm" onclick="_savePenandatangan(${ind.no})" style="background:#0284c7;color:white;border:none">
+            <span class="material-icons">save</span>Simpan Indikator ${ind.no}
+          </button>
+        </div>
+      </div>
+    </div>`;
+}
+
+// State sementara
+if (!window._penandatanganState) window._penandatanganState = {};
+
+function _togglePenandatanganRow(noInd) {
+  const panel   = document.getElementById(`ppanel-${noInd}`);
+  const chevron = document.getElementById(`pchevron-${noInd}`);
+  if (!panel) return;
+  const open = panel.style.display !== 'none';
+  panel.style.display   = open ? 'none' : 'block';
+  chevron.style.transform = open ? '' : 'rotate(180deg)';
+}
+
+function _onPenandatanganCheck(noInd, checkbox) {
+  const jabatan = checkbox.value;
+  if (!window._penandatanganState[noInd]) window._penandatanganState[noInd] = [];
+  const state = window._penandatanganState[noInd];
+  if (checkbox.checked) {
+    if (!state.includes(jabatan)) state.push(jabatan);
+  } else {
+    const idx = state.indexOf(jabatan);
+    if (idx > -1) state.splice(idx, 1);
+  }
+  window._penandatanganState[noInd] = state;
+  _refreshPenandatanganTags(noInd);
+}
+
+function _uncheckPenandatangan(noInd, jabatan, idx) {
+  const state = window._penandatanganState[noInd] || [];
+  state.splice(idx, 1);
+  window._penandatanganState[noInd] = state;
+  _refreshPenandatanganTags(noInd);
+  // Uncheck checkbox-nya
+  const safeId = `pchk-${noInd}-${jabatan.replace(/[^a-zA-Z0-9]/g, '_')}`;
+  const chk = document.getElementById(safeId);
+  if (chk) chk.checked = false;
+}
+
+function _refreshPenandatanganTags(noInd) {
+  const tagsEl = document.getElementById(`ptags-${noInd}`);
+  if (!tagsEl) return;
+  const state = window._penandatanganState[noInd] || [];
+  if (!state.length) {
+    tagsEl.innerHTML = '<span style="font-size:12px;color:#cbd5e1;font-style:italic">Belum ada penandatangan — klik untuk konfigurasi</span>';
+    return;
+  }
+  tagsEl.innerHTML = state.map((j, i) => `
+    <div id="ptag-${noInd}-${i}" style="display:inline-flex;align-items:center;gap:4px;background:#e0f2fe;border:1px solid #7dd3fc;border-radius:20px;padding:3px 10px;font-size:12px;color:#0369a1;font-weight:600;margin:2px">
+      <span style="background:#0369a1;color:white;border-radius:50%;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0">${i+1}</span>
+      ${j}
+      <button onclick="event.stopPropagation();_uncheckPenandatangan(${noInd}, '${j.replace(/'/g, "\\\'")}', ${i})" style="background:none;border:none;cursor:pointer;color:#0369a1;padding:0;display:flex;line-height:1;margin-left:2px">
+        <span class="material-icons" style="font-size:14px">close</span>
+      </button>
+    </div>`).join('');
+}
+
+async function _savePenandatangan(noInd) {
+  if (!window._penandatanganState[noInd]) window._penandatanganState[noInd] = [];
+  const state = window._penandatanganState[noInd] || [];
+  try {
+    await API.post('indikator-penandatangan', { noIndikator: noInd, jabatanList: state });
+    toast(`Konfigurasi Indikator ${noInd} berhasil disimpan!`, 'success');
+  } catch(e) {
+    toast('Gagal simpan: ' + e.message, 'error');
+  }
 }

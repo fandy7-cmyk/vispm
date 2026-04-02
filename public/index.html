@@ -1422,7 +1422,13 @@ input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-o
 </div>
 
 <!-- LOADER -->
-<div class="loader" id="globalLoader"><div class="loader-spinner"></div></div>
+<div class="loader" id="globalLoader">
+  <div style="position:relative;width:40px;height:40px">
+    <div style="position:absolute;inset:0;border-radius:50%;border:3px solid transparent;border-top-color:#0d9488;animation:spin 1.1s linear infinite"></div>
+    <div style="position:absolute;inset:6px;border-radius:50%;border:3px solid transparent;border-right-color:#14b8a6;animation:spin 1.7s linear infinite reverse"></div>
+    <div style="position:absolute;inset:12px;border-radius:50%;border:3px solid transparent;border-bottom-color:#5eead4;animation:spin 2.3s linear infinite"></div>
+  </div>
+</div>
 
 <!-- INPUT USULAN MODAL -->
 <div class="modal fullscreen" id="indikatorModal">

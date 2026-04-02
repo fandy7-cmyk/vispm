@@ -489,6 +489,7 @@ async function openIndikatorModal(idUsulan) {
         <td style="max-width:220px;font-size:12.5px">${ind.nama}</td>
         <input type="hidden" id="bobot-${ind.no}" value="${ind.bobot}">
         <input type="hidden" id="sasaran-${ind.no}" value="${ind.sasaranTahunan || 0}">
+        <input type="hidden" id="prevkum-${ind.no}" value="${Math.max(0, (ind.realisasiKumulatif || 0) - (ind.capaian || 0))}">
         <td style="text-align:center;font-size:12.5px;color:#475569">${ind.sasaranTahunan > 0 ? ind.sasaranTahunan : '<span style="color:#cbd5e1">-</span>'}</td>
         <td style="text-align:center">
           ${isLocked ? `<span>${ind.target}</span>` : `<input type="number" id="t-${ind.no}" value="${ind.target}" min="0" step="1"
@@ -510,7 +511,7 @@ async function openIndikatorModal(idUsulan) {
             ${fmtCapaianPct(ind.capaian, ind.target)}
           </span>
         </td>
-        <td style="text-align:center;font-size:12.5px;font-weight:700;color:${_sisaColor}">${_sisaTgt !== null ? _sisaTgt : '<span style="color:#cbd5e1">-</span>'}</td>
+        <td id="sisa-${ind.no}" style="text-align:center;font-size:12.5px;font-weight:700;color:${_sisaColor}">${_sisaTgt !== null ? _sisaTgt : '<span style="color:#cbd5e1">-</span>'}</td>
         <td style="min-width:100px;text-align:center">
           ${(() => {
             // Parse link_file: bisa string URL tunggal atau JSON array
@@ -1247,7 +1248,30 @@ function clampRealisasi(no) {
     const label = isKunci ? `target tahunan (${batasMaks})` : `target bulan ini (${batasMaks})`;
     toast(`Realisasi Indikator ${no} disesuaikan ke ${label}`, 'warning');
   }
+  updateSisaTarget(no);
   previewSPM(no);
+}
+
+function updateSisaTarget(no) {
+  const sisaEl = document.getElementById(`sisa-${no}`);
+  if (!sisaEl) return;
+  const sasaranEl = document.getElementById(`sasaran-${no}`);
+  const sasaran = parseInt(sasaranEl?.value) || 0;
+  const isKunci = INDIKATOR_TARGET_KUNCI.includes(no);
+  let sisaBaru = null;
+  if (isKunci) {
+    sisaBaru = sasaran > 0 ? sasaran : null;
+  } else if (sasaran > 0) {
+    const prevKum = parseInt(document.getElementById(`prevkum-${no}`)?.value) || 0;
+    const capaian = parseInt(document.getElementById(`c-${no}`)?.value) || 0;
+    sisaBaru = Math.max(0, sasaran - prevKum - capaian);
+  }
+  if (sisaBaru !== null) {
+    sisaEl.textContent = sisaBaru;
+    sisaEl.style.color = sisaBaru === 0 ? '#16a34a' : (sisaBaru < 10 ? '#f59e0b' : '#1e293b');
+  } else {
+    sisaEl.innerHTML = '<span style="color:#cbd5e1">-</span>';
+  }
 }
 
 function previewSPM(changedNo) {
@@ -1467,7 +1491,14 @@ async function openLogAktivitas(idUsulan) {
         <button class="btn-icon" onclick="closeModal('logAktivitasModal')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
       </div>
       <div class="modal-body" id="logAktivitasBody" style="padding:20px;flex:1;overflow-y:auto">
-        <div class="empty-state"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 1s linear infinite"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg><p>Memuat riwayat...</p></div>
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:12px;padding:60px 0">
+          <div style="position:relative;width:40px;height:40px">
+            <div style="position:absolute;inset:0;border-radius:50%;border:3px solid transparent;border-top-color:#0d9488;animation:spin 1.1s linear infinite"></div>
+            <div style="position:absolute;inset:6px;border-radius:50%;border:3px solid transparent;border-right-color:#14b8a6;animation:spin 1.7s linear infinite reverse"></div>
+            <div style="position:absolute;inset:12px;border-radius:50%;border:3px solid transparent;border-bottom-color:#5eead4;animation:spin 2.3s linear infinite"></div>
+          </div>
+          <p style="font-size:13px;color:#64748b;font-weight:500;margin:0">Memuat riwayat...</p>
+        </div>
       </div>
     </div>`;
   showModal('logAktivitasModal');

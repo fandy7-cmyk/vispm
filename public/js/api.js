@@ -151,7 +151,12 @@ const API = {
 
   // Audit Trail
   logAudit:      (data)   => API.post('audit-trail', data).catch(() => {}),
-  getAuditTrail: (params) => API.get('audit-trail', params)
+  getAuditTrail: (params) => API.get('audit-trail', params),
+
+  // Konfigurasi Penandatangan Per Indikator
+  getPenandatangan:    ()            => API.get('indikator-penandatangan'),
+  savePenandatangan:   (data)        => API.post('indikator-penandatangan', data),
+  deletePenandatangan: (noIndikator) => API.del('indikator-penandatangan', { noIndikator })
 };
 
 // Utils

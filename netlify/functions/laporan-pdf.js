@@ -174,13 +174,38 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
     [idUsulan, h.kode_pkm, h.tahun]
   );
 
-  // Verifikasi program — JOIN users untuk ambil tanda_tangan
+  // Verifikasi program — JOIN users untuk ambil tanda_tangan & waktu verifikasi
   const vpResult = await pool.query(
-    `SELECT vp.*, u.tanda_tangan as tt_program, u.jabatan as jabatan_user, u.indikator_akses as user_indikator_akses
+    `SELECT vp.*, u.tanda_tangan as tt_program, u.jabatan as jabatan_user,
+            u.nama as nama_user, u.nip as nip_user,
+            u.indikator_akses as user_indikator_akses
      FROM verifikasi_program vp
      LEFT JOIN users u ON LOWER(u.email) = LOWER(vp.email_program)
      WHERE vp.id_usulan = $1 ORDER BY vp.created_at`, [idUsulan]
   );
+
+  // Konfigurasi penandatangan dari DB (dinamis, bukan hardcoded)
+  // JOIN langsung ke users berdasarkan jabatan → ambil nama, nip, tanda_tangan
+  const penandatanganCfg = await pool.query(
+    `SELECT ip.no_indikator, ip.jabatan, ip.urutan,
+            u.nama, u.nip, u.tanda_tangan, u.email
+     FROM indikator_penandatangan ip
+     LEFT JOIN users u ON (
+       -- Cocokkan jabatan user (bisa multi-jabatan dipisah '|')
+       LOWER(u.jabatan) = LOWER(ip.jabatan)
+       OR u.jabatan ILIKE ip.jabatan || '|%'
+       OR u.jabatan ILIKE '%|' || ip.jabatan
+       OR u.jabatan ILIKE '%|' || ip.jabatan || '|%'
+     ) AND u.aktif = true
+     ORDER BY ip.no_indikator, ip.urutan`
+  ).catch(() => ({ rows: [] }));
+
+  // Kelompokkan per no_indikator → { 1: [{jabatan, nama, nip, tanda_tangan, ...}] }
+  const JABATAN_MAP_DB = {};
+  for (const row of penandatanganCfg.rows) {
+    if (!JABATAN_MAP_DB[row.no_indikator]) JABATAN_MAP_DB[row.no_indikator] = [];
+    JABATAN_MAP_DB[row.no_indikator].push(row);
+  }
 
   const bulanNama = ['','Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
   const bulan = bulanNama[h.bulan] || h.bulan;
@@ -189,48 +214,64 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
   const now = _nowDt.toLocaleDateString('id-ID', { ..._nowOpt, day:'2-digit', month:'long', year:'numeric' })
             + ' | ' + _nowDt.toLocaleTimeString('id-ID', { ..._nowOpt, hour:'2-digit', minute:'2-digit', hour12:false }) + ' WITA';
 
-  const JABATAN_MAP = {
-    1:  ['Pengelola Program Kesehatan Ibu Kabupaten','Pengelola Program HIV / AIDS Kabupaten','Pengelola Program Hepatitis Kabupaten','Pengelola Program Imunisasi Kabupaten'],
-    2:  ['Pengelola Program Kesehatan Ibu Kabupaten'],
-    3:  ['Pengelola Program Imunisasi Kabupaten','Pengelola Program Kesehatan Anak Kabupaten'],
-    4:  ['Pengelola Program Imunisasi Kabupaten','Pengelola Program Gizi Kabupaten','Pengelola Program Kesehatan Anak Kabupaten'],
-    5:  ['Pengelola Program UKS dan Kesehatan Remaja Kabupaten','Pengelola Program Imunisasi Kabupaten'],
-    6:  ['Pengelola Program PTM Kabupaten','Pengelola Program Imunisasi Kabupaten','Pengelola Program KB / Kespro Kabupaten','Pengelola Program Kesehatan Jiwa Kabupaten','Pengelola Program HIV / AIDS Kabupaten'],
-    7:  ['Pengelola Program Lansia Kabupaten'],
-    8:  ['Pengelola Program PTM Kabupaten'],
-    9:  ['Pengelola Program PTM Kabupaten'],
-    10: ['Pengelola Program Kesehatan Jiwa Kabupaten'],
-    11: ['Pengelola Program TB Kabupaten'],
-    12: ['Pengelola Program HIV / AIDS Kabupaten'],
-  };
-  // Kembalikan array {v, jabatan} per slot JABATAN_MAP — 1 orang bisa muncul di >1 slot
   function getVerifierSlots(noInd) {
-    const slots = JABATAN_MAP[noInd] || [];
-    const eligible = vpResult.rows.filter(v => {
-      const inds = (v.indikator_akses||'').split(',').map(s=>s.trim()).filter(Boolean);
-      return inds.length > 0 && inds.includes(String(noInd));
-    });
-    if (!slots.length) {
-      return eligible.map(v => ({ v, jabatan: v.jabatan_user || (v.jabatan_program||'').split('|')[0].trim() || 'Pengelola Program' }));
+    const cfgSlots = JABATAN_MAP_DB[noInd] || [];
+
+    if (!cfgSlots.length) {
+      // Belum dikonfigurasi di UI → fallback: tampilkan PP yang eligible dari verifikasi_program
+      const eligible = vpResult.rows.filter(v => {
+        const inds = (v.user_indikator_akses||'').split(',').map(s=>s.trim()).filter(Boolean);
+        return inds.length > 0 && inds.includes(String(noInd));
+      });
+      return eligible.map(v => ({
+        // mode lama — ambil dari verifikasi_program
+        fromVerif: true,
+        v,
+        jabatan: (v.jabatan_user||'').split('|')[0].trim() || 'Pengelola Program',
+        nama: v.nama_program || v.email_program,
+        nip: v.nip_program || '',
+        tt: v.tt_program || '',
+        verifiedAt: v.verified_at,
+        status: v.status,
+      }));
     }
-    return slots.map(jabatan => {
-      const key = jabatan.replace(' Kabupaten','').toLowerCase();
-      const match = eligible.find(v =>
-        (v.jabatan_user||'').toLowerCase().includes(key) ||
-        (v.jabatan_program||'').toLowerCase().includes(key)
-      );
-      return { v: match || null, jabatan };
-    }).filter(s => s.v !== null);
+
+    // Gunakan konfigurasi dari Master Data → ambil nama/NIP/TT dari users
+    // Lalu cari waktu verifikasi yang sesuai dari verifikasi_program
+    return cfgSlots.map(cfg => {
+      // Cari record verifikasi_program yang cocok dengan email/jabatan dari konfigurasi
+      const verif = vpResult.rows.find(v => {
+        if (cfg.email && LOWER(v.email_program) === LOWER(cfg.email)) return true;
+        const jabatanList = [
+          ...(v.jabatan_user||'').split('|'),
+          ...(v.jabatan_program||'').split('|')
+        ].map(j => j.trim().toLowerCase());
+        const cfgKey = (cfg.jabatan||'').toLowerCase();
+        return jabatanList.some(j => j === cfgKey || j.includes(cfgKey.replace(' kabupaten','')) );
+      });
+
+      const ttRaw = cfg.tanda_tangan || (verif ? verif.tt_program : '') || '';
+      return {
+        fromVerif: false,
+        jabatan: cfg.jabatan,
+        nama: cfg.nama || (verif ? (verif.nama_program || verif.email_program) : '-'),
+        nip: cfg.nip || (verif ? verif.nip_program : '') || '',
+        tt: ttRaw,
+        verifiedAt: verif ? verif.verified_at : null,
+        status: verif ? verif.status : null,
+      };
+    });
   }
 
-  function signBlock(v, jabatan) {
-    const approved = v.status === 'Selesai';
-    jabatan = jabatan || v.jabatan_user || (v.jabatan_program||''). split('|')[0].trim() || 'Pengelola Program';
-    const nama = v.nama_program || v.email_program;
-    const nip = v.nip_program || '';
-    const ttRaw = v.tt_program || '';
-    const tt = ttRaw.startsWith('data:image') ? (compressBase64Img(ttRaw) || '') : ttRaw;
+  // Helper kecil lowercase untuk string nullable
+  function LOWER(s) { return (s||'').toLowerCase(); }
+
+  function signBlock(slot) {
+    const { jabatan, nama, nip, tt: ttRaw, verifiedAt, status } = slot;
+    const approved = status === 'Selesai';
+    const tt = ttRaw && ttRaw.startsWith('data:image') ? (compressBase64Img(ttRaw) || '') : (ttRaw || '');
     const ttValid = tt && (tt.startsWith('data:image') || tt.startsWith('http'));
+
     let signImg;
     if (!approved) {
       signImg = `<div style="width:80px;height:80px;border:2px dashed #cbd5e1;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:#94a3b8;font-size:10px;margin-bottom:6px">Belum</div>
@@ -239,10 +280,10 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
       signImg = `<div style="height:80px;display:flex;align-items:center;justify-content:center;margin-bottom:4px">
                    <img src="${tt}" style="max-height:72px;max-width:160px;object-fit:contain">
                  </div>
-                 <div style="font-size:9px;color:#2d7a47;font-weight:700;margin-bottom:2px;display:flex;align-items:center;justify-content:center;gap:4px"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"11\" height=\"11\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#2d7a47\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M22 11.08V12a10 10 0 1 1-5.93-9.14\"/><polyline points=\"22 4 12 14.01 9 11.01\"/></svg>Diverifikasi: ${fmtDT(v.verified_at)}</div>`;
+                 <div style="font-size:9px;color:#2d7a47;font-weight:700;margin-bottom:2px;display:flex;align-items:center;justify-content:center;gap:4px"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"11\" height=\"11\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#2d7a47\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M22 11.08V12a10 10 0 1 1-5.93-9.14\"/><polyline points=\"22 4 12 14.01 9 11.01\"/></svg>Diverifikasi: ${fmtDT(verifiedAt)}</div>`;
     } else {
       signImg = `<div style="display:inline-block;margin-bottom:6px">${approvedBadgeSVG()}</div>
-                 <div style="font-size:9px;color:#2d7a47;font-weight:700;margin-bottom:2px;display:flex;align-items:center;justify-content:center;gap:4px"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"11\" height=\"11\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#2d7a47\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M22 11.08V12a10 10 0 1 1-5.93-9.14\"/><polyline points=\"22 4 12 14.01 9 11.01\"/></svg>Diverifikasi: ${fmtDT(v.verified_at)}</div>`;
+                 <div style="font-size:9px;color:#2d7a47;font-weight:700;margin-bottom:2px;display:flex;align-items:center;justify-content:center;gap:4px"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"11\" height=\"11\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#2d7a47\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M22 11.08V12a10 10 0 1 1-5.93-9.14\"/><polyline points=\"22 4 12 14.01 9 11.01\"/></svg>Diverifikasi: ${fmtDT(verifiedAt)}</div>`;
     }
     return `<div style="text-align:center;min-width:180px;max-width:220px">
       <div style="font-size:10px;color:#334155;margin-bottom:10px;font-weight:600">${jabatan}</div>
@@ -321,13 +362,13 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
     if (!slots.length) {
       return `<div style="display:flex;justify-content:flex-end"><div style="text-align:center">${dateLabel}${kapus}</div></div>`;
     }
-    const row1 = `${dateLabel}<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:20px">${signBlock(slots[0].v, slots[0].jabatan)}${kapus}</div>`;
+    const row1 = `${dateLabel}<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:20px">${signBlock(slots[0])}${kapus}</div>`;
     const rest = slots.slice(1);
     let extraRows = '';
     for (let i = 0; i < rest.length; i += 2) {
       const chunk = rest.slice(i, i + 2);
       const justify = chunk.length === 1 ? 'center' : 'space-between';
-      extraRows += `<div style="display:flex;justify-content:${justify};align-items:flex-start;gap:20px;margin-top:28px">${chunk.map(s => signBlock(s.v, s.jabatan)).join('')}</div>`;
+      extraRows += `<div style="display:flex;justify-content:${justify};align-items:flex-start;gap:20px;margin-top:28px">${chunk.map(s => signBlock(s)).join('')}</div>`;
     }
     return row1 + extraRows;
   }

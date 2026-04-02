@@ -20,3 +20,8 @@
   from = "/*"
   to = "/index.html"
   status = 200
+
+[[redirects]]
+  from = "/api/indikator-penandatangan"
+  to = "/.netlify/functions/indikator-penandatangan"
+  status = 200

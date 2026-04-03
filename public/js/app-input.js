@@ -903,7 +903,7 @@ function _renderBuktiModal() {
           ${isImage
             ? `<img src="${proxyUrl}" style="max-width:100%;max-height:100%;object-fit:contain;padding:16px">`
             : `<div style="color:#94a3b8;font-size:13px;display:flex;align-items:center;gap:8px">
-                <span class="material-icons" style="animation:spin 1s linear infinite">refresh</span> Memuat...
+                <span class="material-icons" style="animation:spin 1s linear infinite">refresh</span> Memuat data...
               </div>`
           }
         </div>

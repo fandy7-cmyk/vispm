@@ -31,7 +31,17 @@ exports.handler = async (event) => {
     if (method === 'DELETE') {
       const id = params.id || JSON.parse(event.body || '{}').id;
       if (!id) return err('ID jabatan diperlukan');
+      // Ambil nama sebelum hapus untuk cascade remove dari users
+      const delRow = await pool.query('SELECT nama_jabatan FROM master_jabatan WHERE id=$1', [id]);
+      const namaHapus = delRow.rows[0]?.nama_jabatan || '';
       await pool.query('DELETE FROM master_jabatan WHERE id=$1', [id]);
+      if (namaHapus) {
+        const usersWithJab3 = await pool.query(`SELECT email, jabatan FROM users WHERE jabatan LIKE $1`, [`%${namaHapus}%`]);
+        for (const u of usersWithJab3.rows) {
+          const tokens = (u.jabatan || '').split('|').map(t => t.trim()).filter(t => t !== namaHapus);
+          await pool.query('UPDATE users SET jabatan=$1 WHERE email=$2', [tokens.join('|'), u.email]);
+        }
+      }
       return ok({ message: 'Jabatan berhasil dihapus' });
     }
 
@@ -41,8 +51,22 @@ exports.handler = async (event) => {
       const { id, nama, aktif } = body;
       if (!nama || !nama.trim()) return err('Nama jabatan diperlukan');
       if (id) {
-        // Update
+        // Ambil nama lama sebelum update (untuk cascade rename ke users)
+        const oldRow = await pool.query('SELECT nama_jabatan FROM master_jabatan WHERE id=$1', [id]);
+        const namaLama = oldRow.rows[0]?.nama_jabatan || '';
         await pool.query('UPDATE master_jabatan SET nama_jabatan=$1, aktif=$2 WHERE id=$3', [nama.trim(), aktif !== false, id]);
+        // Cascade: rename token di kolom jabatan semua user yang punya jabatan ini
+        if (namaLama && namaLama !== nama.trim()) {
+          const usersWithJab = await pool.query(
+            `SELECT email, jabatan FROM users WHERE jabatan LIKE $1`,
+            [`%${namaLama}%`]
+          );
+          for (const u of usersWithJab.rows) {
+            const tokens = (u.jabatan || '').split('|').map(t => t.trim());
+            const updated = tokens.map(t => t === namaLama ? nama.trim() : t).join('|');
+            await pool.query('UPDATE users SET jabatan=$1 WHERE email=$2', [updated, u.email]);
+          }
+        }
         return ok({ id, message: 'Jabatan berhasil diperbarui' });
       } else {
         // Create - cek duplikat
@@ -64,7 +88,17 @@ exports.handler = async (event) => {
     if (method === 'PUT') {
       const { id, nama, aktif } = body;
       if (!id || !nama) return err('ID dan nama diperlukan');
+      const oldRow2 = await pool.query('SELECT nama_jabatan FROM master_jabatan WHERE id=$1', [id]);
+      const namaLama2 = oldRow2.rows[0]?.nama_jabatan || '';
       await pool.query('UPDATE master_jabatan SET nama_jabatan=$1, aktif=$2 WHERE id=$3', [nama.trim(), aktif !== false, id]);
+      if (namaLama2 && namaLama2 !== nama.trim()) {
+        const usersWithJab2 = await pool.query(`SELECT email, jabatan FROM users WHERE jabatan LIKE $1`, [`%${namaLama2}%`]);
+        for (const u of usersWithJab2.rows) {
+          const tokens = (u.jabatan || '').split('|').map(t => t.trim());
+          const updated = tokens.map(t => t === namaLama2 ? nama.trim() : t).join('|');
+          await pool.query('UPDATE users SET jabatan=$1 WHERE email=$2', [updated, u.email]);
+        }
+      }
       return ok({ message: 'Jabatan diupdate' });
     }
 

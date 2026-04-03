@@ -71,7 +71,7 @@ function toggleNotifPanel() {
       <button onclick="document.getElementById('notifPanel').style.display='none'" style="background:none;border:none;cursor:pointer;color:#94a3b8;display:flex"><span class="material-icons" style="font-size:18px">close</span></button>
     </div>
     <div id="notifPanelBody" style="max-height:360px;overflow-y:auto">
-      <div style="padding:24px;text-align:center;color:#94a3b8;font-size:13px">Memuat...</div>
+      <div style="padding:24px;text-align:center;color:#94a3b8;font-size:13px"><div style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;position:relative;margin-bottom:6px"><div style="width:8px;height:8px;border-radius:50%;background:#378ADD"></div><div style="position:absolute;width:7px;height:7px;border-radius:50%;background:#B5D4F4;animation:orbit-dot 1s linear infinite;transform-origin:center"></div></div><div>Memuat...</div></div>
     </div>`;
 
   const wrap = document.getElementById('notifBtnWrap');
@@ -110,7 +110,7 @@ async function loadNotifPanel() {
       });
     } else if (role === 'Kepala Puskesmas') {
       const list = await API.getUsulan({ kode_pkm: currentUser.kodePKM }).catch(() => []);
-      (list || []).filter(u => u.statusGlobal === 'Menunggu Kepala Puskesmas').forEach(u => {
+      (list || []).filter(u => ['Menunggu Kepala Puskesmas','Menunggu Re-verifikasi Kepala Puskesmas'].includes(u.statusGlobal)).forEach(u => {
         items.push({ icon: 'hourglass_top', color: '#f59e0b', bg: '#fffbeb',
           title: `Menunggu Verifikasi Anda`,
           sub: `${u.idUsulan} · ${u.namaBulan} ${u.tahun}`,

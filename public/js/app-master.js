@@ -527,10 +527,10 @@ async function renderUsers(el) {
     <div class="card">
       <div class="card-body" style="padding:12px 16px">
         <div class="search-row">
-          <div class="search-input-wrap"><span class="material-icons search-icon">search</span><input class="search-input" id="searchUser" placeholder="Cari email atau nama..." oninput="filterUsers()"></div>
+          <div class="search-input-wrap"><span class="material-icons search-icon">search</span><input class="search-input" id="searchUser" placeholder="Cari email atau nama..." oninput="filterUsers()" autocomplete="off"></div>
           <select class="form-control" id="filterRole" onchange="filterUsers()" style="width:160px">
             <option value="">Semua Role</option>
-            <option>Admin</option><option>Operator</option><option>Kepala Puskesmas</option>
+            <option>Operator</option><option>Kepala Puskesmas</option>
             <option>Pengelola Program</option>
           </select>
         </div>
@@ -558,7 +558,7 @@ async function renderUsers(el) {
               <div class="form-group"><label>NIP</label><input class="form-control" id="uNIP" placeholder="Nomor Induk Pegawai (opsional)" maxlength="30"></div>
               <div class="form-group"><label>Role *</label>
                 <select class="form-control" id="uRole" onchange="checkUserRole()">
-                  <option>Admin</option><option>Operator</option><option>Kepala Puskesmas</option>
+                  <option>Operator</option><option>Kepala Puskesmas</option>
                   <option>Pengelola Program</option>
                 </select>
               </div>
@@ -612,7 +612,9 @@ async function renderUsers(el) {
 
   // Load data
   try {
-    [allUsers, allPKMList, allIndList] = await Promise.all([API.getUsers(), API.getPKM(), API.getIndikator()]);
+    const [_rawU, _rawP, _rawI] = await Promise.all([API.getUsers(), API.getPKM(), API.getIndikator()]);
+    allUsers = _rawU.filter(u => u.role !== 'Admin' && u.role !== 'Super Admin');
+    allPKMList = _rawP; allIndList = _rawI;
     window.allIndList = allIndList;
     renderUsersTable(allUsers);
 
@@ -626,6 +628,7 @@ function filterUsers() {
   const q = document.getElementById('searchUser').value.toLowerCase();
   const role = document.getElementById('filterRole').value;
   const filtered = allUsers.filter(u =>
+    u.role !== 'Admin' && u.role !== 'Super Admin' &&
     (!q || u.email.toLowerCase().includes(q) || u.nama.toLowerCase().includes(q)) &&
     (!role || u.role === role)
   );
@@ -638,7 +641,7 @@ function renderUsersTable(users, page) {
   const el = document.getElementById('usersTable');
   if (!el) return;
   if (page) _usersPage = page;
-  const filteredUsers = users.filter(u => u.role !== 'Super Admin' && u.email !== 'admin@vispm.com');
+  const filteredUsers = users.filter(u => u.role !== 'Super Admin' && u.role !== 'Admin' && u.email !== 'admin@vispm.com');
   const { items, page: p, totalPages, total } = paginateData(filteredUsers, _usersPage);
   const rowsHtml = items.map(u => `<tr>
       <td style="font-family:'JetBrains Mono';font-size:12px">${u.email}</td>
@@ -651,6 +654,7 @@ function renderUsersTable(users, page) {
       <td style="display:flex;gap:4px">
         <button class="btn-icon edit" onclick="editUser('${u.email}')"><span class="material-icons">edit</span></button>
         <button class="btn-icon" title="Reset Password" style="color:#0d9488" onclick="resetUserPassword('${u.email}','${u.nama}')"><span class="material-icons">lock_reset</span></button>
+        ${['Kepala Puskesmas','Pengelola Program'].includes(u.role) ? (()=>{ const _hasTT = !!(u.tandaTangan && (u.tandaTangan.startsWith('data:image') || u.tandaTangan.startsWith('http'))); return `<button class="btn-icon" title="${_hasTT ? 'Lihat Tanda Tangan' : 'Tanda tangan belum diupload'}" style="color:${_hasTT ? '#7c3aed' : '#cbd5e1'};cursor:${_hasTT ? 'pointer' : 'default'};opacity:${_hasTT ? '1' : '0.6'}" onclick="previewTandaTanganUser('${u.email}','${u.nama.replace(/'/g,"\\'").replace(/"/g,'&quot;')}','${u.role}')"><span class="material-icons">draw</span></button>`; })() : ''}
         <button class="btn-icon del" onclick="deleteUser('${u.email}')"><span class="material-icons">delete</span></button>
       </td>
     </tr>`).join('');
@@ -658,6 +662,64 @@ function renderUsersTable(users, page) {
     + '<thead><tr><th>Email</th><th>Nama</th><th>NIP</th><th>Role</th><th>Puskesmas</th><th>Jabatan/Indikator</th><th>Status</th><th>Aksi</th></tr></thead>'
     + '<tbody>' + rowsHtml + '</tbody></table></div>'
     + renderPagination('usersTable', total, p, totalPages, 'pg => { _usersPage=pg; renderUsersTable(allUsers); }');
+}
+
+
+// ============== PREVIEW TANDA TANGAN USER ==============
+function previewTandaTanganUser(email, nama, role) {
+  const user = (allUsers || []).find(u => u.email === email);
+  const tt = user?.tandaTangan;
+  let modal = document.getElementById('ttPreviewModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'ttPreviewModal';
+    modal.className = 'modal';
+    modal.style.zIndex = '3500';
+    modal.addEventListener('click', function(e) { if (e.target === modal) closeModal('ttPreviewModal'); });
+    document.body.appendChild(modal);
+  }
+  const hastt = !!(tt && (tt.startsWith('data:image') || tt.startsWith('http')));
+
+  // Build bagian tanda tangan tanpa nested template literal
+  let ttBodyHtml;
+  if (hastt) {
+    ttBodyHtml = '<div style="border:1.5px solid #e2e8f0;border-radius:10px;background:#f8fafc;padding:16px;text-align:center;min-height:80px">'
+      + '<img id="ttPreviewImg" src="' + tt + '" style="max-width:100%;max-height:180px;object-fit:contain" onerror="document.getElementById(\'ttImgErr\').style.display=\'block\';this.style.display=\'none\'">'
+      + '<div id="ttImgErr" style="display:none;color:#ef4444;font-size:13px;padding:8px"><span class="material-icons" style="font-size:18px;vertical-align:middle">broken_image</span> Gagal memuat gambar</div>'
+      + '</div>'
+      + '<div style="margin-top:10px;display:flex;align-items:center;gap:6px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:8px 12px">'
+      + '<span class="material-icons" style="color:#16a34a;font-size:16px">check_circle</span>'
+      + '<span style="font-size:12.5px;color:#15803d;font-weight:500">Tanda tangan tersedia dan siap digunakan di laporan PDF</span>'
+      + '</div>';
+  } else {
+    ttBodyHtml = '<div style="border:2px dashed #e2e8f0;border-radius:10px;background:#f8fafc;padding:32px;text-align:center">'
+      + '<span class="material-icons" style="font-size:40px;color:#cbd5e1;display:block;margin-bottom:8px">draw</span>'
+      + '<div style="font-size:13px;color:#94a3b8;font-weight:500">Tanda tangan belum diupload</div>'
+      + '<div style="font-size:12px;color:#b0bec5;margin-top:4px">User perlu login dan upload tanda tangan di halaman Profil</div>'
+      + '</div>'
+      + '<div style="margin-top:10px;display:flex;align-items:center;gap:6px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:8px 12px">'
+      + '<span class="material-icons" style="color:#ea580c;font-size:16px">warning</span>'
+      + '<span style="font-size:12.5px;color:#c2410c;font-weight:500">Tanda tangan tidak akan muncul di laporan PDF</span>'
+      + '</div>';
+  }
+
+  modal.innerHTML = '<div class="modal-card" style="max-width:480px;width:100%">'
+    + '<div class="modal-header">'
+    + '<span class="material-icons" style="color:#7c3aed">draw</span>'
+    + '<h3>Tanda Tangan</h3>'
+    + '<button class="btn-icon" onclick="closeModal(\'ttPreviewModal\')"><span class="material-icons">close</span></button>'
+    + '</div>'
+    + '<div class="modal-body">'
+    + '<div style="margin-bottom:14px"><div style="font-size:13px;color:var(--text-light);margin-bottom:2px">Nama</div><div style="font-weight:600;font-size:14px">' + nama + '</div></div>'
+    + '<div style="margin-bottom:14px"><div style="font-size:13px;color:var(--text-light);margin-bottom:2px">Role</div><div><span class="badge badge-info">' + role + '</span></div></div>'
+    + '<div><div style="font-size:13px;color:var(--text-light);margin-bottom:8px">Tanda Tangan</div>'
+    + ttBodyHtml
+    + '</div>'
+    + '</div>'
+    + '<div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal(\'ttPreviewModal\')">Tutup</button></div>'
+    + '</div>';
+
+  showModal('ttPreviewModal');
 }
 
 let _resetTargetEmail = '';
@@ -884,7 +946,7 @@ async function saveUser() {
     }
     toast(`User berhasil ${editEmail ? 'diupdate' : 'ditambahkan'}`);
     closeModal('userModal');
-    allUsers = await API.getUsers();
+    allUsers = (await API.getUsers()).filter(u => u.role !== 'Admin' && u.role !== 'Super Admin');
     renderUsersTable(allUsers);
   } catch (e) { toast(e.message, 'error'); }
   finally { setLoading(false); }
@@ -896,7 +958,7 @@ async function deleteUser(email) {
       try {
         await API.deleteUser(email);
         toast('User berhasil dihapus');
-        allUsers = await API.getUsers();
+        allUsers = (await API.getUsers()).filter(u => u.role !== 'Admin' && u.role !== 'Super Admin');
         filterUsers(); // re-apply filter yang aktif, bukan render semua
       } catch (e) { toast(e.message, 'error'); }
     }
@@ -2744,7 +2806,7 @@ async function renderPenandatanganTab(el) {
 
     const inds = (indikatorList || []).filter(i => i.aktif);
     // Daftar jabatan PP dari master jabatan
-    const jabatanOptions = (jabatanList || []).filter(j => j.aktif).map(j => j.nama);
+    const jabatanOptions = (jabatanList || []).filter(j => j.aktif).sort((a,b) => a.nama.localeCompare(b.nama)).map(j => j.nama);
 
     target.innerHTML = `
       <div class="card">

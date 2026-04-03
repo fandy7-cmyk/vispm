@@ -763,10 +763,7 @@ function buildSidebar() {
   html += `
     <div style="margin-top:auto;border-top:1px solid rgba(255,255,255,0.15);padding-top:6px;">
       <div class="menu-item" onclick="openBukuPanduan()" title="Lihat Buku Panduan VISPM">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
-          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
-        </svg>
+        <span class="material-icons">menu_book</span>
         <span>Buku Panduan</span>
       </div>
     </div>`;

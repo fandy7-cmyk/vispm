@@ -58,9 +58,9 @@ function fmtDT(ts) {
 // ============================================================
 function kopSurat(logoSrc = 'https://vispm.netlify.app/logobalut.png') {
   return `
-    <div style="position:relative;padding-bottom:10px;margin-bottom:14px;border-bottom:4px solid #1e293b;min-height:80px">
+    <div style="position:relative;padding-bottom:10px;margin-bottom:14px;border-bottom:2px solid #1e293b;min-height:80px">
       <img src="${logoSrc}" style="position:absolute;left:0;top:0;width:72px;height:72px;object-fit:contain" onerror="this.style.display='none'">
-      <div style="text-align:center;line-height:1;padding:0 86px">
+      <div style="text-align:center;line-height:1.1;padding:0 86px">
         <div style="font-family:Arial;font-size:12px;font-weight:400;text-transform:uppercase;letter-spacing:0.3px">PEMERINTAH KABUPATEN BANGGAI LAUT</div>
         <div style="font-family:Arial;font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:0.2px">DINAS KESEHATAN, PENGENDALIAN PENDUDUK</div>
         <div style="font-family:Arial;font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:0.2px">DAN KELUARGA BERENCANA</div>
@@ -184,27 +184,19 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
      WHERE vp.id_usulan = $1 ORDER BY vp.created_at`, [idUsulan]
   );
 
-  // Konfigurasi penandatangan dari DB (dinamis, bukan hardcoded)
-  // JOIN langsung ke users berdasarkan jabatan → ambil nama, nip, tanda_tangan
+  // Konfigurasi penandatangan dari DB — hanya ambil jabatan & urutan per indikator
+  // nama/NIP/TT diambil dari verifikasi_program+users (by email) di getVerifierSlots
   const penandatanganCfg = await pool.query(
-    `SELECT ip.no_indikator, ip.jabatan, ip.urutan,
-            u.nama, u.nip, u.tanda_tangan, u.email
-     FROM indikator_penandatangan ip
-     LEFT JOIN users u ON (
-       -- Cocokkan jabatan user (bisa multi-jabatan dipisah '|')
-       LOWER(u.jabatan) = LOWER(ip.jabatan)
-       OR u.jabatan ILIKE ip.jabatan || '|%'
-       OR u.jabatan ILIKE '%|' || ip.jabatan
-       OR u.jabatan ILIKE '%|' || ip.jabatan || '|%'
-     ) AND u.aktif = true
-     ORDER BY ip.no_indikator, ip.urutan`
+    `SELECT no_indikator, jabatan, urutan
+     FROM indikator_penandatangan
+     ORDER BY no_indikator, urutan`
   ).catch(() => ({ rows: [] }));
 
-  // Kelompokkan per no_indikator → { 1: [{jabatan, nama, nip, tanda_tangan, ...}] }
+  // Kelompokkan per no_indikator → { 1: ['Jabatan A', 'Jabatan B'], 2: [...] }
   const JABATAN_MAP_DB = {};
   for (const row of penandatanganCfg.rows) {
     if (!JABATAN_MAP_DB[row.no_indikator]) JABATAN_MAP_DB[row.no_indikator] = [];
-    JABATAN_MAP_DB[row.no_indikator].push(row);
+    JABATAN_MAP_DB[row.no_indikator].push(row.jabatan);
   }
 
   const bulanNama = ['','Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
@@ -212,59 +204,66 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
   const _nowDt = new Date();
   const _nowOpt = { timeZone: 'Asia/Makassar' };
   const now = _nowDt.toLocaleDateString('id-ID', { ..._nowOpt, day:'2-digit', month:'long', year:'numeric' })
-            + ' | ' + _nowDt.toLocaleTimeString('id-ID', { ..._nowOpt, hour:'2-digit', minute:'2-digit', hour12:false }) + ' WITA';
+            + ' | ' + _nowDt.toLocaleTimeString('id-ID', { ..._nowOpt, hour:'2-digit', minute:'2-digit', hour12:false }).replace('.', ':') + ' WITA';
+
+  // Helper lowercase untuk string nullable
+  function LOWER(s) { return (s||'').toLowerCase(); }
 
   function getVerifierSlots(noInd) {
-    const cfgSlots = JABATAN_MAP_DB[noInd] || [];
+    const jabatanList = JABATAN_MAP_DB[noInd] || [];
 
-    if (!cfgSlots.length) {
-      // Belum dikonfigurasi di UI → fallback: tampilkan PP yang eligible dari verifikasi_program
-      const eligible = vpResult.rows.filter(v => {
-        const inds = (v.user_indikator_akses||'').split(',').map(s=>s.trim()).filter(Boolean);
-        return inds.length > 0 && inds.includes(String(noInd));
-      });
+    // PP yang benar-benar memverifikasi indikator ini (dari verifikasi_program)
+    // Difilter by indikator_akses user agar hanya yang relevan
+    const eligible = vpResult.rows.filter(v => {
+      const akses = (v.user_indikator_akses||'').split(',').map(s=>s.trim()).filter(Boolean);
+      return akses.includes(String(noInd));
+    });
+
+    if (!jabatanList.length) {
+      // Belum dikonfigurasi → fallback tampilkan PP yang sudah verifikasi
       return eligible.map(v => ({
-        // mode lama — ambil dari verifikasi_program
-        fromVerif: true,
-        v,
-        jabatan: (v.jabatan_user||'').split('|')[0].trim() || 'Pengelola Program',
-        nama: v.nama_program || v.email_program,
-        nip: v.nip_program || '',
+        // Jabatan label: dari jabatan_program (yang disimpan saat verif) atau jabatan_user
+        jabatan: (v.jabatan_program||'').split('|')[0].trim()
+               || (v.jabatan_user||'').split('|')[0].trim()
+               || 'Pengelola Program',
+        nama: v.nama_program || v.nama_user || v.email_program,
+        nip: v.nip_program || v.nip_user || '',
         tt: v.tt_program || '',
         verifiedAt: v.verified_at,
         status: v.status,
       }));
     }
 
-    // Gunakan konfigurasi dari Master Data → ambil nama/NIP/TT dari users
-    // Lalu cari waktu verifikasi yang sesuai dari verifikasi_program
-    return cfgSlots.map(cfg => {
-      // Cari record verifikasi_program yang cocok dengan email/jabatan dari konfigurasi
-      const verif = vpResult.rows.find(v => {
-        if (cfg.email && LOWER(v.email_program) === LOWER(cfg.email)) return true;
-        const jabatanList = [
+    // Ada konfigurasi → per slot jabatan, cari PP yang:
+    //   1. Sudah verifikasi indikator ini (ada di eligible)
+    //   2. Jabatan usernya mengandung jabatan yang dikonfigurasi
+    // Jabatan label tetap dari konfigurasi (bukan dari users.jabatan)
+    return jabatanList.map(jabatanCfg => {
+      const cfgKey = jabatanCfg.toLowerCase().replace(' kabupaten', '').trim();
+
+      const verif = eligible.find(v => {
+        // Pecah multi-jabatan user (dipisah '|')
+        const userJabatanList = [
           ...(v.jabatan_user||'').split('|'),
-          ...(v.jabatan_program||'').split('|')
-        ].map(j => j.trim().toLowerCase());
-        const cfgKey = (cfg.jabatan||'').toLowerCase();
-        return jabatanList.some(j => j === cfgKey || j.includes(cfgKey.replace(' kabupaten','')) );
+          ...(v.jabatan_program||'').split('|'),
+        ].map(j => j.trim().toLowerCase().replace(' kabupaten', '').trim());
+        return userJabatanList.some(j => j === cfgKey || j.includes(cfgKey) || cfgKey.includes(j));
       });
 
-      const ttRaw = cfg.tanda_tangan || (verif ? verif.tt_program : '') || '';
-      return {
-        fromVerif: false,
-        jabatan: cfg.jabatan,
-        nama: cfg.nama || (verif ? (verif.nama_program || verif.email_program) : '-'),
-        nip: cfg.nip || (verif ? verif.nip_program : '') || '',
-        tt: ttRaw,
-        verifiedAt: verif ? verif.verified_at : null,
-        status: verif ? verif.status : null,
-      };
-    });
-  }
+      if (!verif) return null; // slot ini belum diverifikasi, skip
 
-  // Helper kecil lowercase untuk string nullable
-  function LOWER(s) { return (s||'').toLowerCase(); }
+      return {
+        // Jabatan label dari KONFIGURASI (bukan dari users.jabatan)
+        jabatan: jabatanCfg,
+        // Nama, NIP, TT dari user yang benar-benar verifikasi
+        nama: verif.nama_program || verif.nama_user || verif.email_program,
+        nip: verif.nip_program || verif.nip_user || '',
+        tt: verif.tt_program || '',
+        verifiedAt: verif.verified_at,
+        status: verif.status,
+      };
+    }).filter(s => s !== null);
+  }
 
   function signBlock(slot) {
     const { jabatan, nama, nip, tt: ttRaw, verifiedAt, status } = slot;
@@ -278,18 +277,18 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
                  <div style="font-size:9px;color:#94a3b8;margin-bottom:2px">Menunggu persetujuan</div>`;
     } else if (ttValid) {
       signImg = `<div style="height:80px;display:flex;align-items:center;justify-content:center;margin-bottom:4px">
-                   <img src="${tt}" style="max-height:72px;max-width:160px;object-fit:contain">
+                   <img src="${tt}" style="max-height:72px;max-width:160px;object-fit:contain;display:block;margin:0 auto">
                  </div>
                  <div style="font-size:9px;color:#2d7a47;font-weight:700;margin-bottom:2px;display:flex;align-items:center;justify-content:center;gap:4px"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"11\" height=\"11\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#2d7a47\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M22 11.08V12a10 10 0 1 1-5.93-9.14\"/><polyline points=\"22 4 12 14.01 9 11.01\"/></svg>Diverifikasi: ${fmtDT(verifiedAt)}</div>`;
     } else {
       signImg = `<div style="display:inline-block;margin-bottom:6px">${approvedBadgeSVG()}</div>
                  <div style="font-size:9px;color:#2d7a47;font-weight:700;margin-bottom:2px;display:flex;align-items:center;justify-content:center;gap:4px"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"11\" height=\"11\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#2d7a47\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M22 11.08V12a10 10 0 1 1-5.93-9.14\"/><polyline points=\"22 4 12 14.01 9 11.01\"/></svg>Diverifikasi: ${fmtDT(verifiedAt)}</div>`;
     }
-    return `<div style="text-align:center;min-width:180px;max-width:220px">
+    return `<div style="text-align:center;flex:1">
       <div style="font-size:10px;color:#334155;margin-bottom:10px;font-weight:600">${jabatan}</div>
       ${signImg}
-      <div style="margin-top:4px;border-top:1px solid #334155;padding-top:4px;display:inline-block;min-width:150px">
-        <div style="font-size:10.5px;font-weight:700">${nama}</div>
+      <div style="display:inline-block;text-align:center">
+        <div style="font-size:10.5px;font-weight:700;border-bottom:1px solid #334155;padding-bottom:2px;white-space:nowrap">${nama}</div>
         ${nip ? `<div style="font-size:9.5px">NIP. ${nip}</div>` : ''}
       </div>
     </div>`;
@@ -309,18 +308,18 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
                  <div style="font-size:9px;color:#94a3b8;margin-bottom:2px">Menunggu persetujuan</div>`;
     } else if (ttValid) {
       signImg = `<div style="height:80px;display:flex;align-items:center;justify-content:center;margin-bottom:4px">
-                   <img src="${tt}" style="max-height:72px;max-width:160px;object-fit:contain">
+                   <img src="${tt}" style="max-height:72px;max-width:160px;object-fit:contain;display:block;margin:0 auto">
                  </div>
                  <div style="font-size:9px;color:#2d7a47;font-weight:700;margin-bottom:2px;display:flex;align-items:center;justify-content:center;gap:4px"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"11\" height=\"11\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#2d7a47\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M22 11.08V12a10 10 0 1 1-5.93-9.14\"/><polyline points=\"22 4 12 14.01 9 11.01\"/></svg>Diverifikasi: ${fmtDT(h.kapus_approved_at)}</div>`;
     } else {
       signImg = `<div style="display:inline-block;margin-bottom:6px">${approvedBadgeSVG()}</div>
                  <div style="font-size:9px;color:#2d7a47;font-weight:700;margin-bottom:2px;display:flex;align-items:center;justify-content:center;gap:4px"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"11\" height=\"11\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#2d7a47\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M22 11.08V12a10 10 0 1 1-5.93-9.14\"/><polyline points=\"22 4 12 14.01 9 11.01\"/></svg>Diverifikasi: ${fmtDT(h.kapus_approved_at)}</div>`;
     }
-    return `<div style="text-align:center;min-width:180px;max-width:220px">
+    return `<div style="text-align:center;flex:1">
       <div style="font-size:10px;color:#334155;margin-bottom:10px;font-weight:600">Kepala UPTD Puskesmas ${h.nama_puskesmas||h.kode_pkm}</div>
       ${signImg}
-      <div style="margin-top:4px;border-top:1px solid #334155;padding-top:4px;display:inline-block;min-width:150px">
-        <div style="font-size:10.5px;font-weight:700">${nama}</div>
+      <div style="display:inline-block;text-align:center">
+        <div style="font-size:10.5px;font-weight:700;border-bottom:1px solid #334155;padding-bottom:2px;white-space:nowrap">${nama}</div>
         ${nipHtml}
       </div>
     </div>`;
@@ -333,17 +332,16 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
     const tsHtml = h.admin_approved_at
       ? `<div style="font-size:9px;color:#2d7a47;font-weight:700;margin-bottom:2px;display:flex;align-items:center;justify-content:center;gap:4px"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"11\" height=\"11\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#2d7a47\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M22 11.08V12a10 10 0 1 1-5.93-9.14\"/><polyline points=\"22 4 12 14.01 9 11.01\"/></svg>Diverifikasi: ${fmtDT(h.admin_approved_at)}</div>`
       : '';
-    return `<div style="text-align:center;min-width:180px;max-width:220px">
+    return `<div style="text-align:center;flex:1">
       <div style="font-size:10px;color:#334155;margin-bottom:10px;font-weight:600">${jabatanLabel}</div>
       ${ttValid
         ? `<div style="height:80px;display:flex;align-items:center;justify-content:center;margin-bottom:4px">
-             <img src="${tt}" style="max-height:72px;max-width:160px;object-fit:contain">
+             <img src="${tt}" style="max-height:72px;max-width:160px;object-fit:contain;display:block;margin:0 auto">
            </div>`
         : `<div style="width:80px;height:80px;border:2px dashed #cbd5e1;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:#94a3b8;font-size:10px;margin-bottom:6px">TT</div>`}
       ${tsHtml}
-      <div style="margin-top:4px;border-top:1px solid #334155;padding-top:4px;display:inline-block;min-width:150px">
-        <div style="font-size:10.5px;font-weight:700">${pj.nama||'-'}</div>
-        ${pj.nip ? `<div style="font-size:9.5px">NIP. ${pj.nip}</div>` : ''}
+      <div style="display:inline-block;text-align:center">
+        <div style="font-size:10.5px;font-weight:700;border-bottom:1px solid #334155;padding-bottom:2px;white-space:nowrap">${pj.nama||'-'}</div>        ${pj.nip ? `<div style="font-size:9.5px">NIP. ${pj.nip}</div>` : ''}
       </div>
     </div>`;
   }
@@ -913,6 +911,101 @@ async function generateLaporanLog(pool, idUsulan) {
 }
 
 // ============================================================
+//  MODE: rekap — tabel rekap semua usulan sesuai filter
+//  Dipanggil dari handler dengan ?mode=rekap&ids=id1,id2,...
+//  Opsional: &tahun=2026&bulan=Januari&pkm=NUSANTARA&status=Selesai
+// ============================================================
+async function generateLaporanRekap(pool, ids, filterLabel) {
+  if (!ids || !ids.length) throw new Error('Tidak ada data untuk direkap');
+
+  const bulanNama = ['','Januari','Februari','Maret','April','Mei','Juni',
+    'Juli','Agustus','September','Oktober','November','Desember'];
+
+  // Fetch semua header sekaligus
+  const placeholders = ids.map((_, i) => `$${i + 1}`).join(',');
+  const result = await pool.query(
+    `SELECT uh.*, p.nama_puskesmas
+     FROM usulan_header uh
+     LEFT JOIN master_puskesmas p ON uh.kode_pkm = p.kode_pkm
+     WHERE uh.id_usulan IN (${placeholders})
+     ORDER BY uh.tahun DESC, uh.bulan DESC, p.nama_puskesmas`,
+    ids
+  );
+  const rows = result.rows;
+
+  const _nowRekap = new Date();
+  const _nowOpt = { timeZone: 'Asia/Makassar' };
+  const nowStr = _nowRekap.toLocaleDateString('id-ID', { ..._nowOpt, day: '2-digit', month: 'long', year: 'numeric' })
+    + ' | ' + _nowRekap.toLocaleTimeString('id-ID', { ..._nowOpt, hour: '2-digit', minute: '2-digit', hour12: false }).replace('.', ':') + ' WITA';
+
+  // Hitung summary
+  const total    = rows.length;
+  const selesai  = rows.filter(r => r.status_global === 'Selesai').length;
+  const pending  = rows.filter(r => !['Selesai','Ditolak'].includes(r.status_global)).length;
+  const spmNums  = rows.map(r => parseFloat(r.indeks_spm)).filter(v => v > 0);
+  const rataSPM  = spmNums.length ? (spmNums.reduce((a,b)=>a+b,0)/spmNums.length).toFixed(2) : '0';
+
+  const statusColor = (s) => {
+    if (s === 'Selesai') return '#16a34a';
+    if (s === 'Ditolak' || s === 'Ditolak Sebagian') return '#dc2626';
+    if ((s||'').includes('Menunggu')) return '#d97706';
+    return '#475569';
+  };
+  const statusBg = (s) => {
+    if (s === 'Selesai') return '#dcfce7';
+    if (s === 'Ditolak' || s === 'Ditolak Sebagian') return '#fee2e2';
+    if ((s||'').includes('Menunggu')) return '#fef3c7';
+    return '#f1f5f9';
+  };
+
+  const rowsHtml = rows.map((r, i) => {
+    const status = r.status_global || 'Draft';
+    const spm = parseFloat(r.indeks_spm||0).toFixed(2);
+    const namaBln = bulanNama[r.bulan] || '';
+    return `<tr style="${i%2===1?'background:#f8fafc':''}">
+      <td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center;font-weight:600;color:#475569">${i+1}</td>
+      <td style="padding:6px 8px;border:1px solid #e2e8f0;font-weight:600">${r.nama_puskesmas||r.kode_pkm}</td>
+      <td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center">${namaBln} ${r.tahun}</td>
+      <td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center;font-size:10px;color:#64748b">${fmtDT(r.created_at)}</td>
+      <td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center;font-weight:700;color:#0d9488">${spm}</td>
+      <td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center">
+        <span style="background:${statusBg(status)};color:${statusColor(status)};border-radius:20px;padding:2px 8px;font-size:10px;font-weight:700;white-space:nowrap">${status}</span>
+      </td>
+    </tr>`;
+  }).join('');
+
+  const filterInfoHtml = filterLabel
+    ? `<div style="font-size:10.5px;color:#64748b;margin-top:4px">Filter: ${filterLabel}</div>`
+    : '';
+
+  const bodyHtml = `
+    ${kopSurat()}
+    <div style="text-align:center;margin:14px 0 10px">
+      <div style="font-size:13px;font-weight:700;text-transform:uppercase">Rekap Laporan Usulan</div>
+      <div style="font-size:12px;font-weight:700;text-transform:uppercase">Indeks Standar Pelayanan Minimal (SPM) Bidang Kesehatan</div>
+      ${filterInfoHtml}
+    </div>
+    <!-- Tabel data -->
+    <table style="width:100%;border-collapse:collapse;font-size:11px">
+      <thead>
+        <tr style="background:#1e293b">
+          <th style="color:white;padding:7px 8px;border:1px solid #334155;text-align:center;width:28px">NO</th>
+          <th style="color:white;padding:7px 8px;border:1px solid #334155;text-align:left">PUSKESMAS</th>
+          <th style="color:white;padding:7px 8px;border:1px solid #334155;text-align:center;width:100px">PERIODE</th>
+          <th style="color:white;padding:7px 8px;border:1px solid #334155;text-align:center;width:130px">TGL DIBUAT</th>
+          <th style="color:white;padding:7px 8px;border:1px solid #334155;text-align:center;width:70px">INDEKS SPM</th>
+          <th style="color:white;padding:7px 8px;border:1px solid #334155;text-align:center;width:110px">STATUS</th>
+        </tr>
+      </thead>
+      <tbody>${rowsHtml}</tbody>
+    </table>
+    <div style="margin-top:10px;font-size:10px;color:#94a3b8;text-align:right">Dicetak: ${nowStr}</div>`;
+
+  const filename = `Rekap_Laporan_SPM.pdf`;
+  return { html: wrapHtml('Rekap Laporan SPM', bodyHtml), filename };
+}
+
+// ============================================================
 //  ENTRY POINT — generateLaporanHtml (dipanggil dari handler)
 // ============================================================
 async function generateLaporanHtml(idUsulan, mode, aksesFilter) {
@@ -932,9 +1025,30 @@ exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors();
   const params = event.queryStringParameters || {};
   const idUsulan = params.id;
-  const mode = params.mode || 'final'; // 'sementara' | 'final' | 'log'
+  const mode = params.mode || 'final'; // 'sementara' | 'final' | 'log' | 'rekap'
   const aksesParam = params.akses || '';
   const aksesFilter = aksesParam ? aksesParam.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n) && n > 0) : [];
+
+  // Mode rekap — tidak butuh single id, tapi butuh ?ids=id1,id2,...
+  if (mode === 'rekap') {
+    const idsParam = params.ids || '';
+    const ids = idsParam.split(',').map(s => s.trim()).filter(Boolean);
+    if (!ids.length) return { statusCode: 400, headers: { 'Access-Control-Allow-Origin': '*' }, body: 'Parameter ids diperlukan' };
+    try {
+      const pool = getPool();
+      const filterLabel = params.filter_label ? decodeURIComponent(params.filter_label) : '';
+      const { html, filename } = await generateLaporanRekap(pool, ids, filterLabel);
+      const rawBytes = Buffer.byteLength(html, 'utf8');
+      if (rawBytes > 3 * 1024 * 1024) {
+        const compressed = await gzip(html);
+        return { statusCode: 200, isBase64Encoded: true, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Content-Encoding': 'gzip', 'Content-Disposition': `inline; filename="${filename}"`, 'Access-Control-Allow-Origin': '*' }, body: compressed.toString('base64') };
+      }
+      return { statusCode: 200, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Content-Disposition': `inline; filename="${filename}"`, 'Access-Control-Allow-Origin': '*' }, body: html };
+    } catch(e) {
+      return { statusCode: 500, headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ error: e.message }) };
+    }
+  }
+
   if (!idUsulan) return {
     statusCode: 400,
     headers: { 'Access-Control-Allow-Origin': '*' },

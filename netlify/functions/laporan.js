@@ -51,7 +51,6 @@ exports.handler = async (event) => {
       where.push(`uh.created_by = $${idx++}`);
       qParams.push(params.email_operator);
     }
-
     const whereStr = where.length > 0 ? 'WHERE ' + where.join(' AND ') : '';
 
     // Pagination — default 1000 (laporan biasanya ingin semua data dalam satu halaman untuk export)
@@ -97,6 +96,7 @@ exports.handler = async (event) => {
       totalIndikator: parseInt(r.total_indikator) || 0,
       indeksSPM: parseFloat(r.indeks_spm) ? parseFloat(r.indeks_spm).toFixed(2) : '0',
       statusGlobal: r.status_global || 'Draft',
+      statusKapus: r.status_kapus || 'Menunggu',
       createdBy: r.created_by || '',
       createdAt: r.created_at,
       finalApprovedBy: r.final_approved_by || '',

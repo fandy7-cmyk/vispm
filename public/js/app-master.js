@@ -20,8 +20,17 @@ async function renderLaporan() {
     <div class="page-header">
       <h1><span class="material-icons">bar_chart</span>Laporan</h1>
     </div>
+    <div class="stats-grid" id="lapStats"></div>
     <div class="card">
-      <div class="card-header-bar" style="justify-content:space-between"><span class="card-title"><span class="material-icons">filter_list</span>Filter</span><button class="btn btn-primary btn-sm" onclick="exportLaporan()"><span class="material-icons">download</span>Export Excel</button></div>
+      <div class="card-header-bar" style="justify-content:space-between">
+        <span class="card-title"><span class="material-icons">filter_list</span>Filter</span>
+        <div style="display:flex;gap:6px;align-items:center">
+          <button onclick="downloadRekapLaporan()" title="Download PDF Rekap sesuai filter"
+            style="background:transparent;border:none;padding:4px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"/><path d="m7 11 5 5 5-5"/><path d="M4 19c0 1.1 1.8 2 4 2h8c2.2 0 4-.9 4-2"/></svg>
+          </button>
+        </div>
+      </div>
       <div class="card-body">
         <div class="filter-row">
           <select class="form-control" id="lapTahun" onchange="loadLaporan()" style="min-width:100px"><option value="">Memuat...</option></select>
@@ -33,7 +42,6 @@ async function renderLaporan() {
         </div>
       </div>
     </div>
-    <div class="stats-grid" id="lapStats"></div>
     <div class="card">
       <div class="card-body" style="padding:0" id="lapTable"></div>
     </div>`;
@@ -89,19 +97,19 @@ function _lapRebuildFilters(rows, selTahun, selBulan, selStatus, selPKM) {
 
 // Apply filter di sisi klien ke _lapAllData
 function _lapApplyFilter() {
-  const tahun  = document.getElementById('lapTahun')?.value;
-  const bulan  = document.getElementById('lapBulan')?.value;
-  const status = document.getElementById('lapStatus')?.value;
-  const pkm    = document.getElementById('lapPKM')?.value;
+  const tahun    = document.getElementById('lapTahun')?.value;
+  const bulan    = document.getElementById('lapBulan')?.value;
+  const status   = document.getElementById('lapStatus')?.value;
+  const pkm      = document.getElementById('lapPKM')?.value;
 
   // Rebuild semua filter untuk tahun yang dipilih (termasuk PKM & bulan)
   _lapRebuildFilters(_lapAllData, tahun, bulan, status, pkm);
 
   const filtered = _lapAllData.filter(r =>
-    (!tahun  || String(r.tahun) === String(tahun)) &&
-    (!bulan  || String(r.bulan) === String(bulan)) &&
-    (!status || r.statusGlobal  === status)        &&
-    (!pkm    || r.kodePKM       === pkm)
+    (!tahun    || String(r.tahun) === String(tahun))  &&
+    (!bulan    || String(r.bulan) === String(bulan))  &&
+    (!status   || r.statusGlobal  === status)         &&
+    (!pkm      || r.kodePKM       === pkm)
   );
 
   _lapRenderTable(filtered);
@@ -115,7 +123,9 @@ async function loadLaporan() {
 
   try {
     const result = await API.getLaporan(params);
-    _lapAllData = result.data || [];
+    const rawData = result.data || [];
+
+    _lapAllData = rawData;
 
     const prevTahun  = document.getElementById('lapTahun')?.value  || String(CURRENT_YEAR);
     const prevBulan  = document.getElementById('lapBulan')?.value  || '';
@@ -171,15 +181,112 @@ function _lapRenderTable(data) {
 function exportLaporan() {
   const data = window._laporanData;
   if (!data || !data.length) return toast('Tidak ada data untuk diekspor', 'warning');
+  const tahun   = document.getElementById('lapTahun')?.value || '';
+  const bulan   = document.getElementById('lapBulan')?.options[document.getElementById('lapBulan').selectedIndex]?.text || 'Semua Bulan';
+  const pkm     = document.getElementById('lapPKM')?.options[document.getElementById('lapPKM')?.selectedIndex]?.text || '';
+  const filterInfo = `Tahun: ${tahun} | Bulan: ${bulan}${pkm ? ' | PKM: '+pkm : ''}`;
   const headers = ['No','ID Usulan','Puskesmas','Periode','Tgl Dibuat','Indeks SPM','Status','Dibuat Oleh'];
-  const rows = data.map(r => [
-    r.no, r.idUsulan, r.namaPKM,
+  const rows = data.map((r, i) => [
+    i + 1, r.idUsulan, r.namaPKM,
     r.namaBulan + ' ' + r.tahun,
     formatDateTime(r.createdAt),
     parseFloat(r.indeksSPM||0).toFixed(2),
     r.statusGlobal, r.createdBy||''
   ]);
-  _downloadExcel('Laporan_SPM', headers, rows);
+  _downloadExcel('Laporan_SPM_' + tahun, headers, rows);
+  toast('Export Excel berhasil! Filter: ' + filterInfo, 'success');
+}
+
+// Download PDF Rekap sesuai filter aktif — 1 PDF tabel rekap dengan kop surat
+async function downloadRekapLaporan() {
+  const data = window._laporanData;
+  if (!data || !data.length) return toast('Tidak ada data untuk didownload', 'warning');
+
+  // Susun label filter untuk ditampilkan di PDF
+  const tahun  = document.getElementById('lapTahun')?.value || '';
+  const bulanEl = document.getElementById('lapBulan');
+  const bulan  = bulanEl?.options[bulanEl.selectedIndex]?.text || '';
+  const pkmEl  = document.getElementById('lapPKM');
+  const pkm    = pkmEl?.options[pkmEl?.selectedIndex]?.text || '';
+  const statusEl = document.getElementById('lapStatus');
+  const status = statusEl?.options[statusEl.selectedIndex]?.text || '';
+
+  const parts = [];
+  if (tahun) parts.push(`Tahun ${tahun}`);
+  if (bulan && bulan !== 'Semua Bulan') parts.push(bulan);
+  if (pkm   && pkm   !== 'Semua Puskesmas') parts.push(pkm);
+  if (status && status !== 'Semua Status') parts.push(status);
+  const filterLabel = parts.length ? parts.join(' | ') : 'Semua Data';
+
+  const ids = data.map(r => r.idUsulan);
+  const idsParam = encodeURIComponent(ids.join(','));
+  const filterParam = encodeURIComponent(filterLabel);
+  const url = `/api/laporan-pdf?mode=rekap&ids=${idsParam}&filter_label=${filterParam}`;
+
+  const pw = window.open('', '_blank');
+  if (!pw) return toast('Popup diblokir browser. Izinkan popup untuk situs ini.', 'error');
+
+  const _steps = ['Mengambil data rekap...','Menyusun tabel...','Menyiapkan kop surat...','Menyiapkan cetak...'];
+  pw.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Memuat Rekap Laporan...</title><style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'Segoe UI',Arial,sans-serif;background:#0f172a;display:flex;align-items:center;justify-content:center;height:100vh;overflow:hidden}
+    body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 80% 60% at 50% 0%,rgba(13,148,136,0.15) 0%,transparent 70%);pointer-events:none}
+    .card{background:rgba(15,23,42,0.95);border:1px solid rgba(13,148,136,0.25);border-radius:24px;padding:44px 52px;text-align:center;box-shadow:0 0 0 1px rgba(255,255,255,0.04),0 32px 80px rgba(0,0,0,0.6);max-width:400px;width:90%;position:relative;overflow:hidden}
+    .card::before{content:'';position:absolute;top:-1px;left:20%;right:20%;height:1px;background:linear-gradient(90deg,transparent,#0d9488,transparent)}
+    .logo-wrap{width:72px;height:72px;margin:0 auto 24px;position:relative}
+    .pulse{position:absolute;inset:-8px;border-radius:50%;border:1px solid rgba(13,148,136,0.3);animation:pulse 2s ease-out infinite}
+    .pulse2{position:absolute;inset:-16px;border-radius:50%;border:1px solid rgba(13,148,136,0.15);animation:pulse 2s ease-out infinite .6s}
+    .ring-wrap{position:absolute;inset:0}.ring{position:absolute;inset:0;border-radius:50%;border:2.5px solid transparent}
+    .ring-1{border-top-color:#0d9488;animation:spin 1.1s linear infinite}
+    .ring-2{inset:7px;border-right-color:#14b8a6;animation:spin 1.7s linear infinite reverse}
+    .ring-3{inset:14px;border-bottom-color:#5eead4;animation:spin 2.3s linear infinite}
+    .icon-c{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    @keyframes pulse{0%{transform:scale(1);opacity:.6}100%{transform:scale(1.5);opacity:0}}
+    .badge{display:inline-block;font-size:9px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#0d9488;background:rgba(13,148,136,0.1);border:1px solid rgba(13,148,136,0.3);border-radius:99px;padding:3px 10px;margin-bottom:14px}
+    .title{font-size:22px;font-weight:800;color:white;letter-spacing:-0.3px;margin-bottom:6px}
+    .desc{font-size:12.5px;color:#64748b;margin-bottom:28px;line-height:1.5}
+    .bar-wrap{background:rgba(255,255,255,0.06);border-radius:99px;height:4px;overflow:hidden;margin-bottom:20px}
+    .bar{height:100%;width:0%;background:linear-gradient(90deg,#0d9488,#14b8a6,#5eead4);border-radius:99px;animation:load 3.8s cubic-bezier(.4,0,.2,1) forwards}
+    @keyframes load{0%{width:0%}25%{width:38%}55%{width:65%}78%{width:82%}95%{width:93%}100%{width:95%}}
+    .steps{display:flex;flex-direction:column;gap:7px;text-align:left}
+    .step{display:flex;align-items:center;gap:8px;font-size:11px;color:#1e3a4a;transition:color .4s}
+    .step.active{color:#5eead4}.step.done{color:#0d9488}
+    .step-dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,0.07);flex-shrink:0;transition:all .4s}
+    .step.active .step-dot{background:#5eead4;box-shadow:0 0 8px #5eead4}.step.done .step-dot{background:#0d9488}
+    .step-check{display:none;font-size:10px}.step.done .step-check{display:inline}.step.done .step-dot{display:none}
+  </style>
+  <script>
+    var _s=${JSON.stringify(_steps)};var _t=[700,1500,2500,3300];
+    _s.forEach(function(s,i){setTimeout(function(){var els=document.querySelectorAll('.step');if(i>0&&els[i-1])els[i-1].className='step done';if(els[i])els[i].className='step active';},_t[i]||i*900);});
+  <\/script></head><body>
+    <div class="card">
+      <div class="logo-wrap"><div class="pulse"></div><div class="pulse2"></div>
+        <div class="ring-wrap"><div class="ring ring-1"></div><div class="ring ring-2"></div><div class="ring ring-3"></div></div>
+        <div class="icon-c"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#5eead4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg></div>
+      </div>
+      <div class="badge">VISPM</div>
+      <div class="title">Rekap Laporan</div>
+      <div class="desc">Menyiapkan rekap ${data.length} usulan...<br><span style="font-size:11px;color:#475569">${filterLabel}</span></div>
+      <div class="bar-wrap"><div class="bar"></div></div>
+      <div class="steps">${_steps.map((s,i)=>`<div class="step${i===0?' active':''}"><div class="step-dot"></div><span class="step-check">✓</span>${s}</div>`).join('')}</div>
+    </div>
+  </body></html>`);
+
+  toast('Menyiapkan rekap laporan...', 'success');
+  try {
+    const _user = (() => { try { return JSON.parse(sessionStorage.getItem('spm_user') || '{}'); } catch(e) { return {}; } })();
+    const _token = _user.sessionToken || '';
+    const res = await fetch(url, { headers: _token ? { 'Authorization': 'Bearer ' + _token } : {} });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const html = await res.text();
+    pw.document.open();
+    pw.document.write(html);
+    pw.document.close();
+  } catch(e) {
+    pw.document.write('<html><body style="font-family:Arial;padding:40px;color:#ef4444"><p>Gagal memuat rekap: ' + e.message + '</p></body></html>');
+    toast('Gagal membuka rekap: ' + e.message, 'error');
+  }
 }
 
 // ============== MASTER DATA (TAB) ==============

@@ -73,7 +73,7 @@ function renderAdminDashboard(el, d) {
           </button>
         </div>
         <div class="card-body" style="padding:0">
-          <div id="adminPendingTable"><div class="empty-state" style="padding:32px"><div style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;position:relative"><div style="width:8px;height:8px;border-radius:50%;background:#378ADD"></div><div style="position:absolute;width:7px;height:7px;border-radius:50%;background:#B5D4F4;animation:orbit-dot 1s linear infinite;transform-origin:center"></div></div><p>Memuat...</p></div></div>
+          <div id="adminPendingTable"><div class="empty-state" style="padding:32px"><div style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;position:relative"><div style="width:8px;height:8px;border-radius:50%;background:#378ADD"></div><div style="position:absolute;width:7px;height:7px;border-radius:50%;background:#B5D4F4;animation:orbit-dot 1s linear infinite;transform-origin:center"></div></div><p>Memuat data...</p></div></div>
         </div>
       </div>
       <div class="card" style="margin:0">
@@ -84,7 +84,7 @@ function renderAdminDashboard(el, d) {
           </button>
         </div>
         <div class="card-body" style="padding:0" id="pkmProgressTable">
-          <div class="empty-state" style="padding:32px"><div style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;position:relative"><div style="width:8px;height:8px;border-radius:50%;background:#378ADD"></div><div style="position:absolute;width:7px;height:7px;border-radius:50%;background:#B5D4F4;animation:orbit-dot 1s linear infinite;transform-origin:center"></div></div><p>Memuat...</p></div>
+          <div class="empty-state" style="padding:32px"><div style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;position:relative"><div style="width:8px;height:8px;border-radius:50%;background:#378ADD"></div><div style="position:absolute;width:7px;height:7px;border-radius:50%;background:#B5D4F4;animation:orbit-dot 1s linear infinite;transform-origin:center"></div></div><p>Memuat data...</p></div>
         </div>
       </div>
     </div>
@@ -111,7 +111,7 @@ function renderAdminDashboard(el, d) {
       </div>
       <div class="card-body" style="padding:0">
         <div id="adminAllUsulanTable">
-          <div class="empty-state" style="padding:32px"><div style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;position:relative"><div style="width:8px;height:8px;border-radius:50%;background:#378ADD"></div><div style="position:absolute;width:7px;height:7px;border-radius:50%;background:#B5D4F4;animation:orbit-dot 1s linear infinite;transform-origin:center"></div></div><p>Memuat...</p></div>
+          <div class="empty-state" style="padding:32px"><div style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;position:relative"><div style="width:8px;height:8px;border-radius:50%;background:#378ADD"></div><div style="position:absolute;width:7px;height:7px;border-radius:50%;background:#B5D4F4;animation:orbit-dot 1s linear infinite;transform-origin:center"></div></div><p>Memuat data...</p></div>
         </div>
       </div>
     </div>`;

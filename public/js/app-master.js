@@ -533,6 +533,9 @@ async function renderUsers(el) {
             <option>Operator</option><option>Kepala Puskesmas</option>
             <option>Pengelola Program</option>
           </select>
+          <select class="form-control" id="filterPKM" onchange="filterUsers()" style="width:200px">
+            <option value="">Semua Puskesmas</option>
+          </select>
         </div>
       </div>
       <div style="padding:0" id="usersTable"></div>
@@ -618,19 +621,32 @@ async function renderUsers(el) {
     window.allIndList = allIndList;
     renderUsersTable(allUsers);
 
-    // Fill PKM dropdown
+    // Fill PKM dropdown (modal tambah user)
     const pkmSel = document.getElementById('uPKM');
     allPKMList.forEach(p => pkmSel.innerHTML += `<option value="${p.kode}">${p.nama}</option>`);
+
+    // Fill PKM filter dropdown (filter tabel user)
+    const filterPKMSel = document.getElementById('filterPKM');
+    if (filterPKMSel) {
+      // Hanya tampilkan PKM yang ada di daftar user (bukan semua master PKM)
+      const pkmDipakai = new Map();
+      allUsers.forEach(u => { if (u.kodePKM && u.namaPKM) pkmDipakai.set(u.kodePKM, u.namaPKM); });
+      const pkmSorted = [...pkmDipakai.entries()].sort((a,b) => a[1].localeCompare(b[1]));
+      filterPKMSel.innerHTML = '<option value="">Semua Puskesmas</option>'
+        + pkmSorted.map(([kode, nama]) => `<option value="${kode}">${nama}</option>`).join('');
+    }
   } catch (e) { if (!window._verifSilentReload) toast(e.message, 'error'); }
 }
 
 function filterUsers() {
   const q = document.getElementById('searchUser').value.toLowerCase();
   const role = document.getElementById('filterRole').value;
+  const pkm = document.getElementById('filterPKM')?.value || '';
   const filtered = allUsers.filter(u =>
     u.role !== 'Admin' && u.role !== 'Super Admin' &&
     (!q || u.email.toLowerCase().includes(q) || u.nama.toLowerCase().includes(q)) &&
-    (!role || u.role === role)
+    (!role || u.role === role) &&
+    (!pkm || u.kodePKM === pkm)
   );
   _usersPage = 1;
   renderUsersTable(filtered);

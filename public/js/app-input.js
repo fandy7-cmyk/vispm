@@ -1336,7 +1336,7 @@ function previewSPM(changedNo) {
 async function viewDetail(idUsulan) {
   document.getElementById('detailModalId').textContent = idUsulan;
   showModal('detailModal');
-  document.getElementById('detailModalBody').innerHTML = `<div class="empty-state"><p>Memuat...</p></div>`;
+  document.getElementById('detailModalBody').innerHTML = `<div class="empty-state"><p>Memuat data...</p></div>`;
   try {
     const [detail, inds] = await Promise.all([API.getDetailUsulan(idUsulan), API.getIndikatorUsulan(idUsulan)]);
     const vp = detail.verifikasiProgram || [];

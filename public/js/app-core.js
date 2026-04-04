@@ -297,7 +297,7 @@ async function renderCatatanThread(elId, idUsulan, currentRole) {
       <!-- expanded: detail + timestamp -->
       <div id="${cardId}" style="display:none;padding:6px 8px;border-top:1px solid ${aksiClr.c}30;background:white">
         <div style="font-size:11.5px;color:#1e293b;line-height:1.5;word-break:break-word">${_renderDetailLog(log)}</div>
-        <div style="font-size:10px;color:#94a3b8;margin-top:4px">${fmtDT(log.timestamp)}</div>
+        <div style="font-size:10px;color:#94a3b8;margin-top:4px;">${fmtDT(log.timestamp)}</div>
       </div>
     </div>`;
   });
@@ -374,9 +374,9 @@ function renderHeaderInfo(detail) {
     { label: 'Periode', value: `<span style="font-size:13.5px;font-weight:600;color:var(--text-dark)">${detail.namaBulan} ${detail.tahun}</span>`, flex: '1' },
     { label: 'Status', value: statusBadge(detail.statusGlobal), flex: '2' },
     { label: 'Dibuat Oleh', value: `<span style="font-size:13px;font-weight:600;color:var(--text-dark)">${detail.namaPembuat || detail.createdBy || '-'}</span><div style="font-size:10.5px;color:var(--text-light);margin-top:1px">${formatTS(detail.createdAt)}</div>`, flex: '1.5' },
-    { label: 'Indeks Beban Kerja', value: `<span style="font-family:'JetBrains Mono';font-size:13.5px;font-weight:600;color:var(--text-dark)">${parseFloat(detail.indeksBeban||0).toFixed(2)}</span>`, flex: '1' },
-    { label: 'Indeks Kesulitan Wilayah', value: `<span style="font-family:'JetBrains Mono';font-size:13.5px;font-weight:600;color:var(--text-dark)">${parseFloat(detail.indeksKesulitan||0).toFixed(2)}</span>`, flex: '1.2' },
-    { label: 'Indeks SPM', value: `<span style="font-family:'JetBrains Mono';font-size:15px;font-weight:800;color:var(--primary)">${parseFloat(detail.indeksSPM||0).toFixed(2)}</span>`, flex: '1' },
+    { label: 'Indeks Beban Kerja', value: `<span style="font-size:13.5px;font-weight:600;color:var(--text-dark)">${parseFloat(detail.indeksBeban||0).toFixed(2)}</span>`, flex: '1' },
+    { label: 'Indeks Kesulitan Wilayah', value: `<span style="font-size:13.5px;font-weight:600;color:var(--text-dark)">${parseFloat(detail.indeksKesulitan||0).toFixed(2)}</span>`, flex: '1.2' },
+    { label: 'Indeks SPM', value: `<span style="font-size:15px;font-weight:800;color:var(--primary)">${parseFloat(detail.indeksSPM||0).toFixed(2)}</span>`, flex: '1' },
   ];
   return `<div style="background:white;border:1px solid #e2e8f0;border-radius:10px;padding:8px 0;display:flex;align-items:center;gap:0;width:100%;margin-bottom:14px">
     ${items.map((item, i) => `

@@ -50,11 +50,11 @@ async function renderInput() {
       return `<div style="border:1.5px solid #a7f3d0;border-radius:10px;overflow:hidden;background:var(--surface,white);box-shadow:0 1px 4px rgba(13,148,136,0.08)">`
         + `<div style="background:linear-gradient(135deg,#0d9488,#06b6d4);padding:8px 14px;color:white;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:space-between;gap:7px">`
         + `<span style="display:flex;align-items:center;gap:7px"><span style="opacity:0.9;display:flex">${_bSvgCal}</span> Periode Aktif: ${nm} ${pr.tahun}</span>`
-        + `<span id="${timerId}" style="font-size:11px;font-weight:700;background:rgba(0,0,0,0.2);padding:3px 8px;border-radius:20px;letter-spacing:0.3px;font-family:'JetBrains Mono',monospace;white-space:nowrap">--:--:--</span>`
+        + `<span id="${timerId}" style="font-size:11px;font-weight:700;background:rgba(0,0,0,0.2);padding:3px 8px;border-radius:20px;letter-spacing:0.3px;white-space:nowrap">--:--:--</span>`
         + `</div>`
         + `<div style="display:grid;grid-template-columns:1fr 1fr">`
-        + `<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--success-light,#f0fdf9);border-right:1px solid var(--border,#d1fae5)"><span style="color:#0d9488;display:flex;flex-shrink:0">${_bSvgOpen}</span><div><div style="font-size:10px;color:var(--text-light,#64748b);font-weight:600;text-transform:uppercase;letter-spacing:0.4px">Dibuka</div><div style="font-size:12px;font-weight:700;color:var(--text,#0f172a)">${mul} ${jm} WITA</div></div></div>`
-        + `<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--danger-light,#fef2f2)"><span style="color:#ef4444;display:flex;flex-shrink:0">${_bSvgClos}</span><div><div style="font-size:10px;color:var(--text-light,#64748b);font-weight:600;text-transform:uppercase;letter-spacing:0.4px">Ditutup</div><div style="font-size:12px;font-weight:700;color:var(--text,#0f172a)">${sel} ${js} WITA</div></div></div>`
+        + `<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--success-light,#f0fdf9);border-right:1px solid var(--border,#d1fae5)"><span style="color:#0d9488;display:flex;flex-shrink:0">${_bSvgOpen}</span><div><div style="font-size:10px;color:var(--text-light,#64748b);font-weight:600;text-transform:uppercase;letter-spacing:0.4px">Dibuka</div><div style="font-size:12px;font-weight:700;color:var(--text,#0f172a);">${mul} <span style="letter-spacing:0.03em">${jm}</span> WITA</div></div></div>`
+        + `<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--danger-light,#fef2f2)"><span style="color:#ef4444;display:flex;flex-shrink:0">${_bSvgClos}</span><div><div style="font-size:10px;color:var(--text-light,#64748b);font-weight:600;text-transform:uppercase;letter-spacing:0.4px">Ditutup</div><div style="font-size:12px;font-weight:700;color:var(--text,#0f172a);">${sel} <span style="letter-spacing:0.03em">${js}</span> WITA</div></div></div>`
         + `</div>`
         + (not ? `<div style="display:flex;align-items:flex-start;gap:8px;padding:8px 14px;background:var(--warning-light,#fffbeb);border-top:1px solid var(--border,#fcd34d)"><span style="color:#d97706;display:flex;flex-shrink:0;margin-top:1px">${_bSvgNoti}</span><div style="font-size:12px;color:#0f172a;line-height:1.5">${not}</div></div>` : '')
         + `</div>`;
@@ -182,20 +182,9 @@ function updateBulanOptions() {
   }
 }
 
-async function loadMyUsulan() {
-  try {
-    const rows = await API.getUsulan({ email_operator: currentUser.email });
-    const tbl = document.getElementById('myUsulanTable');
-    if (!tbl) {
-      // User mungkin sedang di dashboard, refresh dashboard saja
-      if (currentUser.role === 'Operator') renderDashboard();
-      return;
-    }
-    tbl.innerHTML = rows.length ? `
-      <div class="table-container"><table>
-        <thead><tr><th>ID Usulan</th><th>Puskesmas</th><th>Periode</th><th>Progress Verifikasi</th><th>Aksi</th></tr></thead>
-        <tbody>${rows.map(u => `<tr>
-          <td><span style="font-family:'JetBrains Mono',monospace;font-weight:600;font-size:12px;">${u.idUsulan}</span></td>
+function _renderMyUsulanRow(u) {
+  return `<tr>
+          <td><span style="font-weight:600;font-size:12px;">${u.idUsulan}</span></td>
           <td>${u.namaPKM || u.kodePKM}</td>
           <td>${u.namaBulan} ${u.tahun}</td>
           <td style="min-width:220px">
@@ -210,7 +199,6 @@ async function loadMyUsulan() {
                 ${(() => {
                   const pi = u.penolakanIndikator || [];
                   if (u.ditolakOleh === 'Kepala Puskesmas' && pi.length) {
-                    // Kapus tolak sendiri (siklus pertama)
                     const bermasalah = pi.filter(p =>
                       p.dari_kapus === true || p.dari_kapus === 'true'
                       || p.dibuat_oleh === 'Kapus'
@@ -238,9 +226,38 @@ async function loadMyUsulan() {
               ? `<button class="btn-icon" onclick="openIndikatorModal('${u.idUsulan}')" title="Perbaiki & Ajukan Ulang" style="background:transparent;border:none;color:#f59e0b"><span class="material-icons" style="font-size:17px">restart_alt</span></button>`
               : `<button class="btn-icon" disabled title="${u.statusGlobal === 'Menunggu Pengelola Program' || u.ditolakOleh === 'Admin' ? 'Menunggu respon Pengelola Program' : 'Tidak perlu perbaikan'}" style="background:transparent;border:none;color:#cbd5e1;opacity:0.3;cursor:not-allowed"><span class="material-icons" style="font-size:17px">restart_alt</span></button>`}
           </td>
-        </tr>`).join('')}
-        </tbody>
-      </table></div>` : `<div class="empty-state" style="padding:32px"><span class="material-icons">inbox</span><p>Belum ada usulan</p></div>`;
+        </tr>`;
+}
+
+function _renderMyUsulanPaged(page) {
+  const tbl = document.getElementById('myUsulanTable');
+  if (!tbl) return;
+  const rows = window._myUsulanRows || [];
+  if (!rows.length) {
+    tbl.innerHTML = `<div class="empty-state" style="padding:32px"><span class="material-icons">inbox</span><p>Belum ada usulan</p></div>`;
+    return;
+  }
+  const { items, page: p, totalPages, total } = paginateData(rows, page);
+  window._myUsulanPage = p;
+  tbl.innerHTML = `<div class="table-container"><table>
+      <thead><tr><th>ID Usulan</th><th>Puskesmas</th><th>Periode</th><th>Progress Verifikasi</th><th>Aksi</th></tr></thead>
+      <tbody>${items.map(u => _renderMyUsulanRow(u)).join('')}</tbody>
+    </table></div>`
+    + renderPagination('myUsulanTable', total, p, totalPages, pg => _renderMyUsulanPaged(pg));
+}
+
+async function loadMyUsulan() {
+  try {
+    const rows = await API.getUsulan({ email_operator: currentUser.email });
+    const tbl = document.getElementById('myUsulanTable');
+    if (!tbl) {
+      // User mungkin sedang di dashboard, refresh dashboard saja
+      if (currentUser.role === 'Operator') renderDashboard();
+      return;
+    }
+    window._myUsulanRows = rows;
+    window._myUsulanPage = 1;
+    _renderMyUsulanPaged(1);
   } catch (e) { if (!window._verifSilentReload) toast(e.message, 'error'); }
 }
 
@@ -485,7 +502,7 @@ async function openIndikatorModal(idUsulan) {
         : (ind.sasaranTahunan > 0 ? Math.max(0, ind.sasaranTahunan - ind.realisasiKumulatif) : null);
       const _sisaColor = _sisaTgt !== null && _sisaTgt === 0 ? '#16a34a' : (_sisaTgt !== null && _sisaTgt < 10 ? '#f59e0b' : '#1e293b');
       return `<tr id="indRow-${ind.no}">
-        <td><span style="font-family:'JetBrains Mono';font-weight:700">${ind.no}</span></td>
+        <td><span style="font-weight:700">${ind.no}</span></td>
         <td style="max-width:220px;font-size:12.5px">${ind.nama}</td>
         <input type="hidden" id="bobot-${ind.no}" value="${ind.bobot}">
         <input type="hidden" id="sasaran-${ind.no}" value="${ind.sasaranTahunan || 0}">
@@ -548,7 +565,7 @@ async function openIndikatorModal(idUsulan) {
             return `<div id="uploadCell-${ind.no}" style="display:flex;align-items:center;gap:6px;justify-content:center">
                 <label id="uploadLabel-${ind.no}" style="${btnStyle}">
                   ${hasFiles ? 'Uploaded' : 'Upload'}
-                  <input type="file" multiple accept=".pdf,image/*" style="display:none" onchange="uploadBuktiIndikator(event,${ind.no},'${idUsulan}','${detail.kodePKM}',${detail.tahun},${detail.bulan},'${namaBulan}')">
+                  <input type="file" multiple accept=".pdf,image/*" style="display:none" onchange="uploadBuktiIndikator(event,${ind.no},'${idUsulan}','${detail.kodePKM}','${(detail.namaPKM||detail.kodePKM).replace(/[^a-zA-Z0-9 ]/g,"")}',${detail.tahun},${detail.bulan},'${namaBulan}','${ind.nama.replace(/[^a-zA-Z0-9 ]/g,"").substring(0,40)}')">
                 </label>
                 <div id="fileControls-${ind.no}">${fileControlHtml}</div>
               </div>
@@ -569,7 +586,7 @@ const SVG_EYE = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" str
 const SVG_TRASH = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></svg>';
 
 // ============== UPLOAD BUKTI INDIKATOR ==============
-async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, tahun, bulan, namaBulan) {
+async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, namaPKM, tahun, bulan, namaBulan, namaIndikator) {
   const files = Array.from(event.target.files);
   if (!files.length) return;
 
@@ -616,9 +633,12 @@ async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, tahun
           fileName: file.name,
           fileBase64: base64,
           kodePKM,
+          namaPKM: namaPKM || '',
           tahun,
           bulan,
-          noIndikator
+          namaBulan: namaBulan || '',
+          noIndikator,
+          namaIndikator: namaIndikator || ''
         })
       });
 

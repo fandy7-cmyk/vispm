@@ -67,8 +67,21 @@ async function loadVerifData(status) {
   try {
     const rows = await API.getUsulan(params);
     const verifRole = role === 'Kepala Puskesmas' ? 'kepala-puskesmas' : role === 'Pengelola Program' ? 'program' : 'admin';
-    document.getElementById('verifTable').innerHTML = renderUsulanTable(rows, verifRole);
+    window._verifRows = rows;
+    window._verifRole = verifRole;
+    window._verifPage = 1;
+    _renderVerifTablePaged(1);
   } catch (e) { if (!window._verifSilentReload) toast(e.message, 'error'); }
+}
+
+function _renderVerifTablePaged(page) {
+  const rows = window._verifRows || [];
+  const verifRole = window._verifRole || 'admin';
+  const { items, page: p, totalPages, total } = paginateData(rows, page);
+  window._verifPage = p;
+  document.getElementById('verifTable').innerHTML =
+    renderUsulanTable(items, verifRole)
+    + renderPagination('verifTable', total, p, totalPages, pg => _renderVerifTablePaged(pg));
 }
 
 
@@ -123,6 +136,41 @@ function _updateVerifTTBanner(ttOk, role) {
   }
 }
 
+
+// Tampilkan/hide banner periode tutup di modal verifikasi
+function _updateVerifPeriodeBanner(isOpen, periodeInfo) {
+  let periodeClosedBanner = document.getElementById('verifPeriodeBanner');
+  if (!periodeClosedBanner) {
+    periodeClosedBanner = document.createElement('div');
+    periodeClosedBanner.id = 'verifPeriodeBanner';
+    const modalBody = document.querySelector('#verifikasiModal .modal-body');
+    if (modalBody) modalBody.insertBefore(periodeClosedBanner, modalBody.firstChild);
+  }
+  window._verifPeriodeOpen = isOpen;
+  if (!isOpen && periodeInfo) {
+    const SVG_LOCK = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
+    const tglSelesai = periodeInfo.tanggal_selesai_verif
+      ? new Date(new Date(periodeInfo.tanggal_selesai_verif).getTime() + 8*3600000)
+          .toISOString().slice(0,10)
+          .split('-').reverse().join('/')
+      : '-';
+    const jamSelesai = periodeInfo.jam_selesai_verif || '17:00';
+    periodeClosedBanner.innerHTML = `
+      <div style="background:#fff7ed;border:1.5px solid #fed7aa;border-radius:10px;padding:12px 16px;margin-bottom:14px;display:flex;align-items:flex-start;gap:10px">
+        <span style="color:#ea580c;flex-shrink:0;margin-top:1px;display:flex">${SVG_LOCK}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700;color:#ea580c;font-size:13px;margin-bottom:3px">Periode Verifikasi Sudah Ditutup</div>
+          <div style="font-size:12px;color:#7c2d12;line-height:1.5">
+            Periode verifikasi telah berakhir pada <b>${tglSelesai} <span style="letter-spacing:0.03em">${jamSelesai}</span> WITA</b>.<br>
+            Hubungi <b>Admin</b> untuk memperpanjang periode verifikasi.
+          </div>
+        </div>
+      </div>`;
+  } else {
+    periodeClosedBanner.innerHTML = '';
+  }
+}
+
 async function openVerifikasi(idUsulan) {
   verifCurrentUsulan = idUsulan;
   window.verifCurrentUsulan = idUsulan;
@@ -159,7 +207,35 @@ async function openVerifikasi(idUsulan) {
   _updateVerifTTBanner(_ttOk, _role);
 
   try {
-    const [detail, inds] = await Promise.all([API.getDetailUsulan(idUsulan), API.getIndikatorUsulan(idUsulan)]);
+    const [detail, inds] = await Promise.all([
+      API.getDetailUsulan(idUsulan),
+      API.getIndikatorUsulan(idUsulan)
+    ]);
+    const periodeList = await API.getPeriode(detail.tahun).catch(() => []);
+    // Cek apakah periode verifikasi untuk usulan ini masih aktif
+    const _periodeForUsulan = (periodeList || []).find(p => p.tahun == detail.tahun && p.bulan == detail.bulan);
+    const _nowWita = new Date(Date.now() + 8 * 3600000);
+    const _todayStr = _nowWita.toISOString().slice(0, 10);
+    const _nowTime  = _nowWita.toISOString().slice(11, 16);
+    const _toDs = (v) => { if (!v) return ''; const d = new Date(new Date(v).getTime() + 8*3600000); return d.toISOString().slice(0,10); };
+    let _periodeVerifOpen = true; // default: boleh verif (jika tidak ada data periode, jangan blokir)
+    let _periodeVerifInfo = null;
+    const _role2 = currentUser.role;
+    // Hanya cek periode untuk role verifikator (bukan Operator)
+    if (_periodeForUsulan && ['Kepala Puskesmas','Pengelola Program','Admin'].includes(_role2)) {
+      const tmv = _periodeForUsulan.tanggalMulaiVerif || _periodeForUsulan.tanggal_mulai_verif;
+      const tsv = _periodeForUsulan.tanggalSelesaiVerif || _periodeForUsulan.tanggal_selesai_verif;
+      const jmv = _periodeForUsulan.jamMulaiVerif || _periodeForUsulan.jam_mulai_verif || '00:00';
+      const jsv = _periodeForUsulan.jamSelesaiVerif || _periodeForUsulan.jam_selesai_verif || '23:59';
+      if (tmv && tsv) {
+        const nowDT = _todayStr + 'T' + _nowTime;
+        const mulaiDT = _toDs(tmv) + 'T' + jmv;
+        const selesaiDT = _toDs(tsv) + 'T' + jsv;
+        _periodeVerifOpen = nowDT >= mulaiDT && nowDT <= selesaiDT;
+        _periodeVerifInfo = _periodeForUsulan;
+      }
+    }
+    _updateVerifPeriodeBanner(_periodeVerifOpen, _periodeVerifInfo);
 
     document.getElementById('verifDetailGrid').innerHTML = renderHeaderInfo(detail);
 
@@ -609,7 +685,7 @@ _ppBanner.innerHTML = `<span class="material-icons" style="color:#f59e0b;font-si
     }
 
     const role = currentUser.role;
-    const canAct = !sudahVerifUser && (
+    const canAct = !sudahVerifUser && _periodeVerifOpen && (
       (role === 'Kepala Puskesmas' && ['Menunggu Kepala Puskesmas', 'Menunggu Re-verifikasi Kepala Puskesmas'].includes(detail.statusGlobal)) ||
       (role === 'Pengelola Program' && ['Menunggu Pengelola Program', 'Menunggu Re-verifikasi PP', 'Ditolak Sebagian'].includes(detail.statusGlobal)) ||
       (role === 'Admin' && detail.statusGlobal === 'Menunggu Admin')
@@ -745,6 +821,11 @@ _ppBanner.innerHTML = `<span class="material-icons" style="color:#f59e0b;font-si
         btnSubmit.style.background = ''; btnSubmit.style.borderColor = '';
         btnSubmit.disabled = true; btnSubmit.style.opacity = '0.35';
         btnSubmit.title = 'Upload tanda tangan terlebih dahulu';
+      } else if (!_periodeVerifOpen) {
+        btnSubmit.innerHTML = '<span class="material-icons">lock</span> Periode Verifikasi Ditutup';
+        btnSubmit.style.background = '#ea580c'; btnSubmit.style.borderColor = '#ea580c';
+        btnSubmit.disabled = true; btnSubmit.style.opacity = '0.6';
+        btnSubmit.title = 'Periode verifikasi sudah ditutup. Hubungi Admin untuk memperpanjang.';
       } else if (!canAct) {
         btnSubmit.innerHTML = '<span class="material-icons">send</span> Submit Verifikasi';
         btnSubmit.style.background = ''; btnSubmit.style.borderColor = '';

@@ -6,7 +6,7 @@
 <title>VISPM | Verifikasi Indeks SPM</title>
 <link rel="icon" type="image/png" href="/favicon.png">
 <link rel="apple-touch-icon" href="/favicon.png">
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 <style>
 :root {
@@ -447,7 +447,7 @@ body {
 .stat-icon.cyan { background: linear-gradient(135deg, #0891b2, #06b6d4); }
 .stat-info { min-width: 0; }
 .stat-label { font-size: var(--fs-xs); color: var(--text-light); font-weight: 500; margin-bottom: var(--sp-sm); }
-.stat-value { font-size: var(--fs-2xl); font-weight: 800; color: var(--text); font-family: 'JetBrains Mono', monospace; line-height: var(--lh-tight); }
+.stat-value { font-size: var(--fs-2xl); font-weight: 800; color: var(--text);  line-height: var(--lh-tight); }
 
 /* ===== TABLE ===== */
 .table-container { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--border); }
@@ -594,7 +594,7 @@ textarea.form-control { resize: vertical; }
 .ind-table input[type="number"] { width: var(--sp-3xl); padding: var(--sp-sm) var(--sp-base); border: 1.5px solid var(--border); border-radius: var(--sp-sm); font-size: var(--fs-sm); font-family: inherit; text-align: center; }  /* 89px wide */
 .ind-table input[type="number"]:focus { outline: none; border-color: var(--primary); }
 .ind-table td, .ind-table th { padding: var(--sp-sm) var(--sp-base); }   /* 5px 8px */
-.rasio-cell { font-family: 'JetBrains Mono', monospace; font-size: var(--fs-sm); }
+.rasio-cell {  font-size: var(--fs-sm); }
 
 /* ===== CHART ===== */
 .chart-container { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--sp-sm); padding: var(--sp-base) 0 var(--sp-sm); overflow-x: auto; min-height: var(--sp-3xl); }  /* min-h 89px */
@@ -831,7 +831,7 @@ input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-o
   height: var(--sp-2xl);               /* 55px = φ-based input height */
   text-align: center;
   font-weight: 600;
-  font-family: 'JetBrains Mono', monospace, sans-serif;
+  
   cursor: pointer;
   min-width: var(--sp-2xl);            /* 55px */
   box-sizing: border-box;
@@ -1444,7 +1444,7 @@ input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-o
       <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:linear-gradient(135deg,#0d9488,#06b6d4);border-radius:10px;margin-bottom:12px;color:white">
         <div>
           <div style="font-size:11px;opacity:0.8;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px">Indeks SPM</div>
-          <div style="font-size:30px;font-weight:800;font-family:'JetBrains Mono',monospace;line-height:1" id="indModalSPMTop">0.00</div>
+          <div style="font-size:30px;font-weight:800;line-height:1" id="indModalSPMTop">0.00</div>
         </div>
         <span class="material-icons" style="font-size:40px;opacity:0.3">assessment</span>
       </div>

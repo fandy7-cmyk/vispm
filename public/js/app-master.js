@@ -152,17 +152,29 @@ function _lapRenderTable(data) {
     ${statCard('purple','trending_up','Rata-rata Indeks SPM', rataSPM)}`;
 
   window._laporanData = data;
+  window._lapPage = 1;
 
   if (!data.length) {
     document.getElementById('lapTable').innerHTML = `<div class="empty-state" style="padding:32px"><span class="material-icons">inbox</span><p>Tidak ada data untuk filter ini</p></div>`;
     return;
   }
 
+  _lapRenderPage(1);
+}
+
+function _lapRenderPage(page) {
+  const data = window._laporanData || [];
+  const { items, page: p, totalPages, total } = paginateData(data, page);
+  window._lapPage = p;
+
+  // Hitung offset nomor urut berdasarkan halaman
+  const offset = (p - 1) * 10;
+
   document.getElementById('lapTable').innerHTML = `
     <div class="table-container"><table>
       <thead><tr><th>No</th><th>Puskesmas</th><th>Periode</th><th>Tgl Dibuat</th><th>Indeks SPM</th><th>Status</th><th>Aksi</th></tr></thead>
-      <tbody>${data.map((r, i) => `<tr>
-        <td>${i + 1}</td>
+      <tbody>${items.map((r, i) => `<tr>
+        <td>${offset + i + 1}</td>
         <td>${r.namaPKM}</td>
         <td>${r.namaBulan} ${r.tahun}</td>
         <td style="font-size:11.5px;color:var(--text-light)">${formatDateTime(r.createdAt)}</td>
@@ -175,7 +187,8 @@ function _lapRenderTable(data) {
         </td>
       </tr>`).join('')}
       </tbody>
-    </table></div>`;
+    </table></div>`
+    + renderPagination('lapTable', total, p, totalPages, pg => _lapRenderPage(pg));
 }
 
 function exportLaporan() {
@@ -638,6 +651,8 @@ async function renderUsers(el) {
   } catch (e) { if (!window._verifSilentReload) toast(e.message, 'error'); }
 }
 
+let _currentFilteredUsers = null; // menyimpan hasil filter aktif untuk pagination
+
 function filterUsers() {
   const q = document.getElementById('searchUser').value.toLowerCase();
   const role = document.getElementById('filterRole').value;
@@ -649,6 +664,7 @@ function filterUsers() {
     (!pkm || u.kodePKM === pkm)
   );
   _usersPage = 1;
+  _currentFilteredUsers = filtered;
   renderUsersTable(filtered);
 }
 
@@ -657,12 +673,14 @@ function renderUsersTable(users, page) {
   const el = document.getElementById('usersTable');
   if (!el) return;
   if (page) _usersPage = page;
-  const filteredUsers = users.filter(u => u.role !== 'Super Admin' && u.role !== 'Admin' && u.email !== 'admin@vispm.com');
+  // Simpan ke state filter jika dipanggil langsung (bukan dari pagination)
+  if (users !== undefined) _currentFilteredUsers = users;
+  const filteredUsers = (_currentFilteredUsers || users || allUsers).filter(u => u.role !== 'Super Admin' && u.role !== 'Admin' && u.email !== 'admin@vispm.com');
   const { items, page: p, totalPages, total } = paginateData(filteredUsers, _usersPage);
   const rowsHtml = items.map(u => `<tr>
-      <td style="font-family:'JetBrains Mono';font-size:12px">${u.email}</td>
+      <td style="font-size:12px">${u.email}</td>
       <td>${u.nama}</td>
-      <td style="font-family:'JetBrains Mono';font-size:11px;color:var(--text-light)">${u.nip || '-'}</td>
+      <td style="font-size:11px;color:var(--text-light)">${u.nip || '-'}</td>
       <td><span class="badge badge-info">${u.role}</span></td>
       <td>${u.namaPKM || u.kodePKM || '-'}</td>
       <td style="font-size:12px">${u.role === 'Pengelola Program' ? (u.jabatan ? u.jabatan.split('|').map(j=>'<div style="font-weight:600;color:var(--primary);font-size:11px;white-space:nowrap">'+j.trim()+'</div>').join('') : '') + '<div style="color:var(--text-light);font-size:11px">'+(u.indikatorAkses || '')+'</div>' : ''}</td>
@@ -670,14 +688,14 @@ function renderUsersTable(users, page) {
       <td style="display:flex;gap:4px">
         <button class="btn-icon edit" onclick="editUser('${u.email}')"><span class="material-icons">edit</span></button>
         <button class="btn-icon" title="Reset Password" style="color:#0d9488" onclick="resetUserPassword('${u.email}','${u.nama}')"><span class="material-icons">lock_reset</span></button>
-        ${['Kepala Puskesmas','Pengelola Program'].includes(u.role) ? (()=>{ const _hasTT = !!(u.tandaTangan && (u.tandaTangan.startsWith('data:image') || u.tandaTangan.startsWith('http'))); return `<button class="btn-icon" title="${_hasTT ? 'Lihat Tanda Tangan' : 'Tanda tangan belum diupload'}" style="color:${_hasTT ? '#7c3aed' : '#cbd5e1'};cursor:${_hasTT ? 'pointer' : 'default'};opacity:${_hasTT ? '1' : '0.6'}" onclick="previewTandaTanganUser('${u.email}','${u.nama.replace(/'/g,"\\'").replace(/"/g,'&quot;')}','${u.role}')"><span class="material-icons">draw</span></button>`; })() : ''}
+        ${['Kepala Puskesmas','Pengelola Program'].includes(u.role) ? (()=>{ const _hasTT = !!(u.tandaTangan && (u.tandaTangan.startsWith('data:image') || u.tandaTangan.startsWith('http'))); return `<span title="${_hasTT ? 'Lihat Tanda Tangan' : 'Tanda tangan belum diupload'}" style="display:inline-flex;cursor:${_hasTT ? 'pointer' : 'not-allowed'}"><button class="btn-icon" style="color:${_hasTT ? '#7c3aed' : '#cbd5e1'};opacity:${_hasTT ? '1' : '0.4'};pointer-events:${_hasTT ? 'auto' : 'none'}" ${_hasTT ? `onclick="previewTandaTanganUser('${u.email}','${u.nama.replace(/'/g,"\\'").replace(/"/g,'&quot;')}','${u.role}')"` : 'disabled'}><span class="material-icons">draw</span></button></span>`; })() : ''}
         <button class="btn-icon del" onclick="deleteUser('${u.email}')"><span class="material-icons">delete</span></button>
       </td>
     </tr>`).join('');
   el.innerHTML = '<div class="table-container"><table>'
     + '<thead><tr><th>Email</th><th>Nama</th><th>NIP</th><th>Role</th><th>Puskesmas</th><th>Jabatan/Indikator</th><th>Status</th><th>Aksi</th></tr></thead>'
     + '<tbody>' + rowsHtml + '</tbody></table></div>'
-    + renderPagination('usersTable', total, p, totalPages, 'pg => { _usersPage=pg; renderUsersTable(allUsers); }');
+    + renderPagination('usersTable', total, p, totalPages, pg => { _usersPage = pg; renderUsersTable(); });
 }
 
 
@@ -860,7 +878,7 @@ function populateIndCheckbox(selectedNos = []) {
       onmouseover="this.style.background='var(--border-light)'" onmouseout="this.style.background=''">
       <input type="checkbox" value="${i.no}" ${selectedNos.includes(parseInt(i.no)) ? 'checked' : ''}
         style="width:15px;height:15px;accent-color:var(--primary);cursor:pointer;flex-shrink:0">
-      <span><strong style="font-family:'JetBrains Mono';font-size:12px">${i.no}.</strong> ${i.nama}</span>
+      <span><strong style="font-size:12px">${i.no}.</strong> ${i.nama}</span>
     </label>`).join('');
 }
 
@@ -1197,7 +1215,7 @@ function renderPKMTable(pkm, page) {
   const rowsHtml = items.map(p => {
     const kodeQ = p.kode.replace(/'/g, "\'");
     return '<tr>'
-      + '<td><span style="font-family:JetBrains Mono,monospace;font-weight:700">'+p.kode+'</span></td>'
+      + '<td><span style="font-weight:700">'+p.kode+'</span></td>'
       + '<td>'+p.nama+'</td>'
       + '<td class="rasio-cell">'+parseFloat(p.indeks||0).toFixed(2)+'</td>'
       + '<td class="rasio-cell">'+parseFloat(p.indeksKesulitan||0).toFixed(2)+'</td>'
@@ -1344,14 +1362,14 @@ async function loadTargetTahunan() {
             <thead><tr><th style="width:40px">No</th><th>Nama Indikator</th><th style="width:160px;text-align:center">Jumlah Sasaran (Satu Tahun)</th></tr></thead>
             <tbody>
               ${_ttIndikator.map(ind => `<tr>
-                <td><span style="font-family:'JetBrains Mono';font-weight:700">${ind.noIndikator}</span></td>
+                <td><span style="font-weight:700">${ind.noIndikator}</span></td>
                 <td style="font-size:13px">${ind.namaIndikator}</td>
                 <td style="text-align:center">
                   <input type="number" min="0"
                     class="form-control" id="tt-${ind.noIndikator}"
                     value="${ind.sasaran || ''}"
                     placeholder="0"
-                    style="width:120px;text-align:center;margin:0 auto;font-family:'JetBrains Mono'">
+                    style="width:120px;text-align:center;margin:0 auto;font-family:">
                 </td>
               </tr>`).join('')}
             </tbody>
@@ -1439,9 +1457,9 @@ function renderIndTable(inds, page) {
   if (tbEl) tbEl.textContent = totalBobot;
   const { items, page: p, totalPages, total } = _paginateCustom(inds, _indPage, _PAGE_SIZE_IND);
   const rowsHtml = items.map(i => `<tr>
-      <td><span style="font-family:'JetBrains Mono';font-weight:700">${i.no}</span></td>
+      <td><span style="font-weight:700">${i.no}</span></td>
       <td>${i.nama}</td>
-      <td style="text-align:center"><span style="font-family:'JetBrains Mono'">${i.bobot}</span></td>
+      <td style="text-align:center"><span style="font-family:">${i.bobot}</span></td>
       <td>${i.aktif ? '<span class="badge badge-success">Aktif</span>' : '<span class="badge badge-default">Non-aktif</span>'}</td>
       <td style="display:flex;gap:4px">
         <button class="btn-icon edit" onclick="editInd(${i.no})"><span class="material-icons">edit</span></button>
@@ -1697,12 +1715,12 @@ async function loadPeriodeGrid() {
             <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--success-light,#f0fdf9);border-right:1px solid var(--border,#d1fae5)">
               <span style="color:#0d9488;display:flex;flex-shrink:0">${_svgOpen}</span>
               <div><div style="font-size:10px;color:var(--text-light,#64748b);font-weight:600;text-transform:uppercase;letter-spacing:0.4px">Dibuka</div>
-              <div style="font-size:12px;font-weight:700;color:var(--text,#0f172a)">${formatDate(p.tanggalMulai)} ${jm} WITA</div></div>
+              <div style="font-size:12px;font-weight:700;color:var(--text,#0f172a);">${formatDate(p.tanggalMulai)} <span style="letter-spacing:0.03em">${jm}</span> WITA</div></div>
             </div>
             <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--danger-light,#fef2f2)">
               <span style="color:#ef4444;display:flex;flex-shrink:0">${_svgClose}</span>
               <div><div style="font-size:10px;color:var(--text-light,#64748b);font-weight:600;text-transform:uppercase;letter-spacing:0.4px">Ditutup</div>
-              <div style="font-size:12px;font-weight:700;color:var(--text,#0f172a)">${formatDate(p.tanggalSelesai)} ${js} WITA</div></div>
+              <div style="font-size:12px;font-weight:700;color:var(--text,#0f172a);">${formatDate(p.tanggalSelesai)} <span style="letter-spacing:0.03em">${js}</span> WITA</div></div>
             </div>
           </div>
           ${p.tanggalMulaiVerif ? `<div style="display:flex;align-items:center;gap:8px;padding:8px 14px;background:#f0fdf4;border-top:1px solid #bbf7d0"><span class="material-icons" style="font-size:15px;color:#15803d">verified_user</span><div style="font-size:12px;color:#15803d"><span style="font-weight:700">Verifikasi:</span> ${formatDate(p.tanggalMulaiVerif)} ${fmt24(p.jamMulaiVerif) || '08:00'} WITA — ${formatDate(p.tanggalSelesaiVerif)} ${fmt24(p.jamSelesaiVerif) || '17:00'} WITA</div></div>` : ''}
@@ -1915,11 +1933,11 @@ function _initTimePicker24(pickerId, initialValue) {
 
   wrap.innerHTML = `
     <div style="display:flex;align-items:center;gap:4px">
-      <select class="form-control" id="${pickerId}_h" style="width:64px;height:38px;padding:0 4px;text-align:center;font-weight:600;box-sizing:border-box">
+      <select class="form-control" id="${pickerId}_h" style="width:64px;height:38px;padding:0 4px;text-align:center;font-weight:700;font-size:15px;letter-spacing:0.03em;box-sizing:border-box">
         ${hoursOpts}
       </select>
       <span style="font-weight:700;font-size:16px;color:var(--text-dark)">:</span>
-      <select class="form-control" id="${pickerId}_m" style="width:64px;height:38px;padding:0 4px;text-align:center;font-weight:600;box-sizing:border-box">
+      <select class="form-control" id="${pickerId}_m" style="width:64px;height:38px;padding:0 4px;text-align:center;font-weight:700;font-size:15px;letter-spacing:0.03em;box-sizing:border-box">
         ${minsOpts}
       </select>
     </div>`;
@@ -2210,7 +2228,7 @@ function _kuRenderTable() {
   }
   const { items, page: p, totalPages, total } = paginateData(_kuRows, _kuPage);
   const rowsHtml = items.map(u => `<tr>
-      <td><span style="font-family:'JetBrains Mono',monospace;font-weight:600;font-size:12px">${u.idUsulan}</span></td>
+      <td><span style="font-weight:600;font-size:12px">${u.idUsulan}</span></td>
       <td>${u.namaPKM || u.kodePKM}</td>
       <td style="font-size:12px">${u.createdBy || '-'}</td>
       <td>${u.namaBulan || ''} ${u.tahun}</td>
@@ -2219,7 +2237,6 @@ function _kuRenderTable() {
       <td style="font-size:12px;color:var(--text-light)">${formatDateTime(u.createdAt)}</td>
       <td style="display:flex;gap:4px">
         <button class="btn-icon view" onclick="viewDetail('${u.idUsulan}')" title="Detail"><span class="material-icons">visibility</span></button>
-        <button class="btn-icon edit" onclick="adminEditUsulan('${u.idUsulan}')" title="Edit"><span class="material-icons">edit</span></button>
         <button class="btn-icon del" onclick="adminDeleteUsulan('${u.idUsulan}')" title="Hapus"><span class="material-icons">delete</span></button>
         ${u.statusGlobal === 'Menunggu Admin' && u.statusKapus !== 'Selesai'
           ? `<button class="btn-icon" onclick="restoreVerifAdmin('${u.idUsulan}')" title="Pulihkan verifikasi Kapus & Program" style="background:transparent;border:none;color:#f59e0b"><span class="material-icons">restore</span></button>`

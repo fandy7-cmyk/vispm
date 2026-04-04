@@ -8,9 +8,28 @@
 })();
 
 // ============== DASHBOARD ==============
+
+// Ambil daftar tahun yang tersedia dari semua usulan (dipakai filter dashboard)
+let _dashTahunList = [];
+async function _loadDashTahunList() {
+  if (_dashTahunList.length) return _dashTahunList;
+  try {
+    const rows = await API.getUsulan({});
+    const tahunSet = [...new Set((rows || []).map(u => u.tahun).filter(Boolean))].sort((a,b) => b - a);
+    _dashTahunList = tahunSet;
+  } catch(e) { _dashTahunList = [CURRENT_YEAR]; }
+  return _dashTahunList;
+}
+
 async function renderDashboard() {
   const role = currentUser.role;
+
+  // Baca tahun yang dipilih dari dropdown (jika sudah ada), default CURRENT_YEAR
+  const selEl = document.getElementById('dashTahunFilter');
+  const tahunDipilih = selEl ? (parseInt(selEl.value) || '') : '';
+
   const params = { role, email: currentUser.email, kode_pkm: currentUser.kodePKM };
+  if (tahunDipilih) params.tahun = tahunDipilih;
 
   let data;
   try { data = await API.dashboard(params); } catch (e) {
@@ -20,10 +39,10 @@ async function renderDashboard() {
   const content = document.getElementById('mainContent');
 
   try {
-    if (role === 'Admin') renderAdminDashboard(content, data);
-    else if (role === 'Operator') renderOperatorDashboard(content, data);
-    else if (role === 'Kepala Puskesmas') renderKepalasDashboard(content, data);
-    else if (role === 'Pengelola Program') renderProgramDashboard(content, data);
+    if (role === 'Admin') renderAdminDashboard(content, data, tahunDipilih);
+    else if (role === 'Operator') renderOperatorDashboard(content, data, tahunDipilih);
+    else if (role === 'Kepala Puskesmas') renderKepalasDashboard(content, data, tahunDipilih);
+    else if (role === 'Pengelola Program') renderProgramDashboard(content, data, tahunDipilih);
 
   } catch(e) {
     console.error('renderDashboard error:', e);
@@ -31,8 +50,34 @@ async function renderDashboard() {
   }
 }
 
-function renderAdminDashboard(el, d) {
+// Render dropdown filter tahun di page-header dashboard
+async function _renderDashTahunDropdown(selectedTahun) {
+  const list = await _loadDashTahunList();
+  // Pastikan CURRENT_YEAR selalu ada di list
+  const allTahun = [...new Set([...list, CURRENT_YEAR])].sort((a,b) => b - a);
+  return `<select id="dashTahunFilter" onchange="renderDashboard()"
+    style="border:1px solid var(--border,#e2e8f0);border-radius:7px;padding:5px 10px;font-size:12px;outline:none;font-family:inherit;background:var(--surface,white);color:var(--text);cursor:pointer">
+    <option value="">Semua Tahun</option>
+    ${allTahun.map(t => `<option value="${t}" ${t == selectedTahun ? 'selected' : ''}>${t}</option>`).join('')}
+  </select>`;
+}
+
+function renderAdminDashboard(el, d, tahunDipilih) {
+  const chartMode = d.chartMode || (tahunDipilih ? 'bulan' : 'tahun');
+  const chartTitle = tahunDipilih
+    ? `Statistik per Bulan (${tahunDipilih})`
+    : `Statistik per Tahun`;
   el.innerHTML = `
+    <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:14px">
+      <h1 style="margin:0"><span class="material-icons">dashboard</span>Dashboard</h1>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:12px;color:var(--text-light);font-weight:600">Filter Tahun:</span>
+        <div id="dashTahunWrap"><select id="dashTahunFilter" onchange="renderDashboard()"
+          style="border:1px solid var(--border,#e2e8f0);border-radius:7px;padding:5px 10px;font-size:12px;outline:none;font-family:inherit;background:var(--surface,white);color:var(--text);cursor:pointer">
+          <option value="">Memuat...</option>
+        </select></div>
+      </div>
+    </div>
     <div class="stats-grid">
       ${statCard('blue','assignment','Total Usulan', d.totalUsulan, d.totalUsulan > 0 ? `${d.selesai} selesai · ${d.menunggu} proses` : 'Belum ada usulan')}
       ${statCard('green','check_circle','Selesai', d.selesai, d.totalUsulan > 0 ? `${Math.round((d.selesai/d.totalUsulan)*100)}% dari total` : '-')}
@@ -42,12 +87,12 @@ function renderAdminDashboard(el, d) {
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:stretch;margin-bottom:14px">
       <div class="card" style="margin:0;display:flex;flex-direction:column">
         <div class="card-header-bar">
-          <span class="card-title"><span class="material-icons">timeline</span>Statistik per Bulan (${CURRENT_YEAR})</span>
+          <span class="card-title"><span class="material-icons">timeline</span>${chartTitle}</span>
         </div>
         <div class="card-body" style="padding:12px 16px;flex:1;display:flex;flex-direction:column;justify-content:center">
           <div style="display:flex;align-items:flex-end;gap:16px">
             <div style="flex:1;min-width:0">
-              ${renderChart(d.chartData)}
+              ${renderChart(d.chartData, chartMode)}
             </div>
             <div style="flex-shrink:0;border-left:1px solid var(--border);padding-left:16px">
               ${renderDonutChart(d.selesai||0, d.menunggu||0, Math.max(0,(d.totalUsulan||0)-(d.selesai||0)-(d.menunggu||0)))}
@@ -116,6 +161,15 @@ function renderAdminDashboard(el, d) {
       </div>
     </div>`;
 
+  // Populate dropdown tahun (async, setelah HTML di-render)
+  _loadDashTahunList().then(list => {
+    const sel = document.getElementById('dashTahunFilter');
+    if (!sel) return;
+    const allTahun = [...new Set([...list, CURRENT_YEAR])].sort((a,b) => b - a);
+    sel.innerHTML = `<option value="">Semua Tahun</option>`
+      + allTahun.map(t => `<option value="${t}" ${t == tahunDipilih ? 'selected' : ''}>${t}</option>`).join('');
+  });
+
   // Load usulan menunggu Admin
   API.getUsulan({ awaiting_admin: 'true' }).then(rows => {
     const el = document.getElementById('adminPendingTable');
@@ -138,8 +192,9 @@ function renderAdminDashboard(el, d) {
     if (el) el.innerHTML = `<div class="empty-state" style="padding:32px"><span class="material-icons">inbox</span><p>Gagal memuat data</p></div>`;
   });
 
-  // Load progress per PKM
-  API.getUsulan({ tahun: CURRENT_YEAR }).then(rows => {
+  // Load progress per PKM — ikut filter tahun (Semua Tahun = tanpa filter)
+  const _pkmTahunParam = tahunDipilih ? { tahun: tahunDipilih } : {};
+  API.getUsulan(_pkmTahunParam).then(rows => {
     renderPKMProgressTable(rows);
   }).catch(() => {});
 
@@ -236,7 +291,7 @@ function renderStatusSummary(d) {
       ${items.map(it => `
         <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:${it.bg};border-radius:8px;border-left:3px solid ${it.color}">
           <span style="font-size:12.5px;font-weight:600;color:var(--text)">${it.label}</span>
-          <span style="font-size:16px;font-weight:900;color:${it.color};font-family:'JetBrains Mono',monospace">${it.val}</span>
+          <span style="font-size:16px;font-weight:900;color:${it.color}">${it.val}</span>
         </div>`).join('')}
     </div>`;
 }
@@ -311,12 +366,13 @@ function renderOperatorStatusSummary(rows) {
       ${items.map(it => `
         <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--surface-alt,var(--surface));border-radius:8px;border:1.5px solid var(--border);border-left:3px solid ${it.color}">
           <span style="font-size:12px;font-weight:600;color:var(--text-light)">${it.label}</span>
-          <span style="font-size:16px;font-weight:900;color:${it.color};font-family:'JetBrains Mono',monospace">${it.val}</span>
+          <span style="font-size:16px;font-weight:900;color:${it.color};">${it.val}</span>
         </div>`).join('')}
     </div>`;
 }
 
-function renderKapusStatusSummary(rows) {
+function
+renderKapusStatusSummary(rows) {
   const total   = rows.length;
   if (total === 0) return `<div class="empty-state" style="padding:16px"><span class="material-icons">inbox</span><p>Belum ada usulan</p></div>`;
   const selesai = rows.filter(u => u.statusGlobal === 'Selesai').length;
@@ -340,16 +396,27 @@ function renderKapusStatusSummary(rows) {
       ${_items.map(it => `
         <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:${it.bg};border-radius:8px;border-left:3px solid ${it.color}">
           <span style="font-size:12px;font-weight:600;color:var(--text)">${it.label}</span>
-          <span style="font-size:16px;font-weight:900;color:${it.color};font-family:'JetBrains Mono',monospace">${it.val}</span>
+          <span style="font-size:16px;font-weight:900;color:${it.color};">${it.val}</span>
         </div>`).join('')}
     </div>`;
 }
 
-function renderOperatorDashboard(el, d) {
+function
+renderOperatorDashboard(el, d, tahunDipilih) {
   const periodeList = (d.periodeAktifList || (d.periodeAktif ? [d.periodeAktif] : [])).filter(p => p.isAktifToday);
   const periodeLabel = periodeList.length > 0 ? periodeList.length : '-';
 
   el.innerHTML = `
+    <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:14px">
+      <h1 style="margin:0"><span class="material-icons">dashboard</span>Dashboard</h1>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:12px;color:var(--text-light);font-weight:600">Filter Tahun:</span>
+        <select id="dashTahunFilter" onchange="renderDashboard()"
+          style="border:1px solid var(--border,#e2e8f0);border-radius:7px;padding:5px 10px;font-size:12px;outline:none;font-family:inherit;background:var(--surface,white);color:var(--text);cursor:pointer">
+          <option value="">Memuat...</option>
+        </select>
+      </div>
+    </div>
     <div class="stats-grid">
       ${statCard("blue","assignment","Total Usulan Saya", d.totalUsulan)}
       ${statCard("green","check_circle","Selesai/Disetujui", d.disetujui)}
@@ -383,7 +450,18 @@ function renderOperatorDashboard(el, d) {
       <div class="card-body" style="padding:0" id="recentTable"></div>
     </div>`;
 
-  API.getUsulan({ email_operator: currentUser.email }).then(rows => {
+  // Populate dropdown tahun
+  _loadDashTahunList().then(list => {
+    const sel = document.getElementById('dashTahunFilter');
+    if (!sel) return;
+    const allTahun = [...new Set([...list, CURRENT_YEAR])].sort((a,b) => b - a);
+    sel.innerHTML = `<option value="">Semua Tahun</option>`
+      + allTahun.map(t => `<option value="${t}" ${t == tahunDipilih ? 'selected' : ''}>${t}</option>`).join('');
+  });
+
+  const _opTahunParam = { email_operator: currentUser.email };
+  if (tahunDipilih) _opTahunParam.tahun = tahunDipilih;
+  API.getUsulan(_opTahunParam).then(rows => {
     document.getElementById("recentTable").innerHTML = renderUsulanTable(rows.slice(0, 5), "operator");
     const el2 = document.getElementById("operatorStatusSummary");
     if (el2) el2.innerHTML = renderOperatorStatusSummary(rows);
@@ -432,21 +510,21 @@ function renderPeriodeBanner(periodeList) {
     return `<div style="border:1.5px solid #a7f3d0;border-radius:10px;overflow:hidden;background:var(--surface,white);box-shadow:0 1px 4px rgba(13,148,136,0.08)">
       <div style="background:linear-gradient(135deg,#0d9488,#06b6d4);padding:8px 14px;color:white;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:space-between;gap:7px">
         <span style="display:flex;align-items:center;gap:7px"><span style="opacity:0.9;display:flex">${svgCal}</span> Periode Aktif: ${nm} ${thn}</span>
-        <span id="${timerId}" style="font-size:11px;font-weight:700;background:rgba(0,0,0,0.2);padding:3px 8px;border-radius:20px;letter-spacing:0.3px;font-family:'JetBrains Mono',monospace;white-space:nowrap">--:--:--</span>
+        <span id="${timerId}" style="font-size:11px;font-weight:700;background:rgba(0,0,0,0.2);padding:3px 8px;border-radius:20px;letter-spacing:0.3px;white-space:nowrap">--:--:--</span>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:0">
         <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--success-light,#f0fdf9);border-right:1px solid var(--border,#d1fae5)">
           <span style="color:#0d9488;display:flex;flex-shrink:0">${svgOpen}</span>
           <div>
             <div style="font-size:10px;color:var(--text-light,#64748b);font-weight:600;text-transform:uppercase;letter-spacing:0.4px">Dibuka</div>
-            <div style="font-size:12px;font-weight:700;color:var(--text,#0f172a)">${mulai} ${jm} WITA</div>
+            <div style="font-size:12px;font-weight:700;color:var(--text,#0f172a);">${mulai} <span style="letter-spacing:0.03em">${jm}</span> WITA</div>
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--danger-light,#fef2f2)">
           <span style="color:#ef4444;display:flex;flex-shrink:0">${svgClose}</span>
           <div>
             <div style="font-size:10px;color:var(--text-light,#64748b);font-weight:600;text-transform:uppercase;letter-spacing:0.4px">Ditutup</div>
-            <div style="font-size:12px;font-weight:700;color:var(--text,#0f172a)">${selesai} ${js} WITA</div>
+            <div style="font-size:12px;font-weight:700;color:var(--text,#0f172a);">${selesai} <span style="letter-spacing:0.03em">${js}</span> WITA</div>
           </div>
         </div>
       </div>
@@ -546,21 +624,21 @@ function renderPeriodeVerifBanner(periodeList) {
     return `<div style="border:1.5px solid ${borderColor};border-radius:10px;overflow:hidden;background:var(--surface,white);box-shadow:0 1px 4px rgba(13,148,136,0.08)">
       <div style="background:${headerBg};padding:8px 14px;color:white;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:space-between;gap:7px">
         <span style="display:flex;align-items:center;gap:7px"><span style="opacity:0.9;display:flex">${svgCal}</span> ${judulHeader}</span>
-        <span id="${timerId}" style="font-size:11px;font-weight:700;background:rgba(0,0,0,0.2);padding:3px 8px;border-radius:20px;letter-spacing:0.3px;font-family:'JetBrains Mono',monospace;white-space:nowrap">${isAktif ? '--:--:--' : statusLabel}</span>
+        <span id="${timerId}" style="font-size:11px;font-weight:700;background:rgba(0,0,0,0.2);padding:3px 8px;border-radius:20px;letter-spacing:0.3px;white-space:nowrap">${isAktif ? '--:--:--' : statusLabel}</span>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:0">
         <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--success-light,#f0fdf9);border-right:1px solid var(--border,#d1fae5)">
           <span style="color:#0d9488;display:flex;flex-shrink:0">${svgOpen}</span>
           <div>
             <div style="font-size:10px;color:var(--text-light,#64748b);font-weight:600;text-transform:uppercase;letter-spacing:0.4px">Dibuka</div>
-            <div style="font-size:12px;font-weight:700;color:var(--text,#0f172a)">${mulaiStr} ${jmv} WITA</div>
+            <div style="font-size:12px;font-weight:700;color:var(--text,#0f172a);">${mulaiStr} <span style="letter-spacing:0.03em">${jmv}</span> WITA</div>
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--danger-light,#fef2f2)">
           <span style="color:#ef4444;display:flex;flex-shrink:0">${svgClose}</span>
           <div>
             <div style="font-size:10px;color:var(--text-light,#64748b);font-weight:600;text-transform:uppercase;letter-spacing:0.4px">Ditutup</div>
-            <div style="font-size:12px;font-weight:700;color:var(--text,#0f172a)">${selesaiStr} ${jsv} WITA</div>
+            <div style="font-size:12px;font-weight:700;color:var(--text,#0f172a);">${selesaiStr} <span style="letter-spacing:0.03em">${jsv}</span> WITA</div>
           </div>
         </div>
       </div>
@@ -612,8 +690,18 @@ function renderPeriodeVerifBanner(periodeList) {
   return html;
 }
 
-function renderKepalasDashboard(el, d) {
+function renderKepalasDashboard(el, d, tahunDipilih) {
   el.innerHTML = `
+    <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:14px">
+      <h1 style="margin:0"><span class="material-icons">dashboard</span>Dashboard</h1>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:12px;color:var(--text-light);font-weight:600">Filter Tahun:</span>
+        <select id="dashTahunFilter" onchange="renderDashboard()"
+          style="border:1px solid var(--border,#e2e8f0);border-radius:7px;padding:5px 10px;font-size:12px;outline:none;font-family:inherit;background:var(--surface,white);color:var(--text);cursor:pointer">
+          <option value="">Memuat...</option>
+        </select>
+      </div>
+    </div>
     <div class="stats-grid">
       ${statCard('orange','pending','Menunggu Verifikasi', d.menunggu)}
       ${statCard('green','check_circle','Sudah Diverifikasi', d.terverifikasi)}
@@ -645,6 +733,16 @@ function renderKepalasDashboard(el, d) {
       <div class="card-body" style="padding:0" id="kapusAllTable"></div>
     </div>`;
 
+  // Populate dropdown tahun
+  _loadDashTahunList().then(list => {
+    const sel = document.getElementById('dashTahunFilter');
+    if (!sel) return;
+    const allTahun = [...new Set([...list, CURRENT_YEAR])].sort((a,b) => b - a);
+    sel.innerHTML = `<option value="">Semua Tahun</option>`
+      + allTahun.map(t => `<option value="${t}" ${t == tahunDipilih ? 'selected' : ''}>${t}</option>`).join('');
+  });
+
+  // Pending: tidak perlu filter tahun (semua yang menunggu verifikasi kapus)
   API.getUsulan({ kode_pkm: currentUser.kodePKM, status: 'Menunggu Kepala Puskesmas' }).then(rows => {
     const renderKapusPendingPaged = (pg) => {
       const el = document.getElementById('pendingTable');
@@ -658,7 +756,10 @@ function renderKepalasDashboard(el, d) {
     renderKapusPendingPaged(1);
   }).catch(() => {});
 
-  API.getUsulan({ kode_pkm: currentUser.kodePKM }).then(rows => {
+  // Riwayat + summary — ikut filter tahun
+  const _kapusTahunParam = { kode_pkm: currentUser.kodePKM };
+  if (tahunDipilih) _kapusTahunParam.tahun = tahunDipilih;
+  API.getUsulan(_kapusTahunParam).then(rows => {
     // Progress summary
     const elSum = document.getElementById('kapusStatusSummary');
     if (elSum) elSum.innerHTML = renderKapusStatusSummary(rows);
@@ -676,7 +777,7 @@ function renderKepalasDashboard(el, d) {
   }).catch(() => {});
 }
 
-function renderProgramDashboard(el, d) {
+function renderProgramDashboard(el, d, tahunDipilih) {
   // Ringkasan indikator tanggung jawab PP
   const aksesArr = (currentUser.indikatorAkses || []);
   // Ambil nama indikator dari master jika tersedia (allIndList dari halaman master)
@@ -702,6 +803,16 @@ function renderProgramDashboard(el, d) {
     : `<span style="font-size:12px;color:var(--text-light)">Anda bertanggung jawab atas <strong style="color:var(--primary)">semua indikator</strong></span>`;
 
   el.innerHTML = `
+    <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:14px">
+      <h1 style="margin:0"><span class="material-icons">dashboard</span>Dashboard</h1>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:12px;color:var(--text-light);font-weight:600">Filter Tahun:</span>
+        <select id="dashTahunFilter" onchange="renderDashboard()"
+          style="border:1px solid var(--border,#e2e8f0);border-radius:7px;padding:5px 10px;font-size:12px;outline:none;font-family:inherit;background:var(--surface,white);color:var(--text);cursor:pointer">
+          <option value="">Memuat...</option>
+        </select>
+      </div>
+    </div>
     <div class="stats-grid">
       ${statCard('orange','pending','Menunggu Verifikasi', d.menunggu)}
       ${statCard('green','check_circle','Sudah Diverifikasi', d.terverifikasi)}
@@ -730,8 +841,19 @@ function renderProgramDashboard(el, d) {
       </div>
     </div>`;
 
+  // Populate dropdown tahun
+  _loadDashTahunList().then(list => {
+    const sel = document.getElementById('dashTahunFilter');
+    if (!sel) return;
+    const allTahun = [...new Set([...list, CURRENT_YEAR])].sort((a,b) => b - a);
+    sel.innerHTML = `<option value="">Semua Tahun</option>`
+      + allTahun.map(t => `<option value="${t}" ${t == tahunDipilih ? 'selected' : ''}>${t}</option>`).join('');
+  });
+
   // Fetch indikator dulu, lalu render info card dengan nama lengkap
   // reVerifNos: Set nomor indikator yang sedang perlu di-re-verifikasi (opsional, default kosong)
+  const _ppUsulanParam = { status_program: 'Menunggu Pengelola Program,Menunggu Re-verifikasi PP,Ditolak,Ditolak Sebagian,Selesai,Menunggu Admin', email_program: currentUser.email };
+  if (tahunDipilih) _ppUsulanParam.tahun = tahunDipilih;
   const _renderPPIndikatorInfo = (indList, reVerifNos) => {
     const _reVerif = reVerifNos instanceof Set ? reVerifNos : new Set();
     const _getNama = (no) => {
@@ -775,7 +897,7 @@ function renderProgramDashboard(el, d) {
 
   Promise.all([
     _indFetch,
-    API.getUsulan({ status_program: 'Menunggu Pengelola Program,Menunggu Re-verifikasi PP,Ditolak,Ditolak Sebagian,Selesai,Menunggu Admin', email_program: currentUser.email })
+    API.getUsulan(_ppUsulanParam)
   ]).then(([indList, rows]) => {
     const pending = rows.filter(u => !u.sudahVerif);
     const done = rows.filter(u => u.sudahVerif);
@@ -868,29 +990,47 @@ function statCard(color, icon, label, value, sub = null) {
       <div style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.85)">${label}</div>
     </div>
     <div>
-      <div style="font-size:22px;font-weight:900;color:#fff;line-height:1;font-family:'JetBrains Mono',monospace;letter-spacing:-1px">${value ?? 0}</div>
+      <div style="font-size:22px;font-weight:900;color:#fff;line-height:1;letter-spacing:-1px">${value ?? 0}</div>
       ${sub !== null ? `<div style="font-size:10px;color:rgba(255,255,255,0.6);margin-top:2px;font-weight:500">${sub}</div>` : ''}
     </div>
   </div>`;
 }
 
-function renderChart(data) {
+function renderChart(data, chartMode) {
+  // chartMode: 'bulan' (tahun tertentu dipilih) atau 'tahun' (Semua Tahun)
+  const isBulanMode = !chartMode || chartMode === 'bulan';
   const ALL_MONTHS = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Ags','Sep','Okt','Nov','Des'];
-  const dataMap = {};
-  (data || []).forEach(d => { dataMap[d.bulan] = d.total || 0; });
-  const full = ALL_MONTHS.map(b => ({ bulan: b, total: dataMap[b] || 0 }));
+
+  let full;
+  if (isBulanMode) {
+    // Mode per bulan: isi semua 12 bulan, bulan tanpa data = 0
+    const dataMap = {};
+    (data || []).forEach(d => { dataMap[d.label || d.bulan] = d.total || 0; });
+    full = ALL_MONTHS.map(b => ({ label: b, total: dataMap[b] || 0 }));
+  } else {
+    // Mode per tahun: gunakan data apa adanya dari backend, urutkan
+    full = (data || [])
+      .map(d => ({ label: d.label || String(d.tahun || ''), total: d.total || 0 }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+    // Jika tidak ada data sama sekali, tampilkan placeholder
+    if (!full.length) full = [{ label: '-', total: 0 }];
+  }
+
   const max = Math.max(...full.map(d => d.total), 1);
-  const bars = full.map((d, i) => {
+  const bars = full.map((d) => {
     const targetH = Math.max((d.total / max) * 90, d.total > 0 ? 6 : 0);
     const isEmpty = d.total === 0;
+    const barColor = isBulanMode
+      ? (isEmpty ? 'linear-gradient(180deg,#e2e8f0,#cbd5e1)' : 'linear-gradient(180deg,#0d9488,#06b6d4)')
+      : (isEmpty ? 'linear-gradient(180deg,#e2e8f0,#cbd5e1)' : 'linear-gradient(180deg,#7c3aed,#a78bfa)');
     return `<div class="chart-bar-wrap" style="position:relative">
       <div class="chart-bar-val" style="color:${isEmpty ? 'transparent' : 'var(--text)'};min-height:14px">${d.total}</div>
       <div class="chart-bar chart-bar-anim"
         data-target="${targetH}"
-        style="height:0px;background:${isEmpty ? 'linear-gradient(180deg,#e2e8f0,#cbd5e1)' : 'linear-gradient(180deg,#0d9488,#06b6d4)'};opacity:${isEmpty ? '0.45' : '1'}"
-        title="${d.bulan}: ${d.total} usulan"></div>
-      <div class="chart-bar-lbl" style="color:${isEmpty ? 'var(--text-xlight)' : 'var(--text-light)'}">${d.bulan}</div>
-      ${!isEmpty ? `<div class="chart-tooltip">${d.bulan}<br><b>${d.total}</b> usulan</div>` : ''}
+        style="height:0px;background:${barColor};opacity:${isEmpty ? '0.45' : '1'}"
+        title="${d.label}: ${d.total} usulan"></div>
+      <div class="chart-bar-lbl" style="color:${isEmpty ? 'var(--text-xlight)' : 'var(--text-light)'}${!isBulanMode ? ';font-size:9.5px' : ''}">${d.label}</div>
+      ${!isEmpty ? `<div class="chart-tooltip">${d.label}<br><b>${d.total}</b> usulan</div>` : ''}
     </div>`;
   }).join('');
   setTimeout(() => {
@@ -902,7 +1042,7 @@ function renderChart(data) {
       }, i * 30);
     });
   }, 60);
-  return `<div class="chart-container" style="min-height:130px;padding:8px 0 4px;justify-content:space-between;gap:4px">${bars}</div>`;
+  return `<div class="chart-container" style="min-height:130px;padding:8px 0 4px;justify-content:space-between;gap:${isBulanMode ? '4' : '6'}px">${bars}</div>`;
 }
 
 function renderDonutChart(selesai, proses, ditolak) {
@@ -956,12 +1096,12 @@ function renderDonutChart(selesai, proses, ditolak) {
       <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#e2e8f0" stroke-width="13"/>
       ${svgSegs}
       <text x="${cx}" y="${cy + 5}" text-anchor="middle" font-size="15" font-weight="900"
-        fill="var(--text)" font-family="'JetBrains Mono',monospace">${pct}%</text>
+        fill="var(--text)" >${pct}%</text>
 
     </svg>
     <div style="display:flex;flex-direction:column;gap:6px;flex:1">
       <div style="font-size:10px;font-weight:600;color:var(--text-light);text-transform:uppercase;letter-spacing:0.4px">Total Usulan</div>
-      <div style="font-size:24px;font-weight:900;color:var(--text);font-family:'JetBrains Mono',monospace;line-height:1">${total}</div>
+      <div style="font-size:24px;font-weight:900;color:var(--text);line-height:1">${total}</div>
       <div style="display:flex;flex-direction:column;gap:5px;margin-top:2px">${legend}</div>
     </div>
   </div>`;
@@ -1021,7 +1161,7 @@ function renderUsulanTable(rows, role) {
   return `<div class="table-container"><table>
     <thead><tr><th>ID Usulan</th><th>Puskesmas</th><th>Periode</th><th>Indeks SPM</th><th>Status</th><th>Dibuat</th><th>Aksi</th></tr></thead>
     <tbody>${rows.map(u => `<tr>
-      <td><span style="font-family:'JetBrains Mono',monospace;font-weight:600;font-size:12px;">${u.idUsulan}</span></td>
+      <td><span style="font-weight:600;font-size:12px;">${u.idUsulan}</span></td>
       <td>${u.namaPKM || u.kodePKM}</td>
       <td>${u.namaBulan || ''} ${u.tahun}</td>
       <td class="rasio-cell" style="font-weight:700;color:var(--primary)">${parseFloat(u.indeksSPM||0).toFixed(2)}</td>

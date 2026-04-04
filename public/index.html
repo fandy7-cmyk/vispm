@@ -898,6 +898,41 @@ input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-o
 [data-theme="dark"] .status-summary-bar { background: #273449 !important; }
 [data-theme="dark"] .status-summary-item { color: #f1f5f9 !important; }
 
+/* ===== SPINNER TRIPLE-RING ===== */
+/* Digunakan via spinnerHTML(size, gap) — lihat app-core.js */
+.spm-spinner { position:relative; display:inline-block; flex-shrink:0; }
+.spm-spinner > div { position:absolute; inset:0; border-radius:50%; border-style:solid; border-color:transparent; }
+.spm-spinner .sr1 { border-top-color:#0d9488; animation:spin 1.1s linear infinite; }
+.spm-spinner .sr2 { border-right-color:#14b8a6; animation:spin 1.7s linear infinite reverse; }
+.spm-spinner .sr3 { border-bottom-color:#5eead4; animation:spin 2.3s linear infinite; }
+
+/* Variasi ukuran prebuilt */
+.spm-spinner.sm  { width:16px; height:16px; }
+.spm-spinner.sm  > div { border-width:2px; }
+.spm-spinner.sm  .sr2 { inset:4px; }
+.spm-spinner.sm  .sr3 { inset:8px; }
+
+.spm-spinner.md  { width:24px; height:24px; }
+.spm-spinner.md  > div { border-width:2.5px; }
+.spm-spinner.md  .sr2 { inset:5px; }
+.spm-spinner.md  .sr3 { inset:10px; }
+
+.spm-spinner.lg  { width:36px; height:36px; }
+.spm-spinner.lg  > div { border-width:3px; }
+.spm-spinner.lg  .sr2 { inset:6px; }
+.spm-spinner.lg  .sr3 { inset:12px; }
+
+.spm-spinner.xl  { width:48px; height:48px; }
+.spm-spinner.xl  > div { border-width:3.5px; }
+.spm-spinner.xl  .sr2 { inset:8px; }
+.spm-spinner.xl  .sr3 { inset:16px; }
+
+/* Loading state wrapper — spinner + teks */
+.loading-state { display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:10px; padding:32px; color:var(--text-light); font-size:13px; }
+.loading-state.inline { flex-direction:row; padding:10px 16px; gap:8px; }
+.loading-state p { margin:0; font-size:13px; color:var(--text-light); }
+
 /* ===== GOLDEN RATIO REMINDER (φ = 1.618) =====
  * Semua spacing, sizing, dan typography di sistem ini
  * menggunakan variabel CSS --sp-* dan --fs-* yang
@@ -1589,6 +1624,29 @@ document.addEventListener('DOMContentLoaded', function() {
     e.target.style.outline = 'none';
   }, true);
 });
+
+// ============================================================
+//  HELPER GLOBAL: spinnerHTML(size, label)
+//  size: 'sm'(16px) | 'md'(24px) | 'lg'(36px) | 'xl'(48px)
+//  Menghasilkan HTML spinner triple-ring teal seragam.
+//  Gunakan di mana saja sebagai pengganti spinner ad-hoc.
+// ============================================================
+function spinnerHTML(size = 'lg', label = '') {
+  const spinner = `<div class="spm-spinner ${size}"><div class="sr1"></div><div class="sr2"></div><div class="sr3"></div></div>`;
+  if (!label) return spinner;
+  return `<div class="loading-state">${spinner}<p>${label}</p></div>`;
+}
+
+// Shortcut: loading state untuk area konten (full block)
+function loadingBlock(label = 'Memuat data...') {
+  return `<div class="loading-state">${spinnerHTML('lg')}` +
+         `<p>${label}</p></div>`;
+}
+
+// Shortcut: loading state inline (baris, misal di dalam tabel / tombol)
+function loadingInline(label = 'Memuat...') {
+  return `<div class="loading-state inline">${spinnerHTML('sm')}<span>${label}</span></div>`;
+}
 
 // Lupa password: tampilkan info di authStatus
 function showForgotPasswordInfo() {

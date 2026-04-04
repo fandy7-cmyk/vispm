@@ -317,7 +317,7 @@ async function renderMasterData(tab) {
   _highlightMasterTab(activeTab);
 
   const tc = document.getElementById('masterTabContent');
-  tc.innerHTML = '<div class="empty-state"><p>Memuat...</p></div>';
+  tc.innerHTML = loadingBlock('Memuat...');
   setLoading(true);
   try {
     if (activeTab === 'pejabat') {
@@ -384,7 +384,7 @@ async function renderPejabatTab(el) {
       <div class="card-body">
         <p style="font-size:13px;color:#64748b;margin-bottom:20px">Tanda tangan pejabat berikut akan muncul di laporan PDF yang telah selesai diverifikasi.</p>
         <div id="pejabatList" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px">
-          <div class="empty-state"><div style="position:relative;width:32px;height:32px;display:inline-block;margin:0 auto"><div style="position:absolute;inset:0;border-radius:50%;border:2.5px solid transparent;border-top-color:#0d9488;animation:spin 1.1s linear infinite"></div><div style="position:absolute;inset:5px;border-radius:50%;border:2.5px solid transparent;border-right-color:#14b8a6;animation:spin 1.7s linear infinite reverse"></div><div style="position:absolute;inset:10px;border-radius:50%;border:2.5px solid transparent;border-bottom-color:#5eead4;animation:spin 2.3s linear infinite"></div></div><p>Memuat...</p></div>
+          ${loadingBlock('Memuat...')}
         </div>
       </div>
     </div>`;
@@ -596,7 +596,7 @@ async function renderUsers(el) {
                   <span style="font-size:11px;font-weight:400;color:var(--text-light)">(bisa pilih lebih dari satu)</span>
                 </div>
                 <div id="jabatanCheckboxList" style="flex:1;min-height:0;overflow-y:auto;border:1.5px solid var(--border);border-radius:8px;padding:8px;background:white;display:grid;grid-template-columns:1fr 1fr;align-content:start;gap:4px">
-                  <div style="color:var(--text-light);font-size:12px;padding:4px">Memuat daftar jabatan...</div>
+                  ${loadingInline('Memuat daftar jabatan...')}
                 </div>
               </div>
 
@@ -1022,7 +1022,7 @@ async function renderJabatan(el) {
         </div>
       </div>
       <div class="card-body" style="padding:0" id="jabatanTable">
-        <div class="empty-state" style="padding:32px"><p>Memuat...</p></div>
+        ${loadingBlock('Memuat...')}
       </div>
     </div>
 
@@ -1337,7 +1337,7 @@ async function loadTargetTahunan() {
   _ttCurrentKode = kode; _ttCurrentTahun = tahun;
 
   const el = document.getElementById('ttContent');
-  el.innerHTML = `<div class="empty-state" style="padding:32px"><p>Memuat...</p></div>`;
+  el.innerHTML = loadingBlock('Memuat...');
   try {
     _ttIndikator = await API.get(`target-tahunan`, { kode_pkm: kode, tahun });
 
@@ -2381,8 +2381,8 @@ async function renderAuditTrail(el) {
     </div>
     <div class="card">
       <div class="card-body" style="padding:0" id="auditTrailTable">
-        <div class="empty-state" style="padding:40px">
-          <span class="material-icons" style="font-size:40px;color:#cbd5e1">manage_search</span>
+        <div class="loading-state" style="padding:40px">
+          ${spinnerHTML('lg')}
           <p>Memuat log 7 hari terakhir...</p>
         </div>
       </div>
@@ -2677,9 +2677,7 @@ async function doGlobalSearch(q) {
     return;
   }
 
-  el.innerHTML = `<div style="padding:20px;text-align:center;color:#94a3b8;font-size:13px">
-    <div style="position:relative;width:32px;height:32px;display:inline-block;margin:0 auto"><div style="position:absolute;inset:0;border-radius:50%;border:2.5px solid transparent;border-top-color:#0d9488;animation:spin 1.1s linear infinite"></div><div style="position:absolute;inset:5px;border-radius:50%;border:2.5px solid transparent;border-right-color:#14b8a6;animation:spin 1.7s linear infinite reverse"></div><div style="position:absolute;inset:10px;border-radius:50%;border:2.5px solid transparent;border-bottom-color:#5eead4;animation:spin 2.3s linear infinite"></div></div>Mencari...
-  </div>`;
+  el.innerHTML = `<div class="loading-state" style="padding:20px">${spinnerHTML('md')}<span style="font-size:13px;color:#94a3b8">Mencari...</span></div>`;
 
   _searchTimeout = setTimeout(async () => {
     const query = q.trim().toLowerCase();
@@ -2827,7 +2825,7 @@ async function renderPenandatanganTab(el) {
   const target = el || document.getElementById('masterTabContent');
   if (!target) return;
 
-  target.innerHTML = `<div class="empty-state"><div style="position:relative;width:32px;height:32px;display:inline-block;margin:0 auto"><div style="position:absolute;inset:0;border-radius:50%;border:2.5px solid transparent;border-top-color:#0d9488;animation:spin 1.1s linear infinite"></div><div style="position:absolute;inset:5px;border-radius:50%;border:2.5px solid transparent;border-right-color:#14b8a6;animation:spin 1.7s linear infinite reverse"></div><div style="position:absolute;inset:10px;border-radius:50%;border:2.5px solid transparent;border-bottom-color:#5eead4;animation:spin 2.3s linear infinite"></div></div><p>Memuat...</p></div>`;
+  target.innerHTML = loadingBlock('Memuat...');
 
   try {
     // Load semua data sekaligus

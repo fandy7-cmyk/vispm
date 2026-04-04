@@ -33,7 +33,7 @@ async function renderVerifikasi() {
     </div>` : ''}
     <div class="card">
       <div class="card-body" style="padding:0" id="verifTable">
-        <div class="empty-state" style="padding:32px"><p>Memuat data...</p></div>
+        <div class="loading-state"><div class="spm-spinner lg"><div class="sr1"></div><div class="sr2"></div><div class="sr3"></div></div><p>Memuat data...</p></div>
       </div>
     </div>`;
 
@@ -185,7 +185,7 @@ async function openVerifikasi(idUsulan) {
   if (adminPanelReset) adminPanelReset.style.display = 'none';
   const programPanelReset = document.getElementById('programRejectPanel');
   if (programPanelReset) programPanelReset.style.display = 'none';
-  document.getElementById('verifIndikatorBody').innerHTML = `<tr><td colspan="7"><div class="empty-state" style="padding:20px"><p>Memuat...</p></div></td></tr>`;
+  document.getElementById('verifIndikatorBody').innerHTML = `<tr><td colspan="7"><div class="loading-state"><div class="spm-spinner lg"><div class="sr1"></div><div class="sr2"></div><div class="sr3"></div></div><p>Memuat...</p></div></td></tr>`;
 
   // ===== CEK TANDA TANGAN =====
   let _ttOk = true;

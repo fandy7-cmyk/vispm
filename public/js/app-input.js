@@ -326,7 +326,7 @@ let indikatorData = [];
 // Buka/buat folder Google Drive otomatis
 async function openGDriveFolder(kodePKM, tahun, bulan, namaBulan, idUsulan) {
   const btn = document.getElementById('btnOpenDrive');
-  if (btn) { btn.innerHTML = '<div style="position:relative;width:14px;height:14px;display:inline-block;vertical-align:middle;margin-right:5px"><div style="position:absolute;inset:0;border-radius:50%;border:2px solid transparent;border-top-color:#0d9488;animation:spin 1.1s linear infinite"></div><div style="position:absolute;inset:3px;border-radius:50%;border:2px solid transparent;border-right-color:#14b8a6;animation:spin 1.7s linear infinite reverse"></div></div> Membuat folder...'; btn.disabled = true; }
+  if (btn) { btn.innerHTML = '<div class="spm-spinner sm"><div class="sr1"></div><div class="sr2"></div><div class="sr3"></div></div> Membuat folder...'; btn.disabled = true; }
   try {
     const result = await API.get('drive', { kodePKM, tahun, bulan, namaBulan });
     // Save folder URL to DB
@@ -372,7 +372,7 @@ async function openIndikatorModal(idUsulan) {
   const _submitBtn = document.getElementById('btnSubmitFromModal');
   if (_submitBtn) _submitBtn.style.display = '';
   showModal('indikatorModal');
-  document.getElementById('indikatorInputBody').innerHTML = `<tr><td colspan="8"><div class="empty-state" style="padding:20px"><p>Memuat data...</p></div></td></tr>`;
+  document.getElementById('indikatorInputBody').innerHTML = `<tr><td colspan="8"><div class="loading-state"><div class="spm-spinner lg"><div class="sr1"></div><div class="sr2"></div><div class="sr3"></div></div><p>Memuat data...</p></div></td></tr>`;
 
   try {
     const [detail, inds] = await Promise.all([API.getDetailUsulan(idUsulan), API.getIndikatorUsulan(idUsulan)]);
@@ -612,7 +612,7 @@ async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, namaP
   const cell = document.getElementById(`uploadCell-${noIndikator}`);
   const statusDiv = document.createElement('div');
   statusDiv.style.cssText = 'font-size:11px;color:#0891b2';
-  statusDiv.innerHTML = `<div style="position:relative;width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:4px"><div style="position:absolute;inset:0;border-radius:50%;border:1.5px solid transparent;border-top-color:#0d9488;animation:spin 1.1s linear infinite"></div></div> Mengupload ${files.length} file...`;
+  statusDiv.innerHTML = `<div class="loading-state inline">${spinnerHTML('sm')}<span>Mengupload ${files.length} file...</span></div>`;
   cell.insertBefore(statusDiv, cell.firstChild);
 
   const uploadedLinks = [];
@@ -923,7 +923,7 @@ function _renderBuktiModal() {
           ${isImage
             ? `<img src="${proxyUrl}" style="max-width:100%;max-height:100%;object-fit:contain;padding:16px">`
             : `<div style="color:#94a3b8;font-size:13px;display:flex;align-items:center;gap:8px">
-                <div style="position:relative;width:28px;height:28px;display:inline-block;vertical-align:middle;margin-right:6px"><div style="position:absolute;inset:0;border-radius:50%;border:2.5px solid transparent;border-top-color:#0d9488;animation:spin 1.1s linear infinite"></div><div style="position:absolute;inset:5px;border-radius:50%;border:2.5px solid transparent;border-right-color:#14b8a6;animation:spin 1.7s linear infinite reverse"></div></div> Memuat data...
+                ${spinnerHTML('md')}<span>Memuat data...</span>
               </div>`
           }
         </div>
@@ -947,7 +947,7 @@ function _renderBuktiModal() {
           // Render PDF pakai PDF.js (pdfjs-dist CDN) — bebas dari IDM intercept
           // karena tidak ada fetch/download ke URL eksternal, semua dirender via canvas
           el.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:12px;color:#94a3b8">
-            <div style="position:relative;width:32px;height:32px;display:inline-block"><div style="position:absolute;inset:0;border-radius:50%;border:3px solid transparent;border-top-color:#0d9488;animation:spin 1.1s linear infinite"></div><div style="position:absolute;inset:6px;border-radius:50%;border:3px solid transparent;border-right-color:#14b8a6;animation:spin 1.7s linear infinite reverse"></div><div style="position:absolute;inset:12px;border-radius:50%;border:3px solid transparent;border-bottom-color:#5eead4;animation:spin 2.3s linear infinite"></div></div>
+            ${spinnerHTML('lg')}
             <span style="font-size:13px">Memuat PDF...</span>
           </div>`;
           await _renderPDFjs(el, proxyUrl, idx);
@@ -1356,7 +1356,7 @@ function previewSPM(changedNo) {
 async function viewDetail(idUsulan) {
   document.getElementById('detailModalId').textContent = idUsulan;
   showModal('detailModal');
-  document.getElementById('detailModalBody').innerHTML = `<div class="empty-state"><p>Memuat data...</p></div>`;
+  document.getElementById('detailModalBody').innerHTML = loadingBlock('Memuat data...');
   try {
     const [detail, inds] = await Promise.all([API.getDetailUsulan(idUsulan), API.getIndikatorUsulan(idUsulan)]);
     const vp = detail.verifikasiProgram || [];
@@ -1512,11 +1512,7 @@ async function openLogAktivitas(idUsulan) {
       </div>
       <div class="modal-body" id="logAktivitasBody" style="padding:20px;flex:1;overflow-y:auto">
         <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:12px;padding:60px 0">
-          <div style="position:relative;width:40px;height:40px">
-            <div style="position:absolute;inset:0;border-radius:50%;border:3px solid transparent;border-top-color:#0d9488;animation:spin 1.1s linear infinite"></div>
-            <div style="position:absolute;inset:6px;border-radius:50%;border:3px solid transparent;border-right-color:#14b8a6;animation:spin 1.7s linear infinite reverse"></div>
-            <div style="position:absolute;inset:12px;border-radius:50%;border:3px solid transparent;border-bottom-color:#5eead4;animation:spin 2.3s linear infinite"></div>
-          </div>
+          ${spinnerHTML('xl')}
           <p style="font-size:13px;color:#64748b;font-weight:500;margin:0">Memuat riwayat...</p>
         </div>
       </div>

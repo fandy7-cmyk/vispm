@@ -450,7 +450,7 @@ async function doLogin() {
 
   const btn = document.getElementById('authBtn');
   btn.disabled = true;
-  btn.innerHTML = '<div style="position:relative;width:16px;height:16px;display:inline-block;vertical-align:middle;margin-right:6px"><div style="position:absolute;inset:0;border-radius:50%;border:2px solid transparent;border-top-color:#0d9488;animation:spin 1.1s linear infinite"></div><div style="position:absolute;inset:3px;border-radius:50%;border:2px solid transparent;border-right-color:#14b8a6;animation:spin 1.7s linear infinite reverse"></div></div>Loading...';
+  btn.innerHTML = spinnerHTML('sm') + ' Loading...';
   setAuthStatus('Memeriksa kredensial...', '');
 
   try {

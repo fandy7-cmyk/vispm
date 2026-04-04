@@ -109,7 +109,7 @@ function renderAdminDashboard(el, d, tahunDipilih) {
           </button>
         </div>
         <div class="card-body" style="padding:0">
-          <div id="adminPendingTable"><div class="empty-state" style="padding:32px"><p>Memuat data...</p></div></div>
+          <div id="adminPendingTable"><div class="loading-state"><div class="spm-spinner lg"><div class="sr1"></div><div class="sr2"></div><div class="sr3"></div></div><p>Memuat data...</p></div></div>
         </div>
       </div>
       <div class="card" style="margin:0">
@@ -120,7 +120,7 @@ function renderAdminDashboard(el, d, tahunDipilih) {
           </button>
         </div>
         <div class="card-body" style="padding:0" id="pkmProgressTable">
-          <div class="empty-state" style="padding:32px"><p>Memuat data...</p></div>
+          <div class="loading-state"><div class="spm-spinner lg"><div class="sr1"></div><div class="sr2"></div><div class="sr3"></div></div><p>Memuat data...</p></div>
         </div>
       </div>
     </div>
@@ -147,7 +147,7 @@ function renderAdminDashboard(el, d, tahunDipilih) {
       </div>
       <div class="card-body" style="padding:0">
         <div id="adminAllUsulanTable">
-          <div class="empty-state" style="padding:32px"><p>Memuat data...</p></div>
+          <div class="loading-state"><div class="spm-spinner lg"><div class="sr1"></div><div class="sr2"></div><div class="sr3"></div></div><p>Memuat data...</p></div>
         </div>
       </div>
     </div>`;
@@ -198,7 +198,7 @@ function renderAdminDashboard(el, d, tahunDipilih) {
 async function loadAdminAllUsulan() {
   const el = document.getElementById('adminAllUsulanTable');
   if (!el) return;
-  el.innerHTML = `<div class="empty-state" style="padding:32px"><p>Memuat data...</p></div>`;
+  el.innerHTML = `<div class="loading-state"><div class="spm-spinner lg"><div class="sr1"></div><div class="sr2"></div><div class="sr3"></div></div><p>Memuat data...</p></div>`;
   try {
     const rows = await API.getUsulan({});
     _adminAllUsulanData = rows || [];
@@ -432,7 +432,7 @@ renderOperatorDashboard(el, d, tahunDipilih) {
           <span class="card-title"><span class="material-icons">donut_large</span>Status Usulan Saya</span>
         </div>
         <div class="card-body" style="padding:12px 14px;flex:1" id="operatorStatusSummary">
-          <div class="empty-state" style="padding:16px"><p>Memuat...</p></div>
+          <div class="loading-state"><div class="spm-spinner lg"><div class="sr1"></div><div class="sr2"></div><div class="sr3"></div></div><p>Memuat...</p></div>
         </div>
       </div>
     </div>
@@ -712,7 +712,7 @@ function renderKepalasDashboard(el, d, tahunDipilih) {
           <span class="card-title"><span class="material-icons">donut_large</span>Progress Puskesmas</span>
         </div>
         <div class="card-body" style="padding:12px 14px;flex:1" id="kapusStatusSummary">
-          <div class="empty-state" style="padding:16px"><p>Memuat...</p></div>
+          <div class="loading-state"><div class="spm-spinner lg"><div class="sr1"></div><div class="sr2"></div><div class="sr3"></div></div><p>Memuat...</p></div>
         </div>
       </div>
     </div>
@@ -813,7 +813,7 @@ function renderProgramDashboard(el, d, tahunDipilih) {
     <div class="card" style="border-left:3px solid var(--primary);margin-bottom:14px" id="ppIndikatorInfoCard">
       <div class="card-body" style="padding:10px 16px;display:flex;align-items:center;gap:8px">
         <span class="material-icons" style="color:var(--primary);font-size:18px">info</span>
-        <span style="font-size:12px;color:var(--text-light)">Memuat indikator...</span>
+        <div class="loading-state inline"><div class="spm-spinner sm"><div class="sr1"></div><div class="sr2"></div><div class="sr3"></div></div><span style="font-size:12px;color:var(--text-light)">Memuat indikator...</span></div>
       </div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:stretch;margin-bottom:14px">

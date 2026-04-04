@@ -8,16 +8,17 @@ exports.handler = async (event) => {
   const role = params.role || '';
   const email = params.email || '';
   const kodePKM = params.kode_pkm || '';
+  const tahun = params.tahun ? parseInt(params.tahun) : null;
 
   try {
     if (role === 'Admin') {
-      return await adminStats(pool);
+      return await adminStats(pool, tahun);
     } else if (role === 'Operator') {
-      return await operatorStats(pool, email);
+      return await operatorStats(pool, email, tahun);
     } else if (role === 'Kapus' || role === 'Kepala Puskesmas') {
-      return await kapusStats(pool, kodePKM);
+      return await kapusStats(pool, kodePKM, tahun);
     } else if (role === 'Pengelola Program') {
-      return await programStats(pool, email);
+      return await programStats(pool, email, tahun);
     } else if (role === 'Kadis') {
       return await kadisStats(pool);
     }
@@ -28,39 +29,54 @@ exports.handler = async (event) => {
   }
 };
 
-async function adminStats(pool) {
+async function adminStats(pool, tahun) {
+  const tahunFilter = tahun ? `WHERE tahun = ${tahun}` : '';
+  const tahunFilterAnd = tahun ? `AND tahun = ${tahun}` : '';
+
+  // Saat tahun dipilih → chart per bulan. Saat "Semua Tahun" → chart per tahun.
+  const chartQuery = tahun
+    ? `SELECT bulan, COUNT(*) as total FROM usulan_header
+       WHERE tahun = ${tahun} GROUP BY bulan ORDER BY bulan`
+    : `SELECT tahun, COUNT(*) as total FROM usulan_header
+       GROUP BY tahun ORDER BY tahun`;
+
   const [usulanResult, pkmResult, chartResult] = await Promise.all([
     pool.query(`SELECT
       COUNT(*) FILTER(WHERE TRUE) as total,
       COUNT(*) FILTER(WHERE status_global='Selesai') as selesai,
       COUNT(*) FILTER(WHERE status_global NOT IN ('Selesai','Ditolak')) as menunggu
-      FROM usulan_header`),
+      FROM usulan_header ${tahunFilter}`),
     pool.query(`SELECT COUNT(*) as total FROM master_puskesmas WHERE aktif=true`),
-    pool.query(`SELECT tahun, bulan, COUNT(*) as total FROM usulan_header
-                WHERE tahun = EXTRACT(YEAR FROM NOW())
-                GROUP BY tahun, bulan ORDER BY bulan`)
+    pool.query(chartQuery)
   ]);
 
   const s = usulanResult.rows[0];
   const bulanNama = ['','Jan','Feb','Mar','Apr','Mei','Jun','Jul','Ags','Sep','Okt','Nov','Des'];
-  const chart = chartResult.rows.map(r => ({ bulan: bulanNama[r.bulan] || r.bulan, total: parseInt(r.total) }));
+
+  // Format chart sesuai mode: per bulan atau per tahun
+  const chart = tahun
+    ? chartResult.rows.map(r => ({ label: bulanNama[r.bulan] || r.bulan, total: parseInt(r.total), isBulan: true }))
+    : chartResult.rows.map(r => ({ label: String(r.tahun), total: parseInt(r.total), isBulan: false }));
 
   return ok({
     totalUsulan: parseInt(s.total) || 0,
     selesai: parseInt(s.selesai) || 0,
     menunggu: parseInt(s.menunggu) || 0,
     puskesmasAktif: parseInt(pkmResult.rows[0].total) || 0,
-    chartData: chart
+    chartData: chart,
+    chartMode: tahun ? 'bulan' : 'tahun',
+    tahunFilter: tahun || null
   });
 }
 
-async function operatorStats(pool, email) {
+async function operatorStats(pool, email, tahun) {
+  const tahunFilterAnd = tahun ? `AND tahun = ${tahun}` : '';
   const result = await pool.query(
     `SELECT
       COUNT(*) as total,
       COUNT(*) FILTER(WHERE status_global='Selesai') as selesai,
       COUNT(*) FILTER(WHERE status_global NOT IN ('Selesai','Ditolak')) as menunggu
-     FROM usulan_header WHERE created_by=$1`,
+     FROM usulan_header WHERE created_by=$1 ${tahunFilterAnd}`,
     [email]
   );
   const s = result.rows[0];
@@ -107,18 +123,20 @@ async function operatorStats(pool, email) {
     disetujui: parseInt(s.selesai) || 0,
     menunggu: parseInt(s.menunggu) || 0,
     periodeAktif,
-    periodeAktifList
+    periodeAktifList,
+    tahunFilter: tahun || null
   });
 }
 
-async function kapusStats(pool, kodePKM) {
+async function kapusStats(pool, kodePKM, tahun) {
+  const tahunFilter = tahun ? `AND tahun = ${tahun}` : '';
   const [result, periodeResult, usulanPeriodeResult] = await Promise.all([
     pool.query(
       `SELECT
         COUNT(*) FILTER(WHERE status_global='Menunggu Kepala Puskesmas') as menunggu,
         COUNT(*) FILTER(WHERE status_kapus='Selesai') as terverifikasi,
         COUNT(*) as total
-       FROM usulan_header WHERE kode_pkm=$1`,
+       FROM usulan_header WHERE kode_pkm=$1 ${tahunFilter}`,
       [kodePKM]
     ),
     pool.query(
@@ -148,6 +166,7 @@ async function kapusStats(pool, kodePKM) {
     menunggu: parseInt(s.menunggu) || 0,
     terverifikasi: parseInt(s.terverifikasi) || 0,
     total: parseInt(s.total) || 0,
+    tahunFilter: tahun || null,
     // Hanya tampilkan periode yang ada usulannya untuk PKM ini
     periodeAktifList: periodeResult.rows
       .filter(r => usulanSet.has(`${r.tahun}-${r.bulan}`))
@@ -169,14 +188,16 @@ async function kapusStats(pool, kodePKM) {
   });
 }
 
-async function programStats(pool, email) {
+async function programStats(pool, email, tahun) {
+  const tahunFilterAnd = tahun ? `AND uh.tahun = ${tahun}` : '';
   // Total & terverifikasi: semua usulan yang pernah ditugaskan ke PP ini
   const totalResult = await pool.query(
     `SELECT
       COUNT(DISTINCT vp.id_usulan) as total,
       COUNT(DISTINCT vp.id_usulan) FILTER(WHERE vp.status='Selesai') as terverifikasi
      FROM verifikasi_program vp
-     WHERE LOWER(vp.email_program)=LOWER($1)`,
+     JOIN usulan_header uh ON vp.id_usulan = uh.id_usulan
+     WHERE LOWER(vp.email_program)=LOWER($1) ${tahunFilterAnd}`,
     [email]
   );
 
@@ -187,7 +208,8 @@ async function programStats(pool, email) {
      JOIN usulan_header uh ON vp.id_usulan = uh.id_usulan
      WHERE LOWER(vp.email_program)=LOWER($1)
        AND vp.status = 'Menunggu'
-       AND uh.status_global IN ('Menunggu Pengelola Program', 'Menunggu Admin')`,
+       AND uh.status_global IN ('Menunggu Pengelola Program', 'Menunggu Admin')
+       ${tahunFilterAnd}`,
     [email]
   );
 
@@ -314,7 +336,8 @@ async function programStats(pool, email) {
     jamMulaiVerif: pv.jam_mulai_verif || '08:00',
     jamSelesaiVerif: pv.jam_selesai_verif || '17:00',
     periodeAktifList,
-    indikatorBermasalahPerUsulan
+    indikatorBermasalahPerUsulan,
+    tahunFilter: tahun || null
   });
 }
 

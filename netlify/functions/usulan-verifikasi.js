@@ -18,17 +18,18 @@ async function verifProgram(pool, body) {
   // Cek periode verifikasi
   const { tahun: tahunVP, bulan: bulanVP } = headerRes.rows[0];
   const pvResVP = await pool.query(
-    `SELECT tanggal_mulai_verif, tanggal_selesai_verif FROM periode_input WHERE tahun=$1 AND bulan=$2 AND status='Aktif'`,
+    `SELECT tanggal_mulai_verif, tanggal_selesai_verif, jam_mulai_verif, jam_selesai_verif FROM periode_input WHERE tahun=$1 AND bulan=$2 AND status='Aktif'`,
     [tahunVP, bulanVP]
   ).catch(() => ({ rows: [] }));
   if (pvResVP.rows.length && pvResVP.rows[0].tanggal_mulai_verif && pvResVP.rows[0].tanggal_selesai_verif) {
     const nowWita = new Date(Date.now() + 8 * 3600000);
-    const todayStr = nowWita.toISOString().slice(0, 10);
-    const toDs = (v) => { const d = new Date(new Date(v).getTime() + 8*3600000); return d.toISOString().slice(0,10); };
-    const mulaiVerif   = toDs(pvResVP.rows[0].tanggal_mulai_verif);
-    const selesaiVerif = toDs(pvResVP.rows[0].tanggal_selesai_verif);
-    if (todayStr < mulaiVerif) return err(`Periode verifikasi belum dibuka. Dibuka mulai ${new Date(pvResVP.rows[0].tanggal_mulai_verif).toLocaleDateString('id-ID')}.`);
-    if (todayStr > selesaiVerif) return err(`Periode verifikasi sudah ditutup pada ${new Date(pvResVP.rows[0].tanggal_selesai_verif).toLocaleDateString('id-ID')}.`);
+    const nowStr  = nowWita.toISOString().slice(0, 16);
+    const toWitaStr = (tgl, jam) => { const d = new Date(new Date(tgl).getTime() + 8*3600000); return d.toISOString().slice(0,10) + 'T' + (jam || '00:00'); };
+    const pv = pvResVP.rows[0];
+    const mulaiStr   = toWitaStr(pv.tanggal_mulai_verif,  pv.jam_mulai_verif  || '00:00');
+    const selesaiStr = toWitaStr(pv.tanggal_selesai_verif, pv.jam_selesai_verif || '23:59');
+    if (nowStr < mulaiStr)   return err(`Periode verifikasi belum dibuka. Dibuka mulai ${new Date(pv.tanggal_mulai_verif).toLocaleDateString('id-ID')} pukul ${pv.jam_mulai_verif || '00:00'} WITA.`);
+    if (nowStr > selesaiStr) return err(`Periode verifikasi sudah ditutup pada ${new Date(pv.tanggal_selesai_verif).toLocaleDateString('id-ID')} pukul ${pv.jam_selesai_verif || '23:59'} WITA.`);
   }
 
   // Validasi: catatan PP wajib hanya pada re-verifikasi dari Admin, jika ada indikator yang disanggah (tombol Sanggah)
@@ -300,17 +301,18 @@ async function verifKapus(pool, body) {
   if (hdrVerif.rows.length) {
     const { tahun, bulan } = hdrVerif.rows[0];
     const pvRes = await pool.query(
-      `SELECT tanggal_mulai_verif, tanggal_selesai_verif FROM periode_input WHERE tahun=$1 AND bulan=$2 AND status='Aktif'`,
+      `SELECT tanggal_mulai_verif, tanggal_selesai_verif, jam_mulai_verif, jam_selesai_verif FROM periode_input WHERE tahun=$1 AND bulan=$2 AND status='Aktif'`,
       [tahun, bulan]
     ).catch(() => ({ rows: [] }));
     if (pvRes.rows.length && pvRes.rows[0].tanggal_mulai_verif && pvRes.rows[0].tanggal_selesai_verif) {
       const nowWita = new Date(Date.now() + 8 * 3600000);
-      const todayStr = nowWita.toISOString().slice(0, 10);
-      const toDs = (v) => { const d = new Date(new Date(v).getTime() + 8*3600000); return d.toISOString().slice(0,10); };
-      const mulaiVerif  = toDs(pvRes.rows[0].tanggal_mulai_verif);
-      const selesaiVerif = toDs(pvRes.rows[0].tanggal_selesai_verif);
-      if (todayStr < mulaiVerif) return err(`Periode verifikasi belum dibuka. Dibuka mulai ${new Date(pvRes.rows[0].tanggal_mulai_verif).toLocaleDateString('id-ID')}.`);
-      if (todayStr > selesaiVerif) return err(`Periode verifikasi sudah ditutup pada ${new Date(pvRes.rows[0].tanggal_selesai_verif).toLocaleDateString('id-ID')}.`);
+      const nowStr  = nowWita.toISOString().slice(0, 16);
+      const toWitaStr = (tgl, jam) => { const d = new Date(new Date(tgl).getTime() + 8*3600000); return d.toISOString().slice(0,10) + 'T' + (jam || '00:00'); };
+      const pv = pvRes.rows[0];
+      const mulaiStr   = toWitaStr(pv.tanggal_mulai_verif,  pv.jam_mulai_verif  || '00:00');
+      const selesaiStr = toWitaStr(pv.tanggal_selesai_verif, pv.jam_selesai_verif || '23:59');
+      if (nowStr < mulaiStr)   return err(`Periode verifikasi belum dibuka. Dibuka mulai ${new Date(pv.tanggal_mulai_verif).toLocaleDateString('id-ID')} pukul ${pv.jam_mulai_verif || '00:00'} WITA.`);
+      if (nowStr > selesaiStr) return err(`Periode verifikasi sudah ditutup pada ${new Date(pv.tanggal_selesai_verif).toLocaleDateString('id-ID')} pukul ${pv.jam_selesai_verif || '23:59'} WITA.`);
     }
   }
 
@@ -734,17 +736,18 @@ async function verifAdmin(pool, body) {
   // Cek periode verifikasi
   const { tahun, bulan } = headerRes.rows[0];
   const pvRes = await pool.query(
-    `SELECT tanggal_mulai_verif, tanggal_selesai_verif FROM periode_input WHERE tahun=$1 AND bulan=$2 AND status='Aktif'`,
+    `SELECT tanggal_mulai_verif, tanggal_selesai_verif, jam_mulai_verif, jam_selesai_verif FROM periode_input WHERE tahun=$1 AND bulan=$2 AND status='Aktif'`,
     [tahun, bulan]
   ).catch(() => ({ rows: [] }));
   if (pvRes.rows.length && pvRes.rows[0].tanggal_mulai_verif && pvRes.rows[0].tanggal_selesai_verif) {
     const nowWita = new Date(Date.now() + 8 * 3600000);
-    const todayStr = nowWita.toISOString().slice(0, 10);
-    const toDs = (v) => { const d = new Date(new Date(v).getTime() + 8*3600000); return d.toISOString().slice(0,10); };
-    const mulaiVerif   = toDs(pvRes.rows[0].tanggal_mulai_verif);
-    const selesaiVerif = toDs(pvRes.rows[0].tanggal_selesai_verif);
-    if (todayStr < mulaiVerif)   return err(`Periode verifikasi belum dibuka. Dibuka mulai ${new Date(pvRes.rows[0].tanggal_mulai_verif).toLocaleDateString('id-ID')}.`);
-    if (todayStr > selesaiVerif) return err(`Periode verifikasi sudah ditutup pada ${new Date(pvRes.rows[0].tanggal_selesai_verif).toLocaleDateString('id-ID')}.`);
+    const nowStr  = nowWita.toISOString().slice(0, 16);
+    const toWitaStr = (tgl, jam) => { const d = new Date(new Date(tgl).getTime() + 8*3600000); return d.toISOString().slice(0,10) + 'T' + (jam || '00:00'); };
+    const pv = pvRes.rows[0];
+    const mulaiStr   = toWitaStr(pv.tanggal_mulai_verif,  pv.jam_mulai_verif  || '00:00');
+    const selesaiStr = toWitaStr(pv.tanggal_selesai_verif, pv.jam_selesai_verif || '23:59');
+    if (nowStr < mulaiStr)   return err(`Periode verifikasi belum dibuka. Dibuka mulai ${new Date(pv.tanggal_mulai_verif).toLocaleDateString('id-ID')} pukul ${pv.jam_mulai_verif || '00:00'} WITA.`);
+    if (nowStr > selesaiStr) return err(`Periode verifikasi sudah ditutup pada ${new Date(pv.tanggal_selesai_verif).toLocaleDateString('id-ID')} pukul ${pv.jam_selesai_verif || '23:59'} WITA.`);
   }
 
   const adaTolak = indikatorList.some(i => i.aksi === 'tolak');

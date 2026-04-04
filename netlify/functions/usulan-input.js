@@ -1,6 +1,38 @@
 const { getPool, ok, err, confirm, cors } = require('./db');
 const { isValidText, parseIndikatorAkses, logAktivitas, mapHeader } = require('./usulan-helpers');
 
+// ─── Helper: cek apakah sekarang (WITA) masih dalam periode input yang aktif ───
+// Kembalikan objek error jika di luar periode, atau null jika masih valid.
+// Dipakai oleh updateIndikator dan submitUsulan agar konsisten dengan buatUsulan.
+async function cekPeriodeInput(pool, tahun, bulan) {
+  const periodeCheck = await pool.query(
+    `SELECT tanggal_mulai, tanggal_selesai, jam_mulai, jam_selesai
+     FROM periode_input WHERE tahun=$1 AND bulan=$2 AND status='Aktif'`,
+    [tahun, bulan]
+  ).catch(() => ({ rows: [] }));
+
+  if (!periodeCheck.rows.length) return null; // tidak ada periode aktif → biarkan logika lain yang handle
+
+  const p = periodeCheck.rows[0];
+  if (!p.tanggal_mulai || !p.tanggal_selesai) return null; // tanggal belum diset → skip
+
+  const nowWita  = new Date(Date.now() + 8 * 3600000);
+  const nowStr   = nowWita.toISOString().slice(0, 16); // "YYYY-MM-DDTHH:MM"
+  const toWitaStr = (tgl, jam) => {
+    const d = new Date(new Date(tgl).getTime() + 8 * 3600000);
+    return d.toISOString().slice(0, 10) + 'T' + (jam || '00:00');
+  };
+  const mulaiStr   = toWitaStr(p.tanggal_mulai,  p.jam_mulai  || '00:00');
+  const selesaiStr = toWitaStr(p.tanggal_selesai, p.jam_selesai || '23:59');
+
+  if (nowStr < mulaiStr)
+    return err(`Periode input belum dibuka. Dibuka mulai ${new Date(p.tanggal_mulai).toLocaleDateString('id-ID')} pukul ${p.jam_mulai || '00:00'} WITA.`);
+  if (nowStr > selesaiStr)
+    return err(`Periode input sudah ditutup pada ${new Date(p.tanggal_selesai).toLocaleDateString('id-ID')} pukul ${p.jam_selesai || '23:59'} WITA.`);
+
+  return null; // periode valid
+}
+
 async function buatUsulan(pool, body) {
   const { kodePKM, tahun, bulan, emailOperator } = body;
   // Selalu gunakan waktu server (UTC) agar konsisten dan tidak bergantung jam PC user
@@ -14,12 +46,17 @@ async function buatUsulan(pool, body) {
   // Cek rentang tanggal DAN jam jika ada
   const p = periodeCheck.rows[0];
   if (p.tanggal_mulai && p.tanggal_selesai) {
-    const now = new Date();
-    const today = new Date(now); today.setHours(0,0,0,0);
-    const mulai = new Date(p.tanggal_mulai); mulai.setHours(0,0,0,0);
-    const selesai = new Date(p.tanggal_selesai); selesai.setHours(23,59,59);
-    if (today < mulai) return err(`Periode input belum dimulai. Mulai ${mulai.toLocaleDateString('id-ID')}.`);
-    if (today > selesai) return err(`Periode input sudah ditutup pada ${selesai.toLocaleDateString('id-ID')}.`);
+    // Gunakan WITA (UTC+8) konsisten dengan frontend dan backend verifikasi
+    const nowWita = new Date(Date.now() + 8 * 3600000);
+    const nowStr  = nowWita.toISOString().slice(0, 16); // "YYYY-MM-DDTHH:MM"
+    const toWitaStr = (tgl, jam) => {
+      const d = new Date(new Date(tgl).getTime() + 8 * 3600000);
+      return d.toISOString().slice(0, 10) + 'T' + (jam || '00:00');
+    };
+    const mulaiStr   = toWitaStr(p.tanggal_mulai,  p.jam_mulai  || '00:00');
+    const selesaiStr = toWitaStr(p.tanggal_selesai, p.jam_selesai || '23:59');
+    if (nowStr < mulaiStr) return err(`Periode input belum dibuka. Dibuka mulai ${new Date(p.tanggal_mulai).toLocaleDateString('id-ID')} pukul ${p.jam_mulai || '00:00'} WITA.`);
+    if (nowStr > selesaiStr) return err(`Periode input sudah ditutup pada ${new Date(p.tanggal_selesai).toLocaleDateString('id-ID')} pukul ${p.jam_selesai || '23:59'} WITA.`);
   }
   const dupCheck = await pool.query(`SELECT id_usulan FROM usulan_header WHERE created_by=$1 AND tahun=$2 AND bulan=$3`, [emailOperator, tahun, bulan]);
   if (dupCheck.rows.length > 0) return err(`Anda sudah memiliki usulan untuk periode ini (${dupCheck.rows[0].id_usulan}). Setiap operator hanya dapat mengajukan 1 usulan per periode.`);
@@ -70,11 +107,19 @@ const INDIKATOR_TARGET_KUNCI = [8, 9];
 async function updateIndikator(pool, body) {
   const { idUsulan, noIndikator, target, capaian, catatan, linkFile } = body;
 
-  const lockCheck = await pool.query('SELECT is_locked, status_global, kode_pkm, tahun FROM usulan_header WHERE id_usulan=$1', [idUsulan]);
+  const lockCheck = await pool.query('SELECT is_locked, status_global, kode_pkm, tahun, bulan FROM usulan_header WHERE id_usulan=$1', [idUsulan]);
   if (lockCheck.rows.length === 0) return err('Usulan tidak ditemukan');
-  const { is_locked, status_global, kode_pkm, tahun } = lockCheck.rows[0];
+  const { is_locked, status_global, kode_pkm, tahun, bulan } = lockCheck.rows[0];
   // Boleh edit kalau: tidak terkunci, ATAU status Ditolak (operator perbaiki)
   if (is_locked && status_global !== 'Ditolak' && status_global !== 'Ditolak Sebagian') return err('Usulan sudah terkunci dan tidak dapat diedit');
+
+  // Cek periode input masih terbuka (termasuk jam)
+  // Hanya berlaku untuk status Draft — saat Ditolak/Ditolak Sebagian,
+  // Operator diizinkan memperbaiki di luar periode input agar tidak tertahan
+  if (status_global === 'Draft') {
+    const periodeErr = await cekPeriodeInput(pool, tahun, bulan);
+    if (periodeErr) return periodeErr;
+  }
 
   // Poin 4: Guard — saat Ditolak/Ditolak Sebagian, hanya boleh edit indikator yang bermasalah
   // Indikator yang tidak ada di penolakan_indikator (dari_kapus=true) tidak boleh diubah
@@ -182,14 +227,22 @@ async function submitUsulan(pool, body) {
   const { idUsulan, email, forceSubmit, catatanOperator } = body;
 
   const result = await pool.query(
-    'SELECT status_global, status_kapus, status_program, ditolak_oleh, konteks_penolakan FROM usulan_header WHERE id_usulan=$1',
+    'SELECT status_global, status_kapus, status_program, ditolak_oleh, konteks_penolakan, tahun, bulan FROM usulan_header WHERE id_usulan=$1',
     [idUsulan]
   );
   if (result.rows.length === 0) return err('Usulan tidak ditemukan');
-  const { status_global: statusSaatIni, status_kapus, status_program, ditolak_oleh: ditolakOleh, konteks_penolakan } = result.rows[0];
+  const { status_global: statusSaatIni, status_kapus, status_program, ditolak_oleh: ditolakOleh, konteks_penolakan, tahun, bulan } = result.rows[0];
 
   if (statusSaatIni !== 'Draft' && statusSaatIni !== 'Ditolak' && statusSaatIni !== 'Ditolak Sebagian')
     return err('Usulan tidak dapat disubmit pada status ini');
+
+  // Cek periode input masih terbuka (termasuk jam) untuk submit pertama (Draft).
+  // Untuk re-submit (Ditolak/Ditolak Sebagian), Operator tetap diizinkan
+  // mengajukan ulang di luar periode agar proses perbaikan tidak tertahan.
+  if (statusSaatIni === 'Draft') {
+    const periodeSubmitErr = await cekPeriodeInput(pool, tahun, bulan);
+    if (periodeSubmitErr) return periodeSubmitErr;
+  }
 
   // Cek indikator yang belum ada bukti DULU sebelum reset apapun
   const indResult = await pool.query(

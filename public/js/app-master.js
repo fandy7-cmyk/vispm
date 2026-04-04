@@ -317,8 +317,7 @@ async function renderMasterData(tab) {
   _highlightMasterTab(activeTab);
 
   const tc = document.getElementById('masterTabContent');
-  tc.innerHTML = '<div class="empty-state"><span class="material-icons" style="animation:spin 1s linear infinite">refresh</span><p>Memuat...</p></div>';
-
+  tc.innerHTML = '<div class="empty-state"><p>Memuat...</p></div>';
   setLoading(true);
   try {
     if (activeTab === 'pejabat') {
@@ -385,7 +384,7 @@ async function renderPejabatTab(el) {
       <div class="card-body">
         <p style="font-size:13px;color:#64748b;margin-bottom:20px">Tanda tangan pejabat berikut akan muncul di laporan PDF yang telah selesai diverifikasi.</p>
         <div id="pejabatList" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px">
-          <div class="empty-state"><span class="material-icons" style="animation:spin 1s linear infinite">refresh</span><p>Memuat...</p></div>
+          <div class="empty-state"><div style="position:relative;width:32px;height:32px;display:inline-block;margin:0 auto"><div style="position:absolute;inset:0;border-radius:50%;border:2.5px solid transparent;border-top-color:#0d9488;animation:spin 1.1s linear infinite"></div><div style="position:absolute;inset:5px;border-radius:50%;border:2.5px solid transparent;border-right-color:#14b8a6;animation:spin 1.7s linear infinite reverse"></div><div style="position:absolute;inset:10px;border-radius:50%;border:2.5px solid transparent;border-bottom-color:#5eead4;animation:spin 2.3s linear infinite"></div></div><p>Memuat...</p></div>
         </div>
       </div>
     </div>`;
@@ -1924,20 +1923,20 @@ function _initTimePicker24(pickerId, initialValue) {
     const hh = String(h).padStart(2, '0');
     hoursOpts += `<option value="${hh}"${h === initH ? ' selected' : ''}>${hh}</option>`;
   }
-  // Opsi menit 00–55 per 5 menit
+  // Opsi menit 00–59 (lengkap)
   let minsOpts = '';
-  for (let m = 0; m < 60; m += 5) {
+  for (let m = 0; m < 60; m++) {
     const mm = String(m).padStart(2, '0');
-    minsOpts += `<option value="${mm}"${m === (Math.round(initM/5)*5) % 60 ? ' selected' : ''}>${mm}</option>`;
+    minsOpts += `<option value="${mm}"${m === initM ? ' selected' : ''}>${mm}</option>`;
   }
 
   wrap.innerHTML = `
     <div style="display:flex;align-items:center;gap:4px">
-      <select class="form-control" id="${pickerId}_h" style="width:64px;height:38px;padding:0 4px;text-align:center;font-weight:700;font-size:15px;letter-spacing:0.03em;box-sizing:border-box">
+      <select class="form-control" id="${pickerId}_h" style="width:64px;box-sizing:border-box">
         ${hoursOpts}
       </select>
       <span style="font-weight:700;font-size:16px;color:var(--text-dark)">:</span>
-      <select class="form-control" id="${pickerId}_m" style="width:64px;height:38px;padding:0 4px;text-align:center;font-weight:700;font-size:15px;letter-spacing:0.03em;box-sizing:border-box">
+      <select class="form-control" id="${pickerId}_m" style="width:64px;box-sizing:border-box">
         ${minsOpts}
       </select>
     </div>`;
@@ -1963,10 +1962,7 @@ function _setTimePicker24(pickerId, value) {
   const selM = document.getElementById(`${pickerId}_m`);
   if (selH) selH.value = h;
   if (selM) {
-    // Snap ke pilihan menit terdekat (per 5)
-    const mNum = parseInt(m) || 0;
-    const snapped = String(Math.round(mNum / 5) * 5 % 60).padStart(2, '0');
-    selM.value = snapped;
+    selM.value = String(parseInt(m) || 0).padStart(2, '0');
   }
   // Update hidden input juga
   const wrap = document.getElementById(pickerId);
@@ -2377,7 +2373,7 @@ async function renderAuditTrail(el) {
             <label style="font-size:12px;font-weight:600;color:#64748b;display:block;margin-bottom:4px">Cari User</label>
             <input type="text" class="form-control" id="atUser" placeholder="Email atau nama...">
           </div>
-          <button class="btn btn-primary" onclick="loadAuditTrail()">
+          <button class="btn btn-primary" onclick="setLoading(true);loadAuditTrail().finally(()=>setLoading(false))">
             <span class="material-icons">search</span>Tampilkan
           </button>
         </div>
@@ -2393,9 +2389,11 @@ async function renderAuditTrail(el) {
     </div>`;
 
   // Isi dropdown modul & aksi dari data nyata (tanpa filter tanggal, limit besar)
-  _populateAuditFilterOptions();
-
-  loadAuditTrail();
+  // Keduanya di-await agar spinner global tidak mati sebelum data selesai dimuat
+  await Promise.all([
+    _populateAuditFilterOptions(),
+    loadAuditTrail()
+  ]);
 }
 
 // Ambil semua data tanpa filter → bangun opsi modul & aksi yang benar-benar ada di DB
@@ -2434,7 +2432,9 @@ async function _populateAuditFilterOptions() {
 async function loadAuditTrail() {
   const el = document.getElementById('auditTrailTable');
   if (!el) return;
-  el.innerHTML = `<div class="empty-state" style="padding:32px"><span class="material-icons" style="animation:spin 1s linear infinite">refresh</span><p>Memuat...</p></div>`;
+  // Tidak memanggil setLoading di sini — caller (renderAuditTrail atau tombol Tampilkan)
+  // yang bertanggung jawab mengaktifkan/menonaktifkan spinner global.
+  el.innerHTML = '';
 
   const params = {};
   const df = document.getElementById('atDateFrom')?.value;
@@ -2678,7 +2678,7 @@ async function doGlobalSearch(q) {
   }
 
   el.innerHTML = `<div style="padding:20px;text-align:center;color:#94a3b8;font-size:13px">
-    <span class="material-icons" style="animation:spin 1s linear infinite;display:block;margin:0 auto 8px">refresh</span>Mencari...
+    <div style="position:relative;width:32px;height:32px;display:inline-block;margin:0 auto"><div style="position:absolute;inset:0;border-radius:50%;border:2.5px solid transparent;border-top-color:#0d9488;animation:spin 1.1s linear infinite"></div><div style="position:absolute;inset:5px;border-radius:50%;border:2.5px solid transparent;border-right-color:#14b8a6;animation:spin 1.7s linear infinite reverse"></div><div style="position:absolute;inset:10px;border-radius:50%;border:2.5px solid transparent;border-bottom-color:#5eead4;animation:spin 2.3s linear infinite"></div></div>Mencari...
   </div>`;
 
   _searchTimeout = setTimeout(async () => {
@@ -2827,7 +2827,7 @@ async function renderPenandatanganTab(el) {
   const target = el || document.getElementById('masterTabContent');
   if (!target) return;
 
-  target.innerHTML = `<div class="empty-state"><span class="material-icons" style="animation:spin 1s linear infinite">refresh</span><p>Memuat...</p></div>`;
+  target.innerHTML = `<div class="empty-state"><div style="position:relative;width:32px;height:32px;display:inline-block;margin:0 auto"><div style="position:absolute;inset:0;border-radius:50%;border:2.5px solid transparent;border-top-color:#0d9488;animation:spin 1.1s linear infinite"></div><div style="position:absolute;inset:5px;border-radius:50%;border:2.5px solid transparent;border-right-color:#14b8a6;animation:spin 1.7s linear infinite reverse"></div><div style="position:absolute;inset:10px;border-radius:50%;border:2.5px solid transparent;border-bottom-color:#5eead4;animation:spin 2.3s linear infinite"></div></div><p>Memuat...</p></div>`;
 
   try {
     // Load semua data sekaligus

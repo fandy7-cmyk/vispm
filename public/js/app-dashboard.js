@@ -1,12 +1,3 @@
-(function(){
-  if (!document.getElementById('orbit-dot-style')) {
-    var s = document.createElement('style');
-    s.id = 'orbit-dot-style';
-    s.textContent = '@keyframes orbit-dot{0%{transform:rotate(0deg) translateX(14px) rotate(0deg)}100%{transform:rotate(360deg) translateX(14px) rotate(-360deg)}}';
-    document.head.appendChild(s);
-  }
-})();
-
 // ============== DASHBOARD ==============
 
 // Ambil daftar tahun yang tersedia dari semua usulan (dipakai filter dashboard)
@@ -118,7 +109,7 @@ function renderAdminDashboard(el, d, tahunDipilih) {
           </button>
         </div>
         <div class="card-body" style="padding:0">
-          <div id="adminPendingTable"><div class="empty-state" style="padding:32px"><div style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;position:relative"><div style="width:8px;height:8px;border-radius:50%;background:#378ADD"></div><div style="position:absolute;width:7px;height:7px;border-radius:50%;background:#B5D4F4;animation:orbit-dot 1s linear infinite;transform-origin:center"></div></div><p>Memuat data...</p></div></div>
+          <div id="adminPendingTable"><div class="empty-state" style="padding:32px"><p>Memuat data...</p></div></div>
         </div>
       </div>
       <div class="card" style="margin:0">
@@ -129,7 +120,7 @@ function renderAdminDashboard(el, d, tahunDipilih) {
           </button>
         </div>
         <div class="card-body" style="padding:0" id="pkmProgressTable">
-          <div class="empty-state" style="padding:32px"><div style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;position:relative"><div style="width:8px;height:8px;border-radius:50%;background:#378ADD"></div><div style="position:absolute;width:7px;height:7px;border-radius:50%;background:#B5D4F4;animation:orbit-dot 1s linear infinite;transform-origin:center"></div></div><p>Memuat data...</p></div>
+          <div class="empty-state" style="padding:32px"><p>Memuat data...</p></div>
         </div>
       </div>
     </div>
@@ -156,7 +147,7 @@ function renderAdminDashboard(el, d, tahunDipilih) {
       </div>
       <div class="card-body" style="padding:0">
         <div id="adminAllUsulanTable">
-          <div class="empty-state" style="padding:32px"><div style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;position:relative"><div style="width:8px;height:8px;border-radius:50%;background:#378ADD"></div><div style="position:absolute;width:7px;height:7px;border-radius:50%;background:#B5D4F4;animation:orbit-dot 1s linear infinite;transform-origin:center"></div></div><p>Memuat data...</p></div>
+          <div class="empty-state" style="padding:32px"><p>Memuat data...</p></div>
         </div>
       </div>
     </div>`;
@@ -207,7 +198,7 @@ function renderAdminDashboard(el, d, tahunDipilih) {
 async function loadAdminAllUsulan() {
   const el = document.getElementById('adminAllUsulanTable');
   if (!el) return;
-  el.innerHTML = `<div class="empty-state" style="padding:32px"><div style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;position:relative"><div style="width:8px;height:8px;border-radius:50%;background:#378ADD"></div><div style="position:absolute;width:7px;height:7px;border-radius:50%;background:#B5D4F4;animation:orbit-dot 1s linear infinite;transform-origin:center"></div></div><p>Memuat data...</p></div>`;
+  el.innerHTML = `<div class="empty-state" style="padding:32px"><p>Memuat data...</p></div>`;
   try {
     const rows = await API.getUsulan({});
     _adminAllUsulanData = rows || [];
@@ -441,7 +432,7 @@ renderOperatorDashboard(el, d, tahunDipilih) {
           <span class="card-title"><span class="material-icons">donut_large</span>Status Usulan Saya</span>
         </div>
         <div class="card-body" style="padding:12px 14px;flex:1" id="operatorStatusSummary">
-          <div class="empty-state" style="padding:16px"><div style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;position:relative"><div style="width:8px;height:8px;border-radius:50%;background:#378ADD"></div><div style="position:absolute;width:7px;height:7px;border-radius:50%;background:#B5D4F4;animation:orbit-dot 1s linear infinite;transform-origin:center"></div></div></div>
+          <div class="empty-state" style="padding:16px"><p>Memuat...</p></div>
         </div>
       </div>
     </div>
@@ -721,7 +712,7 @@ function renderKepalasDashboard(el, d, tahunDipilih) {
           <span class="card-title"><span class="material-icons">donut_large</span>Progress Puskesmas</span>
         </div>
         <div class="card-body" style="padding:12px 14px;flex:1" id="kapusStatusSummary">
-          <div class="empty-state" style="padding:16px"><div style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;position:relative"><div style="width:8px;height:8px;border-radius:50%;background:#378ADD"></div><div style="position:absolute;width:7px;height:7px;border-radius:50%;background:#B5D4F4;animation:orbit-dot 1s linear infinite;transform-origin:center"></div></div></div>
+          <div class="empty-state" style="padding:16px"><p>Memuat...</p></div>
         </div>
       </div>
     </div>

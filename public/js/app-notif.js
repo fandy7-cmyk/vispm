@@ -71,7 +71,7 @@ function toggleNotifPanel() {
       <button onclick="document.getElementById('notifPanel').style.display='none'" style="background:none;border:none;cursor:pointer;color:#94a3b8;display:flex"><span class="material-icons" style="font-size:18px">close</span></button>
     </div>
     <div id="notifPanelBody" style="max-height:360px;overflow-y:auto">
-      <div style="padding:24px;text-align:center;color:#94a3b8;font-size:13px"><div style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;position:relative;margin-bottom:6px"><div style="width:8px;height:8px;border-radius:50%;background:#378ADD"></div><div style="position:absolute;width:7px;height:7px;border-radius:50%;background:#B5D4F4;animation:orbit-dot 1s linear infinite;transform-origin:center"></div></div><div>Memuat...</div></div>
+      <div style="padding:24px;text-align:center;color:#94a3b8;font-size:13px"><div style="position:relative;width:36px;height:36px;display:inline-block;margin-bottom:6px"><div style="position:absolute;inset:0;border-radius:50%;border:3px solid transparent;border-top-color:#0d9488;animation:spin 1.1s linear infinite"></div><div style="position:absolute;inset:6px;border-radius:50%;border:3px solid transparent;border-right-color:#14b8a6;animation:spin 1.7s linear infinite reverse"></div><div style="position:absolute;inset:12px;border-radius:50%;border:3px solid transparent;border-bottom-color:#5eead4;animation:spin 2.3s linear infinite"></div></div><div>Memuat...</div></div>
     </div>`;
 
   const wrap = document.getElementById('notifBtnWrap');

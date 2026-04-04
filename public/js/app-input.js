@@ -326,7 +326,7 @@ let indikatorData = [];
 // Buka/buat folder Google Drive otomatis
 async function openGDriveFolder(kodePKM, tahun, bulan, namaBulan, idUsulan) {
   const btn = document.getElementById('btnOpenDrive');
-  if (btn) { btn.innerHTML = '<span class="material-icons" style="font-size:15px;animation:spin 0.8s linear infinite">refresh</span> Membuat folder...'; btn.disabled = true; }
+  if (btn) { btn.innerHTML = '<div style="position:relative;width:14px;height:14px;display:inline-block;vertical-align:middle;margin-right:5px"><div style="position:absolute;inset:0;border-radius:50%;border:2px solid transparent;border-top-color:#0d9488;animation:spin 1.1s linear infinite"></div><div style="position:absolute;inset:3px;border-radius:50%;border:2px solid transparent;border-right-color:#14b8a6;animation:spin 1.7s linear infinite reverse"></div></div> Membuat folder...'; btn.disabled = true; }
   try {
     const result = await API.get('drive', { kodePKM, tahun, bulan, namaBulan });
     // Save folder URL to DB
@@ -612,7 +612,7 @@ async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, namaP
   const cell = document.getElementById(`uploadCell-${noIndikator}`);
   const statusDiv = document.createElement('div');
   statusDiv.style.cssText = 'font-size:11px;color:#0891b2';
-  statusDiv.innerHTML = `<span class="material-icons" style="font-size:12px;animation:spin 0.8s linear infinite;vertical-align:middle">refresh</span> Mengupload ${files.length} file...`;
+  statusDiv.innerHTML = `<div style="position:relative;width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:4px"><div style="position:absolute;inset:0;border-radius:50%;border:1.5px solid transparent;border-top-color:#0d9488;animation:spin 1.1s linear infinite"></div></div> Mengupload ${files.length} file...`;
   cell.insertBefore(statusDiv, cell.firstChild);
 
   const uploadedLinks = [];
@@ -923,7 +923,7 @@ function _renderBuktiModal() {
           ${isImage
             ? `<img src="${proxyUrl}" style="max-width:100%;max-height:100%;object-fit:contain;padding:16px">`
             : `<div style="color:#94a3b8;font-size:13px;display:flex;align-items:center;gap:8px">
-                <span class="material-icons" style="animation:spin 1s linear infinite">refresh</span> Memuat data...
+                <div style="position:relative;width:28px;height:28px;display:inline-block;vertical-align:middle;margin-right:6px"><div style="position:absolute;inset:0;border-radius:50%;border:2.5px solid transparent;border-top-color:#0d9488;animation:spin 1.1s linear infinite"></div><div style="position:absolute;inset:5px;border-radius:50%;border:2.5px solid transparent;border-right-color:#14b8a6;animation:spin 1.7s linear infinite reverse"></div></div> Memuat data...
               </div>`
           }
         </div>
@@ -947,7 +947,7 @@ function _renderBuktiModal() {
           // Render PDF pakai PDF.js (pdfjs-dist CDN) — bebas dari IDM intercept
           // karena tidak ada fetch/download ke URL eksternal, semua dirender via canvas
           el.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:12px;color:#94a3b8">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="animation:spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+            <div style="position:relative;width:32px;height:32px;display:inline-block"><div style="position:absolute;inset:0;border-radius:50%;border:3px solid transparent;border-top-color:#0d9488;animation:spin 1.1s linear infinite"></div><div style="position:absolute;inset:6px;border-radius:50%;border:3px solid transparent;border-right-color:#14b8a6;animation:spin 1.7s linear infinite reverse"></div><div style="position:absolute;inset:12px;border-radius:50%;border:3px solid transparent;border-bottom-color:#5eead4;animation:spin 2.3s linear infinite"></div></div>
             <span style="font-size:13px">Memuat PDF...</span>
           </div>`;
           await _renderPDFjs(el, proxyUrl, idx);

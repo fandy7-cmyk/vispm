@@ -450,7 +450,7 @@ async function doLogin() {
 
   const btn = document.getElementById('authBtn');
   btn.disabled = true;
-  btn.innerHTML = '<span class="material-icons" style="animation:spin 0.8s linear infinite">refresh</span> Loading...';
+  btn.innerHTML = '<div style="position:relative;width:16px;height:16px;display:inline-block;vertical-align:middle;margin-right:6px"><div style="position:absolute;inset:0;border-radius:50%;border:2px solid transparent;border-top-color:#0d9488;animation:spin 1.1s linear infinite"></div><div style="position:absolute;inset:3px;border-radius:50%;border:2px solid transparent;border-right-color:#14b8a6;animation:spin 1.7s linear infinite reverse"></div></div>Loading...';
   setAuthStatus('Memeriksa kredensial...', '');
 
   try {
@@ -873,7 +873,14 @@ function loadPage(page) {
 
   const fn = renders[page];
   if (fn) {
-    Promise.resolve(fn()).finally(() => setLoading(false));
+    // 'master-data' mengelola setLoading(true/false) sendiri di dalam renderMasterData,
+    // sehingga tidak perlu setLoading(true) ganda dari loadPage — cukup panggil fn() langsung.
+    if (page === 'master-data') {
+      setLoading(false); // batalkan setLoading(true) di atas, serahkan ke renderMasterData
+      Promise.resolve(fn());
+    } else {
+      Promise.resolve(fn()).finally(() => setLoading(false));
+    }
   } else {
     document.getElementById('mainContent').innerHTML = `<div class="empty-state"><span class="material-icons">construction</span><p>Halaman dalam pengembangan</p></div>`;
     setLoading(false);

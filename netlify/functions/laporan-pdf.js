@@ -209,6 +209,11 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
   // Helper lowercase untuk string nullable
   function LOWER(s) { return (s||'').toLowerCase(); }
 
+  // Helper title case — hanya huruf pertama tiap kata kapital
+  function toTitleCase(s) {
+    return (s||'').toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+  }
+
   function getVerifierSlots(noInd) {
     const jabatanList = JABATAN_MAP_DB[noInd] || [];
 
@@ -277,7 +282,7 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
                  <div style="font-size:9px;color:#94a3b8;margin-bottom:2px">Menunggu persetujuan</div>`;
     } else if (ttValid) {
       signImg = `<div style="height:80px;display:flex;align-items:center;justify-content:center;margin-bottom:4px">
-                   <img src="${tt}" style="max-height:72px;max-width:160px;object-fit:contain;display:block;margin:0 auto">
+                   <img src="${tt}" style="max-height:70px;max-width:160px;object-fit:contain;display:block;margin:0 auto">
                  </div>
                  <div style="font-size:9px;color:#2d7a47;font-weight:700;margin-bottom:2px;display:flex;align-items:center;justify-content:center;gap:4px"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"11\" height=\"11\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#2d7a47\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M22 11.08V12a10 10 0 1 1-5.93-9.14\"/><polyline points=\"22 4 12 14.01 9 11.01\"/></svg>Diverifikasi: ${fmtDT(verifiedAt)}</div>`;
     } else {
@@ -285,11 +290,11 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
                  <div style="font-size:9px;color:#2d7a47;font-weight:700;margin-bottom:2px;display:flex;align-items:center;justify-content:center;gap:4px"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"11\" height=\"11\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#2d7a47\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M22 11.08V12a10 10 0 1 1-5.93-9.14\"/><polyline points=\"22 4 12 14.01 9 11.01\"/></svg>Diverifikasi: ${fmtDT(verifiedAt)}</div>`;
     }
     return `<div style="text-align:center;flex:1">
-      <div style="font-size:10px;color:#334155;margin-bottom:10px;font-weight:600">${jabatan}</div>
+      <div style="font-size:11px;color:#334155;margin-bottom:4px;font-weight:600">${jabatan}</div>
       ${signImg}
       <div style="display:inline-block;text-align:center">
-        <div style="font-size:10.5px;font-weight:700;border-bottom:1px solid #334155;padding-bottom:2px;white-space:nowrap">${nama}</div>
-        ${nip ? `<div style="font-size:9.5px">NIP. ${nip}</div>` : ''}
+        <div style="font-size:11px;font-weight:700;border-bottom:1px solid #334155;padding-bottom:2px;white-space:nowrap">${nama}</div>
+        ${nip ? `<div style="font-size:11px">NIP. ${nip}</div>` : ''}
       </div>
     </div>`;
   }
@@ -301,14 +306,14 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
     const ttRaw2 = h.kapus_tt || '';
     const tt   = ttRaw2.startsWith('data:image') ? (compressBase64Img(ttRaw2) || '') : ttRaw2;
     const ttValid = tt && (tt.startsWith('data:image') || tt.startsWith('http'));
-    const nipHtml = nip ? `<div style="font-size:9.5px">NIP. ${nip}</div>` : '';
+    const nipHtml = nip ? `<div style="font-size:11px">NIP. ${nip}</div>` : '';
     let signImg;
     if (!approved) {
       signImg = `<div style="width:80px;height:80px;border:2px dashed #cbd5e1;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:#94a3b8;font-size:10px;margin-bottom:6px">Belum</div>
                  <div style="font-size:9px;color:#94a3b8;margin-bottom:2px">Menunggu persetujuan</div>`;
     } else if (ttValid) {
       signImg = `<div style="height:80px;display:flex;align-items:center;justify-content:center;margin-bottom:4px">
-                   <img src="${tt}" style="max-height:72px;max-width:160px;object-fit:contain;display:block;margin:0 auto">
+                   <img src="${tt}" style="max-height:70px;max-width:160px;object-fit:contain;display:block;margin:0 auto">
                  </div>
                  <div style="font-size:9px;color:#2d7a47;font-weight:700;margin-bottom:2px;display:flex;align-items:center;justify-content:center;gap:4px"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"11\" height=\"11\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#2d7a47\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M22 11.08V12a10 10 0 1 1-5.93-9.14\"/><polyline points=\"22 4 12 14.01 9 11.01\"/></svg>Diverifikasi: ${fmtDT(h.kapus_approved_at)}</div>`;
     } else {
@@ -316,10 +321,10 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
                  <div style="font-size:9px;color:#2d7a47;font-weight:700;margin-bottom:2px;display:flex;align-items:center;justify-content:center;gap:4px"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"11\" height=\"11\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#2d7a47\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M22 11.08V12a10 10 0 1 1-5.93-9.14\"/><polyline points=\"22 4 12 14.01 9 11.01\"/></svg>Diverifikasi: ${fmtDT(h.kapus_approved_at)}</div>`;
     }
     return `<div style="text-align:center;flex:1">
-      <div style="font-size:10px;color:#334155;margin-bottom:10px;font-weight:600">Kepala UPTD Puskesmas ${h.nama_puskesmas||h.kode_pkm}</div>
+      <div style="font-size:11px;color:#334155;margin-bottom:4px;font-weight:600">Kepala UPTD Puskesmas ${toTitleCase(h.nama_puskesmas)||h.kode_pkm}</div>
       ${signImg}
       <div style="display:inline-block;text-align:center">
-        <div style="font-size:10.5px;font-weight:700;border-bottom:1px solid #334155;padding-bottom:2px;white-space:nowrap">${nama}</div>
+        <div style="font-size:11px;font-weight:700;border-bottom:1px solid #334155;padding-bottom:2px;white-space:nowrap">${nama}</div>
         ${nipHtml}
       </div>
     </div>`;
@@ -333,7 +338,7 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
       ? `<div style="font-size:9px;color:#2d7a47;font-weight:700;margin-bottom:2px;display:flex;align-items:center;justify-content:center;gap:4px"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"11\" height=\"11\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#2d7a47\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M22 11.08V12a10 10 0 1 1-5.93-9.14\"/><polyline points=\"22 4 12 14.01 9 11.01\"/></svg>Diverifikasi: ${fmtDT(h.admin_approved_at)}</div>`
       : '';
     return `<div style="text-align:center;flex:1">
-      <div style="font-size:10px;color:#334155;margin-bottom:10px;font-weight:600">${jabatanLabel}</div>
+      <div style="font-size:11px;color:#334155;margin-bottom:4px;font-weight:600">${jabatanLabel}</div>
       ${ttValid
         ? `<div style="height:80px;display:flex;align-items:center;justify-content:center;margin-bottom:4px">
              <img src="${tt}" style="max-height:72px;max-width:160px;object-fit:contain;display:block;margin:0 auto">
@@ -341,7 +346,7 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
         : `<div style="width:80px;height:80px;border:2px dashed #cbd5e1;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:#94a3b8;font-size:10px;margin-bottom:6px">TT</div>`}
       ${tsHtml}
       <div style="display:inline-block;text-align:center">
-        <div style="font-size:10.5px;font-weight:700;border-bottom:1px solid #334155;padding-bottom:2px;white-space:nowrap">${pj.nama||'-'}</div>        ${pj.nip ? `<div style="font-size:9.5px">NIP. ${pj.nip}</div>` : ''}
+        <div style="font-size:11px;font-weight:700;border-bottom:1px solid #334155;padding-bottom:2px;white-space:nowrap">${pj.nama||'-'}</div>        ${pj.nip ? `<div style="font-size:11px">NIP. ${pj.nip}</div>` : ''}
       </div>
     </div>`;
   }
@@ -366,7 +371,7 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
     for (let i = 0; i < rest.length; i += 2) {
       const chunk = rest.slice(i, i + 2);
       const justify = chunk.length === 1 ? 'center' : 'space-between';
-      extraRows += `<div style="display:flex;justify-content:${justify};align-items:flex-start;gap:20px;margin-top:28px">${chunk.map(s => signBlock(s)).join('')}</div>`;
+      extraRows += `<div style="display:flex;justify-content:${justify};align-items:flex-start;gap:20px;margin-top:14px">${chunk.map(s => signBlock(s)).join('')}</div>`;
     }
     return row1 + extraRows;
   }

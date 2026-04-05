@@ -450,7 +450,7 @@ async function doLogin() {
 
   const btn = document.getElementById('authBtn');
   btn.disabled = true;
-  btn.innerHTML = spinnerHTML('sm') + ' Loading...';
+  btn.innerHTML = '<div class="spm-spinner sm white"><div class="sr1"></div><div class="sr2"></div><div class="sr3"></div></div> Loading...';
   setAuthStatus('Memeriksa kredensial...', '');
 
   try {

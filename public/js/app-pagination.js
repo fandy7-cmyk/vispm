@@ -28,7 +28,7 @@ function __pgGo(key, p) {
   if (window.__pgCallbacks[key]) window.__pgCallbacks[key](p);
 }
 
-function renderPagination(containerId, total, page, totalPages, onPageChange) {
+function renderPagination(containerId, total, page, totalPages, onPageChange, itemsPerPage) {
   if (totalPages <= 1) return '';
 
   // Simpan callback ke registry dengan key unik per container
@@ -41,8 +41,9 @@ function renderPagination(containerId, total, page, totalPages, onPageChange) {
     window.__pgCallbacks[cbKey] = new Function('pg', onPageChange.replace(/^pg\s*=>\s*/, ''));
   }
 
-  const start = (page - 1) * ITEMS_PER_PAGE + 1;
-  const end = Math.min(page * ITEMS_PER_PAGE, total);
+  const _ipp = itemsPerPage || ITEMS_PER_PAGE;
+  const start = (page - 1) * _ipp + 1;
+  const end = Math.min(page * _ipp, total);
   const pages = [];
   for (let i = 1; i <= totalPages; i++) {
     if (i === 1 || i === totalPages || (i >= page - 2 && i <= page + 2)) {

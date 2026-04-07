@@ -263,7 +263,7 @@ function renderAdminAllUsulanTable(rows) {
   }
   const { items, page: p, totalPages, total } = paginateDash(rows, _adminAllPage);
   el.innerHTML = renderUsulanTable(items, 'admin')
-    + renderPagination('adminAllUsulanTable', total, p, totalPages, `pg => { _adminAllPage=pg; filterAdminAllUsulan(); }`);
+    + renderPagination('adminAllUsulanTable', total, p, totalPages, `pg => { _adminAllPage=pg; filterAdminAllUsulan(); }`, DASH_ITEMS_PER_PAGE);
 }
 
 function renderStatusSummary(d) {
@@ -288,16 +288,24 @@ function renderStatusSummary(d) {
 }
 
 
+let _pkmProgressData = [];
+let _pkmProgressPage = 1;
+
 function renderPKMProgressTable(rows) {
+  _pkmProgressData = rows || [];
+  _pkmProgressPage = 1;
+  _renderPKMProgressPaged(_pkmProgressPage);
+}
+
+function _renderPKMProgressPaged(pg) {
   const el = document.getElementById('pkmProgressTable');
   if (!el) return;
-  if (!rows || rows.length === 0) {
+  if (!_pkmProgressData || _pkmProgressData.length === 0) {
     el.innerHTML = `<div class="empty-state" style="padding:32px"><span class="material-icons">inbox</span><p>Belum ada data</p></div>`;
     return;
   }
-  // Group by puskesmas
   const map = {};
-  rows.forEach(u => {
+  _pkmProgressData.forEach(u => {
     const k = u.kodePKM || u.kode_pkm || '-';
     const n = u.namaPKM || u.nama_puskesmas || k;
     if (!map[k]) map[k] = { nama: n, total: 0, selesai: 0, menunggu: 0, ditolak: 0 };
@@ -306,7 +314,10 @@ function renderPKMProgressTable(rows) {
     else if (['Ditolak','Ditolak Sebagian'].includes(u.statusGlobal)) map[k].ditolak++;
     else map[k].menunggu++;
   });
-  const pkms = Object.values(map).sort((a,b) => b.total - a.total);
+  const allPkms = Object.values(map).sort((a,b) => b.total - a.total);
+  const { items: pkms, page: p, totalPages, total } = paginateDash(allPkms, pg);
+  _pkmProgressPage = p;
+  window._pkmProgressGoTo = (newPg) => { _pkmProgressPage = newPg; _renderPKMProgressPaged(newPg); };
   el.innerHTML = `<table>
     <thead><tr>
       <th>Puskesmas</th>
@@ -316,15 +327,15 @@ function renderPKMProgressTable(rows) {
       <th style="text-align:center">Ditolak</th>
       <th style="min-width:120px">Progres</th>
     </tr></thead>
-    <tbody>${pkms.map(p => {
-      const pct = p.total > 0 ? Math.round((p.selesai / p.total) * 100) : 0;
+    <tbody>${pkms.map(pkm => {
+      const pct = pkm.total > 0 ? Math.round((pkm.selesai / pkm.total) * 100) : 0;
       const barColor = pct >= 80 ? '#10b981' : pct >= 50 ? '#f59e0b' : '#ef4444';
       return `<tr>
-        <td style="font-weight:600;font-size:13px">${p.nama}</td>
-        <td style="text-align:center">${p.total}</td>
-        <td style="text-align:center"><span style="color:#10b981;font-weight:700">${p.selesai}</span></td>
-        <td style="text-align:center"><span style="color:#f59e0b;font-weight:700">${p.menunggu}</span></td>
-        <td style="text-align:center"><span style="color:#ef4444;font-weight:700">${p.ditolak}</span></td>
+        <td style="font-weight:600;font-size:13px">${pkm.nama}</td>
+        <td style="text-align:center">${pkm.total}</td>
+        <td style="text-align:center"><span style="color:#10b981;font-weight:700">${pkm.selesai}</span></td>
+        <td style="text-align:center"><span style="color:#f59e0b;font-weight:700">${pkm.menunggu}</span></td>
+        <td style="text-align:center"><span style="color:#ef4444;font-weight:700">${pkm.ditolak}</span></td>
         <td>
           <div style="display:flex;align-items:center;gap:7px">
             <div style="flex:1;height:6px;border-radius:99px;background:#e2e8f0;overflow:hidden">
@@ -335,8 +346,10 @@ function renderPKMProgressTable(rows) {
         </td>
       </tr>`;
     }).join('')}</tbody>
-  </table>`;
+  </table>`
+  + renderPagination('pkmProgressTable', total, p, totalPages, `pg => window._pkmProgressGoTo(pg)`, DASH_ITEMS_PER_PAGE);
 }
+
 
 function renderOperatorStatusSummary(rows) {
   const total   = rows.length;

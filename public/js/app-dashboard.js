@@ -229,8 +229,8 @@ async function loadAdminAllUsulan() {
   }
 }
 
-function filterAdminAllUsulan() {
-  _adminAllPage = 1; // reset ke halaman pertama saat filter berubah
+function filterAdminAllUsulan(resetPage = true) {
+  if (resetPage) _adminAllPage = 1; // reset ke halaman pertama saat filter berubah
   const pkmVal    = (document.getElementById('adminAllFilterPKM')?.value    || '').toLowerCase();
   const statusVal = (document.getElementById('adminAllFilterStatus')?.value  || '').toLowerCase();
   const tahunVal  = (document.getElementById('adminAllFilterTahun')?.value   || '');
@@ -263,7 +263,7 @@ function renderAdminAllUsulanTable(rows) {
   }
   const { items, page: p, totalPages, total } = paginateDash(rows, _adminAllPage);
   el.innerHTML = renderUsulanTable(items, 'admin')
-    + renderPagination('adminAllUsulanTable', total, p, totalPages, `pg => { _adminAllPage=pg; filterAdminAllUsulan(); }`, DASH_ITEMS_PER_PAGE);
+    + renderPagination('adminAllUsulanTable', total, p, totalPages, `pg => { _adminAllPage=pg; filterAdminAllUsulan(false); }`, DASH_ITEMS_PER_PAGE);
 }
 
 function renderStatusSummary(d) {

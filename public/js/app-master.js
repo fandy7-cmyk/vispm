@@ -33,7 +33,7 @@ async function renderLaporan() {
       </div>
       <div class="card-body">
         <div class="filter-row">
-          <select class="form-control" id="lapTahun" onchange="loadLaporan()" style="min-width:100px"><option value="">Memuat...</option></select>
+          <select class="form-control" id="lapTahun" onchange="loadLaporan()" style="min-width:100px"><option value="${CURRENT_YEAR}">${CURRENT_YEAR}</option></select>
           <select class="form-control" id="lapBulan" onchange="_lapApplyFilter()"><option value="">Semua Bulan</option></select>
           ${role === 'Admin' ? `<select class="form-control" id="lapPKM" onchange="_lapApplyFilter()"><option value="">Semua Puskesmas</option></select>` : ''}
           <select class="form-control" id="lapStatus" onchange="_lapApplyFilter()">
@@ -55,8 +55,9 @@ function _lapRebuildFilters(rows, selTahun, selBulan, selStatus, selPKM) {
   const tahunSel = document.getElementById('lapTahun');
   if (tahunSel) {
     const years = [...new Set(rows.map(r => parseInt(r.tahun)).filter(Boolean))].sort((a,b) => b - a);
-    const picked = selTahun || (years[0] || CURRENT_YEAR);
-    tahunSel.innerHTML = years.map(y => `<option value="${y}" ${y == picked ? 'selected':''}>${y}</option>`).join('');
+const finalYears = years.length > 0 ? years : [CURRENT_YEAR];
+const picked = selTahun || finalYears[0];
+tahunSel.innerHTML = finalYears.map(y => `<option value="${y}" ${y == picked ? 'selected':''}>${y}</option>`).join('');
   }
 
   const tahunPilih = parseInt(document.getElementById('lapTahun')?.value || selTahun);
@@ -134,7 +135,14 @@ async function loadLaporan() {
 
     _lapRebuildFilters(_lapAllData, prevTahun, prevBulan, prevStatus, prevPKM);
     _lapApplyFilter();
-  } catch (e) { if (!window._verifSilentReload) toast(e.message, 'error'); }
+  } catch (e) {
+    if (!window._verifSilentReload) toast(e.message, 'error');
+    // Fallback: isi dropdown tahun agar tidak stuck "Memuat..."
+    const tahunSel = document.getElementById('lapTahun');
+    if (tahunSel) {
+      tahunSel.innerHTML = `<option value="${CURRENT_YEAR}">${CURRENT_YEAR}</option>`;
+    }
+  }
 }
 
 function _lapRenderTable(data) {

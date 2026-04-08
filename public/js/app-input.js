@@ -1570,8 +1570,24 @@ async function viewDetail(idUsulan) {
               </div>
               <div style="font-size:11px;color:#94a3b8">Indikator: ${v.indikator_akses||'Semua'}</div>
               ${v.verified_at ? `<div style="font-size:10.5px;color:${iconColor}">${formatDateTime(v.verified_at)}</div>` : ''}
-              ${isDitolakVP && v.catatan ? `<div style="font-size:11px;color:#7f1d1d;margin-top:4px;background:#fee2e2;border-radius:4px;padding:4px 6px"><span style="font-weight:700">Alasan:</span> ${v.catatan}</div>` : ''}
-              ${isSelesai && v.catatan ? `<div style="font-size:11px;color:#065f46;margin-top:3px;font-style:italic">"${v.catatan}"</div>` : ''}
+              ${isDitolakVP && v.catatan ? (() => {
+  const id = 'alasan_' + Math.random().toString(36).slice(2,8);
+  const short = v.catatan.length > 80;
+  return `<div style="font-size:11px;color:#7f1d1d;margin-top:4px;background:#fee2e2;border-radius:4px;padding:4px 6px">
+    <span style="font-weight:700">Alasan:</span>
+    <span id="${id}" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${v.catatan}</span>
+    ${short ? `<button onclick="(function(b){var s=document.getElementById('${id}');var open=s.style.webkitLineClamp==='unset';s.style.webkitLineClamp=open?'2':'unset';b.textContent=open?'Selengkapnya':'Sembunyikan';})(this)" style="background:none;border:none;color:#b91c1c;font-size:10.5px;font-weight:700;cursor:pointer;padding:0;margin-top:2px;display:block">Selengkapnya</button>` : ''}
+  </div>`;
+})() : ''}
+${isSelesai && v.catatan ? (() => {
+  const id2 = 'ctt_' + Math.random().toString(36).slice(2,8);
+  const short2 = v.catatan.length > 80;
+  return `<div style="font-size:11px;color:#065f46;margin-top:3px;font-style:italic">
+    <span id="${id2}" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">"${v.catatan}"</span>
+    ${short2 ? `<button onclick="(function(b){var s=document.getElementById('${id2}');var open=s.style.webkitLineClamp==='unset';s.style.webkitLineClamp=open?'2':'unset';b.textContent=open?'Selengkapnya':'Sembunyikan';})(this)" style="background:none;border:none;color:#065f46;font-size:10.5px;font-weight:700;cursor:pointer;padding:0;margin-top:2px;display:block">Selengkapnya</button>` : ''}
+  </div>`;
+})() : ''}
+
             </div>`;
           }).join('')}
         </div>

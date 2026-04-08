@@ -1214,6 +1214,7 @@ input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-o
 [data-theme="dark"] ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
 [data-theme="dark"] ::-webkit-scrollbar-thumb:hover { background: #475569; }
 </style>
+<link rel="stylesheet" href="/css/responsive.css">
 </head>
 <body>
 
@@ -1338,6 +1339,14 @@ input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-o
         <span class="topbar-title" id="topbarTitle">Dashboard</span>
       </div>
       <div class="topbar-right">
+        <!-- NOTIF BUTTON -->
+    <div id="notifBtnWrap" style="position:relative">
+      <button id="notifBtn" title="Notifikasi" aria-label="Notifikasi"
+        onclick="toggleNotifPanel()"
+        style="display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:50%;border:1.5px solid var(--border);background:var(--surface);cursor:pointer;color:var(--text-light);transition:border-color .15s,color .15s">
+        <span class="material-icons" style="font-size:20px">notifications</span>
+      </button>
+    </div>
         <button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()" title="Ganti Tema">🌙</button>
         <div class="topbar-avatar-wrap" id="topbarAvatarWrap">
           <div class="topbar-avatar" id="topbarAvatar" onclick="toggleTopbarDropdown()">A</div>
@@ -1660,5 +1669,6 @@ function showForgotPasswordInfo() {
   box._hideTimer = setTimeout(() => { box.style.display = 'none'; }, 4000);
 }
 </script>
+ <script src="/js/responsive-patch.js"></script>
 </body>
 </html>

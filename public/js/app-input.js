@@ -190,30 +190,33 @@ function _renderMyUsulanRow(u) {
           <td style="min-width:220px">
             ${renderStatusBar(u)}
             ${['Ditolak','Ditolak Sebagian'].includes(u.statusGlobal) ? `
-              <div style="margin-top:6px;background:var(--danger-light,#fef2f2);border:1px solid #fca5a5;border-radius:7px;padding:7px 10px">
-                <div style="font-size:11.5px;font-weight:700;color:#dc2626;margin-bottom:3px;display:flex;align-items:center;gap:4px">
-                  <span class="material-icons" style="font-size:13px">cancel</span>
-                  Ditolak oleh ${u.ditolakOleh || 'Verifikator'}
-                </div>
-                ${u.alasanTolak ? `<div style="font-size:11px;color:#7f1d1d;margin-bottom:4px"><span style="font-weight:600">Alasan:</span> ${u.alasanTolak}</div>` : ''}
-                ${(() => {
-                  const pi = u.penolakanIndikator || [];
-                  if (u.ditolakOleh === 'Kepala Puskesmas' && pi.length) {
-                    const bermasalah = pi.filter(p =>
-                      p.dari_kapus === true || p.dari_kapus === 'true'
-                      || p.dibuat_oleh === 'Kapus'
-                      || (!p.dibuat_oleh && (!p.aksi || p.aksi === null))
-                    );
-                    if (bermasalah.length)
+              <div style="margin-top:6px;background:var(--danger-light,#fef2f2);border:1px solid #fca5a5;border-radius:7px;overflow:hidden">
+                <button onclick="(function(btn){var b=btn.nextElementSibling;var a=btn.querySelector('.ri-arrow');var open=b.style.display!=='none';b.style.display=open?'none':'block';a.style.transform=open?'rotate(0deg)':'rotate(180deg)';})(this)" style="width:100%;display:flex;align-items:center;gap:4px;padding:7px 10px;background:none;border:none;cursor:pointer;text-align:left">
+                  <span class="material-icons" style="font-size:13px;color:#dc2626;flex-shrink:0">cancel</span>
+                  <span style="font-size:11.5px;font-weight:700;color:#dc2626;flex:1">Ditolak oleh ${u.ditolakOleh || 'Verifikator'}</span>
+                  <span class="material-icons ri-arrow" style="font-size:16px;color:#b91c1c;flex-shrink:0;transition:transform .2s">expand_more</span>
+                </button>
+                <div style="display:none;padding:0 10px 8px 10px">
+                  ${u.alasanTolak ? `<div style="font-size:11px;color:#7f1d1d;margin-bottom:4px"><span style="font-weight:600">Alasan:</span> ${u.alasanTolak}</div>` : ''}
+                  ${(() => {
+                    const pi = u.penolakanIndikator || [];
+                    if (u.ditolakOleh === 'Kepala Puskesmas' && pi.length) {
+                      const bermasalah = pi.filter(p =>
+                        p.dari_kapus === true || p.dari_kapus === 'true'
+                        || p.dibuat_oleh === 'Kapus'
+                        || (!p.dibuat_oleh && (!p.aksi || p.aksi === null))
+                      );
+                      if (bermasalah.length)
+                        return `<div style="font-size:11px;font-weight:700;color:#b91c1c;margin-bottom:3px">Indikator perlu diperbaiki:</div>
+                    <div style="display:flex;flex-wrap:wrap;gap:4px 8px">${bermasalah.map(p => `<span style="display:inline-flex;align-items:center;gap:4px;white-space:nowrap"><span style="background:#fecaca;color:#7f1d1d;border-radius:4px;padding:1px 6px;font-size:11px;font-weight:700">#${parseInt(p.no_indikator||p.noIndikator)}</span><span style="font-size:11px;color:#7f1d1d">${p.alasan||''}</span></span>`).join('')}</div>`;
+                    }
+                    if (u.ditolakOleh === 'Pengelola Program' && pi.filter(p => p.dari_kapus === true || p.dari_kapus === 'true').length) {
                       return `<div style="font-size:11px;font-weight:700;color:#b91c1c;margin-bottom:3px">Indikator perlu diperbaiki:</div>
-                  <div style="display:flex;flex-wrap:wrap;gap:4px 8px">${bermasalah.map(p => `<span style="display:inline-flex;align-items:center;gap:4px;white-space:nowrap"><span style="background:#fecaca;color:#7f1d1d;border-radius:4px;padding:1px 6px;font-size:11px;font-weight:700">#${parseInt(p.no_indikator||p.noIndikator)}</span><span style="font-size:11px;color:#7f1d1d">${p.alasan||''}</span></span>`).join('')}</div>`;
-                  }
-                  if (u.ditolakOleh === 'Pengelola Program' && pi.filter(p => p.dari_kapus === true || p.dari_kapus === 'true').length) {
-                    return `<div style="font-size:11px;font-weight:700;color:#b91c1c;margin-bottom:3px">Indikator perlu diperbaiki:</div>
-                  <div style="display:flex;flex-wrap:wrap;gap:4px 8px">${pi.filter(p => p.dari_kapus === true || p.dari_kapus === 'true').map(p => `<span style="display:inline-flex;align-items:center;gap:4px;white-space:nowrap"><span style="background:#fecaca;color:#7f1d1d;border-radius:4px;padding:1px 6px;font-size:11px;font-weight:700">#${parseInt(p.no_indikator||p.noIndikator)}</span><span style="font-size:11px;color:#7f1d1d">${p.alasan||''}</span></span>`).join('')}</div>`;
-                  }
-                  return '';
-                })()}
+                    <div style="display:flex;flex-wrap:wrap;gap:4px 8px">${pi.filter(p => p.dari_kapus === true || p.dari_kapus === 'true').map(p => `<span style="display:inline-flex;align-items:center;gap:4px;white-space:nowrap"><span style="background:#fecaca;color:#7f1d1d;border-radius:4px;padding:1px 6px;font-size:11px;font-weight:700">#${parseInt(p.no_indikator||p.noIndikator)}</span><span style="font-size:11px;color:#7f1d1d">${p.alasan||''}</span></span>`).join('')}</div>`;
+                    }
+                    return '';
+                  })()}
+                </div>
               </div>` : ''}
           </td>
           <td>
@@ -900,9 +903,20 @@ function _renderBuktiModal() {
 
   const svgDownload = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
   const svgTrashM = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></svg>`;
+  const svgZoomIn  = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>`;
+  const svgZoomOut = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>`;
+  const svgReset   = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>`;
   const navBtn = (dir, fn) => `<button onclick="${fn}" style="position:absolute;top:50%;${dir}:14px;transform:translateY(-50%);background:rgba(255,255,255,0.12);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,0.18);color:white;border-radius:50%;width:42px;height:42px;cursor:pointer;font-size:22px;display:flex;align-items:center;justify-content:center;line-height:1;z-index:10" onmouseover="this.style.background='rgba(255,255,255,0.25)'" onmouseout="this.style.background='rgba(255,255,255,0.12)'">${dir==='left'?'&#8249;':'&#8250;'}</button>`;
   const fileIcons = { pdf:'&#128196;', doc:'&#128196;', docx:'&#128196;', xls:'&#128202;', xlsx:'&#128202;', ppt:'&#128190;', pptx:'&#128190;' };
   const fileIcon = fileIcons[ext] || '&#128196;';
+
+  // Inisialisasi zoom state
+  if (!window._buktiZoomState) window._buktiZoomState = {};
+  if (window._buktiZoomState.fileIdx !== idx) {
+    window._buktiZoomState = { scale: 1.0, fileIdx: idx };
+  }
+
+  const zoomBtnStyle = `background:rgba(255,255,255,0.08);color:#cbd5e1;border:1px solid rgba(255,255,255,0.15);padding:5px 8px;border-radius:7px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:4px`;
 
   const previewId = 'buktiPreview_' + idx + '_' + Date.now();
   modal.innerHTML = `
@@ -912,16 +926,25 @@ function _renderBuktiModal() {
         <h3 style="color:white;font-size:14px;">Data Dukung
           ${total > 1 ? `<span style="background:#334155;color:#94a3b8;font-size:11px;padding:2px 8px;border-radius:20px;font-weight:600;margin-left:8px;">${idx+1} / ${total}</span>` : ''}
         </h3>
-        <div style="display:flex;gap:6px;align-items:center;margin-left:auto;">
+        <div style="display:flex;gap:6px;align-items:center;margin-left:auto;flex-wrap:wrap;">
+          ${isImage || isPDF ? `
+          <div style="display:flex;gap:4px;align-items:center;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:3px 5px;">
+            <button id="buktiZoomOut" onclick="_buktiZoom(-1,'${previewId}','${isImage?'img':'pdf'}')" title="Zoom Out" style="${zoomBtnStyle}">${svgZoomOut}</button>
+            <span id="buktiZoomLabel" style="font-size:11px;font-weight:700;color:#94a3b8;min-width:36px;text-align:center;cursor:default">100%</span>
+            <button id="buktiZoomIn" onclick="_buktiZoom(1,'${previewId}','${isImage?'img':'pdf'}')" title="Zoom In" style="${zoomBtnStyle}">${svgZoomIn}</button>
+            <button id="buktiZoomReset" onclick="_buktiZoomReset('${previewId}','${isImage?'img':'pdf'}')" title="Reset Zoom" style="${zoomBtnStyle}">${svgReset}</button>
+          </div>` : ''}
           <button onclick="downloadBukti(${idx})" title="Download" style="background:rgba(13,148,136,0.15);color:#0d9488;border:1px solid rgba(13,148,136,0.3);padding:5px 10px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px">${svgDownload}</button>
           ${idUsulan ? `<button onclick="hapusBukti('${idUsulan}',${noIndikator},${idx})" title="Hapus file" style="background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.3);padding:5px 10px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center">${svgTrashM}</button>` : ''}
           <button onclick="document.getElementById('previewBuktiModal').classList.remove('show')" style="background:rgba(255,255,255,0.08);border:none;cursor:pointer;color:white;border-radius:7px;width:32px;height:32px;font-size:20px;display:flex;align-items:center;justify-content:center">&#215;</button>
         </div>
       </div>
-      <div class="modal-body flex-col" style="position:relative;background:#0f172a;">
-        <div id="${previewId}" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;">
+      <div class="modal-body flex-col" style="position:relative;background:#0f172a;overflow:hidden;">
+        <div id="${previewId}" style="width:100%;height:100%;display:flex;align-items:${isImage?'center':'flex-start'};justify-content:center;overflow:auto;">
           ${isImage
-            ? `<img src="${proxyUrl}" style="max-width:100%;max-height:100%;object-fit:contain;padding:16px">`
+            ? `<div id="buktiImgWrap" style="display:flex;align-items:center;justify-content:center;min-width:100%;min-height:100%;padding:16px;box-sizing:border-box;transform-origin:center center;transition:transform 0.2s ease">
+                <img src="${proxyUrl}" id="buktiZoomImg" style="max-width:100%;max-height:100%;object-fit:contain;display:block;user-select:none;transition:transform 0.2s ease;transform-origin:center center">
+               </div>`
             : `<div style="color:#94a3b8;font-size:13px;display:flex;align-items:center;gap:8px">
                 ${spinnerHTML('md')}<span>Memuat data...</span>
               </div>`
@@ -937,6 +960,18 @@ function _renderBuktiModal() {
     </div>`;
   modal.classList.add('show');
 
+  // Pasang wheel zoom untuk gambar
+  if (isImage) {
+    const previewEl = document.getElementById(previewId);
+    if (previewEl) {
+      previewEl.addEventListener('wheel', function(e) {
+        e.preventDefault();
+        const dir = e.deltaY < 0 ? 1 : -1;
+        _buktiZoom(dir, previewId, 'img');
+      }, { passive: false });
+    }
+  }
+
   // Untuk non-image: embed langsung pakai proxyUrl (sign-url set Content-Type yang benar)
   if (!isImage) {
     (async () => {
@@ -950,7 +985,8 @@ function _renderBuktiModal() {
             ${spinnerHTML('lg')}
             <span style="font-size:13px">Memuat PDF...</span>
           </div>`;
-          await _renderPDFjs(el, proxyUrl, idx);
+          const _initZoom = (window._buktiZoomState && window._buktiZoomState.scale) ? window._buktiZoomState.scale : 1.0;
+          await _renderPDFjs(el, proxyUrl, idx, _initZoom);
         } else if (isOffice) {
           // Office: pakai Google Docs Viewer sebagai fallback yang lebih reliable
           const googleViewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(proxyDownloadUrl)}&embedded=true`;
@@ -976,7 +1012,8 @@ function _renderBuktiModal() {
 }
 
 
-async function _renderPDFjs(container, url, idx) {
+async function _renderPDFjs(container, url, idx, zoomScale) {
+  const _zoom = (typeof zoomScale === 'number' && zoomScale > 0) ? zoomScale : 1.0;
   const SVG_DL = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
   const btnDl = `<button onclick="downloadBukti(${idx})" style="background:#0d9488;color:white;padding:10px 28px;border-radius:8px;border:none;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:8px">${SVG_DL} Download File</button>`;
 
@@ -991,6 +1028,12 @@ async function _renderPDFjs(container, url, idx) {
       });
       window.pdfjsLib.GlobalWorkerOptions.workerSrc =
         'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      // Suppress verbose font warnings (e.g. "TT: undefined function: 22")
+      if (window.pdfjsLib.verbosity !== undefined) {
+        window.pdfjsLib.verbosity = window.pdfjsLib.VerbosityLevel
+          ? window.pdfjsLib.VerbosityLevel.ERRORS
+          : 0;
+      }
     } catch(e) {
       _showPDFFallback(container, 'Gagal memuat PDF.js library', btnDl);
       return;
@@ -1025,21 +1068,33 @@ async function _renderPDFjs(container, url, idx) {
     const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
     const totalPages = pdf.numPages;
 
-    container.innerHTML = `<div id="pdfScroll_${idx}" style="width:100%;height:100%;overflow-y:auto;overflow-x:hidden;background:#3a3a3a;padding:12px 0"></div>`;
-    const scroll = document.getElementById('pdfScroll_' + idx);
+    container.innerHTML = `<div id="pdfScroll_${idx}" style="width:100%;height:100%;overflow-y:auto;overflow-x:auto;background:#3a3a3a;padding:12px 0"><div id="pdfPages_${idx}" style="transform-origin:top center;transition:transform 0.2s ease"></div></div>`;
+    const scroll   = document.getElementById('pdfScroll_' + idx);
+    const pdfPages = document.getElementById('pdfPages_' + idx);
+
+    // Simpan referensi id agar _applyBuktiZoom bisa zoom via CSS tanpa re-download
+    container._pdfPagesId  = 'pdfPages_' + idx;
+    container._pdfScrollId = 'pdfScroll_' + idx;
 
     for (let p = 1; p <= totalPages; p++) {
       const page = await pdf.getPage(p);
       const containerW = scroll.clientWidth || 620;
       const baseVp = page.getViewport({ scale: 1 });
-      const scale = Math.min(2.0, (containerW - 32) / baseVp.width);
-      const vp = page.getViewport({ scale });
+      // Render pada fitScale saja; zoom visual dilakukan via CSS transform
+      const fitScale = Math.min(2.0, (containerW - 32) / baseVp.width);
+      const vp = page.getViewport({ scale: fitScale });
       const canvas = document.createElement('canvas');
       canvas.width  = vp.width;
       canvas.height = vp.height;
-      canvas.style.cssText = 'display:block;margin:0 auto 10px;max-width:calc(100% - 24px);box-shadow:0 2px 12px rgba(0,0,0,0.5);border-radius:2px;background:white';
-      scroll.appendChild(canvas);
+      canvas.style.cssText = 'display:block;margin:0 auto 10px;box-shadow:0 2px 12px rgba(0,0,0,0.5);border-radius:2px;background:white';
+      pdfPages.appendChild(canvas);
       await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
+    }
+
+    // Terapkan zoom awal jika bukan 1.0
+    if (_zoom !== 1.0) {
+      pdfPages.style.transform = `scale(${_zoom})`;
+      pdfPages.style.marginBottom = `${pdfPages.scrollHeight * (_zoom - 1)}px`;
     }
   } catch(e) {
     _showPDFFallback(container, e.message, btnDl);
@@ -1071,12 +1126,101 @@ function _showPDFFallback(container, errMsg, btnDl) {
 function _buktiNav(dir) {
   const d = window._modalBukti;
   d.idx = (d.idx + dir + d.links.length) % d.links.length;
+  window._buktiZoomState = { scale: 1.0, fileIdx: d.idx };
   _renderBuktiModal();
 }
 
 function _buktiGoto(idx) {
   window._modalBukti.idx = idx;
+  window._buktiZoomState = { scale: 1.0, fileIdx: idx };
   _renderBuktiModal();
+}
+
+// ======= ZOOM CONTROLS untuk modal Data Dukung =======
+// Skala zoom: 0.5x – 4.0x (step 0.25)
+const _ZOOM_STEPS  = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 2.5, 3.0, 4.0];
+const _ZOOM_MIN    = 0.5;
+const _ZOOM_MAX    = 4.0;
+const _ZOOM_STEP   = 0.25;
+
+function _buktiZoom(dir, previewId, mode) {
+  // dir: +1 = zoom in, -1 = zoom out
+  if (!window._buktiZoomState) window._buktiZoomState = { scale: 1.0 };
+  let s = window._buktiZoomState.scale || 1.0;
+  // Cari step berikutnya dari _ZOOM_STEPS
+  if (dir > 0) {
+    const next = _ZOOM_STEPS.find(v => v > s + 0.001);
+    s = next !== undefined ? next : _ZOOM_MAX;
+  } else {
+    const prev = [..._ZOOM_STEPS].reverse().find(v => v < s - 0.001);
+    s = prev !== undefined ? prev : _ZOOM_MIN;
+  }
+  window._buktiZoomState.scale = s;
+  _applyBuktiZoom(previewId, mode, s);
+}
+
+function _buktiZoomReset(previewId, mode) {
+  window._buktiZoomState = { scale: 1.0 };
+  _applyBuktiZoom(previewId, mode, 1.0);
+}
+
+function _applyBuktiZoom(previewId, mode, scale) {
+  // Update label
+  const label = document.getElementById('buktiZoomLabel');
+  if (label) label.textContent = Math.round(scale * 100) + '%';
+
+  // Disable/enable tombol
+  const btnOut   = document.getElementById('buktiZoomOut');
+  const btnIn    = document.getElementById('buktiZoomIn');
+  const btnReset = document.getElementById('buktiZoomReset');
+  if (btnOut)   { btnOut.disabled   = scale <= _ZOOM_MIN; btnOut.style.opacity   = scale <= _ZOOM_MIN ? '0.35' : '1'; }
+  if (btnIn)    { btnIn.disabled    = scale >= _ZOOM_MAX; btnIn.style.opacity    = scale >= _ZOOM_MAX ? '0.35' : '1'; }
+  if (btnReset) { btnReset.style.opacity = scale === 1.0 ? '0.45' : '1'; }
+
+  if (mode === 'img') {
+    const img = document.getElementById('buktiZoomImg');
+    if (img) {
+      img.style.transform = scale === 1.0 ? '' : `scale(${scale})`;
+      img.style.transformOrigin = 'center center';
+      // Kalau zoom > 1 ubah max-width/height agar bisa scroll
+      img.style.maxWidth  = scale > 1 ? 'none' : '100%';
+      img.style.maxHeight = scale > 1 ? 'none' : '100%';
+    }
+    // Pastikan container bisa scroll saat zoom > 1
+    const container = document.getElementById(previewId);
+    if (container) {
+      container.style.overflow = scale > 1 ? 'scroll' : 'auto';
+      container.style.alignItems = scale > 1 ? 'flex-start' : 'center';
+      container.style.justifyContent = scale > 1 ? 'flex-start' : 'center';
+    }
+  } else if (mode === 'pdf') {
+    // Zoom PDF via CSS transform — instan tanpa re-download
+    const container = document.getElementById(previewId);
+    if (!container) return;
+
+    const pagesId  = container._pdfPagesId;
+    const scrollId = container._pdfScrollId;
+    const pdfPages = pagesId  ? document.getElementById(pagesId)  : null;
+    const scroll   = scrollId ? document.getElementById(scrollId) : null;
+
+    if (pdfPages) {
+      pdfPages.style.transform       = scale === 1.0 ? '' : `scale(${scale})`;
+      pdfPages.style.transformOrigin = 'top center';
+      pdfPages.style.transition      = 'transform 0.2s ease';
+      // Agungkan tinggi wrapper agar scroll area menyesuaikan konten yang diperbesar
+      if (scale > 1.0) {
+        const naturalH = pdfPages.scrollHeight / (parseFloat(pdfPages.dataset.lastScale) || 1);
+        pdfPages.dataset.lastScale    = scale;
+        pdfPages.style.marginBottom   = `${naturalH * (scale - 1)}px`;
+      } else {
+        pdfPages.dataset.lastScale    = 1;
+        pdfPages.style.marginBottom   = '';
+      }
+    }
+    if (scroll) {
+      scroll.style.overflowX = scale > 1 ? 'auto' : 'hidden';
+    }
+  }
 }
 
 async function downloadBukti(idx) {
@@ -1353,17 +1497,35 @@ function previewSPM(changedNo) {
 }
 
 // ============== DETAIL MODAL ==============
+// Cache nama user (email → nama) agar tidak fetch berulang kali
+if (!window._userNamaCache) window._userNamaCache = {};
+async function _getNamaByEmail(email) {
+  if (!email) return email;
+  if (window._userNamaCache[email]) return window._userNamaCache[email];
+  try {
+    const users = await API.getUsers();
+    (users || []).forEach(u => { window._userNamaCache[u.email] = u.nama || u.email; });
+  } catch(e) {}
+  return window._userNamaCache[email] || email;
+}
+
 async function viewDetail(idUsulan) {
   document.getElementById('detailModalId').textContent = idUsulan;
   showModal('detailModal');
   document.getElementById('detailModalBody').innerHTML = loadingBlock('Memuat data...');
   try {
     const [detail, inds] = await Promise.all([API.getDetailUsulan(idUsulan), API.getIndikatorUsulan(idUsulan)]);
+    // Resolve nama Kepala Puskesmas dari email jika belum ada namaKapus
+    if (!detail.namaKapus && detail.kapusApprovedBy) {
+      detail.namaKapus = await _getNamaByEmail(detail.kapusApprovedBy);
+    }
     const vp = detail.verifikasiProgram || [];
-    const _vpSelesai = vp.filter(v=>v.status==='Selesai').length;
-    const _vpTolak   = vp.filter(v=>v.status==='Ditolak').length;
-    const _vpTunggu  = vp.filter(v=>v.status==='Menunggu').length;
-    const _vpPct     = vp.length ? Math.round((_vpSelesai / vp.length) * 100) : 0;
+    const _vpSelesai  = vp.filter(v=>v.status==='Selesai').length;
+    const _vpTolak    = vp.filter(v=>v.status==='Ditolak').length;
+    const _vpTunggu   = vp.filter(v=>v.status==='Menunggu').length;
+    // Selesai + Menolak = sudah melakukan verifikasi (keduanya dihitung sebagai progress)
+    const _vpSudahVerif = _vpSelesai + _vpTolak;
+    const _vpPct      = vp.length ? Math.round((_vpSudahVerif / vp.length) * 100) : 0;
     const _svgGroups = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>';
     const _svgCheck  = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0d9488" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
     const _svgX      = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
@@ -1383,11 +1545,12 @@ async function viewDetail(idUsulan) {
             <span style="display:flex;align-items:center;gap:4px;background:#fffbeb;border:1px solid #fde68a;border-radius:20px;padding:3px 10px;font-size:12px;font-weight:700;color:#d97706">
               ${_svgClock} ${_vpTunggu} menunggu
             </span>
-            <span style="font-size:11px;color:#94a3b8;font-weight:600">${_vpSelesai}/${vp.length}</span>
+            <span style="font-size:11px;color:#94a3b8;font-weight:600">${_vpSudahVerif}/${vp.length}</span>
           </div>
         </div>
-        <div style="height:6px;background:#e2e8f0;border-radius:99px;overflow:hidden;margin-bottom:10px">
-          <div style="height:100%;width:${_vpPct}%;background:linear-gradient(90deg,#0d9488,#06b6d4);border-radius:99px"></div>
+        <div style="height:6px;background:#e2e8f0;border-radius:99px;overflow:hidden;margin-bottom:10px;display:flex">
+          <div style="height:100%;width:${vp.length?Math.round((_vpSelesai/vp.length)*100):0}%;background:linear-gradient(90deg,#0d9488,#06b6d4);transition:width .3s"></div>
+          <div style="height:100%;width:${vp.length?Math.round((_vpTolak/vp.length)*100):0}%;background:#ef4444;transition:width .3s"></div>
         </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px">
           ${[...vp].sort((a,b)=>(a.nama_program||a.email_program).localeCompare(b.nama_program||b.email_program,'id')).map(v => {
@@ -1418,15 +1581,16 @@ async function viewDetail(idUsulan) {
   const pdfBtn = document.getElementById('btnDownloadPDF');
   if (pdfBtn) pdfBtn.style.display = detail.statusGlobal === 'Selesai' ? 'inline-flex' : 'none';
 
-  // Banner alasan penolakan — tampil paling atas kalau ditolak
+  // Banner alasan penolakan — collapsible, tampil paling atas kalau ditolak
   const rejectionBanner = ['Ditolak','Ditolak Sebagian'].includes(detail.statusGlobal) ? `
-    <div style="background:var(--danger-light,#fef2f2);border:2px solid #fca5a5;border-radius:10px;padding:14px 16px;margin-bottom:16px;display:flex;gap:12px;align-items:flex-start">
-      <span class="material-icons" style="color:#ef4444;font-size:22px;flex-shrink:0">cancel</span>
-      <div>
-        <div style="font-weight:700;font-size:14px;color:#dc2626;margin-bottom:4px">
-          Usulan Ditolak oleh ${detail.ditolakOleh || 'Verifikator'}
-        </div>
-        <div style="font-size:13px;color:#7f1d1d;background:#fee2e2;border-radius:6px;padding:8px 12px;margin-top:4px">
+    <div style="background:var(--danger-light,#fef2f2);border:2px solid #fca5a5;border-radius:10px;margin-bottom:16px;overflow:hidden">
+      <button onclick="(function(btn){var b=btn.nextElementSibling;var a=btn.querySelector('.ri-arrow');var open=b.style.display!=='none';b.style.display=open?'none':'block';a.style.transform=open?'rotate(0deg)':'rotate(180deg)';})(this)" style="width:100%;display:flex;gap:10px;align-items:center;padding:12px 16px;background:none;border:none;cursor:pointer;text-align:left">
+        <span class="material-icons" style="color:#ef4444;font-size:20px;flex-shrink:0">cancel</span>
+        <span style="font-weight:700;font-size:13.5px;color:#dc2626;flex:1">Usulan Ditolak oleh ${detail.ditolakOleh || 'Verifikator'}</span>
+        <span class="material-icons ri-arrow" style="font-size:18px;color:#b91c1c;flex-shrink:0;transition:transform .2s">expand_more</span>
+      </button>
+      <div style="display:none;padding:0 16px 14px 16px">
+        <div style="font-size:13px;color:#7f1d1d;background:#fee2e2;border-radius:6px;padding:8px 12px">
           <span style="font-weight:600">Alasan:</span> ${detail.alasanTolak || '(tidak ada keterangan)'}
         </div>
         <div style="font-size:12px;color:#ef4444;margin-top:8px;display:flex;align-items:center;gap:4px">
@@ -1459,7 +1623,7 @@ async function viewDetail(idUsulan) {
       </div>
       ${vpHtml}
       <div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
-        ${approvalBox('Kepala Puskesmas', detail.kapusApprovedBy, detail.kapusApprovedAt, detail.statusKapus==='Ditolak' ? detail.kapusCatatan : '')}
+        ${approvalBox('Kepala Puskesmas', detail.namaKapus || detail.kapusApprovedBy, detail.kapusApprovedAt, detail.statusKapus==='Ditolak' ? detail.kapusCatatan : '')}
         ${approvalBox('Pengelola Program', vp.length && vp.every(v=>v.status==='Selesai') ? 'Semua selesai' : '', '', detail.statusProgram==='Ditolak' ? detail.adminCatatan : '')}
         ${approvalBox('Admin', detail.adminApprovedBy, detail.adminApprovedAt, detail.statusGlobal==='Ditolak' && detail.statusKapus!=='Ditolak' && detail.statusProgram!=='Ditolak' ? detail.adminCatatan : '')}
       </div>

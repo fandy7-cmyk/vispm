@@ -304,13 +304,19 @@ async function renderCatatanThread(elId, idUsulan, currentRole) {
 
   html += '</div>';
 
-  el.innerHTML = `<div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px;padding:12px 14px">
-    <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #e2e8f0">
+  const rcBodyId = elId + '_rcbody';
+  const rcArrowId = elId + '_rcarrow';
+  el.innerHTML = `<div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px;overflow:hidden">
+    <button onclick="(function(){var b=document.getElementById('${rcBodyId}');var a=document.getElementById('${rcArrowId}');var open=b.style.display!=='none';b.style.display=open?'none':'block';a.style.transform=open?'rotate(0deg)':'rotate(180deg)';a.style.transition='transform .2s';})()" style="width:100%;display:flex;align-items:center;gap:6px;padding:10px 14px;background:none;border:none;cursor:pointer;text-align:left">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
       <span style="font-size:12px;font-weight:700;color:#475569">Riwayat Catatan</span>
       <span style="font-size:10px;color:#94a3b8;margin-left:4px">(${logs.length} entri — klik untuk detail)</span>
+      <span id="${rcArrowId}" style="margin-left:auto;display:flex;flex-shrink:0;transition:transform .2s"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span>
+    </button>
+    <div id="${rcBodyId}" style="display:none;padding:0 14px 12px 14px;border-top:1px solid #e2e8f0">
+      <div style="height:10px"></div>
+      <div style="width:100%">${html}</div>
     </div>
-    <div style="width:100%">${html}</div>
   </div>`;
   el.style.display = 'block';
 }
@@ -337,19 +343,25 @@ function renderPenolakanBanner(elId, ditolakOleh, alasanArr) {
   if (!ditolakOleh || !alasanArr || !alasanArr.length) {
     el.style.display = 'none'; el.innerHTML = ''; return;
   }
+  const bodyId = elId + '_body';
+  const arrowId = elId + '_arrow';
+  const count = alasanArr.length;
   const cells = alasanArr.map(({ no, alasan }) =>
-    `<div style="display:flex;align-items:baseline;gap:7px;background:#fff5f5;border:1px solid #fecaca;border-radius:6px;padding:5px 9px;min-width:0">
-      <span style="background:#fee2e2;color:#991b1b;border-radius:4px;padding:1px 7px;font-size:11px;font-weight:700;white-space:nowrap;flex-shrink:0">Ind. #${no}</span>
-      <span style="font-size:11.5px;color:#7f1d1d;line-height:1.4;word-break:break-word">${alasan || '-'}</span>
+    `<div style="display:flex;align-items:flex-start;gap:7px;background:#fff5f5;border:1px solid #fecaca;border-radius:6px;padding:6px 9px;min-width:0;box-sizing:border-box">
+      <span style="background:#fee2e2;color:#991b1b;border-radius:4px;padding:1px 7px;font-size:11px;font-weight:700;white-space:nowrap;flex-shrink:0;margin-top:1px">Ind. #${no}</span>
+      <span style="font-size:11.5px;color:#7f1d1d;line-height:1.5;word-break:break-word;overflow-wrap:anywhere">${alasan || '-'}</span>
     </div>`
   ).join('');
   el.innerHTML = `
-    <div style="background:var(--danger-light,#fef2f2);border:1.5px solid #fca5a5;border-radius:8px;padding:10px 14px">
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
-        <span class="material-icons" style="font-size:16px;color:#dc2626">cancel</span>
-        <span style="font-size:12.5px;font-weight:700;color:#991b1b">Alasan Penolakan dari ${ditolakOleh}</span>
+    <div style="background:var(--danger-light,#fef2f2);border:1.5px solid #fca5a5;border-radius:8px;overflow:hidden;box-sizing:border-box">
+      <button onclick="(function(){var b=document.getElementById('${bodyId}');var a=document.getElementById('${arrowId}');var open=b.style.display!=='none';b.style.display=open?'none':'block';a.style.transform=open?'rotate(0deg)':'rotate(180deg)';a.style.transition='transform .2s';})()" style="width:100%;display:flex;align-items:center;gap:6px;padding:10px 14px;background:none;border:none;cursor:pointer;text-align:left">
+        <span class="material-icons" style="font-size:16px;color:#dc2626;flex-shrink:0">cancel</span>
+        <span style="font-size:12.5px;font-weight:700;color:#991b1b;flex:1">Alasan Penolakan dari ${ditolakOleh} <span style="font-weight:400;font-size:11.5px;color:#b91c1c">(${count} indikator)</span></span>
+        <span class="material-icons" id="${arrowId}" style="font-size:18px;color:#b91c1c;flex-shrink:0;transition:transform .2s">expand_more</span>
+      </button>
+      <div id="${bodyId}" style="display:none;padding:0 14px 12px 14px">
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,200px),1fr));gap:6px;width:100%">${cells}</div>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px">${cells}</div>
     </div>`;
   el.style.display = 'block';
 }

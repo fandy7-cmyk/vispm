@@ -1,0 +1,639 @@
+/* ============================================================
+ * VISPM — RESPONSIVE PATCH
+ * Tambahkan <link rel="stylesheet" href="/css/responsive.css">
+ * di index.html SEBELUM tag </head>
+ * ============================================================ */
+
+/* ── Breakpoints
+ *   xs  : ≤ 480px  (HP kecil / portrait)
+ *   sm  : ≤ 600px  (HP besar / landscape HP)
+ *   md  : ≤ 768px  (tablet portrait)
+ *   lg  : ≤ 1024px (tablet landscape / laptop kecil)
+ * ──────────────────────────────────────────────────────────── */
+
+
+/* ============================================================
+ * 1. TOPBAR — tambah tombol notifikasi + rapikan di mobile
+ * ============================================================ */
+#notifBtnWrap {
+  position: relative;
+}
+#notifBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border, #e2e8f0);
+  background: var(--surface, #fff);
+  cursor: pointer;
+  color: var(--text-light, #64748b);
+  transition: border-color .15s, color .15s;
+  flex-shrink: 0;
+}
+#notifBtn:hover {
+  border-color: var(--primary, #0d9488);
+  color: var(--primary, #0d9488);
+}
+
+/* Sembunyikan teks label topbar-title di HP kecil */
+@media (max-width: 480px) {
+  .topbar-title {
+    font-size: 13px;
+    max-width: 140px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .topbar {
+    padding: 0 12px;
+  }
+}
+
+
+/* ============================================================
+ * 2. SIDEBAR — overlay & body scroll lock
+ * ============================================================ */
+@media (max-width: 768px) {
+  /* Pastikan sidebar tidak overlap saat menutup */
+  .sidebar {
+    width: 260px !important;
+    min-width: 260px !important;
+  }
+
+  /* Body scroll lock saat sidebar terbuka */
+  body.sidebar-open {
+    overflow: hidden;
+  }
+
+  /* Sidebar user info — lebih ringkas */
+  .sidebar-user-name {
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 140px;
+  }
+}
+
+
+/* ============================================================
+ * 3. CONTENT PADDING
+ * ============================================================ */
+@media (max-width: 768px) {
+  .content {
+    padding: 12px !important;
+  }
+}
+@media (max-width: 480px) {
+  .content {
+    padding: 8px !important;
+  }
+}
+
+
+/* ============================================================
+ * 4. STATS GRID
+ * ============================================================ */
+
+/* Tablet landscape: 4 kolom (default auto-fit sudah handle) */
+
+/* Tablet portrait: 2 kolom */
+@media (max-width: 768px) {
+  .stats-grid {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 10px !important;
+  }
+  .stat-card {
+    padding: 12px !important;
+  }
+  .stat-value {
+    font-size: 22px !important;
+  }
+}
+
+/* HP kecil: 1 kolom */
+@media (max-width: 480px) {
+  .stats-grid {
+    grid-template-columns: 1fr !important;
+    gap: 8px !important;
+  }
+}
+
+
+/* ============================================================
+ * 5. DASHBOARD GRID (2 kolom hardcoded di JS → override)
+ * ============================================================ */
+/* Kita pakai class helper .dash-grid-2 yang ditambahkan via JS patch,
+   tapi juga override semua grid 1fr 1fr inline dengan selector kuat */
+
+/* Tablet portrait ke bawah */
+@media (max-width: 768px) {
+  /* Override grid inline style yang dirender via JS */
+  #mainContent [style*="grid-template-columns:1fr 1fr"],
+  #mainContent [style*="grid-template-columns: 1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Grid status summary dalam dashboard juga */
+  #mainContent [style*="grid-template-columns:1fr 1fr;gap:8px"],
+  #mainContent [style*="grid-template-columns: 1fr 1fr; gap: 8px"] {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+
+/* ============================================================
+ * 6. TABLE — horizontal scroll wrapper
+ * ============================================================ */
+.table-container {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Tabel dalam modal fullscreen */
+.modal.fullscreen .table-container {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Kolom indikator: biarkan overflow tapi jangan stretch layar */
+@media (max-width: 768px) {
+  .ind-table {
+    min-width: 700px;
+  }
+  .ind-table input[type="number"] {
+    width: 60px !important;
+  }
+}
+
+/* Sembunyikan kolom yang tidak terlalu penting di HP kecil */
+@media (max-width: 600px) {
+  /* Tabel usulan: sembunyikan kolom NIP jika ada */
+  table th.col-hide-sm,
+  table td.col-hide-sm {
+    display: none;
+  }
+}
+
+
+/* ============================================================
+ * 7. MODAL — ukuran & padding
+ * ============================================================ */
+@media (max-width: 768px) {
+  .modal {
+    padding: 8px !important;
+    align-items: flex-end !important;  /* slide-up dari bawah */
+  }
+  .modal-card {
+    width: 100% !important;
+    max-width: 100% !important;
+    border-radius: 16px 16px 0 0 !important;
+    margin: 0 !important;
+  }
+  .modal-card.lg,
+  .modal-card.xl {
+    width: 100% !important;
+  }
+  .modal-body {
+    max-height: 75vh !important;
+    padding: 12px !important;
+  }
+  .modal-header {
+    padding: 12px 14px !important;
+  }
+  .modal-footer {
+    padding: 10px 14px !important;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .modal-footer .btn {
+    flex: 1;
+    justify-content: center;
+    min-width: 100px;
+  }
+}
+
+/* Modal fullscreen di HP */
+@media (max-width: 768px) {
+  .modal.fullscreen {
+    padding: 0 !important;
+    align-items: stretch !important;
+  }
+  .modal.fullscreen .modal-card {
+    width: 100% !important;
+    height: 100% !important;
+    border-radius: 0 !important;
+    max-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  .modal.fullscreen .modal-body {
+    flex: 1;
+    overflow-y: auto;
+    max-height: none !important;
+  }
+}
+
+/* Confirm modal */
+@media (max-width: 480px) {
+  .confirm-card {
+    width: calc(100vw - 32px) !important;
+    max-width: none !important;
+  }
+  .confirm-footer {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .confirm-footer .btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+
+/* ============================================================
+ * 8. FORM — form-row collapse
+ * ============================================================ */
+@media (max-width: 600px) {
+  .form-row {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Input & select ukuran lebih user-friendly di mobile */
+@media (max-width: 768px) {
+  .form-control,
+  .auth-input {
+    font-size: 16px !important; /* Cegah iOS zoom otomatis */
+  }
+  select.form-control {
+    font-size: 16px !important;
+  }
+}
+
+
+/* ============================================================
+ * 9. FILTER ROW & SEARCH ROW — stack di mobile
+ * ============================================================ */
+@media (max-width: 600px) {
+  .filter-row {
+    flex-direction: column !important;
+    gap: 8px !important;
+  }
+  .filter-row .form-control {
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+  .search-row {
+    flex-direction: column !important;
+    gap: 8px !important;
+  }
+  .search-input-wrap {
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+}
+
+
+/* ============================================================
+ * 10. PAGE HEADER — wrap di mobile
+ * ============================================================ */
+@media (max-width: 600px) {
+  .page-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 10px !important;
+  }
+  .page-header h1 {
+    font-size: 16px !important;
+  }
+  .page-header > div {
+    width: 100%;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .page-header > div .btn {
+    flex: 1;
+    justify-content: center;
+  }
+}
+
+
+/* ============================================================
+ * 11. AUTH SCREEN — mobile full-page form
+ * ============================================================ */
+@media (max-width: 700px) {
+  #authScreen {
+    background-size: cover;
+    background-position: center;
+    padding: 16px;
+    align-items: center;
+  }
+  .auth-modal {
+    width: 100% !important;
+    max-width: 420px;
+    flex-direction: column !important;
+    max-height: none !important;
+    border-radius: 16px !important;
+  }
+  .auth-left {
+    display: none !important;
+  }
+  .auth-right {
+    flex: 1;
+    width: 100% !important;
+    padding: 24px 20px !important;
+    border-radius: 16px !important;
+  }
+  .auth-input {
+    height: 48px !important;
+    font-size: 16px !important; /* cegah iOS zoom */
+  }
+  .auth-btn {
+    height: 48px !important;
+  }
+}
+
+/* Landscape HP — tampilkan auth lebih kompak */
+@media (max-width: 700px) and (orientation: landscape) {
+  .auth-right {
+    padding: 16px 20px !important;
+  }
+  .auth-right-logo {
+    margin-bottom: 10px !important;
+  }
+  .auth-right h2 {
+    font-size: 18px !important;
+    margin-bottom: 2px !important;
+  }
+  .auth-right-sub {
+    margin-bottom: 10px !important;
+    font-size: 11px !important;
+  }
+  .auth-field {
+    margin-bottom: 8px !important;
+  }
+}
+
+
+/* ============================================================
+ * 12. TOAST — full-width di mobile
+ * ============================================================ */
+@media (max-width: 480px) {
+  .toast {
+    left: 12px !important;
+    right: 12px !important;
+    bottom: 12px !important;
+    max-width: none !important;
+  }
+}
+
+
+/* ============================================================
+ * 13. DETAIL GRID (info usulan)
+ * ============================================================ */
+@media (max-width: 600px) {
+  .detail-grid {
+    grid-template-columns: 1fr !important;
+    gap: 8px !important;
+  }
+}
+
+
+/* ============================================================
+ * 14. CARD — padding lebih kecil di mobile
+ * ============================================================ */
+@media (max-width: 600px) {
+  .card-body {
+    padding: 12px !important;
+  }
+  .card-header-bar {
+    padding: 10px 12px !important;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}
+
+
+/* ============================================================
+ * 15. TABS — scroll horizontal jika banyak
+ * ============================================================ */
+.tabs {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  flex-wrap: nowrap !important;
+  padding-bottom: 4px;
+  scrollbar-width: none; /* Firefox */
+}
+.tabs::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
+@media (max-width: 600px) {
+  .tab {
+    white-space: nowrap;
+    flex-shrink: 0;
+    font-size: 12px !important;
+    padding: 5px 12px !important;
+  }
+}
+
+
+/* ============================================================
+ * 16. INDIKATOR INPUT MODAL — tabel scroll + info box wrap
+ * ============================================================ */
+@media (max-width: 768px) {
+  /* Info banner di atas tabel */
+  #indModalInfo {
+    font-size: 12px !important;
+  }
+  /* SPM bar */
+  #indikatorModal .modal-header h3 {
+    font-size: 13px !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  /* Footer tombol stack */
+  #indikatorModal .modal-footer > div {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  #indikatorModal .modal-footer .btn {
+    flex: 1;
+    justify-content: center;
+    min-width: 120px;
+  }
+}
+
+
+/* ============================================================
+ * 17. VERIFIKASI MODAL — stack actions di mobile
+ * ============================================================ */
+@media (max-width: 600px) {
+  #verifikasiModal .modal-footer {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  #verifikasiModal .modal-footer .btn {
+    flex: 1;
+    justify-content: center;
+    min-width: 100px;
+  }
+}
+
+
+/* ============================================================
+ * 18. NOTIF PANEL — full-width di mobile
+ * ============================================================ */
+@media (max-width: 480px) {
+  #notifPanel {
+    width: calc(100vw - 24px) !important;
+    right: -12px !important;
+    left: auto !important;
+  }
+}
+
+
+/* ============================================================
+ * 19. CHART — min height & scroll
+ * ============================================================ */
+@media (max-width: 600px) {
+  .chart-container {
+    min-height: 80px;
+    gap: 4px !important;
+  }
+  .chart-bar-lbl {
+    font-size: 9px !important;
+  }
+  .chart-bar-val {
+    font-size: 9px !important;
+  }
+}
+
+
+/* ============================================================
+ * 20. PAGINATION — compact di mobile
+ * ============================================================ */
+@media (max-width: 480px) {
+  /* Teks "Menampilkan X-Y dari Z data" */
+  .pagination-info {
+    font-size: 11px !important;
+  }
+  /* Tombol pagination lebih kecil */
+  button[onclick*="__pgGo"] {
+    padding: 4px 8px !important;
+    font-size: 11px !important;
+  }
+}
+
+
+/* ============================================================
+ * 21. BADGE — wrap jika teks panjang
+ * ============================================================ */
+.badge {
+  max-width: 100%;
+  word-break: break-word;
+}
+
+
+/* ============================================================
+ * 22. LAPTOP KECIL (1024px) — sidebar lebih sempit
+ * ============================================================ */
+@media (max-width: 1024px) and (min-width: 769px) {
+  :root {
+    --sidebar-w: 220px;
+  }
+  .content {
+    padding: 20px !important;
+  }
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+
+/* ============================================================
+ * 23. PRINT — sembunyikan sidebar & topbar
+ * ============================================================ */
+@media print {
+  .sidebar,
+  .topbar,
+  .modal-footer,
+  #globalLoader,
+  .toast {
+    display: none !important;
+  }
+  .main {
+    width: 100% !important;
+  }
+  .content {
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+  .modal.fullscreen {
+    position: static !important;
+  }
+  .modal.fullscreen .modal-card {
+    width: 100% !important;
+    height: auto !important;
+    box-shadow: none !important;
+  }
+}
+
+
+/* ============================================================
+ * 24. ACCESSIBILITY — focus visible di touch device
+ * ============================================================ */
+@media (hover: none) {
+  /* Pastikan tap target cukup besar */
+  .btn {
+    min-height: 40px;
+  }
+  .btn-sm {
+    min-height: 34px;
+  }
+  .menu-item {
+    min-height: 40px;
+  }
+  .tab {
+    min-height: 36px;
+  }
+}
+
+
+/* ============================================================
+ * 25. SAFE AREA — iPhone notch / home indicator
+ * ============================================================ */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .sidebar {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .modal-footer {
+    padding-bottom: calc(10px + env(safe-area-inset-bottom)) !important;
+  }
+  .toast {
+    bottom: calc(12px + env(safe-area-inset-bottom)) !important;
+  }
+  #authScreen .auth-right {
+    padding-bottom: calc(24px + env(safe-area-inset-bottom)) !important;
+  }
+}
+
+
+/* ============================================================
+ * 26. PENOLAKAN BANNER — pastikan grid tidak overflow di modal
+ * ============================================================ */
+#indModalPenolakanBanner [style*="grid-template-columns"] {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)) !important;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 600px) {
+  #indModalPenolakanBanner [style*="grid-template-columns"] {
+    grid-template-columns: 1fr !important;
+  }
+}

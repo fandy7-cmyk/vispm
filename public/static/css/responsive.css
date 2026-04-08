@@ -277,12 +277,40 @@
 /* ============================================================
  * 9. FILTER ROW & SEARCH ROW — stack di mobile
  * ============================================================ */
+
+/* BASE: harus flex dulu di semua ukuran layar */
+.filter-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.search-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* .cs-wrap di dalam filter/search row: jangan stretch, ikut width select asli */
+.filter-row .cs-wrap,
+.search-row .cs-wrap {
+  flex-shrink: 0;
+}
+
+/* search input wrapper: boleh grow */
+.search-row .search-input-wrap {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
 @media (max-width: 600px) {
   .filter-row {
     flex-direction: column !important;
     gap: 8px !important;
   }
-  .filter-row .form-control {
+  .filter-row .form-control,
+  .filter-row .cs-wrap {
     min-width: 0 !important;
     width: 100% !important;
   }
@@ -290,7 +318,8 @@
     flex-direction: column !important;
     gap: 8px !important;
   }
-  .search-input-wrap {
+  .search-input-wrap,
+  .search-row .cs-wrap {
     min-width: 0 !important;
     width: 100% !important;
   }

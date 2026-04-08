@@ -731,7 +731,9 @@ _ppBanner.innerHTML = `<span class="material-icons" style="color:#f59e0b;font-si
         //   - Admin re-verif setelah PP sanggah
         const _isKapusPPLoop   = window._verifIsKapusReVerif && window._verifDitolakOleh === 'Pengelola Program';
         const _isKapusAdminLoop = window._verifIsKapusReVerif && (window._verifDitolakOleh === 'Admin' || window._verifKonteksPenolakan === 'Admin');
-        const _isPPRespondMode = window._verifIsPPReVerif; // PP selalu respond penolakan pihak lain
+        // PP mode sanggah HANYA saat merespons penolakan Admin (bukan Kapus)
+        // Kalau ditolak Kapus, PP cukup Setuju/Tolak biasa (menerima atau menolak keputusan Kapus)
+        const _isPPRespondMode = window._verifIsPPReVerif && (window._verifDitolakOleh === 'Admin' || window._verifKonteksPenolakan === 'Admin');
         const _isSanggahMode   = _isKapusPPLoop || _isPPRespondMode; // Kapus Admin loop TIDAK sanggah mode
         const _isReVerifMode   = window._verifIsPPReVerif || window._verifIsKapusReVerif || window._verifIsAdminReVerif;
 
@@ -896,7 +898,8 @@ async function submitIndVerifikasi(idUsulan, displayInds, role) {
   const _isKapusPPLoop2   = window._verifIsKapusReVerif && window._verifDitolakOleh === 'Pengelola Program';
   // Kapus di re-verif Admin: tombol Setuju/Tolak biasa (bukan Sanggah/Terima)
   const _isKapusAdminLoop2 = window._verifIsKapusReVerif && (window._verifDitolakOleh === 'Admin' || window._verifKonteksPenolakan === 'Admin');
-  const _isPPRespondMode2 = window._verifIsPPReVerif;
+  // PP mode sanggah HANYA saat merespons penolakan Admin (bukan Kapus)
+  const _isPPRespondMode2 = window._verifIsPPReVerif && (window._verifDitolakOleh === 'Admin' || window._verifKonteksPenolakan === 'Admin');
   const _isSanggahMode2   = _isKapusPPLoop2 || _isPPRespondMode2; // Kapus Admin loop TIDAK pakai sanggah mode
   for (const i of displayInds) {
     const isSetuju = document.getElementById(`pgApprove_${i.no}`)?.dataset.active === '1';

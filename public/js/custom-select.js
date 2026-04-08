@@ -31,8 +31,9 @@
 .cs-wrap {
   position: relative;
   display: block;
-  width: 100%;
+  /* width diatur via JS: 100% di luar flex container, auto/inherit di dalam flex */
   font-family: 'Plus Jakarta Sans', sans-serif;
+  box-sizing: border-box;
 }
 .cs-wrap.cs-disabled { opacity: 0.55; pointer-events: none; }
 
@@ -567,6 +568,19 @@
     if (select.disabled) wrap.classList.add('cs-disabled');
     // Salin class tertentu dari select ke wrap (untuk filter-row dll)
     ['flex-1', 'w-full'].forEach(c => { if (select.classList.contains(c)) wrap.classList.add(c); });
+    // Wariskan dimensi inline dari select asli ke wrapper
+    if (select.style.width)    wrap.style.width    = select.style.width;
+    if (select.style.minWidth) wrap.style.minWidth = select.style.minWidth;
+    if (select.style.maxWidth) wrap.style.maxWidth = select.style.maxWidth;
+    if (select.style.flex)     wrap.style.flex     = select.style.flex;
+    // Jika tidak ada width/flex eksplisit dan bukan di dalam konteks flex parent,
+    // default ke width 100% hanya jika select asli juga 100% (atau tidak diset)
+    if (!select.style.width && !select.style.flex) {
+      // Cek apakah parent adalah flex container (search-row / filter-row)
+      const parentStyle = window.getComputedStyle(select.parentNode);
+      const isFlexParent = parentStyle.display === 'flex' || parentStyle.display === 'inline-flex';
+      if (!isFlexParent) wrap.style.width = '100%';
+    }
 
     // Sembunyikan select asli
     select.classList.add('cs-native-hidden');

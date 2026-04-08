@@ -2210,6 +2210,21 @@ async function loadKelolaUsulan(page) {
     _kuAllRows = await API.getUsulan({});
     _kuPage = 1;
 
+    // Resolve nama operator dari email (pakai cache _userNamaCache)
+    try {
+      if (!window._userNamaCache) window._userNamaCache = {};
+      const uniqueEmails = [...new Set(_kuAllRows.map(u => u.createdBy).filter(Boolean))];
+      const uncached = uniqueEmails.filter(e => !window._userNamaCache[e]);
+      if (uncached.length) {
+        const users = await API.getUsers().catch(() => []);
+        (users || []).forEach(u => { window._userNamaCache[u.email] = u.nama || u.email; });
+      }
+      _kuAllRows = _kuAllRows.map(u => ({
+        ...u,
+        _namaOperator: (u.createdBy && window._userNamaCache[u.createdBy]) || u.createdBy || '-'
+      }));
+    } catch(e) {}
+
     _kuRebuildFilters(_kuAllRows, prevTahun, prevBulan, prevStatus);
     _kuApplyFilter(1);
   } catch(e) { toast(e.message, 'error'); }
@@ -2226,7 +2241,7 @@ function _kuRenderTable() {
   const rowsHtml = items.map(u => `<tr>
       <td><span style="font-weight:600;font-size:12px">${u.idUsulan}</span></td>
       <td>${u.namaPKM || u.kodePKM}</td>
-      <td style="font-size:12px">${u.createdBy || '-'}</td>
+      <td style="font-size:12px">${u._namaOperator || u.createdBy || '-'}</td>
       <td>${u.namaBulan || ''} ${u.tahun}</td>
       <td class="rasio-cell" style="font-weight:700;color:var(--primary)">${parseFloat(u.indeksSPM||0).toFixed(2)}</td>
       <td>${statusBadge(u.statusGlobal)}</td>

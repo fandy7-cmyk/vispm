@@ -618,7 +618,7 @@ function startApp() {
   } catch(e) {}
   loadPage(lastPage);
 
-  // Sembunyikan menu Edit Profil & Tanda Tangan untuk Operator
+  // Tampilkan menu Tanda Tangan hanya untuk Kepala Puskesmas dan Pengelola Program
   const btnEPTT = document.getElementById('btnEditProfilTT');
   if (btnEPTT) {
     const rolesBolehTT = ['Kepala Puskesmas','Pengelola Program'];
@@ -680,7 +680,7 @@ async function showTandaTanganLoginPopup() {
         </div>
       </div>
       <div style="background:var(--danger-light,#fef2f2);border:1px solid #fca5a5;border-radius:8px;padding:10px 14px;font-size:12px;color:#7f1d1d;margin-bottom:4px">
-        ⚠️ Upload di: <b>Foto Profil → Edit Profil & Tanda Tangan</b>
+        ⚠️ Upload di: <b>Foto Profil → Tanda Tangan</b>
       </div>`;
 
     const popup = document.createElement('div');

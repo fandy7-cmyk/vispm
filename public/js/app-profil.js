@@ -101,6 +101,17 @@ function openEditProfil() {
   document.getElementById('epEmail').value = currentUser.email || '';
   document.getElementById('epRole').value = currentUser.role || '';
   document.getElementById('epStatus').textContent = '';
+  // Lock Nama & NIP untuk non-Admin
+  const isAdmin = currentUser.role === 'Admin';
+  const namaEl = document.getElementById('epNama');
+  const nipEl = document.getElementById('epNIP');
+  if (isAdmin) {
+    namaEl.disabled = false; namaEl.style.background = ''; namaEl.style.color = '';
+    nipEl.disabled = false; nipEl.style.background = ''; nipEl.style.color = '';
+  } else {
+    namaEl.disabled = true; namaEl.style.background = '#f8fafc'; namaEl.style.color = 'var(--text-light)';
+    nipEl.disabled = true; nipEl.style.background = '#f8fafc'; nipEl.style.color = 'var(--text-light)';
+  }
   // Tampilkan tanda tangan jika ada
   const ttPreview = document.getElementById('epTTPreview');
   const ttPlaceholder = document.getElementById('epTTPlaceholder');
@@ -172,10 +183,11 @@ function hapusTandaTangan() {
 
 
 async function saveEditProfil() {
-  const nama = document.getElementById('epNama').value.trim();
-  const nip = document.getElementById('epNIP').value.trim();
   const statusEl = document.getElementById('epStatus');
-  if (!nama) { statusEl.textContent = 'Nama tidak boleh kosong'; return; }
+  const isAdmin = currentUser.role === 'Admin';
+  const nama = isAdmin ? document.getElementById('epNama').value.trim() : (currentUser.nama || '');
+  const nip  = isAdmin ? document.getElementById('epNIP').value.trim()  : (currentUser.nip  || '');
+  if (isAdmin && !nama) { statusEl.textContent = 'Nama tidak boleh kosong'; return; }
   setLoading(true);
   try {
     const ttInput = document.getElementById('epTTInput');
@@ -256,4 +268,3 @@ async function doChangePassword() {
     statusEl.textContent = e.message;
   } finally { setLoading(false); }
 }
-

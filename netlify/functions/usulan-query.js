@@ -10,16 +10,19 @@ async function getUsulanList(pool, params) {
   if (params.awaiting_admin === 'true') where.push(`uh.status_global='Menunggu Admin'`);
 
   // Filter khusus Pengelola Program: tampilkan semua usulan yang ditugaskan ke user ini
-  // termasuk yang sudah Selesai (untuk tampilkan tombol hijau)
-  if (params.status_program && params.email_program) {
+  if (params.email_program) {
     const ALLOWED_STATUSES = ['Menunggu Pengelola Program','Menunggu Re-verifikasi PP','Menunggu Admin','Menunggu Re-verifikasi Kepala Puskesmas','Selesai','Ditolak','Ditolak Sebagian','Draft','Menunggu Kepala Puskesmas'];
-    const statuses = params.status_program.split(',').map(s => s.trim()).filter(s => ALLOWED_STATUSES.includes(s));
-    if (statuses.length > 0) {
-      const placeholders = statuses.map(() => `$${idx++}`).join(',');
-      where.push(`uh.status_global IN (${placeholders})`);
-      qParams.push(...statuses);
+
+    // Filter status_global jika status_program dikirim (tab Semua/Menunggu/Ditolak)
+    if (params.status_program) {
+      const statuses = params.status_program.split(',').map(s => s.trim()).filter(s => ALLOWED_STATUSES.includes(s));
+      if (statuses.length > 0) {
+        const placeholders = statuses.map(() => `$${idx++}`).join(',');
+        where.push(`uh.status_global IN (${placeholders})`);
+        qParams.push(...statuses);
+      }
     }
-    // Tampilkan semua yang punya record di verifikasi_program (sudah/belum verifikasi)
+    // Selalu filter hanya usulan yang ditugaskan ke PP ini (ada record di verifikasi_program)
     where.push(`EXISTS (
       SELECT 1 FROM verifikasi_program vp
       WHERE vp.id_usulan = uh.id_usulan

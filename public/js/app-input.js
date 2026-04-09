@@ -1847,7 +1847,17 @@ async function openLogAktivitas(idUsulan) {
               <span style="font-size:10px;font-weight:600;color:#0f172a;text-align:center;line-height:1.3;word-break:break-word">${log.user_nama||log.user_email}</span>
               <span style="font-size:9.5px;color:#64748b;text-align:center">${log.role}</span>
               <span style="font-size:9px;color:#b0bec5;text-align:center">${fmtDT(log.timestamp)}</span>
-              ${log.detail ? `<div style="font-size:10px;color:#334155;background:#f8fafc;border-left:2.5px solid ${cfg.color};padding:4px 7px;border-radius:0 5px 5px 0;line-height:1.5;margin-top:3px;text-align:left;width:100%;box-sizing:border-box;word-break:break-word">${log.detail}</div>` : ''}
+                    ${log.detail ? (() => {
+                const _dId = `logDet_${rowIdx}_${di}`;
+                const _LIMIT = 120;
+                const _isLong = log.detail.length > _LIMIT;
+                const _short = _isLong ? log.detail.substring(0, _LIMIT).replace(/\s+\S*$/, '')+'\u2026' : log.detail;
+                return `<div style="margin-top:3px;width:100%;box-sizing:border-box">
+                  <div style="font-size:10px;color:#334155;background:#f8fafc;border-left:2.5px solid ${cfg.color};padding:4px 7px;border-radius:0 5px 5px 0;line-height:1.5;text-align:left;word-break:break-word">
+                    <span id="${_dId}_s">${_short}</span><span id="${_dId}_f" style="display:none">${log.detail}</span>${_isLong ? `<button id="${_dId}_b" onclick="(function(id){var s=document.getElementById(id+'_s'),f=document.getElementById(id+'_f'),b=document.getElementById(id+'_b');if(f.style.display==='none'){f.style.display='inline';s.style.display='none';b.textContent='Lebih sedikit';}else{f.style.display='none';s.style.display='inline';b.textContent='Selengkapnya';}})('${_dId}')" style="display:block;margin-top:3px;font-size:9.5px;font-weight:700;color:${cfg.color};background:none;border:none;padding:0;cursor:pointer;text-decoration:underline;text-underline-offset:2px">Selengkapnya</button>` : ''}
+                  </div>
+                </div>`;
+              })() : ''}
             </div>
             ${hasRight ? `<div style="position:absolute;top:26px;left:calc(50% + 18px);right:0;height:2px;background:linear-gradient(to right,${cfg.color}66,#cbd5e1);z-index:0"></div>` : ''}
           </div>`;

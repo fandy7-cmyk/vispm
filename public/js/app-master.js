@@ -1602,91 +1602,104 @@ async function renderPeriode(el) {
 
     <!-- MODAL PERIODE -->
     <div class="modal" id="periodeModal">
-      <div class="modal-card">
+      <div class="modal-card" style="max-width:700px;width:100%">
         <div class="modal-header">
           <span class="material-icons">edit_calendar</span>
           <h3 id="periodeModalTitle">Tambah Periode Input</h3>
           <button class="btn-icon" onclick="closeModal('periodeModal')"><span class="material-icons">close</span></button>
         </div>
-        <div class="modal-body">
-          <div class="form-row">
-            <div class="form-group"><label>Tahun</label><select class="form-control" id="pTahun">${yearOptions(currentTahun)}</select></div>
-            <div class="form-group"><label>Bulan</label><select class="form-control" id="pBulan">${bulanOptions(CURRENT_BULAN)}</select></div>
-          </div>
-          <div style="margin:4px 0 8px;padding:8px 12px;background:#eff6ff;border-radius:8px;border:1px solid #bfdbfe">
-            <div style="font-size:12px;font-weight:700;color:#1d4ed8;margin-bottom:8px;display:flex;align-items:center;gap:6px">
-              <span class="material-icons" style="font-size:15px">edit_calendar</span>Periode Input (Operator)
-            </div>
-            <div style="display:grid;align-items:stretch;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-              <div class="form-group" style="margin-bottom:0;display:flex;flex-direction:column">
-                <label style="display:flex;align-items:center;gap:4px"><span class="material-icons" style="font-size:13px;color:#64748b">event</span>Tanggal Mulai</label>
-                <input type="date" class="form-control" id="pMulai" onchange="_syncVerifDate()">
-              </div>
-              <div class="form-group" style="margin-bottom:0;display:flex;flex-direction:column">
-                <label style="display:flex;align-items:center;gap:4px"><span class="material-icons" style="font-size:13px;color:#64748b">schedule</span>Jam Mulai</label>
-                <input type="time" class="form-control" id="pJamMulai" value="08:00" oninput="_syncVerifTime()" style="display:none">
-                <div class="time-picker-24" id="pJamMulaiPicker" data-target="pJamMulai" data-sync="_syncVerifTime"></div>
-              </div>
-            </div>
-            <div style="display:grid;align-items:stretch;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:0">
-              <div class="form-group" style="margin-bottom:0;display:flex;flex-direction:column">
-                <label style="display:flex;align-items:center;gap:4px"><span class="material-icons" style="font-size:13px;color:#64748b">event</span>Tanggal Selesai</label>
-                <input type="date" class="form-control" id="pSelesai" onchange="_syncVerifDate()">
-              </div>
-              <div class="form-group" style="margin-bottom:0;display:flex;flex-direction:column">
-                <label style="display:flex;align-items:center;gap:4px"><span class="material-icons" style="font-size:13px;color:#64748b">schedule</span>Jam Selesai</label>
-                <input type="time" class="form-control" id="pJamSelesai" value="17:00" oninput="_syncVerifTime()" style="display:none">
-                <div class="time-picker-24" id="pJamSelesaiPicker" data-target="pJamSelesai" data-sync="_syncVerifTime"></div>
-              </div>
+        <div class="modal-body" style="padding:16px 20px">
+          <!-- Baris Tahun + Bulan + Status -->
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">
+            <div class="form-group" style="margin-bottom:0"><label>Tahun</label><select class="form-control" id="pTahun">${yearOptions(currentTahun)}</select></div>
+            <div class="form-group" style="margin-bottom:0"><label>Bulan</label><select class="form-control" id="pBulan">${bulanOptions(CURRENT_BULAN)}</select></div>
+            <div class="form-group" style="margin-bottom:0"><label>Status</label>
+              <select class="form-control" id="pStatus">
+                <option value="Aktif">Aktif</option>
+                <option value="Tidak Aktif">Tidak Aktif</option>
+              </select>
             </div>
           </div>
 
-          <div style="margin:8px 0 6px;padding:8px 12px;background:#f0fdf4;border-radius:8px;border:1px solid #bbf7d0">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px">
-              <div style="font-size:12px;font-weight:700;color:#15803d;display:flex;align-items:center;gap:6px">
-                <span class="material-icons" style="font-size:15px">verified_user</span>Periode Verifikasi (Kapus & Pengelola Program)
+          <!-- 2 kolom: Periode Input | Periode Verifikasi -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start">
+
+            <!-- KIRI: Periode Input -->
+            <div style="padding:10px 12px;background:#eff6ff;border-radius:8px;border:1px solid #bfdbfe">
+              <div style="font-size:11.5px;font-weight:700;color:#1d4ed8;margin-bottom:8px;display:flex;align-items:center;gap:5px">
+                <span class="material-icons" style="font-size:14px">edit_calendar</span>Input (Operator)
               </div>
-              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11.5px;color:#15803d;font-weight:600;user-select:none">
-                <input type="checkbox" id="pSyncVerif" onchange="_onSyncVerifToggle()"
-                  style="accent-color:#16a34a;width:14px;height:14px;cursor:pointer">
-                Ikuti waktu input otomatis
-              </label>
-            </div>
-            <div id="pVerifFields">
-              <div style="display:grid;align-items:stretch;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+              <!-- Mulai -->
+              <div style="display:grid;align-items:stretch;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
                 <div class="form-group" style="margin-bottom:0;display:flex;flex-direction:column">
-                  <label style="display:flex;align-items:center;gap:4px"><span class="material-icons" style="font-size:13px;color:#64748b">event</span>Tanggal Mulai Verifikasi</label>
-                  <input type="date" class="form-control" id="pMulaiVerif">
+                  <label style="display:flex;align-items:center;gap:3px;font-size:11px"><span class="material-icons" style="font-size:12px;color:#64748b">event</span>Tgl Mulai</label>
+                  <input type="date" class="form-control" id="pMulai" onchange="_syncVerifDate()">
                 </div>
                 <div class="form-group" style="margin-bottom:0;display:flex;flex-direction:column">
-                  <label style="display:flex;align-items:center;gap:4px"><span class="material-icons" style="font-size:13px;color:#64748b">schedule</span>Jam Mulai Verifikasi</label>
-                  <input type="time" class="form-control" id="pJamMulaiVerif" value="08:00" style="display:none">
-                  <div class="time-picker-24" id="pJamMulaiVerifPicker" data-target="pJamMulaiVerif"></div>
+                  <label style="display:flex;align-items:center;gap:3px;font-size:11px"><span class="material-icons" style="font-size:12px;color:#64748b">schedule</span>Jam Mulai</label>
+                  <input type="time" class="form-control" id="pJamMulai" value="08:00" oninput="_syncVerifTime()" style="display:none">
+                  <div class="time-picker-24" id="pJamMulaiPicker" data-target="pJamMulai" data-sync="_syncVerifTime"></div>
                 </div>
               </div>
-              <div style="display:grid;align-items:stretch;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:4px">
+              <!-- Selesai -->
+              <div style="display:grid;align-items:stretch;grid-template-columns:1fr 1fr;gap:6px">
                 <div class="form-group" style="margin-bottom:0;display:flex;flex-direction:column">
-                  <label style="display:flex;align-items:center;gap:4px"><span class="material-icons" style="font-size:13px;color:#64748b">event</span>Tanggal Selesai Verifikasi</label>
-                  <input type="date" class="form-control" id="pSelesaiVerif">
+                  <label style="display:flex;align-items:center;gap:3px;font-size:11px"><span class="material-icons" style="font-size:12px;color:#64748b">event</span>Tgl Selesai</label>
+                  <input type="date" class="form-control" id="pSelesai" onchange="_syncVerifDate()">
                 </div>
                 <div class="form-group" style="margin-bottom:0;display:flex;flex-direction:column">
-                  <label style="display:flex;align-items:center;gap:4px"><span class="material-icons" style="font-size:13px;color:#64748b">schedule</span>Jam Selesai Verifikasi</label>
-                  <input type="time" class="form-control" id="pJamSelesaiVerif" value="17:00" style="display:none">
-                  <div class="time-picker-24" id="pJamSelesaiVerifPicker" data-target="pJamSelesaiVerif"></div>
+                  <label style="display:flex;align-items:center;gap:3px;font-size:11px"><span class="material-icons" style="font-size:12px;color:#64748b">schedule</span>Jam Selesai</label>
+                  <input type="time" class="form-control" id="pJamSelesai" value="17:00" oninput="_syncVerifTime()" style="display:none">
+                  <div class="time-picker-24" id="pJamSelesaiPicker" data-target="pJamSelesai" data-sync="_syncVerifTime"></div>
                 </div>
               </div>
             </div>
-            <div id="pVerifSyncInfo" style="display:none;font-size:11.5px;color:#15803d;padding:6px 8px;background:#dcfce7;border-radius:6px;margin-top:4px">
-              <span class="material-icons" style="font-size:13px;vertical-align:middle">sync</span>
-              Waktu verifikasi akan mengikuti periode input secara otomatis.
+
+            <!-- KANAN: Periode Verifikasi -->
+            <div style="padding:10px 12px;background:#f0fdf4;border-radius:8px;border:1px solid #bbf7d0">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:4px;flex-wrap:wrap">
+                <div style="font-size:11.5px;font-weight:700;color:#15803d;display:flex;align-items:center;gap:5px">
+                  <span class="material-icons" style="font-size:14px">verified_user</span>Verifikasi
+                </div>
+                <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:10.5px;color:#15803d;font-weight:600;user-select:none">
+                  <input type="checkbox" id="pSyncVerif" onchange="_onSyncVerifToggle()"
+                    style="accent-color:#16a34a;width:13px;height:13px;cursor:pointer">
+                  Ikuti input
+                </label>
+              </div>
+              <div id="pVerifFields">
+                <!-- Mulai Verif -->
+                <div style="display:grid;align-items:stretch;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
+                  <div class="form-group" style="margin-bottom:0;display:flex;flex-direction:column">
+                    <label style="display:flex;align-items:center;gap:3px;font-size:11px"><span class="material-icons" style="font-size:12px;color:#64748b">event</span>Tgl Mulai</label>
+                    <input type="date" class="form-control" id="pMulaiVerif">
+                  </div>
+                  <div class="form-group" style="margin-bottom:0;display:flex;flex-direction:column">
+                    <label style="display:flex;align-items:center;gap:3px;font-size:11px"><span class="material-icons" style="font-size:12px;color:#64748b">schedule</span>Jam Mulai</label>
+                    <input type="time" class="form-control" id="pJamMulaiVerif" value="08:00" style="display:none">
+                    <div class="time-picker-24" id="pJamMulaiVerifPicker" data-target="pJamMulaiVerif"></div>
+                  </div>
+                </div>
+                <!-- Selesai Verif -->
+                <div style="display:grid;align-items:stretch;grid-template-columns:1fr 1fr;gap:6px">
+                  <div class="form-group" style="margin-bottom:0;display:flex;flex-direction:column">
+                    <label style="display:flex;align-items:center;gap:3px;font-size:11px"><span class="material-icons" style="font-size:12px;color:#64748b">event</span>Tgl Selesai</label>
+                    <input type="date" class="form-control" id="pSelesaiVerif">
+                  </div>
+                  <div class="form-group" style="margin-bottom:0;display:flex;flex-direction:column">
+                    <label style="display:flex;align-items:center;gap:3px;font-size:11px"><span class="material-icons" style="font-size:12px;color:#64748b">schedule</span>Jam Selesai</label>
+                    <input type="time" class="form-control" id="pJamSelesaiVerif" value="17:00" style="display:none">
+                    <div class="time-picker-24" id="pJamSelesaiVerifPicker" data-target="pJamSelesaiVerif"></div>
+                  </div>
+                </div>
+              </div>
+              <div id="pVerifSyncInfo" style="display:none;font-size:11px;color:#15803d;padding:5px 8px;background:#dcfce7;border-radius:6px;margin-top:6px">
+                <span class="material-icons" style="font-size:12px;vertical-align:middle">sync</span>
+                Waktu verifikasi akan mengikuti periode input secara otomatis.
+              </div>
+              <div style="font-size:10.5px;color:#16a34a;margin-top:5px" id="pVerifHint">Kosongkan jika tidak ingin membatasi waktu verifikasi.</div>
             </div>
-            <div style="font-size:11px;color:#16a34a;margin-top:6px" id="pVerifHint">Kosongkan jika tidak ingin membatasi waktu verifikasi.</div>
-          </div>
-          <div class="form-group"><label>Status</label>
-            <select class="form-control" id="pStatus">
-              <option value="Aktif">Aktif (Bisa diinput)</option>
-              <option value="Tidak Aktif">Tidak Aktif</option>
-            </select>
+
           </div>
         </div>
         <div class="modal-footer" style="justify-content:space-between">

@@ -1499,12 +1499,16 @@ function previewSPM(changedNo) {
 // ============== DETAIL MODAL ==============
 // Cache nama user (email → nama) agar tidak fetch berulang kali
 if (!window._userNamaCache) window._userNamaCache = {};
+if (!window._userIndCache) window._userIndCache = {};
 async function _getNamaByEmail(email) {
   if (!email) return email;
   if (window._userNamaCache[email]) return window._userNamaCache[email];
   try {
     const users = await API.getUsers();
-    (users || []).forEach(u => { window._userNamaCache[u.email] = u.nama || u.email; });
+    (users || []).forEach(u => {
+      window._userNamaCache[u.email] = u.nama || u.email;
+      window._userIndCache[u.email] = u.indikatorAkses || '';
+    });
   } catch(e) {}
   return window._userNamaCache[email] || email;
 }
@@ -1514,7 +1518,16 @@ async function viewDetail(idUsulan) {
   showModal('detailModal');
   document.getElementById('detailModalBody').innerHTML = loadingBlock('Memuat data...');
   try {
-    const [detail, inds] = await Promise.all([API.getDetailUsulan(idUsulan), API.getIndikatorUsulan(idUsulan)]);
+    const [detail, inds] = await Promise.all([
+      API.getDetailUsulan(idUsulan),
+      API.getIndikatorUsulan(idUsulan),
+      API.getUsers().then(users => {
+        (users || []).forEach(u => {
+          window._userNamaCache[u.email] = u.nama || u.email;
+          window._userIndCache[u.email] = u.indikatorAkses || '';
+        });
+      }).catch(() => {})
+    ]);
     // Resolve nama Kepala Puskesmas dari email jika belum ada namaKapus
     if (!detail.namaKapus && detail.kapusApprovedBy) {
       detail.namaKapus = await _getNamaByEmail(detail.kapusApprovedBy);
@@ -1568,7 +1581,7 @@ async function viewDetail(idUsulan) {
                 <span class="material-icons" style="font-size:15px;color:${iconColor}">${icon}</span>
                 <span style="font-size:12.5px;font-weight:700;color:${nameColor}">${v.nama_program||v.email_program}</span>
               </div>
-              <div style="font-size:11px;color:#94a3b8">Indikator: ${v.indikator_akses||'Semua'}</div>
+              <div style="font-size:11px;color:#94a3b8">Indikator: ${(window._userIndCache[v.email_program] !== undefined && window._userIndCache[v.email_program] !== '') ? window._userIndCache[v.email_program] : (v.indikator_akses || 'Semua')}</div>
               ${v.verified_at ? `<div style="font-size:10.5px;color:${iconColor}">${formatDateTime(v.verified_at)}</div>` : ''}
               ${isDitolakVP && v.catatan ? (() => {
   const id = 'alasan_' + Math.random().toString(36).slice(2,8);

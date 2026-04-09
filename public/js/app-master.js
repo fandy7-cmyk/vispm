@@ -1617,18 +1617,24 @@ async function renderPeriode(el) {
             <div style="font-size:12px;font-weight:700;color:#1d4ed8;margin-bottom:8px;display:flex;align-items:center;gap:6px">
               <span class="material-icons" style="font-size:15px">edit_calendar</span>Periode Input (Operator)
             </div>
-            <div class="form-row" style="margin-bottom:8px">
-              <div class="form-group" style="margin-bottom:0"><label>Tanggal Mulai</label><input type="date" class="form-control" id="pMulai" onchange="_syncVerifDate()"></div>
-              <div class="form-group" style="margin-bottom:0">
-                <label>Jam Mulai</label>
+            <div style="display:grid;align-items:stretch;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+              <div class="form-group" style="margin-bottom:0;display:flex;flex-direction:column">
+                <label style="display:flex;align-items:center;gap:4px"><span class="material-icons" style="font-size:13px;color:#64748b">event</span>Tanggal Mulai</label>
+                <input type="date" class="form-control" id="pMulai" onchange="_syncVerifDate()">
+              </div>
+              <div class="form-group" style="margin-bottom:0;display:flex;flex-direction:column">
+                <label style="display:flex;align-items:center;gap:4px"><span class="material-icons" style="font-size:13px;color:#64748b">schedule</span>Jam Mulai</label>
                 <input type="time" class="form-control" id="pJamMulai" value="08:00" oninput="_syncVerifTime()" style="display:none">
                 <div class="time-picker-24" id="pJamMulaiPicker" data-target="pJamMulai" data-sync="_syncVerifTime"></div>
               </div>
             </div>
-            <div class="form-row" style="margin-bottom:0">
-              <div class="form-group" style="margin-bottom:0"><label>Tanggal Selesai</label><input type="date" class="form-control" id="pSelesai" onchange="_syncVerifDate()"></div>
-              <div class="form-group" style="margin-bottom:0">
-                <label>Jam Selesai</label>
+            <div style="display:grid;align-items:stretch;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:0">
+              <div class="form-group" style="margin-bottom:0;display:flex;flex-direction:column">
+                <label style="display:flex;align-items:center;gap:4px"><span class="material-icons" style="font-size:13px;color:#64748b">event</span>Tanggal Selesai</label>
+                <input type="date" class="form-control" id="pSelesai" onchange="_syncVerifDate()">
+              </div>
+              <div class="form-group" style="margin-bottom:0;display:flex;flex-direction:column">
+                <label style="display:flex;align-items:center;gap:4px"><span class="material-icons" style="font-size:13px;color:#64748b">schedule</span>Jam Selesai</label>
                 <input type="time" class="form-control" id="pJamSelesai" value="17:00" oninput="_syncVerifTime()" style="display:none">
                 <div class="time-picker-24" id="pJamSelesaiPicker" data-target="pJamSelesai" data-sync="_syncVerifTime"></div>
               </div>
@@ -1647,18 +1653,24 @@ async function renderPeriode(el) {
               </label>
             </div>
             <div id="pVerifFields">
-              <div class="form-row" style="margin-bottom:8px">
-                <div class="form-group" style="margin-bottom:0"><label>Tanggal Mulai Verifikasi</label><input type="date" class="form-control" id="pMulaiVerif"></div>
-                <div class="form-group" style="margin-bottom:0">
-                  <label>Jam Mulai Verifikasi</label>
+              <div style="display:grid;align-items:stretch;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+                <div class="form-group" style="margin-bottom:0;display:flex;flex-direction:column">
+                  <label style="display:flex;align-items:center;gap:4px"><span class="material-icons" style="font-size:13px;color:#64748b">event</span>Tanggal Mulai Verifikasi</label>
+                  <input type="date" class="form-control" id="pMulaiVerif">
+                </div>
+                <div class="form-group" style="margin-bottom:0;display:flex;flex-direction:column">
+                  <label style="display:flex;align-items:center;gap:4px"><span class="material-icons" style="font-size:13px;color:#64748b">schedule</span>Jam Mulai Verifikasi</label>
                   <input type="time" class="form-control" id="pJamMulaiVerif" value="08:00" style="display:none">
                   <div class="time-picker-24" id="pJamMulaiVerifPicker" data-target="pJamMulaiVerif"></div>
                 </div>
               </div>
-              <div class="form-row" style="margin-bottom:4px">
-                <div class="form-group" style="margin-bottom:0"><label>Tanggal Selesai Verifikasi</label><input type="date" class="form-control" id="pSelesaiVerif"></div>
-                <div class="form-group" style="margin-bottom:0">
-                  <label>Jam Selesai Verifikasi</label>
+              <div style="display:grid;align-items:stretch;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:4px">
+                <div class="form-group" style="margin-bottom:0;display:flex;flex-direction:column">
+                  <label style="display:flex;align-items:center;gap:4px"><span class="material-icons" style="font-size:13px;color:#64748b">event</span>Tanggal Selesai Verifikasi</label>
+                  <input type="date" class="form-control" id="pSelesaiVerif">
+                </div>
+                <div class="form-group" style="margin-bottom:0;display:flex;flex-direction:column">
+                  <label style="display:flex;align-items:center;gap:4px"><span class="material-icons" style="font-size:13px;color:#64748b">schedule</span>Jam Selesai Verifikasi</label>
                   <input type="time" class="form-control" id="pJamSelesaiVerif" value="17:00" style="display:none">
                   <div class="time-picker-24" id="pJamSelesaiVerifPicker" data-target="pJamSelesaiVerif"></div>
                 </div>
@@ -1778,9 +1790,9 @@ async function openPeriodeModal() {
   // Reset toggle sinkronisasi: default tidak sync
   const syncCb = document.getElementById('pSyncVerif');
   if (syncCb) { syncCb.checked = false; _onSyncVerifToggle(); }
-  // Init 24h pickers dengan nilai default
-  _initAllPeriodePickers('08:00', '17:00', '08:00', '17:00');
   showModal('periodeModal');
+  // Init 24h pickers SETELAH modal tampil agar elemen div.time-picker-24 sudah ada di DOM
+  setTimeout(() => _initAllPeriodePickers('08:00', '17:00', '08:00', '17:00'), 80);
 }
 
 async function editPeriode(tahun, bulan) {
@@ -1817,9 +1829,10 @@ async function editPeriode(tahun, bulan) {
       && jMulaiVerif === jMulai && jSelesaiVerif === jSelesai;
     const syncCb = document.getElementById('pSyncVerif');
     if (syncCb) { syncCb.checked = isSync; _onSyncVerifToggle(); }
-    // Init 24h pickers dengan nilai dari DB
-    _initAllPeriodePickers(jMulai, jSelesai, jMulaiVerif, jSelesaiVerif);
     showModal('periodeModal');
+    // Init 24h pickers SETELAH modal tampil agar elemen div.time-picker-24 sudah ada di DOM
+    const _jm = jMulai, _js = jSelesai, _jmv = jMulaiVerif, _jsv = jSelesaiVerif;
+    setTimeout(() => _initAllPeriodePickers(_jm, _js, _jmv, _jsv), 80);
   } catch (e) { openPeriodeModal(); }
 }
 
@@ -1922,61 +1935,143 @@ function _initTimePicker24(pickerId, initialValue) {
   const wrap = document.getElementById(pickerId);
   if (!wrap) return;
   const targetId = wrap.dataset.target;
-  const syncFn   = wrap.dataset.sync; // nama fungsi global yang dipanggil setelah change
+  const syncFn   = wrap.dataset.sync;
   const [initH, initM] = (initialValue || '08:00').split(':').map(Number);
 
-  // Opsi jam 00–23
-  let hoursOpts = '';
-  for (let h = 0; h < 24; h++) {
-    const hh = String(h).padStart(2, '0');
-    hoursOpts += `<option value="${hh}"${h === initH ? ' selected' : ''}>${hh}</option>`;
+  // Jika sudah di-render sebagai stepper, update via _tpSet
+  if (wrap._tpSet) {
+    wrap._tpSet(initH, initM);
+    return;
   }
-  // Opsi menit 00–59 (lengkap)
-  let minsOpts = '';
-  for (let m = 0; m < 60; m++) {
-    const mm = String(m).padStart(2, '0');
-    minsOpts += `<option value="${mm}"${m === initM ? ' selected' : ''}>${mm}</option>`;
+  // Fallback: jika ada span display lama, update teks
+  const existH = document.getElementById(pickerId + '_h');
+  const existM = document.getElementById(pickerId + '_m');
+  if (existH && existM && existH.tagName === 'SPAN') {
+    existH.textContent = String(initH).padStart(2, '0');
+    existM.textContent = String(initM).padStart(2, '0');
+    const target = document.getElementById(targetId);
+    if (target) target.value = `${String(initH).padStart(2,'0')}:${String(initM).padStart(2,'0')}`;
+    return;
   }
 
-  wrap.innerHTML = `
-    <div style="display:flex;align-items:center;gap:4px">
-      <select class="form-control" id="${pickerId}_h" style="width:64px;box-sizing:border-box">
-        ${hoursOpts}
-      </select>
-      <span style="font-weight:700;font-size:16px;color:var(--text-dark)">:</span>
-      <select class="form-control" id="${pickerId}_m" style="width:64px;box-sizing:border-box">
-        ${minsOpts}
-      </select>
-    </div>`;
-
-  const onchange = () => {
-    const h = document.getElementById(`${pickerId}_h`)?.value || '00';
-    const m = document.getElementById(`${pickerId}_m`)?.value || '00';
-    const val = `${h}:${m}`;
+  // Stepper helper: update hidden input & trigger sync
+  const _commit = (h, m) => {
+    const val = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
     const target = document.getElementById(targetId);
     if (target) target.value = val;
-    // Panggil sync function jika ada
     if (syncFn && typeof window[syncFn] === 'function') window[syncFn]();
   };
-  document.getElementById(`${pickerId}_h`)?.addEventListener('change', onchange);
-  document.getElementById(`${pickerId}_m`)?.addEventListener('change', onchange);
+
+  const _stepperBtnStyle = 'display:flex;align-items:center;justify-content:center;width:24px;height:20px;background:none;border:none;cursor:pointer;color:#94a3b8;padding:0;line-height:1;transition:color .1s';
+
+  wrap.style.display = 'flex';
+  wrap.style.flex = '1';
+  wrap.style.width = '100%';
+  wrap.style.height = 'auto';
+  wrap.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:100%;background:var(--surface,#fff);border:1.5px solid var(--border,#cbd5e1);border-radius:8px;padding:6px 10px;transition:border-color .15s;box-sizing:border-box"
+      id="${pickerId}_wrap">
+      <span style="display:flex;align-items:center;color:#0d9488;flex-shrink:0;pointer-events:none">
+        <span class="material-icons" style="font-size:16px">schedule</span>
+      </span>
+      <!-- JAM -->
+      <div style="display:flex;flex-direction:column;align-items:center;gap:0">
+        <button type="button" id="${pickerId}_hUp" style="${_stepperBtnStyle}" onmouseover="this.style.color='#0d9488'" onmouseout="this.style.color='#94a3b8'">
+          <span class="material-icons" style="font-size:18px">keyboard_arrow_up</span>
+        </button>
+        <span id="${pickerId}_h" style="font-size:14px;font-weight:700;color:var(--text-dark,#0f172a);min-width:24px;text-align:center;user-select:none;line-height:1.4">${String(initH).padStart(2,'00')}</span>
+        <button type="button" id="${pickerId}_hDn" style="${_stepperBtnStyle}" onmouseover="this.style.color='#0d9488'" onmouseout="this.style.color='#94a3b8'">
+          <span class="material-icons" style="font-size:18px">keyboard_arrow_down</span>
+        </button>
+      </div>
+      <span style="font-weight:800;font-size:16px;color:#94a3b8;user-select:none;margin-bottom:2px">:</span>
+      <!-- MENIT -->
+      <div style="display:flex;flex-direction:column;align-items:center;gap:0">
+        <button type="button" id="${pickerId}_mUp" style="${_stepperBtnStyle}" onmouseover="this.style.color='#0d9488'" onmouseout="this.style.color='#94a3b8'">
+          <span class="material-icons" style="font-size:18px">keyboard_arrow_up</span>
+        </button>
+        <span id="${pickerId}_m" style="font-size:14px;font-weight:700;color:var(--text-dark,#0f172a);min-width:24px;text-align:center;user-select:none;line-height:1.4">${String(initM).padStart(2,'00')}</span>
+        <button type="button" id="${pickerId}_mDn" style="${_stepperBtnStyle}" onmouseover="this.style.color='#0d9488'" onmouseout="this.style.color='#94a3b8'">
+          <span class="material-icons" style="font-size:18px">keyboard_arrow_down</span>
+        </button>
+      </div>
+
+    </div>`;
+
+  // Focus ring on wrap
+  const wrapEl = document.getElementById(`${pickerId}_wrap`);
+  if (wrapEl) {
+    wrapEl.addEventListener('focusin', () => { wrapEl.style.borderColor='#0d9488'; wrapEl.style.boxShadow='0 0 0 3px rgba(13,148,136,0.12)'; });
+    wrapEl.addEventListener('focusout', () => { wrapEl.style.borderColor=''; wrapEl.style.boxShadow=''; });
+  }
+
+  // Current values
+  let _h = initH, _m = initM;
+
+  const _getDisplay = () => {
+    const hEl = document.getElementById(`${pickerId}_h`);
+    const mEl = document.getElementById(`${pickerId}_m`);
+    return { hEl, mEl };
+  };
+
+  document.getElementById(`${pickerId}_hUp`)?.addEventListener('click', e => {
+    e.preventDefault(); e.stopPropagation();
+    _h = (_h + 1) % 24;
+    const { hEl } = _getDisplay(); if (hEl) hEl.textContent = String(_h).padStart(2,'0');
+    _commit(_h, _m);
+  });
+  document.getElementById(`${pickerId}_hDn`)?.addEventListener('click', e => {
+    e.preventDefault(); e.stopPropagation();
+    _h = (_h - 1 + 24) % 24;
+    const { hEl } = _getDisplay(); if (hEl) hEl.textContent = String(_h).padStart(2,'0');
+    _commit(_h, _m);
+  });
+  document.getElementById(`${pickerId}_mUp`)?.addEventListener('click', e => {
+    e.preventDefault(); e.stopPropagation();
+    _m = (_m + 1) % 60;
+    const { mEl } = _getDisplay(); if (mEl) mEl.textContent = String(_m).padStart(2,'0');
+    _commit(_h, _m);
+  });
+  document.getElementById(`${pickerId}_mDn`)?.addEventListener('click', e => {
+    e.preventDefault(); e.stopPropagation();
+    _m = (_m - 1 + 60) % 60;
+    const { mEl } = _getDisplay(); if (mEl) mEl.textContent = String(_m).padStart(2,'0');
+    _commit(_h, _m);
+  });
+
+  // Simpan state ke elemen untuk dibaca _setTimePicker24
+  wrap._tpH = () => _h;
+  wrap._tpM = () => _m;
+  wrap._tpSet = (h, m) => {
+    _h = h; _m = m;
+    const { hEl, mEl } = _getDisplay();
+    if (hEl) hEl.textContent = String(_h).padStart(2,'0');
+    if (mEl) mEl.textContent = String(_m).padStart(2,'0');
+    _commit(_h, _m);
+  };
 }
 
 // Set nilai picker dari string "HH:MM"
 function _setTimePicker24(pickerId, value) {
   if (!value) return;
-  const [h, m] = value.split(':');
-  const selH = document.getElementById(`${pickerId}_h`);
-  const selM = document.getElementById(`${pickerId}_m`);
-  if (selH) selH.value = h;
-  if (selM) {
-    selM.value = String(parseInt(m) || 0).padStart(2, '0');
-  }
-  // Update hidden input juga
+  const [hStr, mStr] = value.split(':');
+  const h = parseInt(hStr) || 0;
+  const m = parseInt(mStr) || 0;
   const wrap = document.getElementById(pickerId);
+  if (!wrap) return;
+  // Stepper mode — gunakan _tpSet yang disimpan saat init
+  if (typeof wrap._tpSet === 'function') {
+    wrap._tpSet(h, m);
+    return;
+  }
+  // Fallback: span display
+  const spanH = document.getElementById(`${pickerId}_h`);
+  const spanM = document.getElementById(`${pickerId}_m`);
+  if (spanH) spanH.textContent = String(h).padStart(2, '0');
+  if (spanM) spanM.textContent = String(m).padStart(2, '0');
   if (wrap?.dataset?.target) {
     const target = document.getElementById(wrap.dataset.target);
-    if (target) target.value = `${selH?.value || '00'}:${selM?.value || '00'}`;
+    if (target) target.value = `${String(h).padStart(2,'00')}:${String(m).padStart(2,'00')}`;
   }
 }
 

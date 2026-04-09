@@ -666,3 +666,15 @@
     grid-template-columns: 1fr !important;
   }
 }
+
+/* ============================================================
+ * TIME PICKER 24H — perbesar select jam & menit agar angka
+ * terlihat jelas (tidak tertutup panah dropdown browser)
+ * ============================================================ */
+.time-picker-24 select.form-control {
+  width: 72px !important;
+  min-width: 72px !important;
+  padding-left: 8px !important;
+  padding-right: 4px !important;
+  text-align: center;
+}

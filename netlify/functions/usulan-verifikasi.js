@@ -68,7 +68,22 @@ async function verifProgram(pool, body) {
     return err('Anda sudah menolak usulan ini');
   }
 
-  const myAkses = parseIndikatorAkses(vpCheck.rows[0].indikator_akses || '');
+  // Ambil indikator_akses terkini dari tabel users (bukan dari VP record yang mungkin stale)
+  // Ini menangani kasus Admin mengubah indikator PP setelah VP record dibuat
+  const _freshUserRes = await pool.query(
+    `SELECT indikator_akses FROM users WHERE LOWER(email)=LOWER($1) AND aktif=true`, [email]
+  ).catch(() => ({ rows: [] }));
+  const _freshAksesStr = _freshUserRes.rows[0]?.indikator_akses ?? vpCheck.rows[0].indikator_akses;
+
+  // Sync ke verifikasi_program jika berbeda, agar data konsisten
+  if (_freshAksesStr !== vpCheck.rows[0].indikator_akses) {
+    await pool.query(
+      `UPDATE verifikasi_program SET indikator_akses=$1 WHERE id_usulan=$2 AND LOWER(email_program)=LOWER($3)`,
+      [_freshAksesStr || '', idUsulan, email]
+    ).catch(() => {});
+  }
+
+  const myAkses = parseIndikatorAkses(_freshAksesStr || '');
   if (myAkses.length > 0) {
     const invalid = indikatorList.filter(i => !myAkses.includes(i.noIndikator));
     if (invalid.length) return err('Indikator ' + invalid.map(i=>i.noIndikator).join(',') + ' bukan tanggung jawab Anda');

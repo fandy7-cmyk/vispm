@@ -1312,21 +1312,7 @@ const nos = _nosAdmin.sort((a,b)=>a-b).map(n => `<span style="background:#fecaca
           </div>` : ''}
 
         ${/* ── PP: menunggu verifikasi Kapus (setelah PP tolak/membenarkan) ── */
-        (role === 'program' && u.statusGlobal === 'Menunggu Kepala Puskesmas' && u.penolakanIndikator && u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'sanggah').length) ? (() => {
-          const aktif = u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'sanggah');
-          const myAkses = currentUser.indikatorAkses || [];
-          const filtered = myAkses.length > 0 ? aktif.filter(p => myAkses.includes(parseInt(p.noIndikator))) : aktif;
-          if (!filtered.length) return '';
-          const isPPMembenarkan = u.ditolakOleh === 'Admin';
-          return `<div style="margin-top:4px;display:inline-flex;align-items:center;gap:4px;flex-wrap:wrap;background:#fef9c3;border:1px solid #fde047;border-radius:5px;padding:2px 7px">
-            <span class="material-icons" style="font-size:12px;color:#ca8a04">${isPPMembenarkan ? 'assignment_return' : 'pending'}</span>
-            <span style="font-size:10.5px;color:#92400e;font-weight:600;white-space:nowrap">${isPPMembenarkan ? 'Dibenarkan' : 'Ditolak'} — tunggu Kapus</span>
-            ${[...new Set(filtered.map(p => parseInt(p.noIndikator)))].sort((a,b)=>a-b).map(n=>`<span style="background:#fecaca;color:#7f1d1d;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;white-space:nowrap">#${n}</span>`).join('')}
-          </div>`;
-        })() : ''}
-
-        ${/* ── PP: menunggu Kapus setelah PP tolak ── */
-        (role === 'program' && u.statusGlobal === 'Menunggu Kepala Puskesmas' && u.penolakanIndikator && u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'sanggah').length) ? (() => {
+        (role === 'program' && !u.sudahVerif && u.statusGlobal === 'Menunggu Kepala Puskesmas' && u.penolakanIndikator && u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'sanggah').length) ? (() => {
           const aktif = u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'sanggah');
           const myAkses = currentUser.indikatorAkses || [];
           const filtered = myAkses.length > 0 ? aktif.filter(p => myAkses.includes(parseInt(p.noIndikator))) : aktif;

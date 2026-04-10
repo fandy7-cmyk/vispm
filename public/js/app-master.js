@@ -2321,6 +2321,11 @@ async function loadKelolaUsulan(page) {
   const prevBulan  = document.getElementById('kuBulan')?.value  || '';
   const prevStatus = document.getElementById('kuStatus')?.value || '';
 
+  // Tampilkan loading spinner di area tabel
+  const kuTableEl = document.getElementById('kuTable');
+  if (kuTableEl) kuTableEl.innerHTML = loadingBlock('Memuat...');
+  setLoading(true);
+
   try {
     // Fetch SEMUA usulan tanpa filter tahun agar dropdown tahun bisa dibangun dari data nyata
     _kuAllRows = await API.getUsulan({});
@@ -2344,6 +2349,7 @@ async function loadKelolaUsulan(page) {
     _kuRebuildFilters(_kuAllRows, prevTahun, prevBulan, prevStatus);
     _kuApplyFilter(1);
   } catch(e) { toast(e.message, 'error'); }
+  finally { setLoading(false); }
 }
 
 function _kuRenderTable() {

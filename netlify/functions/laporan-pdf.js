@@ -162,10 +162,9 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
                 AND ui2.no_indikator = ui.no_indikator
                 AND uh2.status_global NOT IN ('Draft', 'Ditolak')
             ), 0) as realisasi_kumulatif,
-            -- capaian_pct bulan ini vs target tahunan
-            CASE WHEN COALESCE(tt.sasaran,0) > 0
-                 THEN ROUND((COALESCE(ui.capaian,0)::numeric / tt.sasaran::numeric) * 100, 2)
-                 ELSE ROUND(COALESCE(ui.realisasi_rasio,0)::numeric * 100, 2)
+            CASE WHEN COALESCE(ui.target,0) > 0
+            THEN ROUND((COALESCE(ui.capaian,0)::numeric / ui.target::numeric) * 100, 2)
+            ELSE ROUND(COALESCE(ui.realisasi_rasio,0)::numeric * 100, 2)
             END as capaian_pct
      FROM usulan_indikator ui
      LEFT JOIN master_indikator mi ON ui.no_indikator = mi.no_indikator

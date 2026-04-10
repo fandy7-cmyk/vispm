@@ -33,7 +33,7 @@ async function renderLaporan() {
       </div>
       <div class="card-body">
         <div class="filter-row">
-          <select class="form-control" id="lapTahun" onchange="loadLaporan()" style="min-width:100px"><option value="${CURRENT_YEAR}">${CURRENT_YEAR}</option></select>
+          <select class="form-control" id="lapTahun" onchange="loadLaporan()" style="min-width:120px"><option value="">Semua Tahun</option></select>
           <select class="form-control" id="lapBulan" onchange="_lapApplyFilter()"><option value="">Semua Bulan</option></select>
           ${role === 'Admin' ? `<select class="form-control" id="lapPKM" onchange="_lapApplyFilter()"><option value="">Semua Puskesmas</option></select>` : ''}
           <select class="form-control" id="lapStatus" onchange="_lapApplyFilter()">
@@ -55,12 +55,17 @@ function _lapRebuildFilters(rows, selTahun, selBulan, selStatus, selPKM) {
   const tahunSel = document.getElementById('lapTahun');
   if (tahunSel) {
     const years = [...new Set(rows.map(r => parseInt(r.tahun)).filter(Boolean))].sort((a,b) => b - a);
-const finalYears = years.length > 0 ? years : [CURRENT_YEAR];
-const picked = selTahun || finalYears[0];
-tahunSel.innerHTML = finalYears.map(y => `<option value="${y}" ${y == picked ? 'selected':''}>${y}</option>`).join('');
+    const finalYears = years.length > 0 ? years : [CURRENT_YEAR];
+    // selTahun === '' berarti Semua Tahun, undefined/null berarti default ke tahun terbaru
+    const picked = (selTahun !== undefined && selTahun !== null) ? selTahun : finalYears[0];
+    tahunSel.innerHTML =
+      `<option value="" ${picked === '' ? 'selected' : ''}>Semua Tahun</option>` +
+      finalYears.map(y => `<option value="${y}" ${y == picked ? 'selected':''}>${y}</option>`).join('');
   }
 
-  const tahunPilih = parseInt(document.getElementById('lapTahun')?.value || selTahun);
+  // '' = Semua Tahun (tidak filter tahun)
+  const tahunPilihRaw = document.getElementById('lapTahun')?.value ?? selTahun ?? '';
+  const tahunPilih = tahunPilihRaw !== '' ? parseInt(tahunPilihRaw) : 0;
   const rowsByTahun = rows.filter(r => !tahunPilih || parseInt(r.tahun) === tahunPilih);
 
   // --- Bulan (dari data tahun terpilih) ---
@@ -128,7 +133,7 @@ async function loadLaporan() {
 
     _lapAllData = rawData;
 
-    const prevTahun  = document.getElementById('lapTahun')?.value  || String(CURRENT_YEAR);
+    const prevTahun  = document.getElementById('lapTahun')?.value  ?? '';
     const prevBulan  = document.getElementById('lapBulan')?.value  || '';
     const prevStatus = document.getElementById('lapStatus')?.value || '';
     const prevPKM    = document.getElementById('lapPKM')?.value    || '';
@@ -139,8 +144,8 @@ async function loadLaporan() {
     if (!window._verifSilentReload) toast(e.message, 'error');
     // Fallback: isi dropdown tahun agar tidak stuck "Memuat..."
     const tahunSel = document.getElementById('lapTahun');
-    if (tahunSel) {
-      tahunSel.innerHTML = `<option value="${CURRENT_YEAR}">${CURRENT_YEAR}</option>`;
+    if (tahunSel && !tahunSel.options.length) {
+      tahunSel.innerHTML = '<option value="">Semua Tahun</option>';
     }
   }
 }

@@ -200,17 +200,36 @@ function _updateVerifPeriodeBanner(isOpen, periodeInfo) {
 async function openVerifikasi(idUsulan) {
   verifCurrentUsulan = idUsulan;
   window.verifCurrentUsulan = idUsulan;
-  window._verifDitolakOleh = '';
-  window._verifIsPPReVerif  = false;
+
+  // === RESET SEMUA STATE GLOBAL — wajib sebelum load data usulan baru ===
+  // Tanpa ini, data dari usulan sebelumnya masih tersisa dan modal tidak fresh
+  window._verifDitolakOleh      = '';
+  window._verifKonteksPenolakan = '';
+  window._verifIsPPReVerif      = false;
+  window._verifIsKapusReVerif   = false;
+  window._verifIsAdminReVerif   = false;
+  window._verifTTOk             = true;
+  window._verifPeriodeOpen      = true;
+  window._verifRows             = [];
+  // =====================================================================
+
   document.getElementById('verifModalId').textContent = idUsulan;
 
   showModal('verifikasiModal');
-  // Tombol global approve/reject sudah dihapus — semua verifikasi via per-indikator
-  // Reset admin panel
+  // Reset semua panel & banner agar tidak carry-over dari usulan sebelumnya
   const adminPanelReset = document.getElementById('adminRejectPanel');
   if (adminPanelReset) adminPanelReset.style.display = 'none';
   const programPanelReset = document.getElementById('programRejectPanel');
   if (programPanelReset) programPanelReset.style.display = 'none';
+  // Bersihkan banner TT, periode, re-verif, penolakan agar tidak stale
+  ['verifTTBanner','verifPeriodeBanner','verifReVerifBanner','verifPenolakanBanner'].forEach(bid => {
+    const b = document.getElementById(bid); if (b) b.innerHTML = '';
+  });
+  // Reset tombol submit dan header detail
+  const _oldSubmitBtn = document.getElementById('btnSubmitVerif');
+  if (_oldSubmitBtn) { _oldSubmitBtn.disabled = false; _oldSubmitBtn.style.opacity = ''; _oldSubmitBtn.title = ''; }
+  const _detailGrid = document.getElementById('verifDetailGrid');
+  if (_detailGrid) _detailGrid.innerHTML = '';
   document.getElementById('verifIndikatorBody').innerHTML = `<tr><td colspan="7"><div class="loading-state"><div class="spm-spinner lg"><div class="sr1"></div><div class="sr2"></div><div class="sr3"></div></div><p>Memuat...</p></div></td></tr>`;
 
   // ===== CEK TANDA TANGAN =====

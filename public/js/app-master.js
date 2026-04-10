@@ -2260,8 +2260,9 @@ function _kuRebuildFilters(rows, selTahun, selBulan, selStatus) {
   const tahunSel = document.getElementById('kuTahun');
   if (tahunSel) {
     const years = [...new Set(rows.map(u => parseInt(u.tahun)).filter(Boolean))].sort((a,b) => b - a);
-    const picked = selTahun || (years[0] || CURRENT_YEAR);
-    tahunSel.innerHTML = years.map(y => `<option value="${y}" ${y == picked ? 'selected':''}>${y}</option>`).join('');
+    const finalYears = years.length > 0 ? years : [CURRENT_YEAR];
+    const picked = selTahun || finalYears[0];
+    tahunSel.innerHTML = finalYears.map(y => `<option value="${y}" ${y == picked ? 'selected':''}>${y}</option>`).join('');
   }
 
   const tahunPilih = parseInt(document.getElementById('kuTahun')?.value || selTahun);

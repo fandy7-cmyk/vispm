@@ -1309,7 +1309,7 @@ async function renderTargetTahunan(el) {
         <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
           <div style="display:flex;align-items:center;gap:8px">
             <label style="font-size:13px;font-weight:600;color:var(--text-main)">Tahun</label>
-            <select class="form-control" id="ttTahun" onchange="loadTargetTahunan()" style="width:100px">${tahunOpts}</select>
+            <select class="form-control" id="ttTahun" onchange="loadTargetTahunan()" style="width:120px;min-width:120px">${tahunOpts}</select>
           </div>
           <div style="display:flex;align-items:center;gap:8px;flex:1">
             <label style="font-size:13px;font-weight:600;color:var(--text-main)">Puskesmas</label>
@@ -2261,11 +2261,16 @@ function _kuRebuildFilters(rows, selTahun, selBulan, selStatus) {
   if (tahunSel) {
     const years = [...new Set(rows.map(u => parseInt(u.tahun)).filter(Boolean))].sort((a,b) => b - a);
     const finalYears = years.length > 0 ? years : [CURRENT_YEAR];
-    const picked = selTahun || finalYears[0];
-    tahunSel.innerHTML = finalYears.map(y => `<option value="${y}" ${y == picked ? 'selected':''}>${y}</option>`).join('');
+    // selTahun === '' berarti "Semua Tahun", undefined/null berarti default ke tahun terbaru
+    const picked = (selTahun !== undefined && selTahun !== null) ? selTahun : finalYears[0];
+    tahunSel.innerHTML =
+      `<option value="" ${picked === '' ? 'selected' : ''}>Semua Tahun</option>` +
+      finalYears.map(y => `<option value="${y}" ${y == picked ? 'selected':''}>${y}</option>`).join('');
   }
 
-  const tahunPilih = parseInt(document.getElementById('kuTahun')?.value || selTahun);
+  // '' berarti Semua Tahun (tahunPilih = 0 = tidak filter)
+  const tahunPilihRaw = document.getElementById('kuTahun')?.value ?? selTahun ?? '';
+  const tahunPilih = tahunPilihRaw !== '' ? parseInt(tahunPilihRaw) : 0;
 
   // --- Bulan (dari data tahun terpilih) ---
   const bulanSel = document.getElementById('kuBulan');
@@ -2347,9 +2352,8 @@ async function loadKelolaUsulan(page) {
   // Baca filter aktif sebelum DOM di-replace oleh loading
   const prevBulan  = document.getElementById('kuBulan')?.value  || '';
   const prevStatus = document.getElementById('kuStatus')?.value || '';
-  // Tahun dibaca dari DOM; jika masih placeholder ("") gunakan CURRENT_YEAR
-  const prevTahunRaw = document.getElementById('kuTahun')?.value || '';
-  const prevTahun = prevTahunRaw && prevTahunRaw !== '' ? prevTahunRaw : String(CURRENT_YEAR);
+  // Baca tahun dari DOM — '' = Semua Tahun (default saat pertama kali buka)
+  const prevTahun = document.getElementById('kuTahun')?.value ?? '';
 
   // Tampilkan loading spinner di area tabel
   const kuTableEl = document.getElementById('kuTable');
@@ -2376,9 +2380,9 @@ async function loadKelolaUsulan(page) {
       }));
     } catch(e) {}
 
-    // Ambil tahun terbaru dari data jika prevTahun tidak ada di data
+    // '' = Semua Tahun; jika ada nilai tahun tertentu tapi tidak ada di data → fallback ke ''
     const availYears = [...new Set(_kuAllRows.map(u => String(u.tahun)).filter(Boolean))];
-    const resolvedTahun = availYears.includes(prevTahun) ? prevTahun : (availYears[0] || prevTahun);
+    const resolvedTahun = prevTahun === '' ? '' : (availYears.includes(prevTahun) ? prevTahun : '');
 
     _kuRebuildFilters(_kuAllRows, resolvedTahun, prevBulan, prevStatus);
     _kuSyncCustomSelects();

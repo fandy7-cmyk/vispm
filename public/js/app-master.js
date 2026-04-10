@@ -2293,6 +2293,31 @@ function _kuRebuildFilters(rows, selTahun, selBulan, selStatus) {
   }
 }
 
+// Sinkronisasi tampilan custom-select (cs-trigger-text) untuk semua filter KU
+// setelah opsi <select> diubah secara programatik via _kuRebuildFilters.
+function _kuSyncCustomSelects() {
+  ['kuTahun', 'kuBulan', 'kuStatus'].forEach(function(id) {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    const wrap = sel.closest('.cs-wrap');
+    if (!wrap) {
+      // Belum di-replace CustomSelect — coba replace sekarang
+      if (window.CustomSelect && typeof window.CustomSelect.replace === 'function') {
+        window.CustomSelect.replace(sel);
+      }
+      return;
+    }
+    // Update teks trigger sesuai nilai yang terpilih saat ini
+    const triggerText = wrap.querySelector('.cs-trigger-text');
+    if (!triggerText) return;
+    const selectedOpt = sel.options[sel.selectedIndex];
+    const txt = selectedOpt ? selectedOpt.text : '';
+    const isPlaceholder = !sel.value || sel.value === '';
+    triggerText.textContent = txt || sel.getAttribute('placeholder') || 'Pilih...';
+    triggerText.classList.toggle('cs-placeholder', isPlaceholder);
+  });
+}
+
 // Dipanggil saat tahun berubah: rebuild bulan & status untuk tahun baru, lalu apply filter
 function _kuOnTahunChange() {
   _kuRebuildFilters(_kuAllRows, document.getElementById('kuTahun')?.value, '', '');

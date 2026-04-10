@@ -2296,6 +2296,7 @@ function _kuRebuildFilters(rows, selTahun, selBulan, selStatus) {
 // Dipanggil saat tahun berubah: rebuild bulan & status untuk tahun baru, lalu apply filter
 function _kuOnTahunChange() {
   _kuRebuildFilters(_kuAllRows, document.getElementById('kuTahun')?.value, '', '');
+  _kuSyncCustomSelects();
   _kuApplyFilter(1);
 }
 
@@ -2355,6 +2356,7 @@ async function loadKelolaUsulan(page) {
     const resolvedTahun = availYears.includes(prevTahun) ? prevTahun : (availYears[0] || prevTahun);
 
     _kuRebuildFilters(_kuAllRows, resolvedTahun, prevBulan, prevStatus);
+    _kuSyncCustomSelects();
     _kuApplyFilter(1);
   } catch(e) { toast(e.message, 'error'); }
   finally { setLoading(false); }

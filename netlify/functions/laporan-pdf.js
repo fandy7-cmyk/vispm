@@ -44,6 +44,13 @@ function approvedBadgeSVG() {
 // ============================================================
 //  HELPER: Format tanggal/waktu
 // ============================================================
+// Format persentase: 100 → "100", selain itu 1 desimal (58.49 → "58.5", 91.67 → "91.7")
+function fmtPct(val) {
+  const n = parseFloat(val || 0);
+  if (n >= 100) return '100';
+  return n.toFixed(1);
+}
+
 function fmtDT(ts) {
   if (!ts) return '-';
   const d = new Date(ts);
@@ -418,7 +425,7 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
       const realisasiKumulatif = parseFloat(ind.realisasi_kumulatif) || 0;
       const _isKunci1 = [8,9].includes(parseInt(ind.no_indikator));
       const sisaTarget = sasaranTahunan > 0 ? (_isKunci1 ? sasaranTahunan : Math.max(0, sasaranTahunan - realisasiKumulatif)) : '-';
-      const capaianPct = parseFloat(ind.capaian_pct || 0).toFixed(2);
+      const capaianPct = fmtPct(ind.capaian_pct);
       const bg = i % 2 === 0 ? '#f8fafc' : 'white';
       const sisaColor = typeof sisaTarget === 'number' && sisaTarget === 0 ? '#16a34a' : '#1e293b';
       return `<tr style="background:${bg}">
@@ -466,7 +473,7 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
       const realisasiKumulatif = parseFloat(ind.realisasi_kumulatif) || 0;
       const _isKunci2 = [8,9].includes(parseInt(ind.no_indikator));
       const sisaTarget = sasaranTahunan > 0 ? (_isKunci2 ? sasaranTahunan : Math.max(0, sasaranTahunan - realisasiKumulatif)) : null;
-      const capaianPct = parseFloat(ind.capaian_pct || 0).toFixed(2);
+      const capaianPct = fmtPct(ind.capaian_pct);
       const catatan = ind.catatan_indikator || '';
       const slots = getVerifierSlots(ind.no_indikator);
 

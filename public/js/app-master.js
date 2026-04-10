@@ -34,9 +34,9 @@ async function renderLaporan() {
       <div class="card-body">
         <div class="filter-row">
           <select class="form-control" id="lapTahun" onchange="loadLaporan()" style="min-width:120px"><option value="">Semua Tahun</option></select>
-          <select class="form-control" id="lapBulan" onchange="_lapApplyFilter()"><option value="">Semua Bulan</option></select>
-          ${role === 'Admin' ? `<select class="form-control" id="lapPKM" onchange="_lapApplyFilter()"><option value="">Semua Puskesmas</option></select>` : ''}
-          <select class="form-control" id="lapStatus" onchange="_lapApplyFilter()">
+          <select class="form-control" id="lapBulan" onchange="_lapApplyFilter()" style="min-width:150px"><option value="">Semua Bulan</option></select>
+          ${role === 'Admin' ? `<select class="form-control" id="lapPKM" onchange="_lapApplyFilter()" style="min-width:180px"><option value="">Semua Puskesmas</option></select>` : ''}
+          <select class="form-control" id="lapStatus" onchange="_lapApplyFilter()" style="min-width:170px">
             <option value="">Semua Status</option>
           </select>
         </div>
@@ -553,12 +553,12 @@ async function renderUsers(el) {
       <div class="card-body" style="padding:12px 16px">
         <div class="search-row">
           <div class="search-input-wrap"><span class="material-icons search-icon">search</span><input class="search-input" id="searchUser" placeholder="Cari email atau nama..." oninput="filterUsers()" autocomplete="off"></div>
-          <select class="form-control" id="filterRole" onchange="filterUsers()" style="width:160px">
+          <select class="form-control" id="filterRole" onchange="filterUsers()" style="min-width:170px">
             <option value="">Semua Role</option>
             <option>Operator</option><option>Kepala Puskesmas</option>
             <option>Pengelola Program</option>
           </select>
-          <select class="form-control" id="filterPKM" onchange="filterUsers()" style="width:200px">
+          <select class="form-control" id="filterPKM" onchange="filterUsers()" style="min-width:200px">
             <option value="">Semua Puskesmas</option>
           </select>
         </div>
@@ -1029,7 +1029,7 @@ async function renderJabatan(el) {
       <div class="card-body" style="padding:12px 16px">
         <div class="search-row">
           <div class="search-input-wrap"><span class="material-icons search-icon">search</span><input class="search-input" id="searchJabatan" placeholder="Cari kode atau nama..." oninput="filterJabatan()"></div>
-          <select class="form-control" id="filterJabatanStatus" onchange="filterJabatan()" style="width:140px">
+          <select class="form-control" id="filterJabatanStatus" onchange="filterJabatan()" style="min-width:150px">
             <option value="">Semua Status</option><option value="aktif">Aktif</option><option value="nonaktif">Non-aktif</option>
           </select>
         </div>
@@ -1177,7 +1177,7 @@ async function renderPKM(el) {
       <div class="card-body" style="padding:12px 16px">
         <div class="search-row">
           <div class="search-input-wrap"><span class="material-icons search-icon">search</span><input class="search-input" id="searchPKM" placeholder="Cari kode atau nama..." oninput="filterPKM()"></div>
-          <select class="form-control" id="filterPKMAktif" onchange="filterPKM()" style="width:140px">
+          <select class="form-control" id="filterPKMAktif" onchange="filterPKM()" style="min-width:150px">
             <option value="">Semua Status</option><option value="aktif">Aktif</option><option value="nonaktif">Non-aktif</option>
           </select>
         </div>
@@ -1595,7 +1595,7 @@ async function renderPeriode(el) {
         <button class="btn btn-primary btn-sm" onclick="openPeriodeModal()"><span class="material-icons">add</span>Tambah Periode</button>
       </div>
       <div class="card-body" style="padding:12px 16px">
-        <select class="form-control" id="filterTahunPeriode" style="width:150px" onchange="loadPeriodeGrid()">
+        <select class="form-control" id="filterTahunPeriode" style="min-width:120px" onchange="loadPeriodeGrid()">
           ${yearOptions(currentTahun)}
         </select>
       </div>
@@ -2241,11 +2241,11 @@ async function renderKelolaUsulan() {
     <div class="card">
       <div class="card-body" style="padding:12px 16px">
         <div class="filter-row">
-          <select class="form-control" id="kuTahun" onchange="_kuOnTahunChange()" style="min-width:100px"><option value="">Memuat...</option></select>
-          <select class="form-control" id="kuBulan" onchange="_kuApplyFilter()" style="width:140px">
+          <select class="form-control" id="kuTahun" onchange="_kuOnTahunChange()" style="min-width:120px"><option value="">Memuat...</option></select>
+          <select class="form-control" id="kuBulan" onchange="_kuApplyFilter()" style="min-width:150px">
             <option value="">Semua Bulan</option>
           </select>
-          <select class="form-control" id="kuStatus" onchange="_kuApplyFilter()" style="width:160px">
+          <select class="form-control" id="kuStatus" onchange="_kuApplyFilter()" style="min-width:170px">
             <option value="">Semua Status</option>
           </select>
         </div>
@@ -2540,13 +2540,13 @@ async function renderAuditTrail(el) {
           </div>
           <div>
             <label style="font-size:12px;font-weight:600;color:#64748b;display:block;margin-bottom:4px">Modul</label>
-            <select class="form-control" id="atModule" style="width:160px">
+            <select class="form-control" id="atModule" style="min-width:170px">
               <option value="">Semua Modul</option>
             </select>
           </div>
           <div>
             <label style="font-size:12px;font-weight:600;color:#64748b;display:block;margin-bottom:4px">Aksi</label>
-            <select class="form-control" id="atAction" style="width:140px">
+            <select class="form-control" id="atAction" style="min-width:150px">
               <option value="">Semua Aksi</option>
             </select>
           </div>

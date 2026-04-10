@@ -2318,9 +2318,12 @@ function _kuApplyFilter(page) {
 async function loadKelolaUsulan(page) {
   if (page) { _kuPage = page; _kuApplyFilter(page); return; }
 
-  const prevTahun  = document.getElementById('kuTahun')?.value  || String(CURRENT_YEAR);
+  // Baca filter aktif sebelum DOM di-replace oleh loading
   const prevBulan  = document.getElementById('kuBulan')?.value  || '';
   const prevStatus = document.getElementById('kuStatus')?.value || '';
+  // Tahun dibaca dari DOM; jika masih placeholder ("") gunakan CURRENT_YEAR
+  const prevTahunRaw = document.getElementById('kuTahun')?.value || '';
+  const prevTahun = prevTahunRaw && prevTahunRaw !== '' ? prevTahunRaw : String(CURRENT_YEAR);
 
   // Tampilkan loading spinner di area tabel
   const kuTableEl = document.getElementById('kuTable');
@@ -2347,7 +2350,11 @@ async function loadKelolaUsulan(page) {
       }));
     } catch(e) {}
 
-    _kuRebuildFilters(_kuAllRows, prevTahun, prevBulan, prevStatus);
+    // Ambil tahun terbaru dari data jika prevTahun tidak ada di data
+    const availYears = [...new Set(_kuAllRows.map(u => String(u.tahun)).filter(Boolean))];
+    const resolvedTahun = availYears.includes(prevTahun) ? prevTahun : (availYears[0] || prevTahun);
+
+    _kuRebuildFilters(_kuAllRows, resolvedTahun, prevBulan, prevStatus);
     _kuApplyFilter(1);
   } catch(e) { toast(e.message, 'error'); }
   finally { setLoading(false); }

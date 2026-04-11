@@ -791,10 +791,9 @@ function openBukuPanduan() {
     const el = document.createElement('div');
     el.id = 'bukuPanduanModal';
     el.className = 'modal fullscreen';
-    // Override posisi agar tidak menutup topbar (60px)
-    el.style.cssText = 'top:60px;z-index:999;';
+    el.style.cssText = 'top:0;left:0;right:0;bottom:0;z-index:2500;justify-content:flex-start;';
     el.innerHTML = `
-      <div class="modal-card" style="display:flex;flex-direction:column;height:calc(100vh - 60px);border-radius:0;">
+      <div class="modal-card" style="display:flex;flex-direction:column;height:100vh;border-radius:0;width:100%;max-width:100%;margin-left:0;">
         <div class="modal-header">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary);flex-shrink:0">
             <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>

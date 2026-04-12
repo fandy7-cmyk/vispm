@@ -1651,7 +1651,7 @@ ${isSelesai && v.catatan ? (() => {
         </table>
       </div>
       ${vpHtml}
-      <div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+      <div class="approval-grid" style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
         ${approvalBox('Kepala Puskesmas', detail.namaKapus || detail.kapusApprovedBy, detail.kapusApprovedAt, detail.statusKapus==='Ditolak' ? detail.kapusCatatan : '')}
         ${approvalBox('Pengelola Program', vp.length && vp.every(v=>v.status==='Selesai') ? 'Semua selesai' : '', '', detail.statusProgram==='Ditolak' ? detail.adminCatatan : '')}
         ${approvalBox('Admin', detail.adminApprovedBy, detail.adminApprovedAt, detail.statusGlobal==='Ditolak' && detail.statusKapus!=='Ditolak' && detail.statusProgram!=='Ditolak' ? detail.adminCatatan : '')}

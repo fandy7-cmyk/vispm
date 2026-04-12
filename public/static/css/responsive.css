@@ -678,3 +678,792 @@
   padding-right: 4px !important;
   text-align: center;
 }
+
+
+/* ============================================================
+ * 27. DETAIL MODAL — header info & approval box
+ * ============================================================ */
+
+/* Header info: item punya min-width, bisa wrap di mobile */
+@media (max-width: 768px) {
+  .header-info-grid {
+    flex-wrap: wrap !important;
+  }
+  .header-info-item {
+    border-right: none !important;
+    border-bottom: 1px solid #e2e8f0;
+    flex: 1 1 calc(50% - 28px) !important;
+    min-width: calc(50% - 28px) !important;
+  }
+  .header-info-item:last-child {
+    border-bottom: none !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .header-info-item {
+    flex: 1 1 100% !important;
+    min-width: 100% !important;
+  }
+}
+
+/* Approval boxes: 1 kolom di HP */
+@media (max-width: 600px) {
+  .approval-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* detailModal body: pastikan padding & overflow benar */
+@media (max-width: 768px) {
+  #detailModalBody > div {
+    padding: 16px !important;
+  }
+  #detailModalBody .table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  /* Tabel detail indikator di detailModal */
+  #detailModalBody table {
+    min-width: 560px;
+    font-size: 12px;
+  }
+  #detailModalBody table th,
+  #detailModalBody table td {
+    padding: 6px 8px !important;
+  }
+}
+
+/* Status stepper: shrink label teks di HP kecil */
+@media (max-width: 480px) {
+  /* Override inline flex untuk step label agar tidak overlap */
+  #detailModalBody [style*="white-space:nowrap"],
+  #detailModal [style*="white-space:nowrap"] {
+    white-space: normal !important;
+    text-align: center;
+    max-width: 60px;
+    line-height: 1.2;
+  }
+}
+
+/* ============================================================
+ * GLOBAL — Box-sizing & overflow guard (tambahan v2)
+ * ============================================================ */
+*, *::before, *::after { box-sizing: border-box; }
+body { overflow-x: hidden; }
+.main, .content { max-width: 100%; }
+
+
+/* ============================================================
+ * 28. DASHBOARD — grid 2 kolom inline → 1 kolom di mobile
+ * Selector langsung target inline style dari app-dashboard.js
+ * ============================================================ */
+@media (max-width: 768px) {
+  /* Semua grid 1fr 1fr di mana saja (termasuk di dalam modal) */
+  [style*="grid-template-columns:1fr 1fr"],
+  [style*="grid-template-columns: 1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Grid 1fr 1fr dengan gap:0 (periode card dibuka/ditutup) */
+  [style*="grid-template-columns:1fr 1fr;gap:0"],
+  [style*="grid-template-columns: 1fr 1fr;gap:0"] {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Grid 1fr 1fr 1fr → 1 kolom di HP kecil */
+@media (max-width: 600px) {
+  [style*="grid-template-columns:1fr 1fr 1fr"],
+  [style*="grid-template-columns: 1fr 1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+
+/* ============================================================
+ * 29. DASHBOARD CARDS — periode timer & info card
+ * ============================================================ */
+@media (max-width: 480px) {
+  /* Timer badge di header periode card */
+  [style*="white-space:nowrap"][style*="background:rgba(0,0,0,0.2)"] {
+    font-size: 10px !important;
+    padding: 2px 6px !important;
+  }
+  /* Header gradient periode card */
+  [style*="background:linear-gradient(135deg,#0d9488"] {
+    flex-wrap: wrap !important;
+    gap: 4px !important;
+  }
+}
+
+
+/* ============================================================
+ * 30. MASTER MODAL — user modal, periode modal
+ * ============================================================ */
+@media (max-width: 600px) {
+  /* Checkbox list jabatan & indikator: 1 kolom */
+  #jabatanCheckboxList,
+  #indCheckboxList {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Periode modal: input grid date+time stacked */
+  #periodeModal .modal-body [style*="grid-template-columns:1fr 1fr;gap:6px"],
+  #periodeModal .modal-body [style*="grid-template-columns: 1fr 1fr;gap:6px"],
+  #periodeModal .modal-body [style*="grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Periode modal: kiri/kanan panel ikut stack */
+  #periodeModal .modal-body [style*="grid-template-columns:1fr 1fr;gap:10px"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Periode modal jadi 2 kolom tahun/bulan dan status sendiri */
+  #periodeModal .modal-body [style*="grid-template-columns:1fr 1fr 1fr;gap:10px"] {
+    grid-template-columns: 1fr 1fr !important;
+  }
+}
+
+
+/* ============================================================
+ * 31. VERIFIKASI MODAL — tabel scroll + aksi tombol
+ * ============================================================ */
+@media (max-width: 768px) {
+  /* Tabel verifikasi: bisa scroll horizontal */
+  #verifikasiModal .table-container,
+  #verifikasiModal [style*="overflow-x:auto"] {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+  #verifikasiModal table {
+    min-width: 600px;
+    font-size: 12px;
+  }
+  #verifikasiModal table th,
+  #verifikasiModal table td {
+    padding: 6px 8px !important;
+    white-space: normal !important;
+  }
+  /* Kolom verifikasi (action buttons) lebih ramping */
+  #verifikasiModal td[style*="min-width:190px"],
+  #verifikasiModal td[style*="min-width: 190px"] {
+    min-width: 140px !important;
+  }
+  /* PP checkbox list di verif modal */
+  #verifikasiModal [style*="grid-template-columns:repeat(auto-fill,minmax(180px"] {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+
+/* ============================================================
+ * 32. DETAIL MODAL — header info, approval, tabel, status bar
+ * ============================================================ */
+
+/* Header info: wrap jadi 2 kolom di tablet, 1 kolom di HP */
+@media (max-width: 768px) {
+  .header-info-grid {
+    flex-wrap: wrap !important;
+    padding: 4px 0 !important;
+  }
+  .header-info-item {
+    border-right: none !important;
+    border-bottom: 1px solid #e2e8f0;
+    flex: 1 1 calc(50% - 28px) !important;
+    min-width: calc(50% - 28px) !important;
+  }
+  .header-info-item:last-child { border-bottom: none !important; }
+}
+@media (max-width: 480px) {
+  .header-info-item {
+    flex: 1 1 100% !important;
+    min-width: 100% !important;
+  }
+}
+
+/* Approval grid: 1 kolom di HP */
+@media (max-width: 600px) {
+  .approval-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Detail modal body */
+@media (max-width: 768px) {
+  #detailModalBody > div { padding: 14px !important; }
+  #detailModalBody .table-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  #detailModalBody table { min-width: 520px; font-size: 12px; }
+  #detailModalBody table th,
+  #detailModalBody table td { padding: 5px 7px !important; }
+}
+
+/* Status stepper — step labels bisa wrap */
+@media (max-width: 480px) {
+  #detailModalBody [style*="white-space:nowrap"],
+  #detailModal [style*="white-space:nowrap"] {
+    white-space: normal !important;
+    text-align: center;
+    max-width: 58px;
+    line-height: 1.2;
+    font-size: 9px !important;
+  }
+  /* Connector line lebih pendek */
+  #detailModalBody [style*="height:2px"][style*="min-width:8px"] {
+    min-width: 4px !important;
+  }
+}
+
+
+/* ============================================================
+ * 33. LAPORAN HALAMAN — filter + tabel
+ * ============================================================ */
+@media (max-width: 600px) {
+  /* Stats laporan */
+  #lapStats {
+    grid-template-columns: 1fr 1fr !important;
+  }
+  /* Tabel laporan */
+  #lapTable table {
+    min-width: 500px;
+    font-size: 12px;
+  }
+  #lapTable .table-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+}
+
+
+/* ============================================================
+ * 34. INPUT HALAMAN — tabel usulan
+ * ============================================================ */
+@media (max-width: 768px) {
+  /* Tabel list usulan operator */
+  #mainContent table {
+    font-size: 12px;
+  }
+  /* Kolom dengan min-width hardcoded */
+  #mainContent td[style*="min-width:220px"],
+  #mainContent td[style*="min-width: 220px"] {
+    min-width: 160px !important;
+    max-width: 200px !important;
+  }
+}
+
+
+/* ============================================================
+ * 35. MASTER HALAMAN — tabel user, pejabat, puskesmas
+ * ============================================================ */
+@media (max-width: 768px) {
+  /* Semua tabel di halaman master */
+  #mainContent .table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  #mainContent .table-container table {
+    font-size: 12px;
+    min-width: 480px;
+  }
+}
+
+
+/* ============================================================
+ * 36. PERIODE CARD di dashboard — grid dibuka/ditutup
+ * ============================================================ */
+@media (max-width: 480px) {
+  /* Card periode aktif: tanggal dibuka & ditutup stack vertikal */
+  [style*="grid-template-columns:1fr 1fr;gap:0"] {
+    grid-template-columns: 1fr !important;
+  }
+  /* Hapus border-right pada kolom "Dibuka" setelah stack */
+  [style*="border-right:1px solid var(--border"] {
+    border-right: none !important;
+    border-bottom: 1px solid var(--border, #e2e8f0) !important;
+  }
+}
+
+
+/* ============================================================
+ * 37. MODAL CONTENT — pastikan padding tidak overflow
+ * ============================================================ */
+@media (max-width: 768px) {
+  .modal-body {
+    word-break: break-word;
+    overflow-wrap: break-word;
+  }
+  /* Konten yang dirender via JS di dalam modal */
+  .modal-body > div,
+  .modal-body > [style] {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+}
+
+
+/* ============================================================
+ * 38. CATATAN THREAD (zigzag log) — wrap di mobile
+ * ============================================================ */
+@media (max-width: 600px) {
+  /* Grid log thread: 10 kolom → lebih sedikit */
+  #indCatatanThread [style*="grid-template-columns:repeat(10"] {
+    grid-template-columns: repeat(4, 1fr) !important;
+  }
+}
+
+
+/* ============================================================
+ * Tetap pertahankan semua rules lama dari bawah
+ * ============================================================ */
+
+
+/* ============================================================
+ * MOBILE MODAL FIX — PATCH v3
+ * Memperbaiki semua modal yang kacau di tampilan mobile
+ * ============================================================ */
+
+
+/* ────────────────────────────────────────────────────────────
+ * A. MODAL NON-FULLSCREEN — slide-up dari bawah + max-height
+ *    Masalah: max-height:75vh terlalu kecil untuk form panjang,
+ *    animasi tidak slide-up, modal-card melebar melebihi layar
+ * ────────────────────────────────────────────────────────────  */
+@media (max-width: 768px) {
+  /* Pastikan modal non-fullscreen align ke bawah & height cukup */
+  .modal:not(.fullscreen) {
+    align-items: flex-end !important;
+    padding: 0 !important;
+  }
+
+  .modal:not(.fullscreen) .modal-card {
+    width: 100% !important;
+    max-width: 100% !important;
+    border-radius: 18px 18px 0 0 !important;
+    margin: 0 !important;
+    max-height: 92vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* Modal-body di modal non-fullscreen: bisa scroll, tidak terpotong */
+  .modal:not(.fullscreen) .modal-body {
+    flex: 1;
+    overflow-y: auto !important;
+    max-height: none !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Modal-header & footer: tidak ikut scroll */
+  .modal:not(.fullscreen) .modal-header {
+    flex-shrink: 0;
+  }
+  .modal:not(.fullscreen) .modal-footer {
+    flex-shrink: 0;
+  }
+}
+
+/* HP sangat kecil: beri ruang sedikit di atas agar bisa diklik luar */
+@media (max-width: 480px) {
+  .modal:not(.fullscreen) .modal-card {
+    max-height: 95vh;
+  }
+}
+
+
+/* ────────────────────────────────────────────────────────────
+ * B. USER MODAL — overflow:hidden + flex body + grid 320px
+ *    Masalah: modal-body pakai overflow:hidden sehingga konten
+ *    terpotong, dan grid JS-set ke "320px 1fr" di mobile
+ * ────────────────────────────────────────────────────────────  */
+@media (max-width: 768px) {
+  #userModal .modal-body {
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    display: block !important;
+    flex: 1 !important;
+    padding: 16px !important;
+  }
+
+  /* Override grid yang di-set via JS ke "320px 1fr" atau "1fr" */
+  #userModal #userModalGrid {
+    grid-template-columns: 1fr !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 14px !important;
+    min-height: unset !important;
+  }
+
+  /* Kolom kanan PP: tampilkan sebagai blok biasa di mobile */
+  #userModal #ppRightCol {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 14px !important;
+    min-height: unset !important;
+    overflow: visible !important;
+  }
+
+  /* Panel jabatan & indikator: beri max-height agar scroll internal tetap ada */
+  #userModal #jabatanContainer,
+  #userModal #indContainer {
+    flex: unset !important;
+    min-height: unset !important;
+    max-height: 240px;
+    overflow-y: auto !important;
+  }
+
+  #userModal #jabatanCheckboxList,
+  #userModal #indCheckboxList {
+    max-height: 180px;
+    overflow-y: auto !important;
+  }
+}
+
+
+/* ────────────────────────────────────────────────────────────
+ * C. PERIODE MODAL — nested grid & panel kiri/kanan
+ *    Masalah: modal-body punya grid 1fr 1fr 1fr (baris atas)
+ *    dan 1fr 1fr (panel input vs verifikasi) yang overflow
+ * ────────────────────────────────────────────────────────────  */
+@media (max-width: 600px) {
+  /* Baris tahun/bulan/status: 2 kolom, status di bawah */
+  #periodeModal .modal-body > div:first-child {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  /* Panel input + verifikasi: stack vertikal */
+  #periodeModal .modal-body > div:nth-child(2) {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Dalam panel input/verif: grid tgl+jam → stack */
+  #periodeModal [style*="grid-template-columns:1fr 1fr;gap:6px"],
+  #periodeModal [style*="grid-template-columns: 1fr 1fr;gap:6px"],
+  #periodeModal [style*="grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px"],
+  #periodeModal [style*="grid-template-columns: 1fr 1fr; gap: 6px"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Footer periode modal: hapus / batal / simpan bisa wrap */
+  #periodeModal .modal-footer {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+  #periodeModal .modal-footer > div {
+    flex: 1 !important;
+    display: flex !important;
+    gap: 8px !important;
+    justify-content: flex-end !important;
+  }
+  #periodeModal .modal-footer .btn {
+    flex: 1;
+    justify-content: center;
+    min-width: 90px;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Baris tahun/bulan/status: 1 kolom penuh */
+  #periodeModal .modal-body > div:first-child {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+
+/* ────────────────────────────────────────────────────────────
+ * D. DETAIL MODAL — approval-grid 3 kolom, stepper, modal-body
+ *    Masalah: approval-grid inline "1fr 1fr 1fr" tidak override,
+ *    modal-body tidak flex sehingga konten tidak bisa scroll
+ * ────────────────────────────────────────────────────────────  */
+@media (max-width: 768px) {
+  /* detailModal: modal-body harus bisa scroll */
+  #detailModal .modal-body {
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* approval-grid 3 kolom dari detail: sudah ada selector,
+     pastikan tercakup juga yang pakai inline style langsung */
+  #detailModalBody .approval-grid,
+  #detailModalBody [style*="grid-template-columns:1fr 1fr 1fr"] {
+    grid-template-columns: 1fr 1fr !important;
+  }
+}
+
+@media (max-width: 480px) {
+  #detailModalBody .approval-grid,
+  #detailModalBody [style*="grid-template-columns:1fr 1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+
+/* ────────────────────────────────────────────────────────────
+ * E. VERIFIKASI MODAL — verifDetailGrid, banner, tabel aksi
+ *    Masalah: padding 24px terlalu besar, min-width kolom tabel
+ *    membuat tabel tidak bisa scroll dengan benar
+ * ────────────────────────────────────────────────────────────  */
+@media (max-width: 768px) {
+  #verifikasiModal .modal-body {
+    padding: 14px !important;
+  }
+
+  /* Tabel verifikasi: action column min-width dikurangi */
+  #verifikasiModal td[style*="min-width:190px"],
+  #verifikasiModal td[style*="min-width: 190px"] {
+    min-width: 130px !important;
+  }
+
+  /* Tombol Setuju/Tolak di dalam tabel lebih kecil */
+  #verifikasiModal td button {
+    padding: 4px 8px !important;
+    font-size: 11px !important;
+  }
+
+  /* verifDetailGrid info header */
+  #verifDetailGrid .header-info-item {
+    flex: 1 1 calc(50% - 28px) !important;
+    min-width: calc(50% - 28px) !important;
+  }
+}
+
+@media (max-width: 480px) {
+  #verifikasiModal .modal-body {
+    padding: 10px !important;
+  }
+
+  #verifDetailGrid .header-info-item {
+    flex: 1 1 100% !important;
+    min-width: 100% !important;
+  }
+
+  /* Re-verif banner: text lebih kecil */
+  #verifReVerifBanner {
+    font-size: 12px !important;
+    padding: 8px 10px !important;
+  }
+}
+
+
+/* ────────────────────────────────────────────────────────────
+ * F. INDIKATOR INPUT MODAL — SPM header, info, tabel
+ *    Masalah: padding 12px 16px di flex-col body,
+ *    SPM bar bisa overflow, footer button terpotong
+ * ────────────────────────────────────────────────────────────  */
+@media (max-width: 480px) {
+  /* SPM bar besar: kecilkan font angka */
+  #indikatorModal #indModalSPMTop {
+    font-size: 24px !important;
+  }
+
+  /* Info card: lebih kompak */
+  #indikatorModal #indModalInfo {
+    font-size: 11.5px !important;
+    padding: 8px 10px !important;
+  }
+
+  /* Lock notif banner */
+  #indModalLockNotif {
+    font-size: 11.5px !important;
+    padding: 8px 12px !important;
+  }
+
+  /* Footer: tombol stack */
+  #indikatorModal .modal-footer > div {
+    flex-wrap: wrap !important;
+    justify-content: stretch !important;
+  }
+  #indikatorModal .modal-footer .btn {
+    flex: 1 !important;
+    justify-content: center !important;
+    min-width: 100px !important;
+  }
+}
+
+
+/* ────────────────────────────────────────────────────────────
+ * G. EDIT PROFIL MODAL — tanda tangan upload wrap
+ *    Masalah: modal dibuat via JS, ukuran max-width 420px
+ *    perlu dipastikan tidak overflow di HP kecil
+ * ────────────────────────────────────────────────────────────  */
+@media (max-width: 480px) {
+  #editProfilModal .modal-card {
+    max-width: 100% !important;
+  }
+
+  /* Area upload TT: tetap proporsional */
+  #editProfilModal #epTTWrap {
+    min-height: 80px;
+  }
+}
+
+
+/* ────────────────────────────────────────────────────────────
+ * H. PREVIEW BUKTI MODAL (fullscreen dark) — toolbar header
+ *    Masalah: toolbar header overflow di HP karena banyak button,
+ *    dan zoom label terlalu sempit
+ * ────────────────────────────────────────────────────────────  */
+@media (max-width: 480px) {
+  #previewBuktiModal .modal-header {
+    padding: 8px 10px !important;
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+  }
+
+  /* Toolbar zoom: sembunyikan label persen di HP kecil */
+  #previewBuktiModal #buktiZoomLabel {
+    display: none !important;
+  }
+
+  /* Tombol di header preview lebih kecil */
+  #previewBuktiModal .modal-header button {
+    padding: 4px 7px !important;
+    font-size: 11px !important;
+  }
+
+  /* Nav button prev/next: lebih kecil agar tidak overlap konten */
+  #previewBuktiModal button[style*="left:14px"],
+  #previewBuktiModal button[style*="right:14px"] {
+    width: 34px !important;
+    height: 34px !important;
+    font-size: 18px !important;
+  }
+}
+
+
+/* ────────────────────────────────────────────────────────────
+ * I. LOG AKTIVITAS MODAL (fullscreen) — body padding
+ *    Masalah: padding 20px terlalu besar di mobile
+ * ────────────────────────────────────────────────────────────  */
+@media (max-width: 480px) {
+  #logAktivitasModal #logAktivitasBody {
+    padding: 12px !important;
+  }
+}
+
+
+/* ────────────────────────────────────────────────────────────
+ * J. NOTIF PANEL — positioning fix di HP sangat kecil
+ *    Masalah: panel bisa overflow ke kanan layar
+ * ────────────────────────────────────────────────────────────  */
+@media (max-width: 360px) {
+  #notifPanel {
+    width: calc(100vw - 16px) !important;
+    right: -8px !important;
+    left: auto !important;
+  }
+}
+
+
+/* ────────────────────────────────────────────────────────────
+ * K. CONFIRM MODAL — pastikan muncul di tengah (bukan flex-end)
+ *    Confirm modal pakai class sendiri (.confirm-modal), bukan
+ *    .modal, jadi tidak perlu override flex-end
+ * ────────────────────────────────────────────────────────────  */
+@media (max-width: 480px) {
+  .confirm-card {
+    border-radius: 14px !important;
+  }
+  .confirm-footer .btn {
+    flex: 1 !important;
+    justify-content: center !important;
+  }
+}
+
+
+/* ────────────────────────────────────────────────────────────
+ * L. PERIODE CARD — timer badge di header overflow
+ *    Masalah: badge "Sisa X hari" + judul tidak muat dalam 1 baris
+ * ────────────────────────────────────────────────────────────  */
+@media (max-width: 480px) {
+  /* Periode card header: wrap agar badge tidak terpotong */
+  [style*="background:linear-gradient(135deg,#0d9488"] {
+    flex-wrap: wrap !important;
+    row-gap: 6px !important;
+  }
+
+  /* Badge waktu/sisa hari */
+  [style*="white-space:nowrap"][style*="background:rgba(0,0,0,0.2)"],
+  [style*="white-space:nowrap"][style*="background:rgba(0,0,0,0.15)"] {
+    white-space: normal !important;
+    font-size: 10px !important;
+    padding: 2px 6px !important;
+  }
+}
+
+
+/* ────────────────────────────────────────────────────────────
+ * M. TANDA TANGAN PREVIEW MODAL (dibuat via JS di app-master)
+ *    Masalah: modal-card max-width:480px + padding bisa overflow
+ * ────────────────────────────────────────────────────────────  */
+@media (max-width: 520px) {
+  #ttPreviewModal .modal-card {
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+  #ttPreviewModal img {
+    max-width: 100% !important;
+    height: auto !important;
+  }
+}
+
+
+/* ────────────────────────────────────────────────────────────
+ * N. PKM MODAL & INDIKATOR MASTER MODAL — form layout
+ *    Masalah: modal-card default width bisa melebihi layar
+ * ────────────────────────────────────────────────────────────  */
+@media (max-width: 480px) {
+  #pkmModal .modal-card,
+  #jabatanModal .modal-card,
+  #indikatorMasterModal .modal-card {
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+}
+
+
+/* ────────────────────────────────────────────────────────────
+ * O. DASHBOARD TABLE — status badge terpotong di kolom STATUS
+ *    Masalah: badge dengan ikon+teks "Re-verif", "Menunggu Kap #11"
+ *    keluar dari kolom tabel karena kolom tidak cukup lebar
+ * ────────────────────────────────────────────────────────────  */
+@media (max-width: 600px) {
+  /* Tabel dashboard (Menunggu Verifikasi / Sudah Diverifikasi) */
+  #mainContent table td:last-child {
+    min-width: 80px;
+    max-width: 110px;
+    word-break: break-word;
+    white-space: normal !important;
+  }
+
+  /* Badge status: bisa wrap teks */
+  #mainContent .badge,
+  #mainContent [style*="border-radius:20px"],
+  #mainContent [style*="border-radius: 20px"] {
+    white-space: normal !important;
+    word-break: break-word !important;
+    text-align: center !important;
+    line-height: 1.3 !important;
+    height: auto !important;
+    padding-top: 3px !important;
+    padding-bottom: 3px !important;
+  }
+}
+
+
+/* ────────────────────────────────────────────────────────────
+ * P. GLOBAL — cegah modal apapun overflow horizontal
+ * ────────────────────────────────────────────────────────────  */
+@media (max-width: 768px) {
+  .modal-card,
+  .modal-header,
+  .modal-body,
+  .modal-footer {
+    max-width: 100vw;
+    box-sizing: border-box;
+  }
+
+  /* Inline style overflow-x:auto yang terlupakan */
+  .modal-body [style*="overflow-x:auto"],
+  .modal-body [style*="overflow-x: auto"] {
+    -webkit-overflow-scrolling: touch;
+  }
+}

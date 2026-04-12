@@ -242,7 +242,66 @@
   }
 
   /* ──────────────────────────────────────────────────
-   * 9. INIT
+   * 9. GRID FIX — override inline grid-template-columns
+   *    di dalam modal dan konten dinamis
+   * ────────────────────────────────────────────────── */
+  function _fixInlineGrids(root) {
+    if (window.innerWidth > BP_MOBILE) return;
+    var isSm = window.innerWidth <= BP_SM;
+    var context = root || document;
+
+    context.querySelectorAll('[style]').forEach(function(el) {
+      var cols = el.style.gridTemplateColumns;
+      if (!cols) return;
+      var c = cols.trim();
+      // 1fr 1fr 1fr → 1 kolom di ≤600px
+      if (isSm && (c === '1fr 1fr 1fr')) {
+        el.style.gridTemplateColumns = '1fr';
+        return;
+      }
+      // 1fr 1fr → 1 kolom di ≤768px
+      if (c === '1fr 1fr' || c === '1fr 1fr ') {
+        el.style.gridTemplateColumns = '1fr';
+      }
+    });
+  }
+
+  /* ──────────────────────────────────────────────────
+   * 10. MODAL OBSERVER — fix grid & tabel saat modal
+   *     baru dibuka (konten dirender via JS)
+   * ────────────────────────────────────────────────── */
+  function _observeModals() {
+    if (!window.MutationObserver) return;
+    // Amati semua perubahan di body (modal dirender di sini)
+    var obs = new MutationObserver(function(mutations) {
+      if (window.innerWidth > BP_MOBILE) return;
+      mutations.forEach(function(m) {
+        m.addedNodes.forEach(function(node) {
+          if (node.nodeType !== 1) return;
+          // Fix grid di node baru
+          setTimeout(function() {
+            _fixInlineGrids(node);
+            _wrapOrphanTables();
+          }, 60);
+        });
+        // Juga fix jika konten dalam node yang ada berubah
+        if (m.type === 'childList' && m.target && m.target.id) {
+          var id = m.target.id;
+          if (id === 'detailModalBody' || id === 'indikatorInputBody' ||
+              id === 'mainContent' || id === 'notifPanelBody') {
+            setTimeout(function() {
+              _fixInlineGrids(m.target);
+              _wrapOrphanTables();
+            }, 80);
+          }
+        }
+      });
+    });
+    obs.observe(document.body, { childList: true, subtree: true });
+  }
+
+  /* ──────────────────────────────────────────────────
+   * 11. INIT
    * ────────────────────────────────────────────────── */
   function _init() {
     _fixViewportHeight();
@@ -255,10 +314,12 @@
       document.addEventListener('DOMContentLoaded', function() {
         _injectNotifBtn();
         _observeMainContent();
+        _observeModals();
       });
     } else {
       _injectNotifBtn();
       _observeMainContent();
+      _observeModals();
     }
 
     // Jalankan fix setelah app selesai render (tunggu auth selesai)
@@ -269,6 +330,7 @@
         const result = _origLoadPage.apply(this, arguments);
         setTimeout(function() {
           _fixDashboardGrid();
+          _fixInlineGrids();
           _wrapOrphanTables();
         }, 150);
         return result;
@@ -278,6 +340,7 @@
     // Fallback: jalankan setelah 1 detik (pastikan app sudah render)
     setTimeout(function() {
       _fixDashboardGrid();
+      _fixInlineGrids();
       _wrapOrphanTables();
       _injectNotifBtn();
     }, 1000);

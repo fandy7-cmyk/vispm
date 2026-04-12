@@ -390,9 +390,9 @@ function renderHeaderInfo(detail) {
     { label: 'Indeks Kesulitan Wilayah', value: `<span style="font-size:13.5px;font-weight:600;color:var(--text-dark)">${parseFloat(detail.indeksKesulitan||0).toFixed(2)}</span>`, flex: '1.2' },
     { label: 'Indeks SPM', value: `<span style="font-size:15px;font-weight:800;color:var(--primary)">${parseFloat(detail.indeksSPM||0).toFixed(2)}</span>`, flex: '1' },
   ];
-  return `<div style="background:white;border:1px solid #e2e8f0;border-radius:10px;padding:8px 0;display:flex;align-items:center;gap:0;width:100%;margin-bottom:14px">
+  return `<div class="header-info-grid" style="background:white;border:1px solid #e2e8f0;border-radius:10px;padding:8px 0;display:flex;align-items:center;flex-wrap:wrap;gap:0;width:100%;margin-bottom:14px">
     ${items.map((item, i) => `
-      <div style="padding:6px 14px;flex:${item.flex};min-width:0;${i<items.length-1?'border-right:1px solid #e2e8f0;':''}">
+      <div class="header-info-item" style="padding:6px 14px;flex:${item.flex};min-width:120px;${i<items.length-1?'border-right:1px solid #e2e8f0;':''}">
         <div style="font-size:10px;color:var(--text-light);font-weight:600;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${item.label}</div>
         <div style="min-width:0">${item.value}</div>
       </div>`).join('')}

@@ -27,29 +27,41 @@ exports.handler = async (event) => {
     const uploadIdx = pathParts.indexOf('upload');
     if (uploadIdx === -1) throw new Error('Bukan Cloudinary upload URL');
 
-    let pidParts = pathParts.slice(uploadIdx + 1);
-    if (pidParts[0] && /^v\d+$/.test(pidParts[0])) pidParts = pidParts.slice(1);
-    const pidWithExt = pidParts.join('/');
-    const publicId = pidWithExt.replace(/\.[^.]+$/, '');
-    const resourceType = urlObj.pathname.includes('/raw/') ? 'raw' : 'image';
+    /**
+     * Cloudinary delivery signed URL:
+     *
+     * String yang di-sign = semua komponen URL setelah /upload/ (termasuk version),
+     * diikuti langsung oleh apiSecret (tanpa separator).
+     *
+     * Format: SHA1("{version}/{publicId}{apiSecret}") → base64url → 8 karakter pertama
+     *
+     * Contoh URL: /raw/upload/v1234567/VISPM/PKM/file.pdf
+     * String to sign: "v1234567/VISPM/PKM/file.pdf{apiSecret}"
+     *
+     * Ref: https://cloudinary.com/documentation/delivery_url_signatures
+     */
+    const afterUpload = pathParts.slice(uploadIdx + 1).join('/');
+    const _rawExts = ['pdf','doc','docx','xls','xlsx','ppt','pptx','zip','rar','txt','csv'];
+    const _urlExt = urlObj.pathname.split('.').pop().toLowerCase();
+    const isRaw = urlObj.pathname.includes('/raw/') || _rawExts.includes(_urlExt);
+    const resourceType = isRaw ? 'raw' : 'image';
 
-    // Generate signed URL valid 1 jam
-    const expiresAt = Math.floor(Date.now() / 1000) + 3600;
-    // FIX Bug #1: Cloudinary delivery signature TIDAK menyertakan resource_type.
-    // String yang di-sign harus urut abjad: public_id, timestamp (tanpa resource_type).
-    const toSign = `public_id=${publicId}&timestamp=${expiresAt}${apiSecret}`;
-    const signature = crypto.createHash('sha1').update(toSign).digest('hex');
+    const toSign = afterUpload + apiSecret;
+    const sig8 = crypto.createHash('sha1')
+      .update(toSign)
+      .digest('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=/g, '')
+      .substring(0, 8);
 
-    // Build signed delivery URL
-    // Format: /upload/s--{signature}--/v{timestamp}/{public_id}
-    const signedUrl = `https://res.cloudinary.com/${cloudName}/${resourceType}/upload/s--${signature}--/v${expiresAt}/${publicId}`;
-
-    console.log('[get-signed-url] publicId:', publicId, 'signedUrl:', signedUrl);
+    const signedUrl = `https://res.cloudinary.com/${cloudName}/${resourceType}/upload/s--${sig8}--/${afterUpload}`;
+    console.log('[get-signed-url] afterUpload:', afterUpload, '| signedUrl:', signedUrl);
 
     return {
       statusCode: 200,
       headers: cors,
-      body: JSON.stringify({ signedUrl, expiresAt }),
+      body: JSON.stringify({ signedUrl }),
     };
   } catch (e) {
     console.error('[get-signed-url] Error:', e.message);

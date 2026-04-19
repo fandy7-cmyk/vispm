@@ -67,16 +67,18 @@ exports.handler = async (event) => {
     const folder = folderParts.join('/');
 
     const ts        = Math.floor(Date.now() / 1000);
+    const imageExts  = ['jpg','jpeg','png','gif','webp','bmp','svg'];
+    const resourceType = imageExts.includes(ext) ? 'image' : 'raw';
+
     const safeBase  = (baseName + '_' + ts).replace(/[^a-zA-Z0-9_\-]/g, '_').substring(0, 60);
-    const publicId  = folder + '/' + safeBase;
+    // Untuk raw file: sertakan ekstensi di publicId agar URL Cloudinary punya ekstensi
+    // Office Online & Google Docs Viewer butuh URL berakhiran .docx/.xlsx/.pptx dll
+    const publicId  = folder + '/' + safeBase + (resourceType === 'raw' && ext ? ('.' + ext) : '');
     const timestamp = ts;
 
     console.log('[upload] folder:', folder);
     console.log('[upload] publicId:', publicId);
     console.log('[upload] noIndikator:', noIndikator, '| namaIndikator:', namaIndikator);
-
-    const imageExts  = ['jpg','jpeg','png','gif','webp','bmp','svg'];
-    const resourceType = imageExts.includes(ext) ? 'image' : 'raw';
 
     // ─── SIGNATURE ────────────────────────────────────────────────────────────
     // Cloudinary menghitung signature dari nilai RAW (tidak di-encode).

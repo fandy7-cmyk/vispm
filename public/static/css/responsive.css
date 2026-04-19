@@ -223,16 +223,26 @@
   }
   .modal.fullscreen .modal-card {
     width: 100% !important;
-    height: 100% !important;
+    /* Gunakan --vh (di-set responsive-patch.js) agar address bar Chrome tidak memotong footer */
+    height: calc(var(--vh, 1vh) * 100) !important;
+    max-height: calc(var(--vh, 1vh) * 100) !important;
     border-radius: 0 !important;
-    max-height: 100vh;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
+  }
+  .modal.fullscreen .modal-header {
+    flex-shrink: 0;
   }
   .modal.fullscreen .modal-body {
     flex: 1;
+    min-height: 0; /* wajib agar flex child bisa scroll, tidak meluber */
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
     max-height: none !important;
+  }
+  .modal.fullscreen .modal-footer {
+    flex-shrink: 0; /* footer selalu kelihatan, tidak ikut scroll */
   }
 }
 

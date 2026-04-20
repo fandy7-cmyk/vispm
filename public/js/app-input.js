@@ -1045,9 +1045,98 @@ function _renderBuktiModal() {
           const _initZoom = (window._buktiZoomState && window._buktiZoomState.scale) ? window._buktiZoomState.scale : 1.0;
           await _renderPDFjs(el, proxyUrl, idx, _initZoom);
         } else if (isOffice) {
-          // Office: pakai Google Docs Viewer sebagai fallback yang lebih reliable
-          const googleViewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(proxyDownloadUrl)}&embedded=true`;
-          el.innerHTML = `<iframe src="${googleViewerUrl}" style="width:100%;height:100%;border:none" onload="this.style.opacity=1" style="opacity:0;transition:opacity 0.3s"></iframe>`;
+          // Office: fetch file via proxy Netlify → ArrayBuffer → render lokal
+          // - docx/doc  : mammoth.js  → HTML preview
+          // - xlsx/xls  : SheetJS     → HTML table preview
+          // - pptx/ppt  : tidak bisa dirender lokal → tampilkan download
+          el.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:12px;color:#94a3b8">
+            ${spinnerHTML('lg')}
+            <span style="font-size:13px">Memuat dokumen...</span>
+          </div>`;
+
+          const isWord  = ['doc','docx'].includes(ext);
+          const isExcel = ['xls','xlsx'].includes(ext);
+
+          if (isWord) {
+            // ── WORD: mammoth.js ──────────────────────────────────────────
+            if (!window.mammoth) {
+              await new Promise((res, rej) => {
+                const s = document.createElement('script');
+                s.src = 'https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js';
+                s.onload = res; s.onerror = rej;
+                document.head.appendChild(s);
+              });
+            }
+            const resp = await fetch(proxyUrl);
+            if (!resp.ok) throw new Error('Gagal mengambil file');
+            const arrayBuf = await resp.arrayBuffer();
+            const result   = await mammoth.convertToHtml({ arrayBuffer: arrayBuf });
+            el.innerHTML = `
+              <div style="background:white;color:#1e293b;width:100%;max-width:800px;margin:0 auto;
+                          padding:40px 48px;box-sizing:border-box;min-height:100%;
+                          font-family:'Segoe UI',Arial,sans-serif;font-size:14px;line-height:1.7;
+                          box-shadow:0 0 40px rgba(0,0,0,0.3)">
+                ${result.value || '<p style="color:#94a3b8">Dokumen kosong atau tidak dapat dirender.</p>'}
+              </div>`;
+
+          } else if (isExcel) {
+            // ── EXCEL: SheetJS ────────────────────────────────────────────
+            if (!window.XLSX) {
+              await new Promise((res, rej) => {
+                const s = document.createElement('script');
+                s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+                s.onload = res; s.onerror = rej;
+                document.head.appendChild(s);
+              });
+            }
+            const resp = await fetch(proxyUrl);
+            if (!resp.ok) throw new Error('Gagal mengambil file');
+            const arrayBuf = await resp.arrayBuffer();
+            const workbook = XLSX.read(arrayBuf, { type: 'array' });
+
+            // Render semua sheet sebagai tab
+            const sheetNames = workbook.SheetNames;
+            let activeSheet  = 0;
+            const renderSheet = (sheetIdx) => {
+              const ws  = workbook.Sheets[sheetNames[sheetIdx]];
+              const html = XLSX.utils.sheet_to_html(ws, { id: 'xlsxTable', editable: false });
+              const tabsHtml = sheetNames.map((name, i) => `
+                <button onclick="window._xlsxRenderSheet(${i})"
+                  style="padding:6px 14px;border:none;cursor:pointer;font-size:12px;font-weight:600;
+                         border-bottom:2px solid ${i===sheetIdx?'#0d9488':'transparent'};
+                         color:${i===sheetIdx?'#0d9488':'#64748b'};background:none">
+                  ${name}
+                </button>`).join('');
+              el.innerHTML = `
+                <div style="display:flex;flex-direction:column;width:100%;height:100%;background:white;">
+                  ${sheetNames.length > 1 ? `<div style="display:flex;border-bottom:1px solid #e2e8f0;padding:0 12px;background:#f8fafc;flex-shrink:0">${tabsHtml}</div>` : ''}
+                  <div style="overflow:auto;flex:1;padding:0">
+                    <style>
+                      #xlsxTable{border-collapse:collapse;font-size:12px;font-family:'Segoe UI',Arial,sans-serif;white-space:nowrap}
+                      #xlsxTable td,#xlsxTable th{border:1px solid #e2e8f0;padding:5px 10px;color:#1e293b;max-width:240px;overflow:hidden;text-overflow:ellipsis}
+                      #xlsxTable tr:nth-child(even) td{background:#f8fafc}
+                      #xlsxTable tr:first-child td,#xlsxTable th{background:#f1f5f9;font-weight:700}
+                    </style>
+                    ${html}
+                  </div>
+                </div>`;
+            };
+            window._xlsxRenderSheet = (i) => renderSheet(i);
+            renderSheet(0);
+
+          } else {
+            // ── PPT: tidak bisa dirender lokal, tampilkan tombol download ─
+            el.innerHTML = `<div style="text-align:center;color:white;padding:40px">
+              <div style="font-size:64px;margin-bottom:16px">&#128190;</div>
+              <div style="font-size:15px;font-weight:700;color:white;margin-bottom:8px">${fileName}</div>
+              <div style="font-size:12px;color:#94a3b8;margin-bottom:28px">
+                File PowerPoint tidak dapat dipreview langsung.<br>Silakan download untuk membukanya.
+              </div>
+              <button onclick="downloadBukti(${idx})" style="background:#0d9488;color:white;padding:12px 32px;border-radius:8px;border:none;font-weight:600;font-size:14px;cursor:pointer;display:inline-flex;align-items:center;gap:8px">
+                ${svgDownload} Download File
+              </button>
+            </div>`;
+          }
         } else {
           el.innerHTML = `<div style="text-align:center;color:white;padding:40px">
             <div style="font-size:64px;margin-bottom:16px">${fileIcon}</div>

@@ -216,6 +216,36 @@ async function verifProgram(pool, body) {
     [idUsulan, nomorBermasalah]
   );
 
+  // FIX BUG 3: Hapus baris PP lama untuk indikator yang sudah BERSIH (tidak masuk nomorBermasalah).
+  // Tanpa ini, baris dibuat_oleh='PP' dari siklus sebelumnya tetap ada di DB dan ikut ditampilkan
+  // sebagai Re-verif di dashboard Kapus, padahal indikator tersebut sudah disetujui di putaran ini.
+  await pool.query(
+    `DELETE FROM penolakan_indikator
+     WHERE id_usulan=$1
+       AND dibuat_oleh='PP'
+       AND no_indikator != ALL($2)`,
+    [idUsulan, nomorBermasalah.length > 0 ? nomorBermasalah : [0]]
+  ).catch(() => {});
+
+  // FIX: Hapus baris kapus-ok/kapus-setuju yang indikatornya sudah disetujui semua PP putaran ini
+  // (tidak masuk nomorBermasalah). Baris ini sisa siklus sebelumnya dan tidak lagi relevan —
+  // jika dibiarkan, indikator yang sudah clear ikut tampil sebagai Re-verif di dashboard Kapus.
+  if (nomorBermasalah.length > 0) {
+    await pool.query(
+      `DELETE FROM penolakan_indikator
+       WHERE id_usulan=$1
+         AND aksi IN ('kapus-ok','kapus-setuju')
+         AND no_indikator != ALL($2)`,
+      [idUsulan, nomorBermasalah]
+    ).catch(() => {});
+  } else {
+    // Semua indikator clear — hapus semua sisa kapus-ok
+    await pool.query(
+      `DELETE FROM penolakan_indikator WHERE id_usulan=$1 AND aksi IN ('kapus-ok','kapus-setuju')`,
+      [idUsulan]
+    ).catch(() => {});
+  }
+
   // Buat map email PP yang menolak per indikator
   const emailTolakMap = {};
   for (const vp of allVPRejected.rows) {

@@ -1,5 +1,4 @@
 const https = require('https');
-const crypto = require('crypto');
 
 function httpsGet(url, reqHeaders) {
   return new Promise((resolve, reject) => {
@@ -59,54 +58,29 @@ exports.handler = async (event) => {
     return { statusCode: 500, headers: cors, body: JSON.stringify({ error: 'Cloudinary env vars tidak di-set' }) };
   }
 
-  /**
-   * Cloudinary delivery signed URL:
-   *
-   * String yang di-sign = semua komponen URL setelah /upload/ (termasuk version),
-   * diikuti langsung oleh apiSecret (tanpa separator).
-   *
-   * Format: SHA1("{version}/{publicId}{apiSecret}") → base64url → 8 karakter pertama
-   *
-   * Contoh URL: /raw/upload/v1234567/VISPM/PKM/file.pdf
-   * String to sign: "v1234567/VISPM/PKM/file.pdf{apiSecret}"
-   *
-   * Ref: https://cloudinary.com/documentation/delivery_url_signatures
-   */
+  // FIX Bug #3: Generate signed URL sebagai fallback untuk file raw/private.
+  // Cloudinary Basic Auth tidak valid untuk delivery URL, hanya untuk API management.
+  // Solusi: signed delivery URL yang valid 1 jam.
   function buildSignedUrl(rawUrl) {
     try {
       const urlObj = new URL(rawUrl);
       const pathParts = urlObj.pathname.split('/');
       const uploadIdx = pathParts.indexOf('upload');
       if (uploadIdx === -1) return null;
-
-      // Ambil semua segmen setelah /upload/ (termasuk version jika ada)
-      const afterUpload = pathParts.slice(uploadIdx + 1).join('/');
-      const _rawExts = ['pdf','doc','docx','xls','xlsx','ppt','pptx','zip','rar','txt','csv'];
-      const _urlExt = urlObj.pathname.split('.').pop().toLowerCase();
-      const resourceType = urlObj.pathname.includes('/raw/') || _rawExts.includes(_urlExt) ? 'raw' : 'image';
-
-      // String to sign = komponen setelah /upload/ + apiSecret langsung
-      const toSign = afterUpload + apiSecret;
-      const sig8 = crypto.createHash('sha1')
-        .update(toSign)
-        .digest('base64')
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_')
-        .replace(/=/g, '')
-        .substring(0, 8);
-
-      // Sisipkan signature token setelah /upload/
-      const signedUrl = `https://res.cloudinary.com/${cloudName}/${resourceType}/upload/s--${sig8}--/${afterUpload}`;
-      console.log('[sign-url] toSign:', toSign.replace(apiSecret, '[SECRET]'));
-      console.log('[sign-url] signedUrl:', signedUrl);
-      return signedUrl;
-    } catch(e) {
-      console.error('[sign-url] buildSignedUrl error:', e.message);
-      return null;
-    }
+      let pidParts = pathParts.slice(uploadIdx + 1);
+      if (pidParts[0] && /^v\d+$/.test(pidParts[0])) pidParts = pidParts.slice(1);
+      const pidWithExt = pidParts.join('/');
+      const publicId = pidWithExt.replace(/\.[^.]+$/, '');
+      const resourceType = urlObj.pathname.includes('/raw/') ? 'raw' : 'image';
+      const expiresAt = Math.floor(Date.now() / 1000) + 3600;
+      // Signature: urut abjad, tanpa resource_type (sesuai Cloudinary spec)
+      const crypto = require('crypto');
+      const toSign = `public_id=${publicId}&timestamp=${expiresAt}${apiSecret}`;
+      const signature = crypto.createHash('sha1').update(toSign).digest('hex');
+      return `https://res.cloudinary.com/${cloudName}/${resourceType}/upload/s--${signature}--/v${expiresAt}/${publicId}`;
+    } catch(e) { return null; }
   }
-
-  const fileName = (name || 'file').trim();
+  const fileName  = (name || 'file').trim();
 
   try {
     let result = null;
@@ -115,7 +89,8 @@ exports.handler = async (event) => {
     result = await httpsGet(url, {});
     console.log('[sign-url] S1 direct:', result.status);
 
-    // Strategy 2: Signed delivery URL (untuk file raw/private)
+    // Strategy 2: Signed URL (untuk file raw yang tidak di-set access_mode=public)
+    // Basic Auth tidak valid untuk delivery URL Cloudinary — gunakan signed URL saja.
     if (result.status !== 200) {
       const signedUrl = buildSignedUrl(url);
       if (signedUrl) {

@@ -985,12 +985,12 @@ function _renderBuktiModal() {
           <span title="${fileName}" style="font-size:12px;color:white;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:320px;flex-shrink:1;">— ${fileName}</span>
         </h3>
         <div style="display:flex;gap:6px;align-items:center;margin-left:auto;flex-wrap:wrap;">
-          ${isImage || isPDF ? `
+          ${isImage || isPDF || isOffice ? `
           <div style="display:flex;gap:4px;align-items:center;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:3px 5px;">
-            <button id="buktiZoomOut" onclick="_buktiZoom(-1,'${previewId}','${isImage?'img':'pdf'}')" title="Zoom Out" style="${zoomBtnStyle}">${svgZoomOut}</button>
+            <button id="buktiZoomOut" onclick="_buktiZoom(-1,'${previewId}','${isImage?'img':isPDF?'pdf':['doc','docx'].includes(ext)?'word':'excel'}')" title="Zoom Out" style="${zoomBtnStyle}">${svgZoomOut}</button>
             <span id="buktiZoomLabel" style="font-size:11px;font-weight:700;color:#94a3b8;min-width:36px;text-align:center;cursor:default">100%</span>
-            <button id="buktiZoomIn" onclick="_buktiZoom(1,'${previewId}','${isImage?'img':'pdf'}')" title="Zoom In" style="${zoomBtnStyle}">${svgZoomIn}</button>
-            <button id="buktiZoomReset" onclick="_buktiZoomReset('${previewId}','${isImage?'img':'pdf'}')" title="Reset Zoom" style="${zoomBtnStyle}">${svgReset}</button>
+            <button id="buktiZoomIn" onclick="_buktiZoom(1,'${previewId}','${isImage?'img':isPDF?'pdf':['doc','docx'].includes(ext)?'word':'excel'}')" title="Zoom In" style="${zoomBtnStyle}">${svgZoomIn}</button>
+            <button id="buktiZoomReset" onclick="_buktiZoomReset('${previewId}','${isImage?'img':isPDF?'pdf':['doc','docx'].includes(ext)?'word':'excel'}')" title="Reset Zoom" style="${zoomBtnStyle}">${svgReset}</button>
           </div>` : ''}
           <button onclick="downloadBukti(${idx})" title="Download" style="background:rgba(13,148,136,0.15);color:#0d9488;border:1px solid rgba(13,148,136,0.3);padding:5px 10px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px">${svgDownload}</button>
           ${idUsulan ? `<button onclick="hapusBukti('${idUsulan}',${noIndikator},${idx})" title="Hapus file" style="background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.3);padding:5px 10px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center">${svgTrashM}</button>` : ''}
@@ -1072,12 +1072,22 @@ function _renderBuktiModal() {
             const arrayBuf = await resp.arrayBuffer();
             const result   = await mammoth.convertToHtml({ arrayBuffer: arrayBuf });
             el.innerHTML = `
-              <div style="background:white;color:#1e293b;width:100%;max-width:800px;margin:0 auto;
+              <div id="wordDocWrap" style="background:white;color:#1e293b;width:100%;max-width:800px;margin:0 auto;
                           padding:40px 48px;box-sizing:border-box;min-height:100%;
                           font-family:'Segoe UI',Arial,sans-serif;font-size:14px;line-height:1.7;
-                          box-shadow:0 0 40px rgba(0,0,0,0.3)">
+                          box-shadow:0 0 40px rgba(0,0,0,0.3);transform-origin:top center;transition:transform 0.2s ease">
                 ${result.value || '<p style="color:#94a3b8">Dokumen kosong atau tidak dapat dirender.</p>'}
               </div>`;
+            // Simpan referensi untuk zoom
+            el._docMode = 'word';
+            // Terapkan zoom awal jika sudah ada state
+            const _wInitZoom = (window._buktiZoomState && window._buktiZoomState.scale) ? window._buktiZoomState.scale : 1.0;
+            if (_wInitZoom !== 1.0) _applyBuktiZoom(previewId, 'word', _wInitZoom);
+            // Wheel zoom
+            el.addEventListener('wheel', function(e) {
+              e.preventDefault();
+              _buktiZoom(e.deltaY < 0 ? 1 : -1, previewId, 'word');
+            }, { passive: false });
 
           } else if (isExcel) {
             // ── EXCEL: SheetJS ────────────────────────────────────────────
@@ -1123,6 +1133,17 @@ function _renderBuktiModal() {
             };
             window._xlsxRenderSheet = (i) => renderSheet(i);
             renderSheet(0);
+            // Simpan referensi untuk zoom
+            el._docMode = 'excel';
+            // Terapkan zoom awal jika sudah ada state
+            const _xInitZoom = (window._buktiZoomState && window._buktiZoomState.scale) ? window._buktiZoomState.scale : 1.0;
+            if (_xInitZoom !== 1.0) _applyBuktiZoom(previewId, 'excel', _xInitZoom);
+            // Wheel zoom (Ctrl + scroll)
+            el.addEventListener('wheel', function(e) {
+              if (!e.ctrlKey) return; // hanya dengan Ctrl agar tidak clash dengan scroll tabel
+              e.preventDefault();
+              _buktiZoom(e.deltaY < 0 ? 1 : -1, previewId, 'excel');
+            }, { passive: false });
 
           } else {
             // ── PPT: tidak bisa dirender lokal, tampilkan tombol download ─
@@ -1365,6 +1386,54 @@ function _applyBuktiZoom(previewId, mode, scale) {
     }
     if (scroll) {
       scroll.style.overflowX = scale > 1 ? 'auto' : 'hidden';
+    }
+  } else if (mode === 'word') {
+    // Zoom Word via CSS transform pada #wordDocWrap
+    const container = document.getElementById(previewId);
+    if (!container) return;
+    const wrap = container.querySelector('#wordDocWrap');
+    if (wrap) {
+      wrap.style.transform       = scale === 1.0 ? '' : `scale(${scale})`;
+      wrap.style.transformOrigin = 'top center';
+      wrap.style.transition      = 'transform 0.2s ease';
+      // Sesuaikan tinggi wrapper agar scroll area mengikuti
+      if (scale > 1.0) {
+        const naturalH = wrap.scrollHeight / (parseFloat(wrap.dataset.lastScale) || 1);
+        wrap.dataset.lastScale  = scale;
+        wrap.style.marginBottom = `${naturalH * (scale - 1)}px`;
+      } else {
+        wrap.dataset.lastScale  = 1;
+        wrap.style.marginBottom = '';
+      }
+    }
+    container.style.overflowX = scale > 1 ? 'auto' : 'hidden';
+  } else if (mode === 'excel') {
+    // Zoom Excel: scale seluruh konten tabel
+    const container = document.getElementById(previewId);
+    if (!container) return;
+    // Target: div wrapper utama (anak pertama el)
+    const inner = container.firstElementChild;
+    if (inner) {
+      // Temukan div scroll area (anak kedua dari inner — setelah tabs jika ada)
+      const scrollDiv = inner.querySelector('div[style*="overflow:auto"]') || inner.lastElementChild;
+      const tableEl   = inner.querySelector('#xlsxTable') || inner.querySelector('table');
+      if (tableEl) {
+        tableEl.style.transform       = scale === 1.0 ? '' : `scale(${scale})`;
+        tableEl.style.transformOrigin = 'top left';
+        tableEl.style.transition      = 'transform 0.2s ease';
+        // Sesuaikan lebar wrapper agar horizontal scroll muncul saat zoom
+        if (scale > 1.0) {
+          const naturalW = tableEl.offsetWidth / (parseFloat(tableEl.dataset.lastScale) || 1);
+          const naturalH = tableEl.offsetHeight / (parseFloat(tableEl.dataset.lastScale) || 1);
+          tableEl.dataset.lastScale = scale;
+          tableEl.style.marginRight  = `${naturalW  * (scale - 1)}px`;
+          tableEl.style.marginBottom = `${naturalH * (scale - 1)}px`;
+        } else {
+          tableEl.dataset.lastScale  = 1;
+          tableEl.style.marginRight  = '';
+          tableEl.style.marginBottom = '';
+        }
+      }
     }
   }
 }
@@ -1814,7 +1883,7 @@ ${isSelesai && v.catatan ? (() => {
       <div class="table-container">
         <table>
           <thead><tr style="background:#0d9488"><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">No</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Indikator</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;text-align:center;min-width:80px">Target Tahunan</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;text-align:center">Target Bulan Ini</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;text-align:center">Realisasi Bulan Ini</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;text-align:center;min-width:80px">Sisa Target Tahunan</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;text-align:center">Capaian</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;text-align:center">Data Dukung</th></tr></thead>
-          <tbody>${inds.map(i => { const _sisa = INDIKATOR_TARGET_KUNCI.includes(i.no) ? (i.sasaranTahunan > 0 ? i.sasaranTahunan : null) : (i.sasaranTahunan > 0 ? Math.max(0, i.sasaranTahunan - i.realisasiKumulatif) : null); const _sc = _sisa !== null && _sisa === 0 ? '#16a34a' : (_sisa !== null && _sisa < 10 ? '#f59e0b' : '#1e293b'); return `<tr>
+          <tbody>${inds.map(i => { const _sisa = INDIKATOR_TARGET_KUNCI.includes(i.no) ? (i.sasaranTahunan > 0 ? i.sasaranTahunan : null) : (i.sasaranTahunan > 0 ? Math.max(0, i.sasaranTahunan - i.realisasiKumulatif) : null); const _sc = '#1e293b'; return `<tr>
             <td>${i.no}</td><td style="max-width:220px;font-size:12.5px">${i.nama}</td>
             <td style="text-align:center;color:#475569">${i.sasaranTahunan > 0 ? i.sasaranTahunan : '<span style=\"color:#cbd5e1\">-</span>'}</td>
             <td style="text-align:center">${i.target}</td><td style="text-align:center">${i.capaian}</td>
@@ -1955,7 +2024,7 @@ async function openLogAktivitas(idUsulan) {
       const d = new Date(ts);
       const o = { timeZone: 'Asia/Makassar' };
       const tgl = d.toLocaleDateString('id-ID', { ...o, day:'2-digit', month:'2-digit', year:'numeric' });
-      const jam = d.toLocaleTimeString('id-ID', { ...o, hour:'2-digit', minute:'2-digit', hour12:false });
+      const jam = d.toLocaleTimeString('id-ID', { ...o, hour:'2-digit', minute:'2-digit', hour12:false }).replace('.', ':');
       return `${tgl} | ${jam} WITA`;
     }
     const COLS = 10;

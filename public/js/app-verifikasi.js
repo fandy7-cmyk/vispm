@@ -818,7 +818,7 @@ _ppBanner.innerHTML = `<span class="material-icons" style="color:#f59e0b;font-si
       const _sisaV = INDIKATOR_TARGET_KUNCI.includes(i.no)
         ? (i.sasaranTahunan > 0 ? i.sasaranTahunan : null)
         : (i.sasaranTahunan > 0 ? Math.max(0, i.sasaranTahunan - i.realisasiKumulatif) : null);
-      const _scV = _sisaV !== null && _sisaV === 0 ? '#16a34a' : (_sisaV !== null && _sisaV < 10 ? '#f59e0b' : '#1e293b');
+      const _scV = '#1e293b';
       return `<tr id="pgRow_${i.no}">
         <td>${i.no}</td>
         <td style="font-size:13px">${i.nama}${catatanInd}</td>

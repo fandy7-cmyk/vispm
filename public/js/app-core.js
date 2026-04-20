@@ -104,7 +104,7 @@ async function renderCatatanThread(elId, idUsulan, currentRole) {
   function fmtDT(ts) {
     const d = new Date(ts), o = { timeZone:'Asia/Makassar' };
     const tgl = d.toLocaleDateString('id-ID',{...o,day:'2-digit',month:'2-digit',year:'numeric'});
-    const jam = d.toLocaleTimeString('id-ID',{...o,hour:'2-digit',minute:'2-digit',hour12:false});
+    const jam = d.toLocaleTimeString('id-ID',{...o,hour:'2-digit',minute:'2-digit',hour12:false}).replace('.', ':');
     return tgl + ' ' + jam + ' WITA';
   }
 
@@ -373,7 +373,7 @@ function formatTS(ts) {
   if (isNaN(d)) return ts;
   const o = { timeZone: 'Asia/Makassar' };
   const tgl = d.toLocaleDateString('id-ID', { ...o, day: '2-digit', month: '2-digit', year: 'numeric' });
-  const jam = d.toLocaleTimeString('id-ID', { ...o, hour: '2-digit', minute: '2-digit', hour12: false });
+  const jam = d.toLocaleTimeString('id-ID', { ...o, hour: '2-digit', minute: '2-digit', hour12: false }).replace('.', ':');
   return `${tgl} | ${jam} WITA`;
 }
 

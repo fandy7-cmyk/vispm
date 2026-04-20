@@ -185,7 +185,7 @@ function _lapRenderPage(page) {
 
   document.getElementById('lapTable').innerHTML = `
     <div class="table-container"><table>
-      <thead><tr style="background:#0d9488"><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">No</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Puskesmas</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Periode</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Tgl Dibuat</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Indeks SPM</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Status</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Aksi</th></tr></thead>
+      <thead><tr style="background:#0d9488"><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">No</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Puskesmas</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Periode</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Tanggal Dibuat</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Indeks SPM</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Status</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Aksi</th></tr></thead>
       <tbody>${items.map((r, i) => `<tr>
         <td>${offset + i + 1}</td>
         <td>${r.namaPKM}</td>
@@ -211,7 +211,7 @@ function exportLaporan() {
   const bulan   = document.getElementById('lapBulan')?.options[document.getElementById('lapBulan').selectedIndex]?.text || 'Semua Bulan';
   const pkm     = document.getElementById('lapPKM')?.options[document.getElementById('lapPKM')?.selectedIndex]?.text || '';
   const filterInfo = `Tahun: ${tahun} | Bulan: ${bulan}${pkm ? ' | PKM: '+pkm : ''}`;
-  const headers = ['No','ID Usulan','Puskesmas','Periode','Tgl Dibuat','Indeks SPM','Status','Dibuat Oleh'];
+  const headers = ['No','ID Usulan','Puskesmas','Periode','Tanggal Dibuat','Indeks SPM','Status','Dibuat Oleh'];
   const rows = data.map((r, i) => [
     i + 1, r.idUsulan, r.namaPKM,
     r.namaBulan + ' ' + r.tahun,
@@ -1637,7 +1637,7 @@ async function renderPeriode(el) {
               <!-- Mulai -->
               <div style="display:grid;align-items:stretch;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
                 <div class="form-group" style="margin-bottom:0;display:flex;flex-direction:column">
-                  <label style="display:flex;align-items:center;gap:3px;font-size:11px"><span class="material-icons" style="font-size:12px;color:#64748b">event</span>Tgl Mulai</label>
+                  <label style="display:flex;align-items:center;gap:3px;font-size:11px"><span class="material-icons" style="font-size:12px;color:#64748b">event</span>Tanggal Mulai</label>
                   <input type="date" class="form-control" id="pMulai" onchange="_syncVerifDate()">
                 </div>
                 <div class="form-group" style="margin-bottom:0;display:flex;flex-direction:column">
@@ -1649,7 +1649,7 @@ async function renderPeriode(el) {
               <!-- Selesai -->
               <div style="display:grid;align-items:stretch;grid-template-columns:1fr 1fr;gap:6px">
                 <div class="form-group" style="margin-bottom:0;display:flex;flex-direction:column">
-                  <label style="display:flex;align-items:center;gap:3px;font-size:11px"><span class="material-icons" style="font-size:12px;color:#64748b">event</span>Tgl Selesai</label>
+                  <label style="display:flex;align-items:center;gap:3px;font-size:11px"><span class="material-icons" style="font-size:12px;color:#64748b">event</span>Tanggal Selesai</label>
                   <input type="date" class="form-control" id="pSelesai" onchange="_syncVerifDate()">
                 </div>
                 <div class="form-group" style="margin-bottom:0;display:flex;flex-direction:column">
@@ -1676,7 +1676,7 @@ async function renderPeriode(el) {
                 <!-- Mulai Verif -->
                 <div style="display:grid;align-items:stretch;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
                   <div class="form-group" style="margin-bottom:0;display:flex;flex-direction:column">
-                    <label style="display:flex;align-items:center;gap:3px;font-size:11px"><span class="material-icons" style="font-size:12px;color:#64748b">event</span>Tgl Mulai</label>
+                    <label style="display:flex;align-items:center;gap:3px;font-size:11px"><span class="material-icons" style="font-size:12px;color:#64748b">event</span>Tanggal Mulai</label>
                     <input type="date" class="form-control" id="pMulaiVerif">
                   </div>
                   <div class="form-group" style="margin-bottom:0;display:flex;flex-direction:column">
@@ -1688,7 +1688,7 @@ async function renderPeriode(el) {
                 <!-- Selesai Verif -->
                 <div style="display:grid;align-items:stretch;grid-template-columns:1fr 1fr;gap:6px">
                   <div class="form-group" style="margin-bottom:0;display:flex;flex-direction:column">
-                    <label style="display:flex;align-items:center;gap:3px;font-size:11px"><span class="material-icons" style="font-size:12px;color:#64748b">event</span>Tgl Selesai</label>
+                    <label style="display:flex;align-items:center;gap:3px;font-size:11px"><span class="material-icons" style="font-size:12px;color:#64748b">event</span>Tanggal Selesai</label>
                     <input type="date" class="form-control" id="pSelesaiVerif">
                   </div>
                   <div class="form-group" style="margin-bottom:0;display:flex;flex-direction:column">

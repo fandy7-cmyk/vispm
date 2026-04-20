@@ -250,7 +250,7 @@ function formatDateTime(d) {
     const dt = new Date(d);
     const o = { timeZone: 'Asia/Makassar' };
     const tgl = dt.toLocaleDateString('id-ID', { ...o, day: '2-digit', month: '2-digit', year: 'numeric' });
-    const jam = dt.toLocaleTimeString('id-ID', { ...o, hour: '2-digit', minute: '2-digit', hour12: false });
+    const jam = dt.toLocaleTimeString('id-ID', { ...o, hour: '2-digit', minute: '2-digit', hour12: false }).replace('.', ':');
     return `${tgl} | ${jam} WITA`;
   } catch { return '-'; }
 }

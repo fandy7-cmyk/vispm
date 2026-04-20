@@ -59,7 +59,7 @@ function openEditProfil() {
           <div id="epStatus" style="font-size:12.5px;color:#ef4444;min-height:18px"></div>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-secondary" onclick="closeModal('editProfilModal')">Batal</button>
+          <button class="btn btn-cancel" onclick="closeModal('editProfilModal')"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:5px;vertical-align:middle;flex-shrink:0"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>Batal</button>
           <button class="btn btn-primary" onclick="saveEditProfil()"><span class="material-icons">save</span>Simpan</button>
         </div>
       </div>`;

@@ -185,7 +185,7 @@ function _lapRenderPage(page) {
 
   document.getElementById('lapTable').innerHTML = `
     <div class="table-container"><table>
-      <thead><tr><th>No</th><th>Puskesmas</th><th>Periode</th><th>Tgl Dibuat</th><th>Indeks SPM</th><th>Status</th><th>Aksi</th></tr></thead>
+      <thead><tr style="background:#0d9488"><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">No</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Puskesmas</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Periode</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Tgl Dibuat</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Indeks SPM</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Status</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Aksi</th></tr></thead>
       <tbody>${items.map((r, i) => `<tr>
         <td>${offset + i + 1}</td>
         <td>${r.namaPKM}</td>
@@ -632,7 +632,7 @@ async function renderUsers(el) {
           </div>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-secondary" onclick="closeModal('userModal')">Batal</button>
+          <button class="btn btn-cancel" onclick="closeModal('userModal')"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:5px;vertical-align:middle;flex-shrink:0"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>Batal</button>
           <button class="btn btn-primary" onclick="saveUser()"><span class="material-icons">save</span>Simpan</button>
         </div>
       </div>
@@ -705,7 +705,7 @@ function renderUsersTable(users, page) {
       </td>
     </tr>`).join('');
   el.innerHTML = '<div class="table-container"><table>'
-    + '<thead><tr><th>Email</th><th>Nama</th><th>NIP</th><th>Role</th><th>Puskesmas</th><th>Jabatan/Indikator</th><th>Status</th><th>Aksi</th></tr></thead>'
+    + '<thead><tr style="background:#0d9488"><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Email</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Nama</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">NIP</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Role</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Puskesmas</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Jabatan/Indikator</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Status</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Aksi</th></tr></thead>'
     + '<tbody>' + rowsHtml + '</tbody></table></div>'
     + renderPagination('usersTable', total, p, totalPages, pg => { _usersPage = pg; renderUsersTable(); });
 }
@@ -1061,7 +1061,7 @@ async function renderJabatan(el) {
           </div>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-secondary" onclick="closeModal('jabatanModal')">Batal</button>
+          <button class="btn btn-cancel" onclick="closeModal('jabatanModal')"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:5px;vertical-align:middle;flex-shrink:0"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>Batal</button>
           <button class="btn btn-primary" onclick="saveJabatan()"><span class="material-icons">save</span>Simpan</button>
         </div>
       </div>
@@ -1113,7 +1113,7 @@ function _renderJabatanTable(list, page) {
       </td>
     </tr>`).join('');
   el.innerHTML = '<div class="table-container"><table>'
-    + '<thead><tr><th>No</th><th>Nama Jabatan</th><th>Status</th><th>Aksi</th></tr></thead>'
+    + '<thead><tr style="background:#0d9488"><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">No</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Nama Jabatan</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Status</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Aksi</th></tr></thead>'
     + '<tbody>' + rowsHtml + '</tbody></table></div>'
     + renderPagination('jabatanTable', total, p, totalPages, 'pg => { _jabPage=pg; filterJabatan(false); }');
 }
@@ -1196,7 +1196,7 @@ async function renderPKM(el) {
           <div class="form-group"><label>Status</label><select class="form-control" id="pAktif"><option value="true">Aktif</option><option value="false">Non-aktif</option></select></div>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-secondary" onclick="closeModal('pkmModal')">Batal</button>
+          <button class="btn btn-cancel" onclick="closeModal('pkmModal')"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:5px;vertical-align:middle;flex-shrink:0"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>Batal</button>
           <button class="btn btn-primary" onclick="savePKM()"><span class="material-icons">save</span>Simpan</button>
         </div>
       </div>
@@ -1238,7 +1238,7 @@ function renderPKMTable(pkm, page) {
       + '</td></tr>';
   }).join('');
   el.innerHTML = '<div class="table-container"><table>'
-    + '<thead><tr><th>Kode</th><th>Nama Puskesmas</th><th>Indeks Beban Kerja</th><th>Indeks Kesulitan Wilayah</th><th>Status</th><th>Aksi</th></tr></thead>'
+    + '<thead><tr style="background:#0d9488"><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Kode</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Nama Puskesmas</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Indeks Beban Kerja</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Indeks Kesulitan Wilayah</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Status</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Aksi</th></tr></thead>'
     + '<tbody>' + rowsHtml + '</tbody></table></div>'
     + renderPagination('pkmTable', total, p, totalPages, 'pg => { _pkmPage=pg; renderPKMTable(allPKM); }');
 }
@@ -1371,7 +1371,7 @@ async function loadTargetTahunan() {
         </div>
         <div class="table-container">
           <table>
-            <thead><tr><th style="width:40px">No</th><th>Nama Indikator</th><th style="width:160px;text-align:center">Jumlah Sasaran (Satu Tahun)</th></tr></thead>
+            <thead><tr style="background:#0d9488"><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:40px">No</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Nama Indikator</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:160px;text-align:center">Jumlah Sasaran (Satu Tahun)</th></tr></thead>
             <tbody>
               ${_ttIndikator.map(ind => `<tr>
                 <td><span style="font-weight:700">${ind.noIndikator}</span></td>
@@ -1441,7 +1441,7 @@ async function renderIndikator(el) {
           <div class="form-group"><label>Status</label><select class="form-control" id="iAktif"><option value="true">Aktif</option><option value="false">Non-aktif</option></select></div>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-secondary" onclick="closeModal('indModal')">Batal</button>
+          <button class="btn btn-cancel" onclick="closeModal('indModal')"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:5px;vertical-align:middle;flex-shrink:0"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>Batal</button>
           <button class="btn btn-primary" onclick="saveInd()"><span class="material-icons">save</span>Simpan</button>
         </div>
       </div>
@@ -1479,7 +1479,7 @@ function renderIndTable(inds, page) {
       </td>
     </tr>`).join('');
   el.innerHTML = '<div class="table-container"><table>'
-    + '<thead><tr><th>No</th><th>Nama Indikator</th><th>Bobot</th><th>Status</th><th>Aksi</th></tr></thead>'
+    + '<thead><tr style="background:#0d9488"><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">No</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Nama Indikator</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Bobot</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Status</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Aksi</th></tr></thead>'
     + '<tbody>' + rowsHtml + '</tbody></table></div>'
     + renderPagination('indTable', total, p, totalPages, 'pg => { _indPage=pg; renderIndTable(_lastInds); }');
   _lastInds = inds;
@@ -1712,7 +1712,7 @@ async function renderPeriode(el) {
             <span class="material-icons">delete</span>Hapus
           </button>
           <div style="display:flex;gap:8px">
-            <button class="btn btn-secondary" onclick="closeModal('periodeModal')">Batal</button>
+            <button class="btn btn-cancel" onclick="closeModal('periodeModal')"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:5px;vertical-align:middle;flex-shrink:0"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>Batal</button>
             <button class="btn btn-primary" onclick="savePeriode()"><span class="material-icons">save</span>Simpan</button>
           </div>
         </div>
@@ -2421,7 +2421,7 @@ function _kuRenderTable() {
       </td>
     </tr>`).join('');
   el.innerHTML = '<div class="table-container"><table>'
-    + '<thead><tr><th>ID Usulan</th><th>Puskesmas</th><th>Operator</th><th>Periode</th><th>Indeks SPM</th><th>Status</th><th>Dibuat</th><th>Aksi</th></tr></thead>'
+    + '<thead><tr style="background:#0d9488"><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">ID Usulan</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Puskesmas</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Operator</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Periode</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Indeks SPM</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Status</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Dibuat</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Aksi</th></tr></thead>'
     + '<tbody>' + rowsHtml + '</tbody></table></div>'
     + renderPagination('kuTable', total, p, totalPages, 'pg => { _kuPage=pg; _kuRenderTable(); }');
 }
@@ -2696,15 +2696,15 @@ function renderAuditTrailPage(page) {
 
   el.innerHTML = `
     <div class="table-container"><table>
-      <thead><tr>
-        <th style="width:160px">Waktu</th>
-        <th style="width:90px">Modul</th>
-        <th style="width:80px">Aksi</th>
-        <th>User</th>
-        <th style="width:120px">Role</th>
-        <th>Detail</th>
-        <th style="width:110px">IP Address</th>
-        <th style="width:150px">Lokasi</th>
+      <thead><tr style="background:#0d9488">
+        <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:160px">Waktu</th>
+        <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:90px">Modul</th>
+        <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:80px">Aksi</th>
+        <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">User</th>
+        <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:120px">Role</th>
+        <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Detail</th>
+        <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:110px">IP Address</th>
+        <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:150px">Lokasi</th>
       </tr></thead>
       <tbody>${pageData.map(r => {
         const ac = (r.action||'').toUpperCase();

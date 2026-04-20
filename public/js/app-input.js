@@ -165,31 +165,40 @@ function updateBulanOptions() {
     .filter(u => u.tahun == tahun)
     .map(u => parseInt(u.bulan));
   const bulanForTahun = periodeOptions.filter(p => p.tahun == tahun);
-  const bulanList = bulanForTahun.length
-    ? bulanForTahun
+  // Normalisasi field bulan: API bisa pakai 'bulan', 'no_bulan', atau 'noBulan'
+  const normBulanList = bulanForTahun.map(p => ({
+    ...p,
+    bulan: p.bulan ?? p.no_bulan ?? p.noBulan,
+    namaBulan: p.namaBulan || p.nama_bulan || BULAN_NAMA[p.bulan ?? p.no_bulan ?? p.noBulan] || ''
+  }));
+  const bulanList = normBulanList.length
+    ? normBulanList
     : BULAN_NAMA.slice(1).map((m, i) => ({ bulan: i + 1, namaBulan: m }));
   const available = bulanList.filter(p => !sudahAda.includes(parseInt(p.bulan)));
+  const btnBuat = document.querySelector('button[onclick="createUsulan()"]');
   if (available.length === 0) {
     sel.innerHTML = `<option value="">— Semua bulan sudah memiliki usulan —</option>`;
     sel.disabled = true;
-    const btnBuat = document.querySelector('button[onclick="createUsulan()"]');
     if (btnBuat) { btnBuat.disabled = true; btnBuat.style.opacity = '0.5'; btnBuat.style.cursor = 'not-allowed'; }
-  } else {
+  } else if (available.length === 1) {
+    // Hanya 1 bulan aktif — langsung auto-select, tombol langsung enabled
     sel.disabled = false;
-    // Selalu awali dengan placeholder "Pilih..." agar tombol default-nya disable
-    sel.innerHTML = `<option value="">\u2014 Pilih Bulan \u2014</option>`
-      + available.map(p => `<option value="${p.bulan}">${p.namaBulan || BULAN_NAMA[p.bulan]}</option>`).join('');
-    // Tombol disable selama belum ada bulan dipilih
-    const btnBuat = document.querySelector('button[onclick="createUsulan()"]');
+    sel.innerHTML = available.map(p => `<option value="${p.bulan}" selected>${p.namaBulan}</option>`).join('');
+    sel.value = String(available[0].bulan); // force select
+    if (btnBuat) { btnBuat.disabled = false; btnBuat.style.opacity = ''; btnBuat.style.cursor = ''; }
+  } else {
+    // Lebih dari 1 bulan — tampilkan placeholder, tombol disabled sampai user pilih
+    sel.disabled = false;
+    sel.innerHTML = `<option value="">— Pilih Bulan —</option>`
+      + available.map(p => `<option value="${p.bulan}">${p.namaBulan}</option>`).join('');
     if (btnBuat) { btnBuat.disabled = true; btnBuat.style.opacity = '0.5'; btnBuat.style.cursor = 'not-allowed'; }
-    // Enable tombol hanya jika user sudah pilih bulan
-    sel.onchange = () => {
-      const btnBuat2 = document.querySelector('button[onclick="createUsulan()"]');
-      if (!btnBuat2) return;
-      const hasBulan = !!sel.value;
-      btnBuat2.disabled = !hasBulan;
-      btnBuat2.style.opacity = hasBulan ? '' : '0.5';
-      btnBuat2.style.cursor  = hasBulan ? '' : 'not-allowed';
+    sel.onchange = function() {
+      if (btnBuat) {
+        const dipilih = sel.value !== '';
+        btnBuat.disabled = !dipilih;
+        btnBuat.style.opacity = dipilih ? '' : '0.5';
+        btnBuat.style.cursor = dipilih ? '' : 'not-allowed';
+      }
     };
   }
 }
@@ -255,7 +264,7 @@ function _renderMyUsulanPaged(page) {
   const { items, page: p, totalPages, total } = paginateData(rows, page);
   window._myUsulanPage = p;
   tbl.innerHTML = `<div class="table-container"><table>
-      <thead><tr><th>ID Usulan</th><th>Puskesmas</th><th>Periode</th><th>Progress Verifikasi</th><th>Aksi</th></tr></thead>
+      <thead><tr style="background:#0d9488"><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">ID Usulan</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Puskesmas</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Periode</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Progress Verifikasi</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Aksi</th></tr></thead>
       <tbody>${items.map(u => _renderMyUsulanRow(u)).join('')}</tbody>
     </table></div>`
     + renderPagination('myUsulanTable', total, p, totalPages, pg => _renderMyUsulanPaged(pg));
@@ -282,7 +291,6 @@ async function createUsulan() {
   const bulan = parseInt(document.getElementById('inputBulan').value);
   const namaBulanTxt = BULAN_NAMA[bulan] || 'bulan ini';
   if (!kodePKM) return toast('Pilih puskesmas terlebih dahulu', 'error');
-  if (!bulan) return toast('Pilih bulan terlebih dahulu', 'error');
 
   // Cek apakah periode yang dipilih valid (berstatus Aktif)
   const periodeOptions = window._periodeInputAktif || [];
@@ -566,9 +574,10 @@ async function openIndikatorModal(idUsulan) {
               </div>`;
             }
             const hasFiles = normLinks.length > 0;
+            // Kalau sudah ada file: tombol disabled (pointer-events:none), baru aktif lagi setelah file dihapus
             const btnStyle = hasFiles
-              ? 'display:inline-flex;align-items:center;padding:4px 12px;background:#16a34a;color:white;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:600;border:1.5px solid #16a34a;white-space:nowrap'
-              : 'display:inline-flex;align-items:center;padding:4px 12px;background:#ef4444;color:white;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:600;border:1.5px solid #ef4444;white-space:nowrap';
+              ? 'display:inline-flex;align-items:center;gap:4px;padding:4px 12px;background:#16a34a;color:white;border-radius:6px;cursor:not-allowed;font-size:11.5px;font-weight:600;border:1.5px solid #16a34a;white-space:nowrap;pointer-events:none;opacity:0.85'
+              : 'display:inline-flex;align-items:center;gap:4px;padding:4px 12px;background:#ef4444;color:white;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:600;border:1.5px solid #ef4444;white-space:nowrap';
 
             if (normLinks.length > 0) window[`_buktiLinks_${ind.no}`] = { links: normLinks, idUsulan };
             const fileControlHtml = normLinks.length > 0
@@ -579,9 +588,9 @@ async function openIndikatorModal(idUsulan) {
                 </div>`
               : '';
             return `<div id="uploadCell-${ind.no}" style="display:flex;align-items:center;gap:6px;justify-content:center">
-                <label id="uploadLabel-${ind.no}" style="${btnStyle}">
-                  ${hasFiles ? 'Uploaded' : 'Upload'}
-                  <input type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,image/*" style="display:none" onchange="uploadBuktiIndikator(event,${ind.no},'${idUsulan}','${detail.kodePKM}','${(detail.namaPKM||detail.kodePKM).replace(/[^a-zA-Z0-9 ]/g,"")}',${detail.tahun},${detail.bulan},'${namaBulan}','${ind.nama.replace(/[^a-zA-Z0-9 ]/g,"").substring(0,40)}')">
+                <label id="uploadLabel-${ind.no}" style="${btnStyle}" title="${hasFiles ? 'Hapus file terlebih dahulu untuk upload ulang' : ''}">
+                  ${hasFiles ? `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><polyline points="20 6 9 17 4 12"/></svg> Uploaded` : `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Upload`}
+                  ${hasFiles ? '' : `<input type="file" multiple accept=".pdf,image/*,.xls,.xlsx,.doc,.docx,.ppt,.pptx" style="display:none" onchange="uploadBuktiIndikator(event,${ind.no},'${idUsulan}','${detail.kodePKM}','${(detail.namaPKM||detail.kodePKM).replace(/[^a-zA-Z0-9 ]/g,"")}',${detail.tahun},${detail.bulan},'${namaBulan}','${ind.nama.replace(/[^a-zA-Z0-9 ]/g,"").substring(0,40)}')">` }
                 </label>
                 <div id="fileControls-${ind.no}">${fileControlHtml}</div>
               </div>
@@ -606,42 +615,42 @@ async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, namaP
   const files = Array.from(event.target.files);
   if (!files.length) return;
 
-  // Validasi: PDF, gambar, dan dokumen Office
+  // Validasi: PDF, gambar, dan dokumen Office (Excel, Word, PPT)
   const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB per file
-  const ALLOWED_EXTS = ['pdf','doc','docx','xls','xlsx','ppt','pptx',
-                        'jpg','jpeg','png','gif','webp','bmp','svg'];
   const ALLOWED_MIME = [
     'application/pdf',
-    'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     'application/vnd.ms-excel',
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     'application/vnd.ms-powerpoint',
     'application/vnd.openxmlformats-officedocument.presentationml.presentation',
   ];
+  const ALLOWED_EXT = ['.pdf','.xls','.xlsx','.doc','.docx','.ppt','.pptx'];
   const invalidFiles = files.filter(f => {
     const t = f.type;
-    const ext = f.name.toLowerCase().split('.').pop();
-    return !(t.startsWith('image/') || ALLOWED_MIME.includes(t) || ALLOWED_EXTS.includes(ext));
+    const n = f.name.toLowerCase();
+    return !(t.startsWith('image/') || ALLOWED_MIME.includes(t) || ALLOWED_EXT.some(ext => n.endsWith(ext)));
   });
   if (invalidFiles.length > 0) {
-    toast(`Format tidak didukung. File ditolak: ${invalidFiles.map(f => f.name).join(', ')}. Format yang didukung: PDF, Word, Excel, PowerPoint, dan gambar.`, 'error');
+    toast(`Hanya PDF, gambar, Excel, Word, dan PPT yang diizinkan. File ditolak: ${invalidFiles.map(f => f.name).join(', ')}`, 'error');
     event.target.value = '';
     return;
   }
   const oversizedFiles = files.filter(f => f.size > MAX_FILE_SIZE);
   if (oversizedFiles.length > 0) {
-    toast(`File terlalu besar (maks 5MB): ${oversizedFiles.map(f => f.name).join(', ')}`, 'error');
+    toast(`File terlalu besar (maks 10MB): ${oversizedFiles.map(f => f.name).join(', ')}`, 'error');
     event.target.value = '';
     return;
   }
 
-  const cell = document.getElementById(`uploadCell-${noIndikator}`);
-  const statusDiv = document.createElement('div');
-  statusDiv.style.cssText = 'font-size:11px;color:#0891b2';
-  statusDiv.innerHTML = `<div class="loading-state inline">${spinnerHTML('sm')}<span>Mengupload ${files.length} file...</span></div>`;
-  cell.insertBefore(statusDiv, cell.firstChild);
-
+  const label = document.getElementById(`uploadLabel-${noIndikator}`);
+  const _inp0 = label ? label.querySelector('input') : null;
+  if (label) {
+    label.style.cssText = 'display:inline-flex;align-items:center;gap:4px;padding:4px 12px;background:#f59e0b;color:white;border-radius:6px;cursor:not-allowed;font-size:11.5px;font-weight:600;border:1.5px solid #f59e0b;white-space:nowrap;pointer-events:none';
+    label.innerHTML = `Mengupload... <div class="spm-spinner sm" style="margin-left:2px;filter:brightness(0) invert(1)"><div class="sr1"></div><div class="sr2"></div><div class="sr3"></div></div>`;
+    if (_inp0) label.appendChild(_inp0);
+  }
   const uploadedLinks = [];
   for (const file of files) {
     try {
@@ -702,8 +711,6 @@ async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, namaP
     const cVal = parseFloat(document.getElementById(`c-${noIndikator}`)?.value) || 0;
     await API.updateIndikatorUsulan({ idUsulan, noIndikator, target: tVal, capaian: cVal, linkFile: linkToSave });
 
-    statusDiv.remove();
-
     // Update fileControls
     window[`_buktiLinks_${noIndikator}`] = { links: allLinks, idUsulan };
     const controls = document.getElementById(`fileControls-${noIndikator}`);
@@ -718,14 +725,15 @@ async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, namaP
       }
     }
 
-    // Tombol hijau tanpa icon
+    // Tombol hijau — disabled karena sudah ada file. Input dihapus dari label.
     const label = document.getElementById(`uploadLabel-${noIndikator}`);
     if (label) {
-      label.style.cssText = 'display:inline-flex;align-items:center;padding:4px 12px;background:#16a34a;color:white;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:600;border:1.5px solid #16a34a;white-space:nowrap';
-      label.querySelectorAll('.material-icons').forEach(el => el.remove());
-      const textNode = [...label.childNodes].find(n => n.nodeType === 3);
-      if (textNode) textNode.textContent = 'Uploaded';
-      else label.insertBefore(document.createTextNode('Uploaded'), label.querySelector('input'));
+      label.style.cssText = 'display:inline-flex;align-items:center;gap:4px;padding:4px 12px;background:#16a34a;color:white;border-radius:6px;cursor:not-allowed;font-size:11.5px;font-weight:600;border:1.5px solid #16a34a;white-space:nowrap;pointer-events:none;opacity:0.85';
+      label.title = 'Hapus file terlebih dahulu untuk upload ulang';
+      // Hapus input dari label — tidak perlu lagi, tidak boleh diklik
+      const _inp = label.querySelector('input');
+      if (_inp) _inp.remove();
+      label.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><polyline points="20 6 9 17 4 12"/></svg> Uploaded';
     }
 
     // Refresh SPM
@@ -736,7 +744,6 @@ async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, namaP
 
     toast(`${uploadedLinks.length} file berhasil diupload!`, 'success');
   } else {
-    statusDiv.remove();
   }
 }
 // Folder management dipindah ke backend (drive-upload.js)
@@ -770,9 +777,27 @@ function _refreshFileControls(noIndikator, links, idUsulan) {
   }
   const lbl = document.getElementById(`uploadLabel-${noIndikator}`);
   if (lbl && links.length === 0) {
-    lbl.style.cssText = 'display:inline-flex;align-items:center;padding:4px 12px;background:#ef4444;color:white;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:600;border:1.5px solid #ef4444;white-space:nowrap';
-    const tn = [...lbl.childNodes].find(n => n.nodeType === 3);
-    if (tn) tn.textContent = 'Upload';
+    lbl.style.cssText = 'display:inline-flex;align-items:center;gap:4px;padding:4px 12px;background:#ef4444;color:white;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:600;border:1.5px solid #ef4444;white-space:nowrap';
+    lbl.title = '';
+    // Karena saat hasFiles=true kita tidak menyertakan <input> di label,
+    // setelah hapus file kita perlu inject ulang input supaya bisa klik lagi
+    let _inp2 = lbl.querySelector('input');
+    lbl.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Upload';
+    if (_inp2) {
+      _inp2.value = '';
+      lbl.appendChild(_inp2);
+    } else {
+      // Buat input baru dengan handler yang mengacu ke idUsulan dari cache
+      const newInp = document.createElement('input');
+      newInp.type = 'file';
+      newInp.multiple = true;
+      newInp.accept = '.pdf,image/*,.xls,.xlsx,.doc,.docx,.ppt,.pptx';
+      newInp.style.display = 'none';
+      const _cache = window[`_buktiLinks_${noIndikator}`] || {};
+      const _idUsulan2 = _cache.idUsulan || idUsulan;
+      newInp.onchange = function(ev) { uploadBuktiIndikator(ev, noIndikator, _idUsulan2); };
+      lbl.appendChild(newInp);
+    }
   }
 }
 
@@ -785,14 +810,9 @@ async function hapusSemuaBukti(idUsulan, noIndikator) {
     message: `Hapus <strong>semua file</strong> data dukung indikator ${noIndikator}? Tindakan ini tidak dapat dibatalkan.`,
     type: 'danger',
     onConfirm: async () => {
-      const _hapusCell = document.getElementById(`uploadCell-${noIndikator}`);
-      let _hapusStatusDiv = null;
-      if (_hapusCell) {
-        _hapusStatusDiv = document.createElement('div');
-        _hapusStatusDiv.style.cssText = 'font-size:11px;color:#ef4444';
-        _hapusStatusDiv.innerHTML = `<div class="loading-state inline">${spinnerHTML('sm')}<span>Menghapus semua file...</span></div>`;
-        _hapusCell.insertBefore(_hapusStatusDiv, _hapusCell.firstChild);
-      }
+      const _hapusBtn = document.querySelector(`button[onclick="hapusSemuaBukti('${idUsulan}',${noIndikator})"]`);
+      const _hapusBtnOrig = _hapusBtn ? _hapusBtn.innerHTML : null;
+      if (_hapusBtn) { _hapusBtn.disabled = true; _hapusBtn.innerHTML = '<div class="spm-spinner sm"><div class="sr1"></div><div class="sr2"></div><div class="sr3"></div></div>'; }
       try {
         const existingDetail = await API.getIndikatorUsulan(idUsulan);
         const existingInd = (existingDetail || []).find(i => i.no === noIndikator || i.noIndikator === noIndikator);
@@ -813,9 +833,7 @@ async function hapusSemuaBukti(idUsulan, noIndikator) {
         _refreshFileControls(noIndikator, [], idUsulan);
         toast('Semua file berhasil dihapus', 'success');
       } catch(e) { toast('Gagal hapus: ' + e.message, 'error'); }
-      finally {
-        if (_hapusStatusDiv) _hapusStatusDiv.remove();
-      }
+      finally { if (_hapusBtn && _hapusBtnOrig) { _hapusBtn.disabled = false; _hapusBtn.innerHTML = _hapusBtnOrig; } }
     }
   });
 }
@@ -831,15 +849,9 @@ async function hapusBukti(idUsulan, noIndikator, fileIndex) {
     message: `Hapus <strong>File ${fileIndex + 1}</strong> dari indikator ${noIndikator}?`,
     type: 'danger',
     onConfirm: async () => {
-      // Tampilkan inline spinner di cell upload (sama seperti saat upload)
-      const _hapusCell = document.getElementById(`uploadCell-${noIndikator}`);
-      let _hapusStatusDiv = null;
-      if (_hapusCell) {
-        _hapusStatusDiv = document.createElement('div');
-        _hapusStatusDiv.style.cssText = 'font-size:11px;color:#ef4444';
-        _hapusStatusDiv.innerHTML = `<div class="loading-state inline">${spinnerHTML('sm')}<span>Menghapus file...</span></div>`;
-        _hapusCell.insertBefore(_hapusStatusDiv, _hapusCell.firstChild);
-      }
+      const _hapusBtn = document.querySelector(`button[onclick="hapusSemuaBukti('${idUsulan}',${noIndikator})"]`);
+      const _hapusBtnOrig = _hapusBtn ? _hapusBtn.innerHTML : null;
+      if (_hapusBtn) { _hapusBtn.disabled = true; _hapusBtn.innerHTML = '<div class="spm-spinner sm"><div class="sr1"></div><div class="sr2"></div><div class="sr3"></div></div>'; }
       try {
         const existingDetail = await API.getIndikatorUsulan(idUsulan);
         const existingInd = (existingDetail || []).find(i => i.no === noIndikator || i.noIndikator === noIndikator);
@@ -871,8 +883,6 @@ async function hapusBukti(idUsulan, noIndikator, fileIndex) {
         _refreshFileControls(noIndikator, links, idUsulan);
       } catch(e) {
         toast('Gagal hapus: ' + e.message, 'error');
-      } finally {
-        if (_hapusStatusDiv) _hapusStatusDiv.remove();
       }
     }
   });
@@ -952,9 +962,7 @@ function _renderBuktiModal() {
   const svgZoomIn  = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>`;
   const svgZoomOut = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>`;
   const svgReset   = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>`;
-  const _svgChevLeft  = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>`;
-  const _svgChevRight = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>`;
-  const navBtn = (dir, fn) => `<button onclick="${fn}" style="position:absolute;top:50%;${dir}:14px;transform:translateY(-50%);background:#0d9488;border:2px solid rgba(255,255,255,0.25);border-radius:50%;width:42px;height:42px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;box-shadow:0 2px 10px rgba(0,0,0,0.4);padding:0" onmouseover="this.style.background='#0f766e'" onmouseout="this.style.background='#0d9488'">${dir==='left'?_svgChevLeft:_svgChevRight}</button>`;
+  const navBtn = (dir, fn) => `<button onclick="${fn}" style="position:absolute;top:50%;${dir}:14px;transform:translateY(-50%);background:#1e293b;border:1.5px solid rgba(13,148,136,0.5);color:#5eead4;border-radius:50%;width:42px;height:42px;cursor:pointer;font-size:22px;display:flex;align-items:center;justify-content:center;line-height:1;z-index:10;pointer-events:auto;box-shadow:0 2px 12px rgba(0,0,0,0.4)" onmouseover="this.style.background='#0d9488';this.style.color='white'" onmouseout="this.style.background='#1e293b';this.style.color='#5eead4'">${dir==='left'?'&#8249;':'&#8250;'}</button>`;
   const fileIcons = { pdf:'&#128196;', doc:'&#128196;', docx:'&#128196;', xls:'&#128202;', xlsx:'&#128202;', ppt:'&#128190;', pptx:'&#128190;' };
   const fileIcon = fileIcons[ext] || '&#128196;';
 
@@ -971,8 +979,10 @@ function _renderBuktiModal() {
     <div class="modal-card" style="background:#0f172a;">
       <div class="modal-header" style="background:#1e293b;border-bottom:1px solid rgba(255,255,255,0.08);">
         <span class="material-icons" style="color:#0d9488;font-size:18px">description</span>
-        <h3 style="color:white;font-size:14px;">Data Dukung
-          ${total > 1 ? `<span style="background:#334155;color:#94a3b8;font-size:11px;padding:2px 8px;border-radius:20px;font-weight:600;margin-left:8px;">${idx+1} / ${total}</span>` : ''}
+        <h3 style="color:white;font-size:14px;display:flex;align-items:center;gap:8px;min-width:0;flex:1;overflow:hidden;">
+          <span style="white-space:nowrap">Data Dukung</span>
+          ${total > 1 ? `<span style="background:#334155;color:#94a3b8;font-size:11px;padding:2px 8px;border-radius:20px;font-weight:600;flex-shrink:0;">${idx+1} / ${total}</span>` : ''}
+          <span title="${fileName}" style="font-size:12px;color:white;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:320px;flex-shrink:1;">— ${fileName}</span>
         </h3>
         <div style="display:flex;gap:6px;align-items:center;margin-left:auto;flex-wrap:wrap;">
           ${isImage || isPDF ? `
@@ -998,8 +1008,7 @@ function _renderBuktiModal() {
               </div>`
           }
         </div>
-        ${total > 1 ? navBtn('left','_buktiNav(-1)') : ''}
-        ${total > 1 ? navBtn('right','_buktiNav(1)') : ''}
+        ${total > 1 ? `<div style="position:absolute;inset:0;pointer-events:none;z-index:10">${navBtn('left','_buktiNav(-1)')}${navBtn('right','_buktiNav(1)')}</div>` : ''}
       </div>
       ${total > 1 ? `
       <div style="display:flex;justify-content:center;gap:5px;padding:8px;flex-shrink:0;border-top:1px solid rgba(255,255,255,0.08);background:#1e293b;">
@@ -1036,63 +1045,9 @@ function _renderBuktiModal() {
           const _initZoom = (window._buktiZoomState && window._buktiZoomState.scale) ? window._buktiZoomState.scale : 1.0;
           await _renderPDFjs(el, proxyUrl, idx, _initZoom);
         } else if (isOffice) {
-          // Office: Google Docs Viewer / Office Online butuh URL publik
-          // Coba get signed URL dulu dari Cloudinary agar URL benar-benar accessible
-          const officeIconMap = { doc:'📄',docx:'📄',xls:'📊',xlsx:'📊',ppt:'💽',pptx:'💽' };
-          const officeLabel = { doc:'Word Document',docx:'Word Document',xls:'Excel Spreadsheet',xlsx:'Excel Spreadsheet',ppt:'PowerPoint',pptx:'PowerPoint' };
-          const isWordExcel = ['doc','docx','xls','xlsx'].includes(ext);
-
-          // Tampilkan loading dulu
-          el.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:12px;color:#94a3b8">
-            ${spinnerHTML('lg')}
-            <span style="font-size:13px">Menyiapkan pratinjau ${officeLabel[ext]||ext.toUpperCase()}...</span>
-          </div>`;
-
-          // Untuk Office viewer: gunakan URL Cloudinary langsung (public)
-          // Pastikan URL berakhiran ekstensi file agar Office Online / Google Docs tahu format-nya
-          let _viewUrl = (f.url || '').split('?')[0]; // buang query string
-          // Append ekstensi jika URL tidak berakhiran ekstensi yang benar
-          if (ext && !_viewUrl.toLowerCase().endsWith('.' + ext)) {
-            _viewUrl = _viewUrl + '.' + ext;
-          }
-
-          const officeOnlineUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(_viewUrl)}`;
-          const googleViewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(_viewUrl)}&embedded=true`;
-          // Word/Excel pakai Office Online dulu; PPT pakai Google Docs dulu
-          const viewerUrl = isWordExcel ? officeOnlineUrl : googleViewerUrl;
-          const altViewerUrl = isWordExcel ? googleViewerUrl : officeOnlineUrl;
-          const viewerLabel = isWordExcel ? 'Office Online' : 'Google Docs';
-          const altViewerLabel = isWordExcel ? 'Google Docs' : 'Office Online';
-
-          el.innerHTML = `
-            <div style="width:100%;height:100%;display:flex;flex-direction:column;">
-              <div id="officeViewerWrap_${idx}" style="flex:1;position:relative;min-height:0;">
-                <iframe id="officeIframe_${idx}" src="${viewerUrl}"
-                  style="width:100%;height:100%;border:none;opacity:0;transition:opacity 0.4s"
-                  onload="this.style.opacity=1;var m=document.getElementById('officeLoadMsg_${idx}');if(m)m.style.display='none';"
-                ></iframe>
-                <div id="officeLoadMsg_${idx}" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:#94a3b8;pointer-events:none">
-                  <div style="font-size:48px">${officeIconMap[ext]||'📄'}</div>
-                  <div style="font-size:13px;font-weight:600;color:white">${fileName}</div>
-                  <div style="font-size:12px;color:#64748b">${officeLabel[ext]||ext.toUpperCase()} · Memuat via ${viewerLabel}...</div>
-                  <div style="width:32px;height:32px;border-radius:50%;border:3px solid transparent;border-top-color:#0d9488;animation:spin 1s linear infinite;margin-top:4px"></div>
-                </div>
-              </div>
-              <div style="flex-shrink:0;padding:10px 16px;border-top:1px solid rgba(255,255,255,0.08);background:#1e293b;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
-                <span style="font-size:11px;color:#64748b">Pratinjau via ${viewerLabel}. Jika tidak muncul, coba viewer lain atau download.</span>
-                <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                  <button onclick="(function(){var fr=document.getElementById('officeIframe_${idx}');var ms=document.getElementById('officeLoadMsg_${idx}');if(fr){fr.style.opacity=0;if(ms)ms.style.display='flex';fr.src='${altViewerUrl}';}})()" style="background:#334155;color:white;padding:7px 14px;border-radius:7px;border:none;font-size:12px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:5px">
-                    Coba ${altViewerLabel}
-                  </button>
-                  <a href="${_viewUrl}" target="_blank" style="background:#475569;color:white;padding:7px 14px;border-radius:7px;font-size:12px;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:5px">
-                    Buka di Tab Baru
-                  </a>
-                  <button onclick="downloadBukti(${idx})" style="background:#0d9488;color:white;padding:7px 14px;border-radius:7px;border:none;font-size:12px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:5px">
-                    Download
-                  </button>
-                </div>
-              </div>
-            </div>`;
+          // Office: pakai Google Docs Viewer sebagai fallback yang lebih reliable
+          const googleViewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(proxyDownloadUrl)}&embedded=true`;
+          el.innerHTML = `<iframe src="${googleViewerUrl}" style="width:100%;height:100%;border:none" onload="this.style.opacity=1" style="opacity:0;transition:opacity 0.3s"></iframe>`;
         } else {
           el.innerHTML = `<div style="text-align:center;color:white;padding:40px">
             <div style="font-size:64px;margin-bottom:16px">${fileIcon}</div>
@@ -1142,76 +1097,32 @@ async function _renderPDFjs(container, url, idx, zoomScale) {
     }
   }
 
-  // Strategy 1: load PDF langsung dari Cloudinary URL (jika file public/access_mode=public)
-  // Strategy 2: fetch proxy sebagai ArrayBuffer → feed ke PDF.js (bypass CORS & encoding issue)
-  // Strategy 3: feed URL proxy langsung ke PDF.js (fallback terakhir)
-  let pdf = null;
-  const _cMapUrl = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/';
-  const _pdfOpts = { withCredentials: false, cMapUrl: _cMapUrl, cMapPacked: true };
-
-  // Ambil direct Cloudinary URL dari _modalBukti
-  let _directUrl = null;
-  if (window._modalBukti && window._modalBukti.links && window._modalBukti.links[idx]) {
-    const _f = window._modalBukti.links[idx];
-    let _du = (_f.url || '').split('?')[0];
-    if (!_du.toLowerCase().endsWith('.pdf')) _du = _du + '.pdf';
-    _directUrl = _du;
-  }
-
-  // S1: Direct Cloudinary URL (berhasil untuk file public/access_mode=public)
-  if (_directUrl) {
-    try {
-      pdf = await pdfjsLib.getDocument({ url: _directUrl, ..._pdfOpts }).promise;
-      console.log('[PDF] S1 direct OK');
-    } catch(_e) {
-      console.warn('[PDF] S1 direct gagal:', _e.message);
-      pdf = null;
-    }
-  }
-
-  // S2: Fetch proxy sebagai ArrayBuffer → feed langsung ke PDF.js
-  // Paling reliable: tidak ada CORS issue, tidak ada base64 decoding problem
-  if (!pdf) {
-    try {
-      const _proxyRes = await fetch(url, { credentials: 'same-origin' });
-      if (_proxyRes.ok) {
-        const _arrBuf = await _proxyRes.arrayBuffer();
-        // Validasi magic bytes PDF (%PDF = 0x25 0x50 0x44 0x46)
-        const _magic = new Uint8Array(_arrBuf.slice(0, 4));
-        const _isPDFBytes = _magic[0]===0x25 && _magic[1]===0x50 && _magic[2]===0x44 && _magic[3]===0x46;
-        if (_isPDFBytes) {
-          pdf = await pdfjsLib.getDocument({ data: _arrBuf, ..._pdfOpts }).promise;
-          console.log('[PDF] S2 proxy ArrayBuffer OK, size:', _arrBuf.byteLength);
+  // Coba XHR dengan header custom (bypass IDM)
+  let buf = null;
+  try {
+    buf = await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('GET', url, true);
+      xhr.responseType = 'arraybuffer';
+      xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+      xhr.onload = () => {
+        if (xhr.status === 200 && xhr.response && xhr.response.byteLength > 0) {
+          resolve(xhr.response);
         } else {
-          console.warn('[PDF] S2 bukan PDF, magic:', Array.from(_magic).map(b=>b.toString(16)).join(' '));
+          reject(new Error('empty:' + xhr.status));
         }
-      } else {
-        console.warn('[PDF] S2 proxy HTTP error:', _proxyRes.status);
-      }
-    } catch(_e) {
-      console.warn('[PDF] S2 proxy ArrayBuffer gagal:', _e.message);
-      pdf = null;
-    }
-  }
-
-  // S3: Feed URL proxy langsung ke PDF.js (fallback terakhir)
-  if (!pdf) {
-    try {
-      pdf = await pdfjsLib.getDocument({ url, ..._pdfOpts }).promise;
-      console.log('[PDF] S3 proxy URL OK');
-    } catch(_e) {
-      console.warn('[PDF] S3 proxy URL gagal:', _e.message);
-      pdf = null;
-    }
-  }
-
-  if (!pdf) {
+      };
+      xhr.onerror = () => reject(new Error('network'));
+      xhr.send();
+    });
+  } catch(e) {
+    // XHR gagal/kosong → tampilkan fallback download
     _showPDFFallback(container, null, btnDl);
     return;
   }
 
   try {
-    /* pdf sudah di-load di atas */
+    const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
     const totalPages = pdf.numPages;
 
     container.innerHTML = `<div id="pdfScroll_${idx}" style="width:100%;height:100%;overflow-y:auto;overflow-x:auto;background:#3a3a3a;padding:12px 0"><div id="pdfPages_${idx}" style="transform-origin:top center;transition:transform 0.2s ease"></div></div>`;
@@ -1664,7 +1575,7 @@ async function viewDetail(idUsulan) {
   showModal('detailModal');
   document.getElementById('detailModalBody').innerHTML = loadingBlock('Memuat data...');
   try {
-    const [detail, indsRaw] = await Promise.all([
+    let [detail, indsAll] = await Promise.all([
       API.getDetailUsulan(idUsulan),
       API.getIndikatorUsulan(idUsulan),
       API.getUsers().then(users => {
@@ -1674,19 +1585,39 @@ async function viewDetail(idUsulan) {
         });
       }).catch(() => {})
     ]);
+    // Filter indikator: PP hanya lihat yang menjadi tanggung jawabnya
+    const _ppAkses = currentUser.role === 'Pengelola Program' && currentUser.indikatorAkses && currentUser.indikatorAkses.length;
+    let inds = _ppAkses
+      ? indsAll.filter(i => currentUser.indikatorAkses.includes(parseInt(i.no)))
+      : indsAll;
+
+    // Filter tambahan: saat mode re-verifikasi PP, hanya tampilkan indikator yang ditolak/re-verif
+    const _isReVerifPP = currentUser.role === 'Pengelola Program' &&
+      ['Menunggu Pengelola Program', 'Menunggu Re-verifikasi PP'].includes(detail.statusGlobal) &&
+      detail.penolakanIndikator && detail.penolakanIndikator.length > 0;
+
+    if (_isReVerifPP) {
+      const myAkses = currentUser.indikatorAkses || [];
+      // Kumpulkan nomor indikator yang perlu di-re-verifikasi oleh PP ini
+      const reVerifNos = [...new Set(
+        detail.penolakanIndikator
+          .filter(p => {
+            const no = parseInt(p.no_indikator || p.noIndikator);
+            // Hanya indikator yang menjadi tanggung jawab PP ini
+            if (myAkses.length && !myAkses.includes(no)) return false;
+            // Status aktif: tolak/reset (re-verif biasa) atau kapus-ok/kapus-verif (sanggahan kapus)
+            return !p.aksi || p.aksi === 'tolak' || p.aksi === 'reset' || p.aksi === 'kapus-ok' || p.aksi === 'kapus-verif';
+          })
+          .map(p => parseInt(p.no_indikator || p.noIndikator))
+      )];
+      if (reVerifNos.length > 0) {
+        inds = inds.filter(i => reVerifNos.includes(parseInt(i.no)));
+      }
+    }
     // Resolve nama Kepala Puskesmas dari email jika belum ada namaKapus
     if (!detail.namaKapus && detail.kapusApprovedBy) {
       detail.namaKapus = await _getNamaByEmail(detail.kapusApprovedBy);
     }
-    let inds = indsRaw;
-    // Filter indikator untuk Pengelola Program — hanya tampilkan yang jadi tanggung jawabnya
-    if (currentUser.role === 'Pengelola Program') {
-      const myAkses = currentUser.indikatorAkses || [];
-      if (myAkses.length > 0) {
-        inds = inds.filter(i => myAkses.includes(parseInt(i.no)));
-      }
-    }
-
     const vp = detail.verifikasiProgram || [];
     const _vpSelesai  = vp.filter(v=>v.status==='Selesai').length;
     const _vpTolak    = vp.filter(v=>v.status==='Ditolak').length;
@@ -1793,7 +1724,7 @@ ${isSelesai && v.catatan ? (() => {
       <div style="font-weight:700;font-size:13.5px;margin-bottom:8px">Detail Indikator</div>
       <div class="table-container">
         <table>
-          <thead><tr><th>No</th><th>Indikator</th><th style="text-align:center;min-width:80px">Target Tahunan</th><th style="text-align:center">Target Bulan Ini</th><th style="text-align:center">Realisasi Bulan Ini</th><th style="text-align:center;min-width:80px">Sisa Target Tahunan</th><th style="text-align:center">Capaian</th><th style="text-align:center">Data Dukung</th></tr></thead>
+          <thead><tr style="background:#0d9488"><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">No</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Indikator</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;text-align:center;min-width:80px">Target Tahunan</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;text-align:center">Target Bulan Ini</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;text-align:center">Realisasi Bulan Ini</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;text-align:center;min-width:80px">Sisa Target Tahunan</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;text-align:center">Capaian</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;text-align:center">Data Dukung</th></tr></thead>
           <tbody>${inds.map(i => { const _sisa = INDIKATOR_TARGET_KUNCI.includes(i.no) ? (i.sasaranTahunan > 0 ? i.sasaranTahunan : null) : (i.sasaranTahunan > 0 ? Math.max(0, i.sasaranTahunan - i.realisasiKumulatif) : null); const _sc = _sisa !== null && _sisa === 0 ? '#16a34a' : (_sisa !== null && _sisa < 10 ? '#f59e0b' : '#1e293b'); return `<tr>
             <td>${i.no}</td><td style="max-width:220px;font-size:12.5px">${i.nama}</td>
             <td style="text-align:center;color:#475569">${i.sasaranTahunan > 0 ? i.sasaranTahunan : '<span style=\"color:#cbd5e1\">-</span>'}</td>

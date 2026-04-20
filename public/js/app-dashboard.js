@@ -319,13 +319,13 @@ function _renderPKMProgressPaged(pg) {
   _pkmProgressPage = p;
   window._pkmProgressGoTo = (newPg) => { _pkmProgressPage = newPg; _renderPKMProgressPaged(newPg); };
   el.innerHTML = `<table>
-    <thead><tr>
-      <th>Puskesmas</th>
-      <th style="text-align:center">Total</th>
-      <th style="text-align:center">Selesai</th>
-      <th style="text-align:center">Proses</th>
-      <th style="text-align:center">Ditolak</th>
-      <th style="min-width:120px">Progres</th>
+    <thead><tr style="background:#0d9488">
+      <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Puskesmas</th>
+      <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;text-align:center">Total</th>
+      <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;text-align:center">Selesai</th>
+      <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;text-align:center">Proses</th>
+      <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;text-align:center">Ditolak</th>
+      <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;min-width:120px">Progres</th>
     </tr></thead>
     <tbody>${pkms.map(pkm => {
       const pct = pkm.total > 0 ? Math.round((pkm.selesai / pkm.total) * 100) : 0;
@@ -1163,7 +1163,7 @@ function renderUsulanTable(rows, role) {
   };
 
   return `<div class="table-container"><table>
-    <thead><tr><th>ID Usulan</th><th>Puskesmas</th><th>Periode</th><th>Indeks SPM</th><th>Status</th><th>Dibuat</th><th>Aksi</th></tr></thead>
+    <thead><tr style="background:#0d9488"><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">ID Usulan</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Puskesmas</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Periode</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Indeks SPM</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Status</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Dibuat</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Aksi</th></tr></thead>
     <tbody>${rows.map(u => `<tr>
       <td><span style="font-weight:600;font-size:12px;">${u.idUsulan}</span></td>
       <td>${u.namaPKM || u.kodePKM}</td>

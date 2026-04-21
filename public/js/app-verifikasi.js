@@ -804,8 +804,9 @@ _ppBanner.innerHTML = `<span class="material-icons" style="color:#f59e0b;font-si
               </div>
 
               <div id="pgAlasanWrap_${i.no}" style="display:none;width:100%">
-                <input type="text" id="pgAlasan_${i.no}" placeholder="${_placeholderAlasan}"
-                  style="width:100%;font-size:11px;border:1px solid #fca5a5;border-radius:5px;padding:4px 7px;box-sizing:border-box;margin-top:2px">
+                <textarea id="pgAlasan_${i.no}" rows="2" placeholder="${_placeholderAlasan}"
+                  style="width:100%;font-size:11px;border:1px solid #fca5a5;border-radius:5px;padding:4px 7px;box-sizing:border-box;margin-top:2px;resize:none;overflow:hidden;line-height:1.45"
+                  oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
               </div>
             </div>
           </td>`;

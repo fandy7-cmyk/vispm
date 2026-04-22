@@ -15,9 +15,9 @@ async function _loadDashTahunList() {
 async function renderDashboard() {
   const role = currentUser.role;
 
-  // Baca tahun yang dipilih dari dropdown (jika sudah ada), default CURRENT_YEAR
+  // Baca tahun yang dipilih dari dropdown (jika sudah ada), default CURRENT_YEAR saat pertama load
   const selEl = document.getElementById('dashTahunFilter');
-  const tahunDipilih = selEl ? (parseInt(selEl.value) || '') : '';
+  const tahunDipilih = selEl ? (selEl.value === '' ? '' : (parseInt(selEl.value) || CURRENT_YEAR)) : CURRENT_YEAR;
 
   const params = { role, email: currentUser.email, kode_pkm: currentUser.kodePKM };
   if (tahunDipilih) params.tahun = tahunDipilih;

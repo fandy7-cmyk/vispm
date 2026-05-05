@@ -1,5 +1,5 @@
 // ============== NOTIFIKASI IN-APP ==============
-let _notifInterval = null;
+window._notifInterval = null;
 let _notifCount = 0;
 
 async function fetchNotifCount() {
@@ -39,7 +39,7 @@ function updateNotifBadge(count) {
     if (!badge) {
       badge = document.createElement('span');
       badge.id = 'notifBadge';
-      badge.style.cssText = 'position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;background:#ef4444;color:white;border-radius:20px;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;padding:0 4px;border:2px solid white;line-height:1';
+      badge.style.cssText = 'position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;background:#ef4444;color:white;border-radius:20px;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;padding:0 4px;border:2px solid var(--surface,white);line-height:1';
       btn.style.position = 'relative';
       btn.appendChild(badge);
     }
@@ -64,14 +64,14 @@ function toggleNotifPanel() {
 
   panel = document.createElement('div');
   panel.id = 'notifPanel';
-  panel.style.cssText = 'position:absolute;top:calc(100% + 8px);right:0;width:340px;background:white;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.15);border:1px solid #e2e8f0;z-index:9000;overflow:hidden';
+  panel.style.cssText = 'position:absolute;top:calc(100% + 8px);right:0;width:340px;max-width:calc(100vw - 16px);background:var(--surface,#fff);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.15);border:1px solid var(--border,#e2e8f0);z-index:9000;overflow:hidden';
   panel.innerHTML = `
-    <div style="padding:12px 16px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between">
-      <span style="font-size:14px;font-weight:700;color:#1e293b">Notifikasi</span>
-      <button onclick="document.getElementById('notifPanel').style.display='none'" style="background:none;border:none;cursor:pointer;color:#94a3b8;display:flex"><span class="material-icons" style="font-size:18px">close</span></button>
+    <div style="padding:12px 16px;border-bottom:1px solid var(--border,#f1f5f9);display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:14px;font-weight:700;color:var(--text,#1e293b)">Notifikasi</span>
+      <button onclick="document.getElementById('notifPanel').style.display='none'" style="background:none;border:none;cursor:pointer;color:var(--text-light,#94a3b8);display:flex"><span class="material-icons" style="font-size:18px">close</span></button>
     </div>
     <div id="notifPanelBody" style="max-height:360px;overflow-y:auto">
-      <div style="padding:24px;text-align:center;color:#94a3b8;font-size:13px"><div style="position:relative;width:36px;height:36px;display:inline-block;margin-bottom:6px"><div style="position:absolute;inset:0;border-radius:50%;border:3px solid transparent;border-top-color:#0d9488;animation:spin 1.1s linear infinite"></div><div style="position:absolute;inset:6px;border-radius:50%;border:3px solid transparent;border-right-color:#14b8a6;animation:spin 1.7s linear infinite reverse"></div><div style="position:absolute;inset:12px;border-radius:50%;border:3px solid transparent;border-bottom-color:#5eead4;animation:spin 2.3s linear infinite"></div></div><div>Memuat...</div></div>
+      <div style="padding:24px;text-align:center;color:var(--text-light,#94a3b8);font-size:13px"><div style="position:relative;width:36px;height:36px;display:inline-block;margin-bottom:6px"><div style="position:absolute;inset:0;border-radius:50%;border:3px solid transparent;border-top-color:#0d9488;animation:spin 1.1s linear infinite"></div><div style="position:absolute;inset:6px;border-radius:50%;border:3px solid transparent;border-right-color:#14b8a6;animation:spin 1.7s linear infinite reverse"></div><div style="position:absolute;inset:12px;border-radius:50%;border:3px solid transparent;border-bottom-color:#5eead4;animation:spin 2.3s linear infinite"></div></div><div>Memuat...</div></div>
     </div>`;
 
   const wrap = document.getElementById('notifBtnWrap');
@@ -136,7 +136,7 @@ async function loadNotifPanel() {
     }
 
     if (!items.length) {
-      el.innerHTML = `<div style="padding:32px;text-align:center;color:#94a3b8;font-size:13px">
+      el.innerHTML = `<div style="padding:32px;text-align:center;color:var(--text-light,#94a3b8);font-size:13px">
         <span class="material-icons" style="font-size:36px;display:block;margin-bottom:8px;color:#d1fae5">check_circle</span>
         Tidak ada notifikasi baru
       </div>`;
@@ -145,14 +145,14 @@ async function loadNotifPanel() {
 
     el.innerHTML = items.map(item => `
       <button onclick="${item.action};document.getElementById('notifPanel').style.display='none'"
-        style="width:100%;display:flex;align-items:flex-start;gap:10px;padding:12px 16px;background:none;border:none;border-bottom:1px solid #f8fafc;cursor:pointer;text-align:left"
-        onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='none'">
+        style="width:100%;display:flex;align-items:flex-start;gap:10px;padding:12px 16px;background:none;border:none;border-bottom:1px solid var(--border-light,#f8fafc);cursor:pointer;text-align:left"
+        onmouseover="this.style.background='var(--bg,#f8fafc)'" onmouseout="this.style.background='none'">
         <div style="width:34px;height:34px;border-radius:10px;background:${item.bg};display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">
           <span class="material-icons" style="font-size:17px;color:${item.color}">${item.icon}</span>
         </div>
         <div style="flex:1;min-width:0">
-          <div style="font-size:13px;font-weight:600;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${item.title}</div>
-          <div style="font-size:11.5px;color:#64748b;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${item.sub}</div>
+          <div style="font-size:13px;font-weight:600;color:var(--text,#1e293b);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${item.title}</div>
+          <div style="font-size:11.5px;color:var(--text-light,#64748b);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${item.sub}</div>
         </div>
       </button>`).join('');
   } catch(e) {
@@ -162,6 +162,6 @@ async function loadNotifPanel() {
 
 function startNotifPoller() {
   fetchNotifCount();
-  clearInterval(_notifInterval);
-  _notifInterval = setInterval(fetchNotifCount, 60000); // cek tiap 1 menit
+  clearInterval(window._notifInterval);
+  window._notifInterval = setInterval(fetchNotifCount, 60000); // cek tiap 1 menit
 }

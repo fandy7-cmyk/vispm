@@ -86,7 +86,7 @@ async function renderInput() {
     <div class="card">
       <div class="card-header-bar"><span class="card-title"><span class="material-icons">add_circle</span>Buat Usulan</span></div>
       <div class="card-body">
-        <div style="display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:16px;align-items:end">
+        <div style="display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:16px;align-items:end" id="buatUsulanGrid">
           <div class="form-group" style="margin-bottom:0"><label>Puskesmas</label>${pkmSelect}</div>
           <div class="form-group" style="margin-bottom:0"><label>Tahun</label>
             <select class="form-control" id="inputTahun" onchange="updateBulanOptions()" ${noPeriode ? 'disabled' : ''} style="${noPeriode ? 'opacity:0.5;cursor:not-allowed;background:#f1f5f9' : ''}">
@@ -95,7 +95,7 @@ async function renderInput() {
           </div>
           <div class="form-group" style="margin-bottom:0"><label>Bulan</label><select class="form-control" id="inputBulan" ${noPeriode ? 'disabled' : ''} style="${noPeriode ? 'opacity:0.5;cursor:not-allowed;background:#f1f5f9' : ''}"></select></div>
           <div style="margin-bottom:0">
-            <button class="btn btn-primary" onclick="createUsulan()" ${noPeriode ? 'disabled' : ''} style="${noPeriode ? 'opacity:0.5;cursor:not-allowed' : ''}">
+            <button class="btn btn-primary" onclick="createUsulan()" ${noPeriode ? 'disabled' : ''} style="width:100%;${noPeriode ? 'opacity:0.5;cursor:not-allowed' : ''}">
               <span class="material-icons">add</span>Buat Usulan
             </button>
           </div>
@@ -524,20 +524,22 @@ async function openIndikatorModal(idUsulan) {
       const _sisaTgt = INDIKATOR_TARGET_KUNCI.includes(ind.no)
         ? (ind.sasaranTahunan > 0 ? ind.sasaranTahunan : null)
         : (ind.sasaranTahunan > 0 ? Math.max(0, ind.sasaranTahunan - ind.realisasiKumulatif) : null);
-      const _sisaColor = _sisaTgt !== null && _sisaTgt === 0 ? '#16a34a' : (_sisaTgt !== null && _sisaTgt < 10 ? '#f59e0b' : '#1e293b');
+      const _sisaColor = '#1e293b';
       return `<tr id="indRow-${ind.no}">
         <td><span style="font-weight:700">${ind.no}</span></td>
         <td style="max-width:220px;font-size:12.5px">${ind.nama}</td>
         <input type="hidden" id="bobot-${ind.no}" value="${ind.bobot}">
         <input type="hidden" id="sasaran-${ind.no}" value="${ind.sasaranTahunan || 0}">
         <input type="hidden" id="prevkum-${ind.no}" value="${Math.max(0, (ind.realisasiKumulatif || 0) - (ind.capaian || 0))}">
+        <input type="hidden" id="bulan-ind-${ind.no}" value="${detail.bulan || 1}">
         <td style="text-align:center;font-size:12.5px;color:#475569">${ind.sasaranTahunan > 0 ? ind.sasaranTahunan : '<span style="color:#cbd5e1">-</span>'}</td>
         <td style="text-align:center">
           ${isLocked ? `<span>${ind.target}</span>` : `<input type="number" id="t-${ind.no}" value="${ind.target}" min="0" step="1"
-            ${!INDIKATOR_TARGET_KUNCI.includes(ind.no) && ind.sasaranTahunan > 0 ? `max="${ind.sasaranTahunan}"` : ''}
+            ${!INDIKATOR_TARGET_KUNCI.includes(ind.no) && !INDIKATOR_TARGET_SISA.includes(ind.no) && ind.sasaranTahunan > 0 ? `max="${ind.sasaranTahunan}"` : ''}
             style="width:72px;border:1.5px solid var(--border);border-radius:6px;padding:3px 6px;font-size:13px;text-align:center"
-            title="Target sasaran layanan (bilangan bulat${!INDIKATOR_TARGET_KUNCI.includes(ind.no) && ind.sasaranTahunan > 0 ? ', maks ' + ind.sasaranTahunan : ''})"
-            onchange="saveIndikator(${ind.no})" oninput="previewSPM(${ind.no})"
+            title="${INDIKATOR_TARGET_SISA.includes(ind.no) ? 'Target otomatis: Sisa Target Tahunan dibagi Sisa Bulan. Nilai akan dikoreksi ke rumus saat disimpan.' : 'Target sasaran layanan (bilangan bulat)'}"
+            onchange="${INDIKATOR_TARGET_SISA.includes(ind.no) ? `koreksiTargetSisa(${ind.no})` : `saveIndikator(${ind.no})`}"
+            oninput="previewSPM(${ind.no})"
             onkeypress="return event.charCode>=48&&event.charCode<=57">`}
         </td>
         <td style="text-align:center">
@@ -599,6 +601,33 @@ async function openIndikatorModal(idUsulan) {
         </td>
       </tr>`;
     }).join('');
+
+    // Setelah render: koreksi target untuk indikator SISA (no.7)
+    // HANYA jika user sudah pernah mengisi target (nilai > 0).
+    // Jika masih 0 (baru buat usulan), biarkan 0 — user yang isi dulu, baru dikoreksi ke rumus.
+    if (!isLocked) {
+      INDIKATOR_TARGET_SISA.forEach(noSisa => {
+        const sasaran  = parseInt(document.getElementById(`sasaran-${noSisa}`)?.value) || 0;
+        const prevKum  = parseInt(document.getElementById(`prevkum-${noSisa}`)?.value) || 0;
+        const bulanIni = parseInt(document.getElementById(`bulan-ind-${noSisa}`)?.value) || 1;
+        const tEl      = document.getElementById(`t-${noSisa}`);
+        if (!tEl || sasaran <= 0) return;
+
+        // Skip jika target masih 0 — belum diisi user, biarkan kosong dulu
+        const targetSaatIni = parseInt(tEl.value) || 0;
+        if (targetSaatIni === 0) return;
+
+        const sisaTarget    = Math.max(0, sasaran - prevKum);
+        const sisaBulan     = Math.max(1, 12 - bulanIni + 1);
+        const targetBenar   = Math.round(sisaTarget / sisaBulan);
+        tEl.value = targetBenar;
+        // Update tampilan % capaian juga
+        const capEl = document.getElementById(`cap-${noSisa}`);
+        const capaianVal = parseInt(document.getElementById(`c-${noSisa}`)?.value) || 0;
+        if (capEl) capEl.textContent = fmtCapaianPct(capaianVal, targetBenar);
+      });
+    }
+
     } // end else displayInds.length > 0
   } catch (e) {
     toast(e.message, 'error');
@@ -1195,7 +1224,6 @@ async function _renderPDFjs(container, url, idx, zoomScale) {
       });
       window.pdfjsLib.GlobalWorkerOptions.workerSrc =
         'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-      // Suppress verbose font warnings (e.g. "TT: undefined function: 22")
       if (window.pdfjsLib.verbosity !== undefined) {
         window.pdfjsLib.verbosity = window.pdfjsLib.VerbosityLevel
           ? window.pdfjsLib.VerbosityLevel.ERRORS
@@ -1226,7 +1254,6 @@ async function _renderPDFjs(container, url, idx, zoomScale) {
       xhr.send();
     });
   } catch(e) {
-    // XHR gagal/kosong → tampilkan fallback download
     _showPDFFallback(container, null, btnDl);
     return;
   }
@@ -1235,34 +1262,53 @@ async function _renderPDFjs(container, url, idx, zoomScale) {
     const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
     const totalPages = pdf.numPages;
 
-    container.innerHTML = `<div id="pdfScroll_${idx}" style="width:100%;height:100%;overflow-y:auto;overflow-x:auto;background:#3a3a3a;padding:12px 0"><div id="pdfPages_${idx}" style="transform-origin:top center;transition:transform 0.2s ease"></div></div>`;
+    // DPR untuk rendering tajam di layar HiDPI/Retina (maks 3 agar tidak OOM)
+    const DPR = Math.min(window.devicePixelRatio || 1, 3);
+
+    container.innerHTML = `<div id="pdfScroll_${idx}" style="width:100%;height:100%;overflow-y:auto;overflow-x:auto;background:#3a3a3a;padding:12px 0"><div id="pdfPages_${idx}"></div></div>`;
     const scroll   = document.getElementById('pdfScroll_' + idx);
     const pdfPages = document.getElementById('pdfPages_' + idx);
 
-    // Simpan referensi id agar _applyBuktiZoom bisa zoom via CSS tanpa re-download
+    // Simpan referensi agar zoom bisa re-render
     container._pdfPagesId  = 'pdfPages_' + idx;
     container._pdfScrollId = 'pdfScroll_' + idx;
+    container._pdfDoc      = pdf;
+    container._pdfIdx      = idx;
+    container._pdfDPR      = DPR;
 
-    for (let p = 1; p <= totalPages; p++) {
-      const page = await pdf.getPage(p);
-      const containerW = scroll.clientWidth || 620;
-      const baseVp = page.getViewport({ scale: 1 });
-      // Render pada fitScale saja; zoom visual dilakukan via CSS transform
-      const fitScale = Math.min(2.0, (containerW - 32) / baseVp.width);
-      const vp = page.getViewport({ scale: fitScale });
-      const canvas = document.createElement('canvas');
-      canvas.width  = vp.width;
-      canvas.height = vp.height;
-      canvas.style.cssText = 'display:block;margin:0 auto 10px;box-shadow:0 2px 12px rgba(0,0,0,0.5);border-radius:2px;background:white';
-      pdfPages.appendChild(canvas);
-      await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
-    }
+    // Helper: render semua halaman pada userScale tertentu (re-render asli, bukan CSS transform)
+    container._pdfRenderAtScale = async function(userScale) {
+      const pg = document.getElementById(container._pdfPagesId);
+      const sc = document.getElementById(container._pdfScrollId);
+      if (!pg) return;
+      pg.innerHTML = '';
+      const containerW = (sc ? sc.clientWidth : scroll.clientWidth) || 720;
+      for (let p = 1; p <= totalPages; p++) {
+        const page   = await container._pdfDoc.getPage(p);
+        const baseVp = page.getViewport({ scale: 1 });
+        // fitScale: sesuaikan ke lebar container; dikali userScale; dikali DPR untuk ketajaman
+        const fitScale   = (containerW - 24) / baseVp.width;
+        const totalScale = fitScale * userScale * DPR;
+        const vp = page.getViewport({ scale: totalScale });
 
-    // Terapkan zoom awal jika bukan 1.0
-    if (_zoom !== 1.0) {
-      pdfPages.style.transform = `scale(${_zoom})`;
-      pdfPages.style.marginBottom = `${pdfPages.scrollHeight * (_zoom - 1)}px`;
-    }
+        const canvas = document.createElement('canvas');
+        // Dimensi fisik canvas = high-res (tajam)
+        canvas.width  = vp.width;
+        canvas.height = vp.height;
+        // Dimensi CSS = sesuai container setelah zoom user (browser auto scale-down)
+        canvas.style.cssText = `display:block;margin:0 auto 10px;
+          width:${Math.round(vp.width / DPR)}px;
+          height:${Math.round(vp.height / DPR)}px;
+          box-shadow:0 2px 12px rgba(0,0,0,0.5);border-radius:2px;background:white`;
+        pg.appendChild(canvas);
+        await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
+      }
+      container._pdfLastZoom = userScale;
+    };
+
+    // Render awal
+    await container._pdfRenderAtScale(_zoom);
+
   } catch(e) {
     _showPDFFallback(container, e.message, btnDl);
   }
@@ -1361,32 +1407,20 @@ function _applyBuktiZoom(previewId, mode, scale) {
       container.style.justifyContent = scale > 1 ? 'flex-start' : 'center';
     }
   } else if (mode === 'pdf') {
-    // Zoom PDF via CSS transform — instan tanpa re-download
+    // Zoom PDF via re-render canvas — teks tetap tajam di semua zoom level
     const container = document.getElementById(previewId);
-    if (!container) return;
-
-    const pagesId  = container._pdfPagesId;
-    const scrollId = container._pdfScrollId;
-    const pdfPages = pagesId  ? document.getElementById(pagesId)  : null;
-    const scroll   = scrollId ? document.getElementById(scrollId) : null;
-
-    if (pdfPages) {
-      pdfPages.style.transform       = scale === 1.0 ? '' : `scale(${scale})`;
-      pdfPages.style.transformOrigin = 'top center';
-      pdfPages.style.transition      = 'transform 0.2s ease';
-      // Agungkan tinggi wrapper agar scroll area menyesuaikan konten yang diperbesar
-      if (scale > 1.0) {
-        const naturalH = pdfPages.scrollHeight / (parseFloat(pdfPages.dataset.lastScale) || 1);
-        pdfPages.dataset.lastScale    = scale;
-        pdfPages.style.marginBottom   = `${naturalH * (scale - 1)}px`;
-      } else {
-        pdfPages.dataset.lastScale    = 1;
-        pdfPages.style.marginBottom   = '';
+    if (!container || !container._pdfRenderAtScale) return;
+    // Debounce: hindari multiple re-render saat user klik cepat
+    clearTimeout(container._pdfZoomTimer);
+    container._pdfZoomTimer = setTimeout(async () => {
+      const pdfPages = container._pdfPagesId ? document.getElementById(container._pdfPagesId) : null;
+      if (pdfPages) {
+        // Tunjukkan spinner tipis di atas halaman saat re-render
+        pdfPages.style.opacity = '0.5';
       }
-    }
-    if (scroll) {
-      scroll.style.overflowX = scale > 1 ? 'auto' : 'hidden';
-    }
+      await container._pdfRenderAtScale(scale);
+      if (pdfPages) pdfPages.style.opacity = '';
+    }, 80);
   } else if (mode === 'word') {
     // Zoom Word via CSS transform pada #wordDocWrap
     const container = document.getElementById(previewId);
@@ -1466,6 +1500,10 @@ async function downloadBukti(idx) {
     window.open(downloadProxyUrl, '_blank');
   }
 }
+
+// ============== KOREKSI TARGET SISA (Indikator 7 - Lansia) ==============
+// Fungsi ini tidak lagi digunakan — Indikator 7 dikembalikan ke input manual.
+// INDIKATOR_TARGET_SISA dikosongkan di app-core.js.
 
 async function saveIndikator(noIndikator) {
   const target  = parseFloat(document.getElementById(`t-${noIndikator}`)?.value) || 0;
@@ -1616,12 +1654,14 @@ function clampRealisasi(no) {
   const sasaranEl = document.getElementById(`sasaran-${no}`);
   const sasaran = sasaranEl ? (parseInt(sasaranEl.value) || 0) : 0;
   const isKunci = INDIKATOR_TARGET_KUNCI.includes(no);
+  const isSisa = INDIKATOR_TARGET_SISA.includes(no);
   // Untuk indikator kunci: batas maks realisasi = sasaran tahunan
+  // Untuk indikator sisa (no.7): tidak ada batas maks — backend yang naikkan target otomatis
   // Untuk indikator biasa: batas maks realisasi = target bulan ini
   const t = parseInt(tEl.value) || 0;
-  const batasMaks = isKunci && sasaran > 0 ? sasaran : t;
+  const batasMaks = isKunci && sasaran > 0 ? sasaran : (isSisa ? 0 : t);
   let c = parseInt(cEl.value) || 0;
-  if (batasMaks > 0 && c > batasMaks) {
+  if (!isSisa && batasMaks > 0 && c > batasMaks) {
     cEl.value = batasMaks;
     c = batasMaks;
     const label = isKunci ? `target tahunan (${batasMaks})` : `target bulan ini (${batasMaks})`;
@@ -1647,7 +1687,7 @@ function updateSisaTarget(no) {
   }
   if (sisaBaru !== null) {
     sisaEl.textContent = sisaBaru;
-    sisaEl.style.color = sisaBaru === 0 ? '#16a34a' : (sisaBaru < 10 ? '#f59e0b' : '#1e293b');
+    sisaEl.style.color = '#1e293b';
   } else {
     sisaEl.innerHTML = '<span style="color:#cbd5e1">-</span>';
   }
@@ -1699,7 +1739,9 @@ function previewSPM(changedNo) {
     const t = tDom ? (parseFloat(tDom.value) || 0) : (parseFloat(ind.target) || 0);
     const c = cDom ? (parseFloat(cDom.value) || 0) : (parseFloat(ind.capaian) || 0);
     const bobot = parseInt(ind.bobot) || 0;
-    const rasio = t > 0 ? Math.min(c / t, 1) : 0;
+    const rasioRaw = t > 0 ? Math.min(c / t, 1) : 0;
+    // Bulatkan rasio per indikator ke 2 desimal (konsisten dengan perhitungan manual/Excel)
+    const rasio = Math.round((rasioRaw + Number.EPSILON) * 100) / 100;
     totalNilai += bobot * rasio;
     totalBobot += bobot;
   });
@@ -1715,6 +1757,59 @@ function previewSPM(changedNo) {
 // Cache nama user (email → nama) agar tidak fetch berulang kali
 if (!window._userNamaCache) window._userNamaCache = {};
 if (!window._userIndCache) window._userIndCache = {};
+
+// Helper: render badge indikator per-nomor dengan warna sesuai status (tolak=merah, setuju=hijau)
+// nomorMerah: Set nomor indikator yang perlu re-verif/ditolak (badge merah)
+// nomorHijau: Set nomor indikator yang sudah disetujui (badge hijau)
+// Jika keduanya null/undefined → fallback ke perilaku lama (isDitolakVP / isSelesai)
+function _renderIndikatorBadges(emailProgram, indikatorAkses, catatan, isDitolakVP, isSelesai, nomorMerah, nomorHijau) {
+  const _indStr = (window._userIndCache[emailProgram] !== undefined && window._userIndCache[emailProgram] !== '')
+    ? window._userIndCache[emailProgram]
+    : (indikatorAkses || 'Semua');
+  const _hasPerInd = (nomorMerah instanceof Set && nomorMerah.size > 0) || (nomorHijau instanceof Set && nomorHijau.size > 0);
+  // Selalu render badge per-nomor (abu = belum/menunggu, hijau = disetujui, merah = ditolak)
+  // Fallback ke teks biasa hanya jika _indStr tidak bisa di-parse sebagai daftar nomor
+  if (!_hasPerInd && !isSelesai && !isDitolakVP) {
+    const _nums = _indStr.split(/[,\s]+/).filter(Boolean).map(x => parseInt(x)).filter(n => !isNaN(n));
+    if (!_nums.length) return _indStr; // benar-benar tidak ada nomor → teks biasa
+    // Render semua badge abu (belum verifikasi)
+    return _nums.map(function(n) {
+      return '<span style="display:inline-block;background:#f1f5f9;color:#64748b;border:1px solid #cbd5e1;border-radius:4px;padding:0px 5px;font-size:10px;font-weight:700;margin:1px 1px 0 0">' + n + '</span>';
+    }).join('');
+  }
+  // Parse nomor yang ditolak dari catatan VP (fallback lama)
+  const _nomorTolakCatatan = new Set();
+  (catatan || '').split('|').map(function(s) { return s.trim(); }).forEach(function(p) {
+    var _m = p.match(/^#(\d+):/);
+    if (_m) _nomorTolakCatatan.add(parseInt(_m[1]));
+  });
+  // Derive nomorHijau dari _indStr jika tidak disuplai dari luar (atau kosong)
+  // _indStr adalah sumber kebenaran — sudah pakai _userIndCache yang paling up-to-date
+  var _nomorHijauFinal = nomorHijau;
+  if ((isDitolakVP || isSelesai) && nomorHijau instanceof Set && nomorHijau.size === 0) {
+    _nomorHijauFinal = new Set(
+      _indStr.split(/[,\s]+/).filter(Boolean)
+        .map(function(x) { return parseInt(x); })
+        .filter(function(x) { return !isNaN(x) && !(nomorMerah instanceof Set && nomorMerah.has(x)); })
+    );
+  }
+  return _indStr.split(/[,\s]+/).filter(Boolean).map(function(n) {
+    var _no = parseInt(n);
+    var _isMerah, _isHijau;
+    if (_hasPerInd) {
+      _isMerah = nomorMerah instanceof Set && nomorMerah.has(_no);
+      _isHijau = !_isMerah && _nomorHijauFinal instanceof Set && _nomorHijauFinal.has(_no);
+    } else {
+      _isMerah = _nomorTolakCatatan.size > 0 ? _nomorTolakCatatan.has(_no) : isDitolakVP;
+      // Jika PP menolak sebagian (catatan berisi #no: format), nomor yang TIDAK ditolak = hijau (sudah disetujui)
+      _isHijau = !_isMerah && (isSelesai || (isDitolakVP && _nomorTolakCatatan.size > 0));
+    }
+    var _bbg = _isMerah ? '#fee2e2' : _isHijau ? '#d1fae5' : '#f1f5f9';
+    var _bc  = _isMerah ? '#b91c1c' : _isHijau ? '#065f46' : '#64748b';
+    var _bb  = _isMerah ? '#fca5a5' : _isHijau ? '#6ee7b7' : '#cbd5e1';
+    return '<span style="display:inline-block;background:' + _bbg + ';color:' + _bc + ';border:1px solid ' + _bb + ';border-radius:4px;padding:0px 5px;font-size:10px;font-weight:700;margin:1px 1px 0 0">' + n + '</span>';
+  }).join('');
+}
 async function _getNamaByEmail(email) {
   if (!email) return email;
   if (window._userNamaCache[email]) return window._userNamaCache[email];
@@ -1776,6 +1871,10 @@ async function viewDetail(idUsulan) {
     if (!detail.namaKapus && detail.kapusApprovedBy) {
       detail.namaKapus = await _getNamaByEmail(detail.kapusApprovedBy);
     }
+    // Resolve nama Admin dari email jika belum ada namaAdmin
+    if (!detail.namaAdmin && detail.adminApprovedBy) {
+      detail.namaAdmin = await _getNamaByEmail(detail.adminApprovedBy);
+    }
     const vp = detail.verifikasiProgram || [];
     const _vpSelesai  = vp.filter(v=>v.status==='Selesai').length;
     const _vpTolak    = vp.filter(v=>v.status==='Ditolak').length;
@@ -1811,8 +1910,18 @@ async function viewDetail(idUsulan) {
         </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px">
           ${[...vp].sort((a,b)=>(a.nama_program||a.email_program).localeCompare(b.nama_program||b.email_program,'id')).map(v => {
-            // Jika status global sudah melewati tahap PP, semua PP dianggap selesai
-            const _ppSudahLewat = ['Menunggu Admin','Selesai'].includes(detail.statusGlobal);
+            // Jika status global sudah melewati tahap PP, semua PP dianggap selesai.
+            // Status Kapus (Menunggu Re-verifikasi Kepala Puskesmas, Menunggu Keputusan Kapus,
+            // Kapus Terima Penolakan, dll.) juga dianggap sudah lewat tahap PP.
+            // Badge merah tetap aman karena _nomorMerah dihitung per-nomor dari penolakanIndikator
+            // dengan filter aksi, sehingga nomor yang ditolak tidak akan ikut jadi hijau.
+            const _ppSudahLewat = [
+              'Menunggu Admin',
+              'Selesai',
+              'Menunggu Re-verifikasi Kepala Puskesmas',
+              'Menunggu Keputusan Kepala Puskesmas',
+              'Kapus Terima Penolakan',
+            ].includes(detail.statusGlobal);
             const isDitolakVP = v.status === 'Ditolak' && !_ppSudahLewat;
             const isSelesai = _ppSudahLewat || v.status === 'Selesai';
             const bg = isDitolakVP ? '#fef2f2' : isSelesai ? '#e6fffa' : '#f8fafc';
@@ -1820,12 +1929,55 @@ async function viewDetail(idUsulan) {
             const icon = isDitolakVP ? 'cancel' : isSelesai ? 'check_circle' : 'hourglass_top';
             const iconColor = isDitolakVP ? '#ef4444' : isSelesai ? '#0d9488' : '#94a3b8';
             const nameColor = isDitolakVP ? '#dc2626' : isSelesai ? '#0d9488' : '#64748b';
+            // Hitung nomorMerah & nomorHijau per-VP dari penolakan_indikator
+            // agar badge warna tetap akurat di semua status (Menunggu sekalipun)
+            const _piPP = (detail.penolakanIndikator || []).filter(p =>
+              p.email_program?.toLowerCase() === v.email_program?.toLowerCase()
+            );
+            // Nomor yang sudah di-setujui PP di putaran ini (aksi='setuju') — tidak boleh merah.
+            // Ini menangani kasus record lama belum dihapus di DB padahal PP sudah approve.
+            const _nomorSetuju = new Set(
+              _piPP
+                .filter(p => p.aksi === 'setuju')
+                .map(p => parseInt(p.no_indikator || p.noIndikator))
+            );
+            // Kalau PP sudah Selesai, semua indikatornya hijau — abaikan penolakanIndikator lama.
+            // Kalau tidak, hitung merah tapi exclude yang sudah di-setujui.
+            // Sumber 1: penolakan_indikator (penolakan dari Admin / siklus re-verif)
+            const _nomorMerahDariPI = isSelesai ? [] : _piPP
+              .filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'pending' || p.aksi === 'reset' || p.aksi === 'kapus-ok' || p.aksi === 'kapus-verif')
+              .map(p => parseInt(p.no_indikator || p.noIndikator))
+              .filter(n => !_nomorSetuju.has(n));
+            // Sumber 2: v.catatan dari verifikasi_program (penolakan PP normal via verifProgram)
+            // Format catatan: "#7: alasan | #9: alasan" — parse nomor yang ditolak
+            const _nomorMerahDariCatatan = (!isSelesai && isDitolakVP && _nomorMerahDariPI.length === 0)
+              ? (v.catatan || '').split('|').map(s => s.trim())
+                  .map(s => { const m = s.match(/^#(\d+):/); return m ? parseInt(m[1]) : NaN; })
+                  .filter(n => !isNaN(n) && !_nomorSetuju.has(n))
+              : [];
+            const _nomorMerah = new Set([..._nomorMerahDariPI, ..._nomorMerahDariCatatan]);
+            // Hijau = semua nomor indikator PP ini yang tidak merah
+            // Pakai sumber yang sama dengan _renderIndikatorBadges agar konsisten
+            const _indStrForHijau = (window._userIndCache[v.email_program] !== undefined && window._userIndCache[v.email_program] !== '')
+              ? window._userIndCache[v.email_program]
+              : (v.indikator_akses || '');
+            const _aksesArr = _indStrForHijau
+              .replace(/\s/g,'').split(',').map(s => parseInt(s)).filter(n => !isNaN(n) && n > 0);
+            // Isi _nomorHijau jika:
+            // 1. isSelesai / isDitolakVP (kasus lama), ATAU
+            // 2. _nomorMerah ada isinya: berarti ada sebagian indikator yang perlu re-verif,
+            //    sehingga indikator yang TIDAK merah = sudah disetujui sebelumnya = hijau.
+            //    Ini menangani siklus PP tolak sebagian > kapus > operator > ajukan ulang > kapus re-verif > PP.
+            // Kalau _nomorMerah kosong dan bukan isSelesai/isDitolakVP = belum ada verifikasi = abu.
+            const _nomorHijau = (isSelesai || isDitolakVP || _nomorMerah.size > 0)
+              ? new Set(_aksesArr.filter(n => !_nomorMerah.has(n)))
+              : new Set();
             return `<div style="background:${bg};border:1.5px solid ${border};border-radius:8px;padding:10px">
               <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
                 <span class="material-icons" style="font-size:15px;color:${iconColor}">${icon}</span>
                 <span style="font-size:12.5px;font-weight:700;color:${nameColor}">${v.nama_program||v.email_program}</span>
               </div>
-              <div style="font-size:11px;color:#94a3b8">Indikator: ${(window._userIndCache[v.email_program] !== undefined && window._userIndCache[v.email_program] !== '') ? window._userIndCache[v.email_program] : (v.indikator_akses || 'Semua')}</div>
+              <div style="font-size:11px;color:${isDitolakVP ? '#ef4444' : isSelesai ? '#0d9488' : '#94a3b8'};font-weight:${isSelesai ? '700' : '400'}">Indikator: ${_renderIndikatorBadges(v.email_program, v.indikator_akses, v.catatan, isDitolakVP, isSelesai, _nomorMerah, _nomorHijau)}</div>
               ${v.verified_at ? `<div style="font-size:10.5px;color:${iconColor}">${formatDateTime(v.verified_at)}</div>` : ''}
               ${isDitolakVP && v.catatan ? (() => {
   const id = 'alasan_' + Math.random().toString(36).slice(2,8);
@@ -1898,7 +2050,7 @@ ${isSelesai && v.catatan ? (() => {
       <div class="approval-grid" style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
         ${approvalBox('Kepala Puskesmas', detail.namaKapus || detail.kapusApprovedBy, detail.kapusApprovedAt, detail.statusKapus==='Ditolak' ? detail.kapusCatatan : '')}
         ${approvalBox('Pengelola Program', vp.length && vp.every(v=>v.status==='Selesai') ? 'Semua selesai' : '', '', detail.statusProgram==='Ditolak' ? detail.adminCatatan : '')}
-        ${approvalBox('Admin', detail.adminApprovedBy, detail.adminApprovedAt, detail.statusGlobal==='Ditolak' && detail.statusKapus!=='Ditolak' && detail.statusProgram!=='Ditolak' ? detail.adminCatatan : '')}
+        ${approvalBox('Admin', detail.namaAdmin || detail.adminApprovedBy, detail.adminApprovedAt, detail.statusGlobal==='Ditolak' && detail.statusKapus!=='Ditolak' && detail.statusProgram!=='Ditolak' ? detail.adminCatatan : '')}
       </div>
     </div>`;
   } catch (e) { if (!window._verifSilentReload) toast(e.message, 'error'); }

@@ -1,6 +1,10 @@
-// Indikator yang target bulannya selalu = target tahunan (dikunci)
+// Indikator yang target bulannya selalu = sasaran tahunan penuh (dikunci)
 // No. 8: Hipertensi, No. 9: Diabetes Melitus
 const INDIKATOR_TARGET_KUNCI = [8, 9];
+
+// Indikator 7 (Lansia): dikembalikan ke input manual seperti indikator 1-6
+// (tidak ada lagi perhitungan otomatis sisa target / sisa bulan)
+const INDIKATOR_TARGET_SISA = [];
 
 // Validasi teks: harus mengandung minimal 1 huruf atau angka (bukan hanya simbol/spasi)
 function isValidText(str) {
@@ -499,7 +503,7 @@ function doLogout() {
     title: 'Keluar dari Sistem',
     message: 'Yakin ingin keluar dari sistem?',
     type: 'warning',
-    onConfirm: () => { window._intentionalLogout = true; sessionStorage.removeItem('spm_user'); try { sessionStorage.removeItem('spm_last_page'); } catch(e) {} if(currentUser) { API.logout(); API.logAudit({module:'auth',action:'LOGOUT',userEmail:currentUser.email,userNama:currentUser.nama,userRole:currentUser.role,detail:'Logout manual'}); } currentUser = null; location.reload(); }
+    onConfirm: () => { window._intentionalLogout = true; clearInterval(window._notifInterval); sessionStorage.removeItem('spm_user'); try { sessionStorage.removeItem('spm_last_page'); } catch(e) {} if(currentUser) { API.logout(); API.logAudit({module:'auth',action:'LOGOUT',userEmail:currentUser.email,userNama:currentUser.nama,userRole:currentUser.role,detail:'Logout manual'}); } currentUser = null; location.reload(); }
   });
 }
 
@@ -553,7 +557,11 @@ function startApp() {
       window._appTahunAwal  = parseInt(s.tahun_awal);
       window._appTahunAkhir = parseInt(s.tahun_akhir);
     }
-  }).catch(() => {});
+  }).catch((err) => {
+    // Endpoint /api/settings gagal (500/network error) — app tetap berjalan dengan nilai default.
+    // Periksa log server untuk memperbaiki endpoint ini.
+    console.warn('[VISPM] /api/settings gagal:', err.message || err);
+  });
   // Fetch periode aktif untuk proteksi sidebar Input Usulan
   API.get('periode').then(allPeriode => {
     window._periodeAktifList = Array.isArray(allPeriode) ? allPeriode : [];
@@ -605,7 +613,7 @@ function startApp() {
     if (saved && saved !== 'dashboard') {
       // Kumpulkan halaman yang boleh diakses role ini dari menuMap
       const roleMenus = {
-        'Admin':            ['dashboard','verifikasi','laporan','master-data','kelola-usulan'],
+        'Admin':            ['dashboard','verifikasi','laporan','ranking','master-data','kelola-usulan'],
         'Operator':         ['dashboard','input','laporan'],
         'Kepala Puskesmas': ['dashboard','verifikasi','laporan'],
         'Pengelola Program':['dashboard','verifikasi','laporan'],
@@ -630,6 +638,9 @@ function startApp() {
   if (rolesBolehTT2.includes(currentUser.role)) {
     setTimeout(() => showTandaTanganLoginPopup(), 1000);
   }
+
+  // Popup pengumuman sistem (semua role) — tampil setelah popup TT jika ada
+  setTimeout(() => showPengumumanLoginPopup(), 1800);
 }
 
 
@@ -719,13 +730,12 @@ function buildSidebar() {
       { label: 'Menu', items: [
         { id: 'dashboard', icon: 'dashboard', label: 'Dashboard' },
         { id: 'verifikasi', icon: 'verified', label: 'Verifikasi' },
-        { id: 'laporan', icon: 'bar_chart', label: 'Laporan' }
+        { id: 'laporan', icon: 'bar_chart', label: 'Laporan' },
+        { id: 'kelola-usulan', icon: 'manage_accounts', label: 'Kelola Usulan' },
+        { id: 'ranking', icon: 'emoji_events', label: 'Ranking' }
       ]},
       { label: 'Kelola Master', items: [
         { id: 'master-data', icon: 'storage', label: 'Master Data' },
-      ]},
-      { label: 'Manajemen', items: [
-        { id: 'kelola-usulan', icon: 'manage_accounts', label: 'Kelola Semua Usulan' }
       ]}
     ],
     'Operator': [
@@ -792,8 +802,13 @@ function openBukuPanduan() {
     el.id = 'bukuPanduanModal';
     el.className = 'modal fullscreen';
 el.style.cssText = 'top:0;left:0;right:0;bottom:0;z-index:2500;justify-content:flex-start;background:transparent;pointer-events:none;';
+    // Responsif: mobile full-screen, desktop offset sidebar
+    const _isMobilePanduan = () => window.innerWidth <= 768;
+    const _getCardStylePanduan = () => _isMobilePanduan()
+      ? 'display:flex;flex-direction:column;height:100dvh;height:100vh;margin-top:0;margin-left:0;border-radius:0;width:100%;max-width:100%;pointer-events:all;border-left:none;'
+      : 'display:flex;flex-direction:column;height:calc(100vh - 60px);margin-top:60px;margin-left:260px;border-radius:0;width:calc(100% - 260px);max-width:100%;pointer-events:all;border-left:1px solid var(--border);';
 el.innerHTML = `
-  <div class="modal-card" style="display:flex;flex-direction:column;height:calc(100vh - 60px);margin-top:60px;margin-left:260px;border-radius:0 0 0 0;width:calc(100% - 260px);max-width:100%;pointer-events:all;border-left:1px solid var(--border);">
+  <div class="modal-card" id="bukuPanduanCard" style="${_getCardStylePanduan()}">
         <div class="modal-header">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary);flex-shrink:0">
             <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
@@ -819,6 +834,11 @@ el.innerHTML = `
       </div>`;
     document.body.appendChild(el);
     el.addEventListener('click', e => { if (e.target === el) closeModal('bukuPanduanModal'); });
+    // Resize handler — update card style saat orientasi berubah
+    window.addEventListener('resize', () => {
+      const card = document.getElementById('bukuPanduanCard');
+      if (card) card.style.cssText = _getCardStylePanduan();
+    });
   }
 
   showModal('bukuPanduanModal');
@@ -843,7 +863,7 @@ function setActiveNav(page) {
 
 // ============== ROUTING ==============
 const PAGE_TITLES = {
-  dashboard: 'Dashboard', verifikasi: 'Verifikasi', laporan: 'Laporan',
+  dashboard: 'Dashboard', verifikasi: 'Verifikasi', laporan: 'Laporan', ranking: 'Ranking Puskesmas',
   'master-data': 'Master Data', users: 'Kelola User', jabatan: 'Kelola Jabatan', pkm: 'Kelola Puskesmas',
   indikator: 'Kelola Indikator', periode: 'Periode Input', input: 'Input Usulan',
   'kelola-usulan': 'Kelola Usulan', 'target-tahunan': 'Target Tahunan'
@@ -871,6 +891,7 @@ function loadPage(page) {
     dashboard: renderDashboard,
     verifikasi: renderVerifikasi,
     laporan: renderLaporan,
+    ranking: renderRanking,
     'kelola-usulan': renderKelolaUsulan,
     jabatan: renderJabatan,
     users: renderUsers,
@@ -899,14 +920,16 @@ function loadPage(page) {
 }
 
 // ============== SIDEBAR MOBILE ==============
-function toggleSidebar() {
+// Didefinisikan sebagai window.* (bukan function declaration) agar bisa
+// di-override oleh responsive-patch.js tanpa konflik hoisting.
+window.toggleSidebar = function toggleSidebar() {
   document.getElementById('sidebar').classList.toggle('open');
   document.getElementById('sidebarOverlay').classList.toggle('show');
-}
-function closeSidebar() {
+};
+window.closeSidebar = function closeSidebar() {
   document.getElementById('sidebar').classList.remove('open');
   document.getElementById('sidebarOverlay').classList.remove('show');
-}
+};
 
 // ============== HELPER: YEAR SELECT ==============
 function yearOptions(selected, maxYear) {

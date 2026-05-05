@@ -109,19 +109,7 @@
    * ────────────────────────────────────────────────── */
   function _fixDashboardGrid() {
     if (window.innerWidth > BP_MOBILE) return;
-
-    // Cari semua elemen dengan inline style grid 1fr 1fr di dalam mainContent
-    const mainContent = document.getElementById('mainContent');
-    if (!mainContent) return;
-
-    // Ambil semua elemen yang punya grid inline
-    const allEls = mainContent.querySelectorAll('[style]');
-    allEls.forEach(function(el) {
-      const s = el.style.gridTemplateColumns;
-      if (s && s.trim() === '1fr 1fr') {
-        el.style.gridTemplateColumns = '1fr';
-      }
-    });
+    _fixInlineGrids(document.getElementById('mainContent'));
   }
 
   /* ──────────────────────────────────────────────────
@@ -132,12 +120,18 @@
     const mainContent = document.getElementById('mainContent');
     if (!mainContent || !window.MutationObserver) return;
 
-    const observer = new MutationObserver(function(mutations) {
-      // Delay sedikit agar JS render selesai dulu
-      setTimeout(_fixDashboardGrid, 50);
+    var _pgTimer = null;
+    const observer = new MutationObserver(function() {
+      // Debounce: tunggu render batch selesai sebelum fix
+      clearTimeout(_pgTimer);
+      _pgTimer = setTimeout(function() {
+        _fixInlineGrids(mainContent);
+        _wrapOrphanTables();
+      }, 30);
     });
 
-    observer.observe(mainContent, { childList: true, subtree: false });
+    // subtree:true agar nested dynamic content juga tertangkap
+    observer.observe(mainContent, { childList: true, subtree: true });
   }
 
   /* ──────────────────────────────────────────────────
@@ -249,18 +243,34 @@
     if (window.innerWidth > BP_MOBILE) return;
     var isSm = window.innerWidth <= BP_SM;
     var context = root || document;
+    if (!context || !context.querySelectorAll) return;
 
     context.querySelectorAll('[style]').forEach(function(el) {
       var cols = el.style.gridTemplateColumns;
       if (!cols) return;
       var c = cols.trim();
-      // 1fr 1fr 1fr → 1 kolom di ≤600px
-      if (isSm && (c === '1fr 1fr 1fr')) {
+
+      // 1fr 1fr 1fr → 1fr di ≤600px
+      if (isSm && c === '1fr 1fr 1fr') {
         el.style.gridTemplateColumns = '1fr';
         return;
       }
-      // 1fr 1fr → 1 kolom di ≤768px
+      // 1fr 1fr → 1fr di ≤768px (inkl. trailing space)
       if (c === '1fr 1fr' || c === '1fr 1fr ') {
+        el.style.gridTemplateColumns = '1fr';
+        return;
+      }
+      // repeat(2, 1fr) atau repeat(2,1fr)
+      if (/^repeat\(\s*2\s*,\s*1fr\s*\)$/.test(c)) {
+        el.style.gridTemplateColumns = '1fr';
+        return;
+      }
+      // repeat(3, 1fr) → 1fr di ≤600px
+      if (isSm && /^repeat\(\s*3\s*,\s*1fr\s*\)$/.test(c)) {
+        el.style.gridTemplateColumns = '1fr';
+      }
+      // 2fr 1fr 1fr auto (Buat Usulan form) → 1fr di mobile
+      if (c === '2fr 1fr 1fr auto') {
         el.style.gridTemplateColumns = '1fr';
       }
     });
@@ -272,31 +282,42 @@
    * ────────────────────────────────────────────────── */
   function _observeModals() {
     if (!window.MutationObserver) return;
-    // Amati semua perubahan di body (modal dirender di sini)
+
+    // ID container dinamis yang dipantau
+    var WATCHED_IDS = new Set([
+      'detailModalBody', 'indikatorInputBody', 'mainContent',
+      'notifPanelBody', 'userModalGrid', 'periodeGrid',
+      'verifikasiModal', 'pengumumanModal', 'buatUsulanGrid'
+    ]);
+
+    var _modalTimer = null;
+
     var obs = new MutationObserver(function(mutations) {
       if (window.innerWidth > BP_MOBILE) return;
+
+      var targets = new Set();
       mutations.forEach(function(m) {
+        // Node baru ditambahkan ke DOM
         m.addedNodes.forEach(function(node) {
           if (node.nodeType !== 1) return;
-          // Fix grid di node baru
-          setTimeout(function() {
-            _fixInlineGrids(node);
-            _wrapOrphanTables();
-          }, 60);
+          targets.add(node);
         });
-        // Juga fix jika konten dalam node yang ada berubah
-        if (m.type === 'childList' && m.target && m.target.id) {
-          var id = m.target.id;
-          if (id === 'detailModalBody' || id === 'indikatorInputBody' ||
-              id === 'mainContent' || id === 'notifPanelBody') {
-            setTimeout(function() {
-              _fixInlineGrids(m.target);
-              _wrapOrphanTables();
-            }, 80);
-          }
+        // Konten dalam container dinamis berubah
+        if (m.type === 'childList' && m.target && m.target.id && WATCHED_IDS.has(m.target.id)) {
+          targets.add(m.target);
         }
       });
+
+      if (!targets.size) return;
+
+      // Debounce: batch perubahan dalam satu frame render
+      clearTimeout(_modalTimer);
+      _modalTimer = setTimeout(function() {
+        targets.forEach(function(node) { _fixInlineGrids(node); });
+        _wrapOrphanTables();
+      }, 40);
     });
+
     obs.observe(document.body, { childList: true, subtree: true });
   }
 
@@ -322,24 +343,35 @@
       _observeModals();
     }
 
-    // Jalankan fix setelah app selesai render (tunggu auth selesai)
     // Override loadPage untuk jalankan fix setelah navigasi
-    const _origLoadPage = window.loadPage;
+    var _origLoadPage = window.loadPage;
     if (typeof _origLoadPage === 'function') {
       window.loadPage = function() {
-        const result = _origLoadPage.apply(this, arguments);
-        setTimeout(function() {
-          _fixDashboardGrid();
-          _fixInlineGrids();
-          _wrapOrphanTables();
-        }, 150);
+        var result = _origLoadPage.apply(this, arguments);
+        // Dua pass: cepat (30ms) + lambat (200ms) sebagai safety net
+        setTimeout(function() { _fixInlineGrids(); _wrapOrphanTables(); }, 30);
+        setTimeout(function() { _fixInlineGrids(); _wrapOrphanTables(); }, 200);
+        return result;
+      };
+    }
+
+    // Patch showModal agar grid langsung difix saat modal terbuka
+    var _origShowModal = window.showModal;
+    if (typeof _origShowModal === 'function') {
+      window.showModal = function(id) {
+        var result = _origShowModal.apply(this, arguments);
+        if (window.innerWidth <= BP_MOBILE) {
+          setTimeout(function() {
+            var el = document.getElementById(id);
+            if (el) { _fixInlineGrids(el); _wrapOrphanTables(); }
+          }, 50);
+        }
         return result;
       };
     }
 
     // Fallback: jalankan setelah 1 detik (pastikan app sudah render)
     setTimeout(function() {
-      _fixDashboardGrid();
       _fixInlineGrids();
       _wrapOrphanTables();
       _injectNotifBtn();

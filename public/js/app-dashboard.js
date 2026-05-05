@@ -75,7 +75,7 @@ function renderAdminDashboard(el, d, tahunDipilih) {
       ${statCard('orange','pending','Menunggu Verifikasi', d.menunggu, d.menunggu > 0 ? 'Perlu tindakan' : 'Semua tertangani')}
       ${statCard('purple','local_hospital','Puskesmas Aktif', d.puskesmasAktif, 'Terdaftar & aktif')}
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:stretch;margin-bottom:14px">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;align-items:stretch;margin-bottom:14px">
       <div class="card" style="margin:0;display:flex;flex-direction:column">
         <div class="card-header-bar">
           <span class="card-title"><span class="material-icons">timeline</span>${chartTitle}</span>
@@ -100,7 +100,7 @@ function renderAdminDashboard(el, d, tahunDipilih) {
         </div>
       </div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:stretch;margin-bottom:14px">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;align-items:stretch;margin-bottom:14px">
       <div class="card" style="margin:0">
         <div class="card-header-bar">
           <span class="card-title"><span class="material-icons">pending_actions</span>Menunggu Verifikasi Admin</span>
@@ -318,35 +318,35 @@ function _renderPKMProgressPaged(pg) {
   const { items: pkms, page: p, totalPages, total } = paginateDash(allPkms, pg);
   _pkmProgressPage = p;
   window._pkmProgressGoTo = (newPg) => { _pkmProgressPage = newPg; _renderPKMProgressPaged(newPg); };
-  el.innerHTML = `<table>
+  el.innerHTML = `<div style="overflow-x:auto;-webkit-overflow-scrolling:touch"><table style="min-width:420px;width:100%">
     <thead><tr style="background:#0d9488">
       <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Puskesmas</th>
-      <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;text-align:center">Total</th>
-      <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;text-align:center">Selesai</th>
-      <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;text-align:center">Proses</th>
-      <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;text-align:center">Ditolak</th>
-      <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;min-width:120px">Progres</th>
+      <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 8px;text-align:center;white-space:nowrap">Total</th>
+      <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 8px;text-align:center;white-space:nowrap">Selesai</th>
+      <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 8px;text-align:center;white-space:nowrap">Proses</th>
+      <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 8px;text-align:center;white-space:nowrap">Tolak</th>
+      <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;min-width:100px">Progres</th>
     </tr></thead>
     <tbody>${pkms.map(pkm => {
       const pct = pkm.total > 0 ? Math.round((pkm.selesai / pkm.total) * 100) : 0;
       const barColor = pct >= 80 ? '#10b981' : pct >= 50 ? '#f59e0b' : '#ef4444';
       return `<tr>
-        <td style="font-weight:600;font-size:13px">${pkm.nama}</td>
-        <td style="text-align:center">${pkm.total}</td>
-        <td style="text-align:center"><span style="color:#10b981;font-weight:700">${pkm.selesai}</span></td>
-        <td style="text-align:center"><span style="color:#f59e0b;font-weight:700">${pkm.menunggu}</span></td>
-        <td style="text-align:center"><span style="color:#ef4444;font-weight:700">${pkm.ditolak}</span></td>
-        <td>
-          <div style="display:flex;align-items:center;gap:7px">
-            <div style="flex:1;height:6px;border-radius:99px;background:#e2e8f0;overflow:hidden">
+        <td style="font-weight:600;font-size:13px;word-break:break-word;max-width:140px">${pkm.nama}</td>
+        <td style="text-align:center;padding:10px 8px">${pkm.total}</td>
+        <td style="text-align:center;padding:10px 8px"><span style="color:#10b981;font-weight:700">${pkm.selesai}</span></td>
+        <td style="text-align:center;padding:10px 8px"><span style="color:#f59e0b;font-weight:700">${pkm.menunggu}</span></td>
+        <td style="text-align:center;padding:10px 8px"><span style="color:#ef4444;font-weight:700">${pkm.ditolak}</span></td>
+        <td style="padding:10px 12px">
+          <div style="display:flex;align-items:center;gap:5px">
+            <div style="flex:1;height:6px;border-radius:99px;background:#e2e8f0;overflow:hidden;min-width:40px">
               <div style="height:100%;width:${pct}%;background:${barColor};border-radius:99px;transition:width 0.6s ease"></div>
             </div>
-            <span style="font-size:11px;font-weight:700;color:${barColor};min-width:30px;text-align:right">${pct}%</span>
+            <span style="font-size:11px;font-weight:700;color:${barColor};min-width:28px;text-align:right">${pct}%</span>
           </div>
         </td>
       </tr>`;
     }).join('')}</tbody>
-  </table>`
+  </table></div>`
   + renderPagination('pkmProgressTable', total, p, totalPages, `pg => window._pkmProgressGoTo(pg)`, DASH_ITEMS_PER_PAGE);
 }
 
@@ -428,7 +428,7 @@ renderOperatorDashboard(el, d, tahunDipilih) {
       ${statCard('cyan','event_available','Periode Aktif', periodeLabel)}
     </div>
     ${renderPeriodeBanner(periodeList)}
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:stretch;margin-bottom:14px">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;align-items:stretch;margin-bottom:14px">
       <div class="card" style="margin:0;display:flex;flex-direction:column">
         <div class="card-header-bar">
           <span class="card-title"><span class="material-icons">quickreply</span>Aksi Cepat</span>
@@ -712,7 +712,7 @@ function renderKepalasDashboard(el, d, tahunDipilih) {
       ${statCard('blue','assignment','Total Usulan PKM Saya', d.total)}
     </div>
     ${renderPeriodeVerifBanner(d.periodeAktifList || [])}
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:stretch;margin-bottom:14px">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;align-items:stretch;margin-bottom:14px">
       <div class="card" style="margin:0;display:flex;flex-direction:column">
         <div class="card-header-bar">
           <span class="card-title"><span class="material-icons">pending_actions</span>Menunggu Verifikasi Saya</span>
@@ -745,6 +745,29 @@ function renderKepalasDashboard(el, d, tahunDipilih) {
     sel.innerHTML = `<option value="">Semua Tahun</option>`
       + allTahun.map(t => `<option value="${t}" ${t == tahunDipilih ? 'selected' : ''}>${t}</option>`).join('');
   });
+
+  // Set _periodeVerifOpen dari data dashboard agar icon lock muncul jika periode sudah tutup
+  (function() {
+    const _pl = d.periodeAktifList || [];
+    if (_pl.length > 0) {
+      const _nowWita = new Date(Date.now() + 8 * 3600000);
+      const _todayStr = _nowWita.toISOString().slice(0, 10);
+      const _nowTime  = _nowWita.toISOString().slice(11, 16);
+      const _toDs = (v) => { if (!v) return ''; const dt = new Date(new Date(v).getTime() + 8*3600000); return dt.toISOString().slice(0,10); };
+      let anyOpen = false;
+      _pl.forEach(p => {
+        const tmv = p.tanggalMulaiVerif || p.tanggal_mulai_verif;
+        const tsv = p.tanggalSelesaiVerif || p.tanggal_selesai_verif;
+        const jmv = p.jamMulaiVerif || p.jam_mulai_verif || '00:00';
+        const jsv = p.jamSelesaiVerif || p.jam_selesai_verif || '23:59';
+        if (tmv && tsv) {
+          const nowDT = _todayStr + 'T' + _nowTime;
+          if (nowDT >= _toDs(tmv) + 'T' + jmv && nowDT <= _toDs(tsv) + 'T' + jsv) anyOpen = true;
+        }
+      });
+      window._periodeVerifOpen = anyOpen;
+    }
+  })();
 
   // Pending: tidak perlu filter tahun (semua yang menunggu verifikasi kapus)
   API.getUsulan({ kode_pkm: currentUser.kodePKM, status: 'Menunggu Kepala Puskesmas' }).then(rows => {
@@ -829,16 +852,16 @@ function renderProgramDashboard(el, d, tahunDipilih) {
         <div class="loading-state inline"><div class="spm-spinner sm"><div class="sr1"></div><div class="sr2"></div><div class="sr3"></div></div><span style="font-size:12px;color:var(--text-light)">Memuat indikator...</span></div>
       </div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:stretch;margin-bottom:14px">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;align-items:stretch;margin-bottom:14px">
       <div class="card" style="margin:0;display:flex;flex-direction:column">
-        <div class="card-header-bar">
+        <div class="card-header-bar" style="height:54px;box-sizing:border-box;flex-shrink:0">
           <span class="card-title"><span class="material-icons">pending_actions</span>Menunggu Verifikasi Saya</span>
           <button class="btn btn-secondary btn-sm" onclick="loadPage('verifikasi')"><span class="material-icons">arrow_forward</span>Lihat Semua</button>
         </div>
         <div class="card-body" style="padding:0;flex:1" id="pendingTable"></div>
       </div>
       <div class="card" style="margin:0;display:flex;flex-direction:column">
-        <div class="card-header-bar">
+        <div class="card-header-bar" style="height:54px;box-sizing:border-box;flex-shrink:0">
           <span class="card-title"><span class="material-icons">check_circle</span>Sudah Diverifikasi</span>
         </div>
         <div class="card-body" style="padding:0;flex:1" id="ppDoneTable"></div>
@@ -856,7 +879,7 @@ function renderProgramDashboard(el, d, tahunDipilih) {
 
   // Fetch indikator dulu, lalu render info card dengan nama lengkap
   // reVerifNos: Set nomor indikator yang sedang perlu di-re-verifikasi (opsional, default kosong)
-  const _ppUsulanParam = { status_program: 'Menunggu Pengelola Program,Menunggu Re-verifikasi PP,Ditolak,Ditolak Sebagian,Selesai,Menunggu Admin', email_program: currentUser.email };
+  const _ppUsulanParam = { status_program: 'Menunggu Pengelola Program,Menunggu Re-verifikasi PP,Ditolak,Ditolak Sebagian,Selesai,Menunggu Admin,Menunggu Kepala Puskesmas', email_program: currentUser.email };
   if (tahunDipilih) _ppUsulanParam.tahun = tahunDipilih;
   const _renderPPIndikatorInfo = (indList, reVerifNos) => {
     const _reVerif = reVerifNos instanceof Set ? reVerifNos : new Set();
@@ -933,6 +956,29 @@ function renderProgramDashboard(el, d, tahunDipilih) {
 
     // Render info card SEKALI dengan data lengkap (indikator + reVerifNos)
     _renderPPIndikatorInfo(indList, reVerifNos);
+
+    // Set _periodeVerifOpen dari data dashboard agar icon lock muncul jika periode sudah tutup
+    (function() {
+      var _pl = d.periodeAktifList || [];
+      if (_pl.length > 0) {
+        var _nowWita = new Date(Date.now() + 8 * 3600000);
+        var _todayStr = _nowWita.toISOString().slice(0, 10);
+        var _nowTime  = _nowWita.toISOString().slice(11, 16);
+        var _toDs = function(v) { if (!v) return ""; var dt = new Date(new Date(v).getTime() + 8*3600000); return dt.toISOString().slice(0,10); };
+        var anyOpen = false;
+        _pl.forEach(function(p) {
+          var tmv = p.tanggalMulaiVerif || p.tanggal_mulai_verif;
+          var tsv = p.tanggalSelesaiVerif || p.tanggal_selesai_verif;
+          var jmv = p.jamMulaiVerif || p.jam_mulai_verif || "00:00";
+          var jsv = p.jamSelesaiVerif || p.jam_selesai_verif || "23:59";
+          if (tmv && tsv) {
+            var nowDT = _todayStr + "T" + _nowTime;
+            if (nowDT >= _toDs(tmv) + "T" + jmv && nowDT <= _toDs(tsv) + "T" + jsv) anyOpen = true;
+          }
+        });
+        window._periodeVerifOpen = anyOpen;
+      }
+    })();
 
     // Pagination state untuk PP dashboard
     let _ppPendingPage = 1;
@@ -1129,14 +1175,34 @@ function renderUsulanTable(rows, role) {
       return viewBtn + editBtn + perbaikiBtn + pdfBtnEarly + logBtnEarly;
     }
     // PP dan Admin bisa verif sesuai status global
+    // Untuk PP di status 'Menunggu Kepala Puskesmas':
+    // PP masih bisa verif kalau:
+    //   1. Belum pernah verif sama sekali (myVerifStatus=null → VP-nya Menunggu), ATAU
+    //   2. Masih punya indikator miliknya yang belum direspond (aksi=null) di penolakanIndikator
+    const _ppBisaVerifSaatKapus = (() => {
+      if (role !== 'program' || u.statusGlobal !== 'Menunggu Kepala Puskesmas') return false;
+      // Kasus 1: PP ini belum pernah verif sama sekali → harus bisa verif
+      if (!u.myVerifStatus || u.myVerifStatus === 'Menunggu') return true;
+      // Kasus 2: PP sudah pernah verif, cek apakah ada indikator miliknya yg belum direspond
+      const myAkses = currentUser.indikatorAkses || [];
+      const penolakan = u.penolakanIndikator || [];
+      const belumRespond = penolakan.filter(p => !p.aksi || p.aksi === '');
+      if (!belumRespond.length) return false;
+      const milikPP = myAkses.length > 0
+        ? belumRespond.filter(p => myAkses.includes(parseInt(p.noIndikator || p.no_indikator)))
+        : belumRespond;
+      return milikPP.length > 0;
+    })();
+
     const canVerif =
       (role === 'kepala-puskesmas' && u.statusGlobal === 'Menunggu Kepala Puskesmas') ||
-      (role === 'program' && ['Menunggu Pengelola Program','Menunggu Re-verifikasi PP'].includes(u.statusGlobal)) ||
+      (role === 'program' && ['Menunggu Pengelola Program','Menunggu Re-verifikasi PP'].includes(u.statusGlobal) && !u.sudahVerif) ||
+      (role === 'program' && _ppBisaVerifSaatKapus) ||
       (role === 'admin'   && u.statusGlobal === 'Menunggu Admin');
 
     // Sudah verifikasi
     const sudahVerifKepala = role === 'kepala-puskesmas' && (u.statusKapus === 'Selesai' || u.statusKapus === 'Ditolak');
-    const sudahVerifProgram = role === 'program' && u.sudahVerif === true && (u.myVerifStatus === 'Selesai' || u.myVerifStatus === 'Ditolak' || u.myVerifStatus === 'Menunggu');
+    const sudahVerifProgram = role === 'program' && u.sudahVerif === true;
     const sudahVerifAdmin = role === 'admin' && u.statusGlobal === 'Selesai';
     const sudahVerif = sudahVerifKepala || sudahVerifProgram || sudahVerifAdmin;
 
@@ -1144,8 +1210,14 @@ function renderUsulanTable(rows, role) {
     if (sudahVerif) {
       verifBtn = `<button class="btn-icon" title="Anda sudah memverifikasi" style="background:transparent;border:none;color:#0d9488;cursor:default;opacity:0.7" disabled><span class="material-icons">check_circle</span></button>`;
     } else if (canVerif) {
-      verifBtn = `<button class="btn-icon approve" onclick="openVerifikasi('${u.idUsulan}')" title="Verifikasi Sekarang" style="animation:pulse 1.5s infinite"><span class="material-icons">rate_review</span></button>`;
+      // Periode tutup → tampilkan lock, bukan tombol verif
+      if (window._periodeVerifOpen === false) {
+        verifBtn = `<button class="btn-icon" title="Periode verifikasi sudah ditutup" style="background:transparent;border:none;opacity:0.55;cursor:not-allowed;color:#94a3b8" disabled><span class="material-icons">lock</span></button>`;
+      } else {
+        verifBtn = `<button class="btn-icon approve" onclick="openVerifikasi('${u.idUsulan}')" title="Verifikasi Sekarang" style="animation:pulse 1.5s infinite"><span class="material-icons">rate_review</span></button>`;
+      }
     } else {
+      // canVerif=false: belum giliran role ini — tampilkan lock abu-abu
       verifBtn = `<button class="btn-icon" title="Menunggu tahap sebelumnya" style="opacity:0.35;cursor:not-allowed" disabled><span class="material-icons">lock</span></button>`;
     }
 
@@ -1163,7 +1235,7 @@ function renderUsulanTable(rows, role) {
   };
 
   return `<div class="table-container"><table>
-    <thead><tr style="background:#0d9488"><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">ID Usulan</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Puskesmas</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Periode</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Indeks SPM</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Status</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Dibuat</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Aksi</th></tr></thead>
+    <thead><tr style="background:#0d9488"><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">ID Usulan</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Puskesmas</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Periode</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Indeks SPM</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:1%;min-width:140px;white-space:nowrap">Status</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Dibuat</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Aksi</th></tr></thead>
     <tbody>${rows.map(u => `<tr>
       <td><span style="font-weight:600;font-size:12px;">${u.idUsulan}</span></td>
       <td>${u.namaPKM || u.kodePKM}</td>

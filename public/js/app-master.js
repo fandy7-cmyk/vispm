@@ -12,7 +12,8 @@ function _paginateCustom(rows, page, size) {
 }
 
 // Semua data laporan mentah (sebelum filter bulan/status/pkm)
-let _lapAllData = [];
+window._lapAllData = window._lapAllData || [];
+let _lapAllData = window._lapAllData;
 
 async function renderLaporan() {
   const role = currentUser.role;
@@ -42,9 +43,8 @@ async function renderLaporan() {
         </div>
       </div>
     </div>
-    <div class="card">
-      <div class="card-body" style="padding:0" id="lapTable"></div>
-    </div>`;
+    ${role === 'Admin' ? `` : ``}
+    <div class=\"card\" id=\"lapTabelCard\" style=\"\">\n      <div class=\"card-body\" style=\"padding:0\" id=\"lapTable\"></div>\n    </div>`;
 
   await loadLaporan();
 }
@@ -132,6 +132,7 @@ async function loadLaporan() {
     const rawData = result.data || [];
 
     _lapAllData = rawData;
+    window._lapAllData = rawData;
 
     const prevTahun  = document.getElementById('lapTahun')?.value  ?? '';
     const prevBulan  = document.getElementById('lapBulan')?.value  || '';
@@ -185,7 +186,7 @@ function _lapRenderPage(page) {
 
   document.getElementById('lapTable').innerHTML = `
     <div class="table-container"><table>
-      <thead><tr style="background:#0d9488"><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">No</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Puskesmas</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Periode</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Tanggal Dibuat</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Indeks SPM</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Status</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Aksi</th></tr></thead>
+      <thead><tr style="background:#0d9488"><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">No</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Puskesmas</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Periode</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Tanggal Dibuat</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Indeks SPM</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:1%;min-width:140px;white-space:nowrap">Status</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Aksi</th></tr></thead>
       <tbody>${items.map((r, i) => `<tr>
         <td>${offset + i + 1}</td>
         <td>${r.namaPKM}</td>
@@ -339,6 +340,8 @@ async function renderMasterData(tab) {
       await renderPenandatanganTab(tc);
     } else if (activeTab === 'audit-trail') {
       await renderAuditTrail(tc);
+    } else if (activeTab === 'pengumuman') {
+      await renderKelolaPengumuman('masterTabContent');
     } else {
       const fnMap = {
         users: renderUsers, jabatan: renderJabatan, pkm: renderPKM,
@@ -693,7 +696,7 @@ function renderUsersTable(users, page) {
       <td style="font-size:12px">${u.email}</td>
       <td>${u.nama}</td>
       <td style="font-size:11px;color:var(--text-light)">${u.nip || '-'}</td>
-      <td><span class="badge badge-info">${u.role}</span></td>
+      <td style="white-space:nowrap"><span class="badge badge-info" style="white-space:nowrap">${u.role}</span></td>
       <td>${u.namaPKM || u.kodePKM || '-'}</td>
       <td style="font-size:12px">${u.role === 'Pengelola Program' ? (u.jabatan ? u.jabatan.split('|').map(j=>'<div style="font-weight:600;color:var(--primary);font-size:11px;white-space:nowrap">'+j.trim()+'</div>').join('') : '') + '<div style="color:var(--text-light);font-size:11px">'+(u.indikatorAkses || '')+'</div>' : ''}</td>
       <td>${u.aktif ? '<span class="badge badge-success">Aktif</span>' : '<span class="badge badge-default">Non-aktif</span>'}</td>
@@ -705,7 +708,7 @@ function renderUsersTable(users, page) {
       </td>
     </tr>`).join('');
   el.innerHTML = '<div class="table-container"><table>'
-    + '<thead><tr style="background:#0d9488"><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Email</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Nama</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">NIP</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Role</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Puskesmas</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Jabatan/Indikator</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Status</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Aksi</th></tr></thead>'
+    + '<thead><tr style="background:#0d9488"><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Email</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Nama</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">NIP</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;white-space:nowrap;min-width:130px">Role</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Puskesmas</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Jabatan/Indikator</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:1%;min-width:140px;white-space:nowrap">Status</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Aksi</th></tr></thead>'
     + '<tbody>' + rowsHtml + '</tbody></table></div>'
     + renderPagination('usersTable', total, p, totalPages, pg => { _usersPage = pg; renderUsersTable(); });
 }
@@ -1113,7 +1116,7 @@ function _renderJabatanTable(list, page) {
       </td>
     </tr>`).join('');
   el.innerHTML = '<div class="table-container"><table>'
-    + '<thead><tr style="background:#0d9488"><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">No</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Nama Jabatan</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Status</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Aksi</th></tr></thead>'
+    + '<thead><tr style="background:#0d9488"><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">No</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Nama Jabatan</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:1%;min-width:140px;white-space:nowrap">Status</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Aksi</th></tr></thead>'
     + '<tbody>' + rowsHtml + '</tbody></table></div>'
     + renderPagination('jabatanTable', total, p, totalPages, 'pg => { _jabPage=pg; filterJabatan(false); }');
 }
@@ -1238,7 +1241,7 @@ function renderPKMTable(pkm, page) {
       + '</td></tr>';
   }).join('');
   el.innerHTML = '<div class="table-container"><table>'
-    + '<thead><tr style="background:#0d9488"><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Kode</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Nama Puskesmas</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Indeks Beban Kerja</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Indeks Kesulitan Wilayah</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Status</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Aksi</th></tr></thead>'
+    + '<thead><tr style="background:#0d9488"><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Kode</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Nama Puskesmas</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Indeks Beban Kerja</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Indeks Kesulitan Wilayah</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:1%;min-width:140px;white-space:nowrap">Status</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Aksi</th></tr></thead>'
     + '<tbody>' + rowsHtml + '</tbody></table></div>'
     + renderPagination('pkmTable', total, p, totalPages, 'pg => { _pkmPage=pg; renderPKMTable(allPKM); }');
 }
@@ -1479,7 +1482,7 @@ function renderIndTable(inds, page) {
       </td>
     </tr>`).join('');
   el.innerHTML = '<div class="table-container"><table>'
-    + '<thead><tr style="background:#0d9488"><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">No</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Nama Indikator</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Bobot</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Status</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Aksi</th></tr></thead>'
+    + '<thead><tr style="background:#0d9488"><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">No</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Nama Indikator</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Bobot</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:1%;min-width:140px;white-space:nowrap">Status</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Aksi</th></tr></thead>'
     + '<tbody>' + rowsHtml + '</tbody></table></div>'
     + renderPagination('indTable', total, p, totalPages, 'pg => { _indPage=pg; renderIndTable(_lastInds); }');
   _lastInds = inds;
@@ -2236,7 +2239,7 @@ document.addEventListener('DOMContentLoaded', () => {
 async function renderKelolaUsulan() {
   document.getElementById('mainContent').innerHTML = `
     <div class="page-header">
-      <h1><span class="material-icons">admin_panel_settings</span>Kelola Semua Usulan</h1>
+      <h1><span class="material-icons">admin_panel_settings</span>Kelola Usulan</h1>
     </div>
     <div class="card">
       <div class="card-body" style="padding:12px 16px">
@@ -2421,7 +2424,7 @@ function _kuRenderTable() {
       </td>
     </tr>`).join('');
   el.innerHTML = '<div class="table-container"><table>'
-    + '<thead><tr style="background:#0d9488"><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">ID Usulan</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Puskesmas</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Operator</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Periode</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Indeks SPM</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Status</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Dibuat</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Aksi</th></tr></thead>'
+    + '<thead><tr style="background:#0d9488"><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">ID Usulan</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Puskesmas</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Operator</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Periode</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Indeks SPM</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:1%;min-width:140px;white-space:nowrap">Status</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Dibuat</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Aksi</th></tr></thead>'
     + '<tbody>' + rowsHtml + '</tbody></table></div>'
     + renderPagination('kuTable', total, p, totalPages, 'pg => { _kuPage=pg; _kuRenderTable(); }');
 }
@@ -2490,6 +2493,7 @@ const _masterTabs = [
   { id: 'target-tahunan',  icon: 'track_changes',   label: 'Target Tahunan' },
   { id: 'pejabat',         icon: 'draw',            label: 'Pejabat' },
   { id: 'penandatangan',   icon: 'assignment_ind',  label: 'Penandatangan' },
+  { id: 'pengumuman',      icon: 'campaign',        label: 'Pengumuman' },
   { id: 'audit-trail',     icon: 'manage_search',   label: 'Audit Trail' },
 ];
 
@@ -3179,5 +3183,57 @@ async function _savePenandatangan(noInd) {
     toast(`Konfigurasi Indikator ${noInd} berhasil disimpan!`, 'success');
   } catch(e) {
     toast('Gagal simpan: ' + e.message, 'error');
+  }
+}
+
+// ============================================================
+//  RENDER RANKING — halaman tersendiri khusus Admin
+// ============================================================
+async function renderRanking() {
+  document.getElementById('mainContent').innerHTML = `
+    <div class="page-header">
+      <h1><span class="material-icons">emoji_events</span>Ranking Puskesmas</h1>
+    </div>
+    <div class="card">
+      <div class="card-body" style="padding:14px 16px;border-bottom:1px solid var(--border,#f1f5f9)">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="font-size:12px;color:var(--text-light)">Tahun:</span>
+            <select id="rankTahun" class="form-control" onchange="_rankApplyFilter()" style="min-width:130px">
+              <option value="">Semua Tahun</option>
+            </select>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="font-size:12px;color:var(--text-light)">Bulan:</span>
+            <select id="rankBulan" class="form-control" onchange="_rankApplyFilter()" style="min-width:150px">
+              <option value="">Semua Bulan</option>
+            </select>
+          </div>
+          <span id="rankSubtitle" style="margin-left:auto;font-size:11.5px;color:var(--text-light)"></span>
+        </div>
+      </div>
+      <div id="rankTable" style="padding:0"></div>
+    </div>`;
+
+  if (!window._lapAllData || !window._lapAllData.length) {
+    try {
+      const params = {};
+      if (currentUser.role === 'Operator')         params.email_operator = currentUser.email;
+      if (currentUser.role === 'Kepala Puskesmas')  params.kode_pkm       = currentUser.kodePKM;
+      const result = await API.getLaporan(params);
+      window._lapAllData = result.data || [];
+      _lapAllData = window._lapAllData;
+    } catch(e) {
+      window._lapAllData = [];
+      _lapAllData = [];
+    }
+  }
+
+  // Gunakan fungsi dari app-laporan-ranking.js
+  if (typeof window._rankPopulateFilters === 'function') {
+    window._rankPopulateFilters();
+  }
+  if (typeof window._rankApplyFilter === 'function') {
+    window._rankApplyFilter();
   }
 }

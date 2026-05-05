@@ -156,7 +156,30 @@ const API = {
   // Konfigurasi Penandatangan Per Indikator
   getPenandatangan:    ()            => API.get('indikator-penandatangan'),
   savePenandatangan:   (data)        => API.post('indikator-penandatangan', data),
-  deletePenandatangan: (noIndikator) => API.del('indikator-penandatangan', { noIndikator })
+  deletePenandatangan: (noIndikator) => API.del('indikator-penandatangan', { noIndikator }),
+
+  // Pengumuman Sistem (Admin kelola, tampil saat login)
+  // getPengumuman: return [] jika endpoint belum ada (404) — silent fail
+  getPengumuman: async (params) => {
+    try {
+      const qs = new URLSearchParams(params || {}).toString();
+      const url = qs ? ('pengumuman?' + qs) : 'pengumuman';
+      const _user = (() => { try { return JSON.parse(sessionStorage.getItem('spm_user') || '{}'); } catch(e) { return {}; } })();
+      const _token = _user.sessionToken || '';
+      const res = await fetch('/api/' + url, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json', ...(_token ? { 'Authorization': 'Bearer ' + _token } : {}) }
+      });
+      // 404 = endpoint belum dibuat di backend — silent, kembalikan array kosong
+      if (res.status === 404) return [];
+      if (!res.ok) return [];
+      const data = await res.json();
+      return data.success ? (data.data || []) : [];
+    } catch(e) { return []; }
+  },
+  createPengumuman: (data)   => API.post('pengumuman', data),
+  updatePengumuman: (data)   => API.put('pengumuman', data),
+  deletePengumuman: (id)     => API.del('pengumuman', { id })
 };
 
 // Utils
@@ -270,7 +293,7 @@ function statusBadge(status) {
     'Menunggu Re-verifikasi Kepala Puskesmas': 'badge-warning',
   };
   const cls = map[status] || 'badge-default';
-  return `<span class="badge ${cls}" style="white-space:nowrap">${status || '-'}</span>`;
+  return `<span class="badge ${cls}" style="text-align:left">${status || '-'}</span>`;
 }
 
 function toast(msg, type = 'success', title = null) {

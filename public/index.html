@@ -130,7 +130,7 @@ body {
   display: flex; border-radius: var(--radius-lg); overflow: hidden;
   /* Lebar total: kanan 340px, kiri φ×340 ≈ 550px → total 890px */
   width: 890px; max-width: calc(100vw - var(--sp-xl));
-  max-height: calc(100vh - var(--sp-2xl));
+  max-height: calc(var(--vh, 1vh) * 100 - var(--sp-2xl));
   box-shadow: 0 40px 100px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.12);
   animation: authIn 0.4s cubic-bezier(0.34,1.56,0.64,1);
 }
@@ -279,7 +279,7 @@ body {
 }
 
 /* ===== LAYOUT ===== */
-#appLayout { display: flex; height: 100vh; overflow: hidden; }
+#appLayout { display: flex; height: 100vh; height: calc(var(--vh, 1vh) * 100); overflow: hidden; }
 
 /* ===== SIDEBAR ===== */
 .sidebar {
@@ -372,7 +372,7 @@ body {
 .topbar-avatar:hover { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(13,148,136,0.15); }
 .topbar-dropdown {
   position: absolute; top: calc(100% + var(--sp-base)); right: 0;   /* 8px below */
-  background: var(--surface); border-radius: var(--sp-md); min-width: 230px;  /* 13px radius */
+  background: var(--surface); border-radius: var(--sp-md); min-width: 230px; max-width: calc(100vw - 16px);  /* 13px radius */
   box-shadow: 0 8px 32px rgba(0,0,0,0.14), 0 0 0 1px rgba(0,0,0,0.06);
   z-index: 2000; display: none; overflow: hidden;
   animation: dropIn .18s cubic-bezier(.34,1.56,.64,1);
@@ -526,7 +526,7 @@ textarea.form-control { resize: vertical; }
 .modal-card.xl { width: calc(var(--sidebar-w) * 3.236); }   /* φ⁴ × sidebar, cap 900px */
 /* Fullscreen modal */
 .modal.fullscreen { padding: 0; align-items: stretch; justify-content: flex-end; background: rgba(0,0,0,0.3); }
-.modal.fullscreen .modal-card { width: calc(100% - var(--sidebar-w)); max-width: none; height: 100vh; border-radius: 0; margin: 0; display: flex; flex-direction: column; overflow: hidden; }
+.modal.fullscreen .modal-card { width: calc(100% - var(--sidebar-w)); max-width: none; height: 100vh; height: calc(var(--vh, 1vh) * 100); border-radius: 0; margin: 0; display: flex; flex-direction: column; overflow: hidden; }
 .modal.fullscreen .modal-header { flex-shrink: 0; }
 .modal.fullscreen .modal-body { flex: 1; overflow-y: auto; min-height: 0; max-height: none; background: var(--surface); padding: 0; }
 .modal.fullscreen .modal-body.padded { padding: 24px 28px; }
@@ -536,7 +536,7 @@ textarea.form-control { resize: vertical; }
 .modal-header { padding: var(--sp-lg) var(--sp-lg); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: var(--sp-base); }
 .modal-header h3 { font-size: var(--fs-md); font-weight: 700; flex: 1; line-height: var(--lh-tight); }
 .modal-header .material-icons { color: var(--primary); }
-.modal-body { padding: var(--sp-lg); max-height: 70vh; overflow-y: auto; }
+.modal-body { padding: var(--sp-lg); max-height: 70vh; max-height: 70dvh; overflow-y: auto; }
 .modal-footer { padding: var(--sp-md) var(--sp-lg); border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: var(--sp-base); }
 @keyframes modalIn { from { opacity: 0; transform: translateY(-16px) scale(0.98); } to { opacity: 1; transform: none; } }
 
@@ -594,7 +594,7 @@ textarea.form-control { resize: vertical; }
 .empty-state p { font-size: var(--fs-base); line-height: var(--lh-base); }
 
 /* ===== INDIKATOR INPUT TABLE ===== */
-.ind-table input[type="number"] { width: 90px; padding: 7px 8px; border: 1.5px solid var(--border); border-radius: var(--sp-sm); font-size: 13px; font-family: inherit; text-align: center; }
+.ind-table input[type="number"] { width: clamp(60px, 15vw, 90px); padding: 7px 8px; border: 1.5px solid var(--border); border-radius: var(--sp-sm); font-size: 13px; font-family: inherit; text-align: center; }
 .ind-table input[type="number"]:focus { outline: none; border-color: var(--primary); }
 .ind-table td, .ind-table th { padding: 10px 14px; }
 .rasio-cell {  font-size: var(--fs-sm); }
@@ -644,10 +644,18 @@ textarea.form-control { resize: vertical; }
   .auth-modal { flex-direction: column; max-height: none; }
   .auth-left { display: none; }
   .auth-right { flex: 1; width: 100%; }
+  /* Topbar dropdown: tidak overflow di layar kecil */
+  .topbar-dropdown { right: 0; left: auto; }
+  /* Modal body landscape: tinggi lebih fleksibel */
+  .modal-body { max-height: 65dvh; max-height: 65vh; }
+  /* Fullscreen modal lebar penuh */
+  .modal.fullscreen .modal-card { width: 100%; }
 }
 @media (max-width: 480px) {
   .stats-grid { grid-template-columns: 1fr; }
   .filter-row { flex-direction: column; }
+  /* Checkbox list grid: 1 kolom di HP kecil */
+  #jabatanCheckboxList, #indCheckboxList { grid-template-columns: 1fr !important; }
 }
 
 /* ===== THEME VARIABLES ===== */
@@ -1218,6 +1226,10 @@ input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-o
 [data-theme="dark"] ::-webkit-scrollbar-track { background: #0f172a; }
 [data-theme="dark"] ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
 [data-theme="dark"] ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+/* Ranking table — kolom Peringkat selalu center */
+#rankTable th:first-child,
+#rankTable td:first-child { text-align: center !important; }
 </style>
 <link rel="stylesheet" href="/css/responsive.css">
 </head>
@@ -1320,7 +1332,7 @@ input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-o
         </div>
         <div>
           <div class="sidebar-logo-text">VISPM</div>
-          <div class="sidebar-logo-sub">Verifikasi Indeks Standar Pelayanan Minimal</div>
+          <div class="sidebar-logo-sub">Verifikasi Indeks<br>Standar Pelayanan Minimal</div>
         </div>
       </div>
       <div class="sidebar-user">
@@ -1630,6 +1642,8 @@ input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-o
 <script src="/js/app-verifikasi.js"></script>
 <script src="/js/app-profil.js"></script>
 <script src="/js/app-master.js"></script>
+<script src="/js/app-laporan-ranking.js"></script>
+<script src="/js/app-pengumuman.js"></script>
 <script src="/js/date-picker.js"></script> 
 <script>
 // Disable browser native validation styling pada semua input number

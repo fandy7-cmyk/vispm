@@ -382,9 +382,32 @@ async function verifKapus(pool, body) {
     const statusGlobalKapus = headerInfo.rows[0]?.status_global;
 
     const isReVerifPP = ditolakOleh === 'Pengelola Program';
+
+    // Konteks khusus: PP sudah akui penolakan Admin (Kasus 3 respondPenolakan).
+    // Kapus hanya perlu konfirmasi → approve berarti setuju kembalikan ke Operator (Ditolak).
+    // Berbeda dari isReVerifAdmin biasa yang approve-nya naik ke Admin lagi.
+    const isKonfirmasiAdminTerimaKapus = konteksPenolakan === 'AdminTerimaKapus';
+    if (isKonfirmasiAdminTerimaKapus && !adaTolak) {
+      // Kapus konfirmasi → usulan Ditolak, Operator bisa perbaiki dan submit ulang berjenjang
+      // ditolak_oleh='Kepala Puskesmas' agar submitUsulan routing ke Menunggu Kepala Puskesmas
+      // konteks_penolakan=NULL agar siklus baru berjalan normal
+      await pool.query(
+        `DELETE FROM penolakan_indikator WHERE id_usulan=$1 AND dibuat_oleh='Kapus'`, [idUsulan]
+      ).catch(() => {});
+      await pool.query(
+        `UPDATE usulan_header SET status_global='Ditolak', status_kapus='Ditolak', is_locked=false,
+         ditolak_oleh='Kepala Puskesmas', konteks_penolakan=NULL,
+         kapus_approved_by=$1, kapus_approved_at=NOW(), kapus_catatan=$2 WHERE id_usulan=$3`,
+        [email, catatanKapus || 'Dikonfirmasi Kepala Puskesmas — dikembalikan ke Operator', idUsulan]
+      );
+      await logAktivitas(pool, email, 'Kepala Puskesmas', 'Konfirmasi Tolak Admin', idUsulan,
+        `Mengkonfirmasi penolakan Admin yang dibenarkan PP — usulan dikembalikan ke Operator untuk perbaikan${catatanKapus ? ' | Catatan: ' + catatanKapus : ''}`);
+      return ok({ message: 'Dikonfirmasi — usulan dikembalikan ke Operator untuk diperbaiki.' });
+    }
+
     // isReVerifAdmin: HANYA saat status 'Menunggu Re-verifikasi Kepala Puskesmas'
-    // (PP sudah selesai re-verif penolakan Admin, Kapus konfirmasi → langsung ke Admin)
-    // Kasus lain (KapusTolakAdmin, Kapus tolak biasa) → alur normal lewat PP dulu
+    // (PP sudah selesai re-verif penolakan Admin dengan sanggahan, Kapus konfirmasi → ke Admin)
+    // Kasus lain (KapusTolakAdmin, Kapus tolak biasa, AdminTerimaKapus) → alur normal
     const sisaAdminKapus = await pool.query(
   `SELECT COUNT(*) as ct FROM penolakan_indikator
    WHERE id_usulan=$1 AND dibuat_oleh='Admin'`, [idUsulan]
@@ -392,7 +415,7 @@ async function verifKapus(pool, body) {
 const adaSisaAdminKapus = parseInt(sisaAdminKapus.rows[0]?.ct) > 0;
 
 const isReVerifAdmin = statusGlobalKapus === 'Menunggu Re-verifikasi Kepala Puskesmas'
-  || konteksPenolakan === 'Admin'
+  || (konteksPenolakan === 'Admin' && !isKonfirmasiAdminTerimaKapus)
   || adaSisaAdminKapus;
 
     // AFTER — tangkap juga baris lama dengan aksi='kapus-setuju' (data sebelum patch):
@@ -1219,15 +1242,13 @@ for (const no of nomorAkuiArr) {
   }
 
   // ── KASUS 3: Semua PP membenarkan penolakan Admin (tidak ada sanggahan) ──
-  // → Dikembalikan ke Operator untuk diperbaiki, lalu harus naik berjenjang:
-  //   Operator → Kapus → PP → Admin (bukan langsung ke PP lagi)
-  // FIX 1: ditolak_oleh harus 'Kepala Puskesmas' (bukan 'Admin') agar submitUsulan
-  //         routing ke targetStatus='Menunggu Kepala Puskesmas', bukan 'Menunggu Pengelola Program'.
-  // FIX 2: Hapus penolakan_indikator milik Admin agar updateIndikator tidak memblokir
-  //         Operator saat ingin mengedit indikator yang bermasalah.
+  // → Alur berjenjang: PP → Kapus → Operator (bukan langsung ke Operator)
+  // Kapus harus konfirmasi terlebih dahulu sebelum Operator diperintahkan memperbaiki data.
+  // Setelah Kapus konfirmasi (tolak), barulah status menjadi 'Ditolak' dan Operator bisa perbaiki.
   {
-    // Gabungkan: dari admin_catatan + dari PP ini saat respond
     const nomorTolak = [...new Set([...nomorDiterimaPP])];
+
+    // Reset indikator bermasalah ke Draft agar Kapus dan Operator tahu mana yang perlu diperbaiki
     for (const no of nomorTolak) {
       await pool.query(
         `UPDATE usulan_indikator SET status='Draft', approved_by=NULL, approved_role=NULL, approved_at=NULL, catatan=NULL
@@ -1235,23 +1256,76 @@ for (const no of nomorAkuiArr) {
       );
     }
 
-    // FIX 2: Hapus baris penolakan Admin agar guard di updateIndikator tidak blokir Operator
+    // Hapus baris penolakan Admin — ganti dengan baris baru dibuat_oleh='PP'
+    // agar Kapus tahu indikator mana yang diakui PP dan perlu dikonfirmasi
     if (nomorTolak.length > 0) {
       await pool.query(
         `DELETE FROM penolakan_indikator WHERE id_usulan=$1 AND no_indikator=ANY($2) AND dibuat_oleh='Admin'`,
         [idUsulan, nomorTolak]
       ).catch(() => {});
+
+      // Ambil alasan dari admin_catatan sebagai referensi untuk Kapus
+      const adminCatatanRes = await pool.query(
+        `SELECT admin_catatan FROM usulan_header WHERE id_usulan=$1`, [idUsulan]
+      );
+      const adminCatatanStr = adminCatatanRes.rows[0]?.admin_catatan || '';
+      const alasanAdminMap = {};
+      adminCatatanStr.split('|').forEach(part => {
+        const m = part.trim().match(/^#(\d+):\s*(.+)$/);
+        if (m) alasanAdminMap[parseInt(m[1])] = m[2];
+      });
+
+      // Insert baris penolakan dibuat_oleh='PP' agar Kapus bisa lihat detail per indikator
+      const allPPKasus3 = await pool.query(
+        `SELECT email, indikator_akses FROM users WHERE role='Pengelola Program' AND aktif=true`
+      );
+      for (const no of nomorTolak) {
+        for (const pp of allPPKasus3.rows) {
+          const aksesArr = parseIndikatorAkses(pp.indikator_akses || '');
+          const adaIrisan = aksesArr.length === 0 || aksesArr.includes(no);
+          if (!adaIrisan) continue;
+          await pool.query(
+            `INSERT INTO penolakan_indikator (id_usulan, no_indikator, alasan, email_admin, created_at, aksi, email_program, dibuat_oleh)
+             VALUES ($1,$2,$3,$4,NOW(),'tolak',$5,'PP')
+             ON CONFLICT (id_usulan, no_indikator, email_program) DO UPDATE
+             SET alasan=$3, email_admin=$4, created_at=NOW(), aksi='tolak',
+                 catatan_program=NULL, responded_at=NULL, dibuat_oleh='PP'`,
+            [idUsulan, no, alasanAdminMap[no] || 'Dibenarkan oleh Pengelola Program', email, pp.email]
+          ).catch(() => {});
+        }
+      }
     }
 
-    // FIX 1: ditolak_oleh='Kepala Puskesmas' → submitUsulan akan routing ke Menunggu Kepala Puskesmas
-    // konteks_penolakan=NULL agar tidak masuk jalur KapusTolakAdmin
-    await pool.query(
-      `UPDATE usulan_header SET status_global='Ditolak', is_locked=false,
-       ditolak_oleh='Kepala Puskesmas', konteks_penolakan=NULL WHERE id_usulan=$1`, [idUsulan]
+    // Reset VP yang punya irisan dengan indikator bermasalah → Kapus perlu re-verif
+    const allVPKasus3 = await pool.query(
+      `SELECT email_program, indikator_akses FROM verifikasi_program WHERE id_usulan=$1`, [idUsulan]
     );
-    await logAktivitas(pool, email, 'Pengelola Program', 'Terima Penolakan Admin', idUsulan,
-      'PP menerima penolakan Admin — dikembalikan ke Operator | ' + logDetail.join(' | '));
-    return ok({ message: 'Penolakan Admin dibenarkan. Usulan dikembalikan ke Operator untuk diperbaiki.', allDone: true });
+    for (const vp of allVPKasus3.rows) {
+      const aksesArr = parseIndikatorAkses(vp.indikator_akses || '');
+      const adaIrisan = aksesArr.length === 0
+        ? nomorTolak.length > 0
+        : aksesArr.some(n => nomorTolak.includes(n));
+      if (adaIrisan) {
+        await pool.query(
+          `UPDATE verifikasi_program SET status='Menunggu', catatan=NULL, sanggahan=NULL, verified_at=NULL
+           WHERE id_usulan=$1 AND LOWER(email_program)=LOWER($2)`,
+          [idUsulan, vp.email_program]
+        ).catch(() => {});
+      }
+    }
+
+    // Arahkan ke Kapus untuk konfirmasi — bukan langsung Ditolak ke Operator
+    // ditolak_oleh='Admin' + konteks_penolakan='AdminTerimaKapus' (penanda khusus Kasus 3)
+    // agar verifKapus tahu: approve → Ditolak ke Operator, bukan naik ke Admin lagi
+    // is_locked=true agar Operator tidak bisa edit sebelum Kapus konfirmasi
+    await pool.query(
+      `UPDATE usulan_header SET status_global='Menunggu Kepala Puskesmas', status_kapus='Menunggu',
+       status_program='Selesai', is_locked=true,
+       ditolak_oleh='Admin', konteks_penolakan='AdminTerimaKapus' WHERE id_usulan=$1`, [idUsulan]
+    );
+    await logAktivitas(pool, email, 'Pengelola Program', 'Terima Penolakan Admin → Kapus', idUsulan,
+      'PP menerima penolakan Admin — diteruskan ke Kepala Puskesmas untuk konfirmasi | ' + logDetail.join(' | '));
+    return ok({ message: 'Penolakan Admin dibenarkan. Diteruskan ke Kepala Puskesmas untuk konfirmasi.', allDone: true });
   }
 }
 

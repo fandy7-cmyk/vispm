@@ -650,13 +650,14 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
     </div>`;
   })();
 
+  const namaPkm = (h.nama_puskesmas || h.kode_pkm || idUsulan).replace(/\s+/g, '_');
   const titleDoc = isSementara
-    ? `Laporan Sementara_${idUsulan}`
-    : `Laporan Final_${idUsulan}`;
+    ? `Laporan Sementara_${namaPkm}_${idUsulan}`
+    : `Laporan Final_${namaPkm}_${idUsulan}`;
 
   const filename = isSementara
-    ? `Laporan Sementara_${idUsulan}.pdf`
-    : `Laporan Final_${idUsulan}.pdf`;
+    ? `Laporan Sementara_${namaPkm}_${idUsulan}.pdf`
+    : `Laporan Final_${namaPkm}_${idUsulan}.pdf`;
 
   return { html: wrapHtml(titleDoc, pagesHtml + rekapPage), filename };
 }
@@ -915,8 +916,10 @@ async function generateLaporanLog(pool, idUsulan) {
       <tbody>${rowsHtml}</tbody>
     </table>`;
 
-  const titleDoc = `Log Verifikasi_${idUsulan}`;
-  const filename = `Log Verifikasi_${idUsulan}.pdf`;
+  const hLog = headerResult.rows[0];
+  const namaPkmLog = (hLog?.nama_puskesmas || hLog?.kode_pkm || idUsulan).replace(/\s+/g, '_');
+  const titleDoc = `Log Verifikasi_${namaPkmLog}_${idUsulan}`;
+  const filename = `Log Verifikasi_${namaPkmLog}_${idUsulan}.pdf`;
 
   return { html: wrapHtml(titleDoc, bodyHtml), filename };
 }

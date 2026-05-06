@@ -94,32 +94,12 @@ async function loadVerifData(status) {
     const rows = await API.getUsulan(params);
     const verifRole = role === 'Kepala Puskesmas' ? 'kepala-puskesmas' : role === 'Pengelola Program' ? 'program' : 'admin';
 
-    // Set _periodeVerifOpen sebelum render tabel agar icon lock tampil jika periode tutup
-    // Gunakan cache _periodeAktifList yang sudah di-fetch saat login (app-core.js)
-    (function() {
-      var _pl = window._periodeAktifList || [];
-      if (_pl.length === 0) {
-        // Jika cache kosong, jangan blokir (default open)
-        if (window._periodeVerifOpen === undefined) window._periodeVerifOpen = true;
-        return;
-      }
-      var _nowWita = new Date(Date.now() + 8 * 3600000);
-      var _todayStr = _nowWita.toISOString().slice(0, 10);
-      var _nowTime  = _nowWita.toISOString().slice(11, 16);
-      var _toDs = function(v) { if (!v) return ''; var dt = new Date(new Date(v).getTime() + 8 * 3600000); return dt.toISOString().slice(0, 10); };
-      var anyOpen = false;
-      _pl.forEach(function(p) {
-        var tmv = p.tanggalMulaiVerif || p.tanggal_mulai_verif;
-        var tsv = p.tanggalSelesaiVerif || p.tanggal_selesai_verif;
-        var jmv = p.jamMulaiVerif || p.jam_mulai_verif || '00:00';
-        var jsv = p.jamSelesaiVerif || p.jam_selesai_verif || '23:59';
-        if (tmv && tsv) {
-          var nowDT = _todayStr + 'T' + _nowTime;
-          if (nowDT >= _toDs(tmv) + 'T' + jmv && nowDT <= _toDs(tsv) + 'T' + jsv) anyOpen = true;
-        }
-      });
-      window._periodeVerifOpen = anyOpen;
-    })();
+    // Refresh _periodeAktifList setiap kali load verif agar perubahan periode (perpanjang/aktifkan)
+    // langsung terdeteksi tanpa perlu re-login.
+    try {
+      const freshPeriode = await API.get('periode');
+      if (Array.isArray(freshPeriode)) window._periodeAktifList = freshPeriode;
+    } catch (_) { /* gunakan cache lama jika gagal */ }
 
     window._verifRows = rows;
     window._verifRole = verifRole;

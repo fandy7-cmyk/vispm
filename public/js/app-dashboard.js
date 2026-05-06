@@ -746,28 +746,10 @@ function renderKepalasDashboard(el, d, tahunDipilih) {
       + allTahun.map(t => `<option value="${t}" ${t == tahunDipilih ? 'selected' : ''}>${t}</option>`).join('');
   });
 
-  // Set _periodeVerifOpen dari data dashboard agar icon lock muncul jika periode sudah tutup
-  (function() {
-    const _pl = d.periodeAktifList || [];
-    if (_pl.length > 0) {
-      const _nowWita = new Date(Date.now() + 8 * 3600000);
-      const _todayStr = _nowWita.toISOString().slice(0, 10);
-      const _nowTime  = _nowWita.toISOString().slice(11, 16);
-      const _toDs = (v) => { if (!v) return ''; const dt = new Date(new Date(v).getTime() + 8*3600000); return dt.toISOString().slice(0,10); };
-      let anyOpen = false;
-      _pl.forEach(p => {
-        const tmv = p.tanggalMulaiVerif || p.tanggal_mulai_verif;
-        const tsv = p.tanggalSelesaiVerif || p.tanggal_selesai_verif;
-        const jmv = p.jamMulaiVerif || p.jam_mulai_verif || '00:00';
-        const jsv = p.jamSelesaiVerif || p.jam_selesai_verif || '23:59';
-        if (tmv && tsv) {
-          const nowDT = _todayStr + 'T' + _nowTime;
-          if (nowDT >= _toDs(tmv) + 'T' + jmv && nowDT <= _toDs(tsv) + 'T' + jsv) anyOpen = true;
-        }
-      });
-      window._periodeVerifOpen = anyOpen;
-    }
-  })();
+  // Update _periodeAktifList dari data dashboard agar _isPeriodeVerifOpenFor() akurat
+  if (d.periodeAktifList && d.periodeAktifList.length > 0) {
+    window._periodeAktifList = d.periodeAktifList;
+  }
 
   // Pending: tidak perlu filter tahun (semua yang menunggu verifikasi kapus)
   API.getUsulan({ kode_pkm: currentUser.kodePKM, status: 'Menunggu Kepala Puskesmas' }).then(rows => {
@@ -957,28 +939,10 @@ function renderProgramDashboard(el, d, tahunDipilih) {
     // Render info card SEKALI dengan data lengkap (indikator + reVerifNos)
     _renderPPIndikatorInfo(indList, reVerifNos);
 
-    // Set _periodeVerifOpen dari data dashboard agar icon lock muncul jika periode sudah tutup
-    (function() {
-      var _pl = d.periodeAktifList || [];
-      if (_pl.length > 0) {
-        var _nowWita = new Date(Date.now() + 8 * 3600000);
-        var _todayStr = _nowWita.toISOString().slice(0, 10);
-        var _nowTime  = _nowWita.toISOString().slice(11, 16);
-        var _toDs = function(v) { if (!v) return ""; var dt = new Date(new Date(v).getTime() + 8*3600000); return dt.toISOString().slice(0,10); };
-        var anyOpen = false;
-        _pl.forEach(function(p) {
-          var tmv = p.tanggalMulaiVerif || p.tanggal_mulai_verif;
-          var tsv = p.tanggalSelesaiVerif || p.tanggal_selesai_verif;
-          var jmv = p.jamMulaiVerif || p.jam_mulai_verif || "00:00";
-          var jsv = p.jamSelesaiVerif || p.jam_selesai_verif || "23:59";
-          if (tmv && tsv) {
-            var nowDT = _todayStr + "T" + _nowTime;
-            if (nowDT >= _toDs(tmv) + "T" + jmv && nowDT <= _toDs(tsv) + "T" + jsv) anyOpen = true;
-          }
-        });
-        window._periodeVerifOpen = anyOpen;
-      }
-    })();
+    // Update _periodeAktifList dari data dashboard agar _isPeriodeVerifOpenFor() akurat
+    if (d.periodeAktifList && d.periodeAktifList.length > 0) {
+      window._periodeAktifList = d.periodeAktifList;
+    }
 
     // Pagination state untuk PP dashboard
     let _ppPendingPage = 1;
@@ -1158,6 +1122,30 @@ function renderDonutChart(selesai, proses, ditolak) {
 }
 
 // ============== USULAN TABLE HELPER ==============
+// Cek apakah periode verifikasi untuk usulan dengan tahun+bulan tertentu masih aktif.
+// Berbeda dengan _periodeVerifOpen (global), fungsi ini cek per-usulan.
+function _isPeriodeVerifOpenFor(tahun, bulan) {
+  const list = window._periodeAktifList || [];
+  if (!list.length) {
+    // Tidak ada data periode → fallback ke flag global jika tersedia, else open
+    return window._periodeVerifOpen !== false;
+  }
+  // Cari periode yang cocok dengan tahun+bulan usulan ini
+  const p = list.find(x => parseInt(x.tahun) === parseInt(tahun) && parseInt(x.bulan) === parseInt(bulan));
+  if (!p) return false; // Periode tidak ditemukan → anggap tutup
+  const tmv = p.tanggalMulaiVerif || p.tanggal_mulai_verif;
+  const tsv = p.tanggalSelesaiVerif || p.tanggal_selesai_verif;
+  if (!tmv || !tsv) return false; // Periode verif belum diset → tutup
+  const jmv = (p.jamMulaiVerif || p.jam_mulai_verif || '00:00').slice(0, 5);
+  const jsv = (p.jamSelesaiVerif || p.jam_selesai_verif || '23:59').slice(0, 5);
+  const toDs = (v) => { const dt = new Date(new Date(v).getTime() + 8 * 3600000); return dt.toISOString().slice(0, 10); };
+  const nowWita = new Date(Date.now() + 8 * 3600000);
+  const todayStr = nowWita.toISOString().slice(0, 10);
+  const nowTime  = nowWita.toISOString().slice(11, 16);
+  const nowDT    = todayStr + 'T' + nowTime;
+  return nowDT >= toDs(tmv) + 'T' + jmv && nowDT <= toDs(tsv) + 'T' + jsv;
+}
+
 function renderUsulanTable(rows, role) {
   if (!rows || rows.length === 0) {
     return `<div class="empty-state" style="padding:32px"><span class="material-icons">inbox</span><p>Belum ada data usulan</p></div>`;
@@ -1210,8 +1198,8 @@ function renderUsulanTable(rows, role) {
     if (sudahVerif) {
       verifBtn = `<button class="btn-icon" title="Anda sudah memverifikasi" style="background:transparent;border:none;color:#0d9488;cursor:default;opacity:0.7" disabled><span class="material-icons">check_circle</span></button>`;
     } else if (canVerif) {
-      // Periode tutup → tampilkan lock, bukan tombol verif
-      if (window._periodeVerifOpen === false) {
+      // Periode tutup → tampilkan lock per-usulan (cek tahun+bulan usulan, bukan flag global)
+      if (!_isPeriodeVerifOpenFor(u.tahun, u.bulan)) {
         verifBtn = `<button class="btn-icon" title="Periode verifikasi sudah ditutup" style="background:transparent;border:none;opacity:0.55;cursor:not-allowed;color:#94a3b8" disabled><span class="material-icons">lock</span></button>`;
       } else {
         verifBtn = `<button class="btn-icon approve" onclick="openVerifikasi('${u.idUsulan}')" title="Verifikasi Sekarang" style="animation:pulse 1.5s infinite"><span class="material-icons">rate_review</span></button>`;

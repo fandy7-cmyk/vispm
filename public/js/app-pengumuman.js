@@ -397,10 +397,10 @@ async function openFormPengumuman(id, containerId) {
     if (found) data = found;
   }
 
-  // Default durasi tampil: 7 hari mulai hari ini
+  // Default durasi tampil: 3 hari mulai hari ini
   const todayIso = new Date().toISOString().slice(0, 10);
   const defaultEnd = (() => {
-    const d = new Date(); d.setDate(d.getDate() + 7);
+    const d = new Date(); d.setDate(d.getDate() + 2);
     return d.toISOString().slice(0, 10);
   })();
 
@@ -501,16 +501,16 @@ async function openFormPengumuman(id, containerId) {
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
           <div class="form-group" style="margin:0">
             <label>Tanggal Mulai <span style="color:#ef4444">*</span></label>
-            <input type="date" class="form-control" id="pgmMulai" value="${_isoDateOnly(data?.tanggal_mulai) || todayIso}">
+            <input type="hidden" id="pgmMulai" value="${_isoDateOnly(data?.tanggal_mulai) || todayIso}">
           </div>
           <div class="form-group" style="margin:0">
             <label>Tanggal Selesai <span style="color:#ef4444">*</span></label>
-            <input type="date" class="form-control" id="pgmSelesai" value="${_isoDateOnly(data?.tanggal_selesai) || defaultEnd}">
+            <input type="hidden" id="pgmSelesai" value="${_isoDateOnly(data?.tanggal_selesai) || defaultEnd}">
           </div>
         </div>
 
         <!-- Preview durasi -->
-        <div id="pgmDurasiInfo" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:9px 13px;font-size:12px;color:#166534;display:flex;align-items:center;gap:6px">
+        <div id="pgmDurasiInfo" style="margin-top:16px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:9px 13px;font-size:12px;color:#166534;display:flex;align-items:center;gap:6px">
           <span class="material-icons" style="font-size:15px">schedule</span>
           <span id="pgmDurasiTeks">—</span>
         </div>
@@ -529,6 +529,14 @@ async function openFormPengumuman(id, containerId) {
     </div>`;
 
   showModal('pgmFormModal');
+
+  // Init VDP custom date picker untuk kedua field tanggal
+  setTimeout(() => {
+    if (window.VDP) {
+      VDP.init('pgmMulai');
+      VDP.init('pgmSelesai');
+    }
+  }, 50);
 
   // Update info durasi saat tanggal berubah
   const _updDurasi = () => {

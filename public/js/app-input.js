@@ -1766,6 +1766,10 @@ function _renderIndikatorBadges(emailProgram, indikatorAkses, catatan, isDitolak
   const _indStr = (window._userIndCache[emailProgram] !== undefined && window._userIndCache[emailProgram] !== '')
     ? window._userIndCache[emailProgram]
     : (indikatorAkses || 'Semua');
+  // Sentinel: nomorHijau = Set({-1}) → _aksesArr kosong tapi PP sudah Selesai → semua disetujui
+  if (nomorHijau instanceof Set && nomorHijau.has(-1)) {
+    return '<span style="display:inline-block;background:#d1fae5;color:#065f46;border:1px solid #6ee7b7;border-radius:4px;padding:0px 7px;font-size:10px;font-weight:700;margin:1px 0">Semua disetujui ✓</span>';
+  }
   const _hasPerInd = (nomorMerah instanceof Set && nomorMerah.size > 0) || (nomorHijau instanceof Set && nomorHijau.size > 0);
   // Selalu render badge per-nomor (abu = belum/menunggu, hijau = disetujui, merah = ditolak)
   // Fallback ke teks biasa hanya jika _indStr tidak bisa di-parse sebagai daftar nomor
@@ -1935,27 +1939,45 @@ async function viewDetail(idUsulan) {
               p.email_program?.toLowerCase() === v.email_program?.toLowerCase()
             );
             // Nomor yang sudah di-setujui PP di putaran ini (aksi='setuju') — tidak boleh merah.
-            // Ini menangani kasus record lama belum dihapus di DB padahal PP sudah approve.
             const _nomorSetuju = new Set(
               _piPP
                 .filter(p => p.aksi === 'setuju')
                 .map(p => parseInt(p.no_indikator || p.noIndikator))
             );
+            // Akses nomor indikator PP ini (untuk irisan)
+            const _aksesStrForMerah = (window._userIndCache[v.email_program] !== undefined && window._userIndCache[v.email_program] !== '')
+              ? window._userIndCache[v.email_program]
+              : (v.indikator_akses || '');
+            const _aksesSetForMerah = new Set(
+              _aksesStrForMerah.replace(/\s/g,'').split(',').map(s => parseInt(s)).filter(n => !isNaN(n) && n > 0)
+            );
+            // Semua nomor yang aktif ditolak dari seluruh penolakanIndikator (tidak filter per email)
+            // Dipakai sebagai fallback untuk kasus penolakan Admin yang tidak menyimpan email_program.
+            const _allAktifNomor = isSelesai ? new Set() : new Set(
+              (detail.penolakanIndikator || [])
+                .filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'pending' || p.aksi === 'reset' || p.aksi === 'kapus-ok' || p.aksi === 'kapus-verif')
+                .map(p => parseInt(p.no_indikator || p.noIndikator))
+                .filter(n => !isNaN(n))
+            );
             // Kalau PP sudah Selesai, semua indikatornya hijau — abaikan penolakanIndikator lama.
-            // Kalau tidak, hitung merah tapi exclude yang sudah di-setujui.
-            // Sumber 1: penolakan_indikator (penolakan dari Admin / siklus re-verif)
+            // Sumber 1: penolakan_indikator filter per email (akurat untuk penolakan oleh PP)
             const _nomorMerahDariPI = isSelesai ? [] : _piPP
               .filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'pending' || p.aksi === 'reset' || p.aksi === 'kapus-ok' || p.aksi === 'kapus-verif')
               .map(p => parseInt(p.no_indikator || p.noIndikator))
               .filter(n => !_nomorSetuju.has(n));
-            // Sumber 2: v.catatan dari verifikasi_program (penolakan PP normal via verifProgram)
+            // Sumber 2: irisan akses PP dengan semua nomor aktif ditolak
+            // Dipakai jika _piPP kosong (penolakan Admin tidak selalu punya email_program)
+            const _nomorMerahDariIrisan = (_nomorMerahDariPI.length === 0 && !isSelesai && _aksesSetForMerah.size > 0)
+              ? [..._allAktifNomor].filter(n => _aksesSetForMerah.has(n) && !_nomorSetuju.has(n))
+              : [];
+            // Sumber 3: v.catatan dari verifikasi_program (penolakan PP normal via verifProgram)
             // Format catatan: "#7: alasan | #9: alasan" — parse nomor yang ditolak
-            const _nomorMerahDariCatatan = (!isSelesai && isDitolakVP && _nomorMerahDariPI.length === 0)
+            const _nomorMerahDariCatatan = (!isSelesai && isDitolakVP && _nomorMerahDariPI.length === 0 && _nomorMerahDariIrisan.length === 0)
               ? (v.catatan || '').split('|').map(s => s.trim())
                   .map(s => { const m = s.match(/^#(\d+):/); return m ? parseInt(m[1]) : NaN; })
                   .filter(n => !isNaN(n) && !_nomorSetuju.has(n))
               : [];
-            const _nomorMerah = new Set([..._nomorMerahDariPI, ..._nomorMerahDariCatatan]);
+            const _nomorMerah = new Set([..._nomorMerahDariPI, ..._nomorMerahDariIrisan, ..._nomorMerahDariCatatan]);
             // Hijau = semua nomor indikator PP ini yang tidak merah
             // Pakai sumber yang sama dengan _renderIndikatorBadges agar konsisten
             const _indStrForHijau = (window._userIndCache[v.email_program] !== undefined && window._userIndCache[v.email_program] !== '')
@@ -1969,8 +1991,12 @@ async function viewDetail(idUsulan) {
             //    sehingga indikator yang TIDAK merah = sudah disetujui sebelumnya = hijau.
             //    Ini menangani siklus PP tolak sebagian > kapus > operator > ajukan ulang > kapus re-verif > PP.
             // Kalau _nomorMerah kosong dan bukan isSelesai/isDitolakVP = belum ada verifikasi = abu.
+            // FIX: jika isSelesai tapi _aksesArr kosong (indikator_akses tidak tersimpan di verifikasi_program),
+            // paksa _nomorHijau = sentinel Set({-1}) agar _renderIndikatorBadges tahu semua harus hijau.
             const _nomorHijau = (isSelesai || isDitolakVP || _nomorMerah.size > 0)
-              ? new Set(_aksesArr.filter(n => !_nomorMerah.has(n)))
+              ? (_aksesArr.length > 0
+                  ? new Set(_aksesArr.filter(n => !_nomorMerah.has(n)))
+                  : (isSelesai ? new Set([-1]) : new Set())) // -1 = sentinel "semua hijau"
               : new Set();
             return `<div style="background:${bg};border:1.5px solid ${border};border-radius:8px;padding:10px">
               <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">

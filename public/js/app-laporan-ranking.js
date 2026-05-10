@@ -158,7 +158,11 @@
         + (showBulanCol ? '<td style="font-size:12px;color:var(--text-light);padding:10px 12px">' + (r.namaBulan || '') + ' ' + (r.tahun || '') + '</td>' : '')
         + '<td style="font-size:12px;padding:10px 12px;color:var(--text-light)">' + _fmt(r.createdAt) + '</td>'
         + '<td style="font-size:12px;padding:10px 12px;color:var(--text-light)">'
-        + (isSelesai ? _fmt(r.waktuSelesai || r.updatedAt || r.createdAt) : '<span style="color:#f59e0b;font-size:11.5px;font-weight:600">' + r.statusGlobal + '</span>')
+        + (isSelesai
+            ? _fmt(r.waktuSelesai || r.updatedAt || r.createdAt)
+            : '<span title="Sedang diproses" style="display:inline-flex;align-items:center;gap:5px;color:#f59e0b;font-size:11.5px;font-weight:600">'
+            + '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>'
+            + 'Sedang diproses</span>')
         + '</td>'
         + '<td style="font-weight:700;color:#0d9488;padding:10px 12px">' + parseFloat(r.indeksSPM || 0).toFixed(2) + '</td>'
         + '<td style="padding:10px 12px">' + statusBadge(r.statusGlobal) + '</td>'

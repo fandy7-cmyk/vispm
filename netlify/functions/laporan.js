@@ -100,7 +100,9 @@ exports.handler = async (event) => {
       createdBy: r.created_by || '',
       createdAt: r.created_at,
       finalApprovedBy: r.final_approved_by || '',
-      finalApprovedAt: r.final_approved_at
+      finalApprovedAt: r.final_approved_at,
+      waktuSelesai: r.waktu_selesai || null,
+      adminApprovedAt: r.admin_approved_at || null
     }));
 
     return ok({

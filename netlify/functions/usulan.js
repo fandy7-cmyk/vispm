@@ -29,6 +29,7 @@ async function runMigrations(pool) {
     // Poin 2: kolom tracking siklus re-verifikasi Admin ↔ PP
     // Direset ke 0 saat Admin approve semua (Selesai), increment tiap Admin tolak ke PP
     pool.query(`ALTER TABLE usulan_header ADD COLUMN IF NOT EXISTS reverif_count INT DEFAULT 0`).catch(()=>{}),
+    pool.query(`ALTER TABLE usulan_header ADD COLUMN IF NOT EXISTS waktu_selesai TIMESTAMPTZ`).catch(()=>{}),
     pool.query(`CREATE TABLE IF NOT EXISTS penolakan_indikator (
       id SERIAL PRIMARY KEY,
       id_usulan VARCHAR(50) NOT NULL,

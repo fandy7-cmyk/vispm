@@ -825,6 +825,7 @@ async function verifAdmin(pool, body) {
     await pool.query(
       `UPDATE usulan_header SET status_global='Selesai', status_final='Selesai',
        admin_approved_by=$1, admin_approved_at=NOW(),
+       waktu_selesai=NOW(),
        ditolak_oleh=NULL, konteks_penolakan=NULL,
        reverif_count=0
        WHERE id_usulan=$2`,

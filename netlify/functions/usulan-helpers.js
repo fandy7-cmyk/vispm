@@ -65,6 +65,7 @@ function mapHeader(r) {
     kapusCatatan:r.kapus_catatan||'', kapusCatatanUmum:r.kapus_catatan_umum||'', operatorCatatan:r.operator_catatan||'',
     adminApprovedBy:r.admin_approved_by||'',
     adminApprovedAt:r.admin_approved_at, adminCatatan:r.admin_catatan||'',
+    waktuSelesai:r.waktu_selesai||null,
     finalApprovedBy:r.final_approved_by||'', finalApprovedAt:r.final_approved_at,
     driveFolderUrl:r.drive_folder_url||'', driveFolderId:r.drive_folder_id||'',
     ditolakOleh: isDitolak ? (r.ditolak_oleh || ditolakOleh) : (r.ditolak_oleh || null),

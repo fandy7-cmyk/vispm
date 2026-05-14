@@ -1740,13 +1740,11 @@ function previewSPM(changedNo) {
     const c = cDom ? (parseFloat(cDom.value) || 0) : (parseFloat(ind.capaian) || 0);
     const bobot = parseInt(ind.bobot) || 0;
     const rasioRaw = t > 0 ? Math.min(c / t, 1) : 0;
-    // Bulatkan rasio per indikator ke 2 desimal (konsisten dengan perhitungan manual/Excel)
-    const rasio = Math.round((rasioRaw + Number.EPSILON) * 100) / 100;
-    totalNilai += bobot * rasio;
+    totalNilai += bobot * rasioRaw;
     totalBobot += bobot;
   });
   const round2 = n => Math.round((n + Number.EPSILON) * 100) / 100;
-  const indeksKinerja = totalBobot > 0 ? round2(totalNilai / totalBobot) : 0;
+  const indeksKinerja = totalBobot > 0 ? totalNilai / totalBobot : 0;
   const indeksSPM = round2(indeksKinerja * 0.33);
   // Update display dengan tanda bahwa ini preview (belum tersimpan)
   const topEl = document.getElementById('indModalSPMTop');

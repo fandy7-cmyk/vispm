@@ -161,7 +161,7 @@ async function updateIndikator(pool, body) {
 
   // Rumus rasio: capaian / target, maks 1.00, 2 angka di belakang koma
   let rasio = 0;
-  if (t > 0) rasio = Math.round(Math.min(c / t, 1) * 100) / 100;
+  if (t > 0) rasio = Math.min(c / t, 1);
 
   // Ambil bobot indikator ini
   const bobotRes = await pool.query(
@@ -210,7 +210,7 @@ async function hitungSPM(pool, idUsulan) {
   }
 
   // Rumus: indeks_kinerja = total_nilai / total_bobot (pembulatan 2 desimal)
-  const indeksKinerja = totalBobot > 0 ? round2(totalNilai / totalBobot) : 0;
+  const indeksKinerja = totalBobot > 0 ? totalNilai / totalBobot : 0;
 
   // Rumus: indeks_spm = indeks_kinerja * 0.33 (pembulatan 2 desimal)
   const indeksSPM = round2(indeksKinerja * KONSTANTA);

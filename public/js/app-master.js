@@ -781,6 +781,8 @@ function resetUserPassword(email, nama) {
   document.getElementById('rpStatus').textContent = '';
   document.getElementById('rpNew').type = 'password';
   document.getElementById('rpPwIcon').textContent = 'visibility_off';
+  document.getElementById('rpConfirm').type = 'password';
+  document.getElementById('rpConfirmPwIcon').textContent = 'visibility_off';
   showModal('resetPasswordModal');
   setTimeout(() => document.getElementById('rpNew').focus(), 100);
 }
@@ -788,6 +790,13 @@ function resetUserPassword(email, nama) {
 function toggleRpPw() {
   const inp = document.getElementById('rpNew');
   const icon = document.getElementById('rpPwIcon');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+  icon.textContent = inp.type === 'password' ? 'visibility_off' : 'visibility';
+}
+
+function toggleRpConfirmPw() {
+  const inp = document.getElementById('rpConfirm');
+  const icon = document.getElementById('rpConfirmPwIcon');
   inp.type = inp.type === 'password' ? 'text' : 'password';
   icon.textContent = inp.type === 'password' ? 'visibility_off' : 'visibility';
 }
@@ -800,7 +809,7 @@ async function doResetPassword() {
   if (newPassword !== confirm) { statusEl.textContent = 'Konfirmasi password tidak cocok'; return; }
   setLoading(true);
   try {
-    await API.post('auth', { action: 'reset-password', targetEmail: _resetTargetEmail, newPassword });
+    await API.post('auth', { action: 'reset-password', email: currentUser.email, targetEmail: _resetTargetEmail, newPassword });
     closeModal('resetPasswordModal');
     toast(`Password berhasil direset!`, 'success');
   } catch(e) { statusEl.textContent = e.message; }

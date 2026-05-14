@@ -1414,7 +1414,12 @@ input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-o
       </div>
       <div class="form-group">
         <label>Konfirmasi Password Baru</label>
-        <input type="password" id="rpConfirm" class="form-control" placeholder="Ulangi password baru" onkeydown="if(event.key==='Enter')doResetPassword()">
+        <div style="position:relative">
+          <input type="password" id="rpConfirm" class="form-control" placeholder="Ulangi password baru" onkeydown="if(event.key==='Enter')doResetPassword()">
+          <button type="button" onclick="toggleRpConfirmPw()" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-light);display:flex;align-items:center">
+            <span class="material-icons" id="rpConfirmPwIcon" style="font-size:20px">visibility_off</span>
+          </button>
+        </div>
       </div>
       <div id="rpStatus" style="font-size:13px;min-height:18px;color:var(--danger)"></div>
     </div>

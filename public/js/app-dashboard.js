@@ -60,7 +60,7 @@ function renderAdminDashboard(el, d, tahunDipilih) {
     : `Statistik per Tahun`;
   el.innerHTML = `
     <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:14px">
-      <h1 style="margin:0"><span class="material-icons">dashboard</span>Dashboard</h1>
+      <h1 style="margin:0"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;color:var(--primary)"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</h1>
       <div style="display:flex;align-items:center;gap:8px">
         <span style="font-size:12px;color:var(--text-light);font-weight:600">Filter Tahun:</span>
         <div id="dashTahunWrap"><select id="dashTahunFilter" onchange="renderDashboard()"
@@ -412,7 +412,7 @@ renderOperatorDashboard(el, d, tahunDipilih) {
 
   el.innerHTML = `
     <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:14px">
-      <h1 style="margin:0"><span class="material-icons">dashboard</span>Dashboard</h1>
+      <h1 style="margin:0"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;color:var(--primary)"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</h1>
       <div style="display:flex;align-items:center;gap:8px">
         <span style="font-size:12px;color:var(--text-light);font-weight:600">Filter Tahun:</span>
         <select id="dashTahunFilter" onchange="renderDashboard()"
@@ -697,7 +697,7 @@ function renderPeriodeVerifBanner(periodeList) {
 function renderKepalasDashboard(el, d, tahunDipilih) {
   el.innerHTML = `
     <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:14px">
-      <h1 style="margin:0"><span class="material-icons">dashboard</span>Dashboard</h1>
+      <h1 style="margin:0"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;color:var(--primary)"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</h1>
       <div style="display:flex;align-items:center;gap:8px">
         <span style="font-size:12px;color:var(--text-light);font-weight:600">Filter Tahun:</span>
         <select id="dashTahunFilter" onchange="renderDashboard()"
@@ -813,7 +813,7 @@ function renderProgramDashboard(el, d, tahunDipilih) {
 
   el.innerHTML = `
     <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:14px">
-      <h1 style="margin:0"><span class="material-icons">dashboard</span>Dashboard</h1>
+      <h1 style="margin:0"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;color:var(--primary)"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</h1>
       <div style="display:flex;align-items:center;gap:8px">
         <span style="font-size:12px;color:var(--text-light);font-weight:600">Filter Tahun:</span>
         <select id="dashTahunFilter" onchange="renderDashboard()"

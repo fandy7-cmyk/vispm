@@ -350,26 +350,42 @@ body {
 /* ===== MAIN CONTENT ===== */
 .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
 .topbar {
-  background: var(--surface); border-bottom: 1px solid var(--border);
+  background: linear-gradient(90deg, var(--sidebar-bg1) 0%, var(--sidebar-bg2) 60%, var(--sidebar-bg3) 100%);
+  border-bottom: 1px solid rgba(13,148,136,0.25);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.18);
   padding: 0 var(--content-p); height: var(--topbar-h);   /* 0 34px, height 55px */
   display: flex; align-items: center;
   justify-content: space-between; flex-shrink: 0;
 }
-.topbar-title { font-size: var(--fs-md); font-weight: 700; color: var(--text); }  /* 16px */
+.topbar-title {
+  font-size: var(--fs-md); font-weight: 700; color: #ffffff;
+  display: flex; align-items: center; gap: var(--sp-base);
+  letter-spacing: -0.2px;
+}
+.topbar-title svg { flex-shrink: 0; opacity: 0.9; }
 .topbar-right { display: flex; align-items: center; gap: var(--sp-md); }           /* 13px gap */
+/* Notif button in topbar — inverted for dark topbar */
+#notifBtn { border-color: rgba(255,255,255,0.2) !important; background: rgba(255,255,255,0.08) !important; color: rgba(255,255,255,0.75) !important; }
+#notifBtn:hover { border-color: #5eead4 !important; color: #5eead4 !important; background: rgba(94,234,212,0.12) !important; }
+/* Theme toggle in topbar */
+.theme-toggle-btn { color: rgba(255,255,255,0.75); }
+.theme-toggle-btn:hover { background: rgba(255,255,255,0.1); }
+/* Mobile menu btn in topbar */
+.mobile-menu-btn { color: rgba(255,255,255,0.8); }
+.mobile-menu-btn:hover { background: rgba(255,255,255,0.1); }
 
 /* Topbar avatar + dropdown */
 .topbar-avatar-wrap { position: relative; }
 .topbar-avatar {
   width: var(--sp-xl); height: var(--sp-xl); border-radius: 50%;   /* 34px */
-  background: linear-gradient(135deg, #0d9488, #06b6d4);
+  background: linear-gradient(135deg, rgba(13,148,136,0.7), rgba(6,182,212,0.7));
   color: white; font-weight: 700; font-size: var(--fs-base);
   display: flex; align-items: center; justify-content: center;
-  cursor: pointer; border: 2px solid transparent;
+  cursor: pointer; border: 2px solid rgba(255,255,255,0.2);
   transition: border-color .15s, box-shadow .15s;
   user-select: none;
 }
-.topbar-avatar:hover { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(13,148,136,0.15); }
+.topbar-avatar:hover { border-color: rgba(255,255,255,0.6); box-shadow: 0 0 0 3px rgba(94,234,212,0.2); }
 .topbar-dropdown {
   position: absolute; top: calc(100% + var(--sp-base)); right: 0;   /* 8px below */
   background: var(--surface); border-radius: var(--sp-md); min-width: 230px; max-width: calc(100vw - 16px);  /* 13px radius */
@@ -698,7 +714,7 @@ textarea.form-control { resize: vertical; }
 [data-theme="dark"] .stat-value { color: #f1f5f9; }
 
 /* Topbar */
-[data-theme="dark"] .topbar { background: #1e293b; border-color: #334155; box-shadow: 0 1px 0 #334155; }
+[data-theme="dark"] .topbar { background: linear-gradient(90deg, var(--sidebar-bg1) 0%, var(--sidebar-bg2) 60%, var(--sidebar-bg3) 100%); border-bottom: 1px solid rgba(13,148,136,0.2); box-shadow: 0 2px 12px rgba(0,0,0,0.35); }
 [data-theme="dark"] .topbar-dropdown { background: #1e293b; box-shadow: 0 8px 32px rgba(0,0,0,0.5); border: 1px solid #334155; }
 [data-theme="dark"] .topbar-dropdown-header { background: #0f172a; border-color: #334155; }
 [data-theme="dark"] .topbar-dropdown-item { color: #cbd5e1; }
@@ -858,15 +874,11 @@ input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-o
   box-sizing: border-box;
 }
 
-/* Notif button dark mode */
+/* Notif button dark mode — topbar selalu gelap, override tidak diperlukan */
 [data-theme="dark"] #notifBtn {
-  border-color: #334155 !important;
-  color: #94a3b8 !important;
-  background: #1e293b !important;
-}
-[data-theme="dark"] #notifBtn:hover {
-  border-color: #0d9488 !important;
-  color: #0d9488 !important;
+  border-color: rgba(255,255,255,0.15) !important;
+  color: rgba(255,255,255,0.65) !important;
+  background: rgba(255,255,255,0.06) !important;
 }
 
 /* Filter row selects & inputs rendered via JS (inline style pakai #e2e8f0) */

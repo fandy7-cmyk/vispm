@@ -19,7 +19,7 @@ async function renderLaporan() {
   const role = currentUser.role;
   document.getElementById('mainContent').innerHTML = `
     <div class="page-header">
-      <h1><span class="material-icons">bar_chart</span>Laporan</h1>
+      <h1><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;color:var(--primary)"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Laporan</h1>
     </div>
     <div class="stats-grid" id="lapStats"></div>
     <div class="card">
@@ -549,7 +549,7 @@ async function renderUsers(el) {
   const _mc = el || document.getElementById('mainContent');
   _mc.innerHTML = `
     <div class="page-header">
-      <h1><span class="material-icons">group</span>Kelola User</h1>
+      <h1><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;color:var(--primary)"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Kelola User</h1>
       <button class="btn btn-primary" onclick="openUserModal()"><span class="material-icons">person_add</span>Tambah User</button>
     </div>
     <div class="card">
@@ -1032,7 +1032,7 @@ async function renderJabatan(el) {
   const _mc = el || document.getElementById('mainContent');
   _mc.innerHTML = `
     <div class="page-header">
-      <h1><span class="material-icons">badge</span>Kelola Jabatan Pengelola Program</h1>
+      <h1><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;color:var(--primary)"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>Kelola Jabatan Pengelola Program</h1>
       <button class="btn btn-primary" onclick="openJabatanModal()">
         <span class="material-icons">add</span>Tambah Jabatan
       </button>
@@ -1182,7 +1182,7 @@ async function renderPKM(el) {
   const _mc = el || document.getElementById('mainContent');
   _mc.innerHTML = `
     <div class="page-header">
-      <h1><span class="material-icons">local_hospital</span>Kelola Puskesmas</h1>
+      <h1><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;color:var(--primary)"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>Kelola Puskesmas</h1>
       <button class="btn btn-primary" onclick="openPKMModal()"><span class="material-icons">add</span>Tambah Puskesmas</button>
     </div>
     <div class="card">
@@ -1319,7 +1319,7 @@ async function renderTargetTahunan(el) {
   const tahunOpts = yearOptions(CURRENT_YEAR);
   _mc.innerHTML = `
     <div class="page-header">
-      <h1><span class="material-icons">track_changes</span>Target Tahunan per Puskesmas</h1>
+      <h1><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;color:var(--primary)"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>Target Tahunan per Puskesmas</h1>
     </div>
     <div class="card" style="margin-bottom:16px">
       <div class="card-body" style="padding:12px 16px">
@@ -1425,7 +1425,7 @@ async function renderIndikator(el) {
   const _mc = el || document.getElementById('mainContent');
   _mc.innerHTML = `
     <div class="page-header">
-      <h1><span class="material-icons">monitor_heart</span>Kelola Indikator</h1>
+      <h1><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;color:var(--primary)"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Kelola Indikator</h1>
       <button class="btn btn-primary" onclick="openIndModal()"><span class="material-icons">add</span>Tambah Indikator</button>
     </div>
     <div class="card">
@@ -2248,7 +2248,7 @@ document.addEventListener('DOMContentLoaded', () => {
 async function renderKelolaUsulan() {
   document.getElementById('mainContent').innerHTML = `
     <div class="page-header">
-      <h1><span class="material-icons">admin_panel_settings</span>Kelola Usulan</h1>
+      <h1><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;color:var(--primary)"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/><polyline points="9 9 10 9 11 9"/></svg>Kelola Usulan</h1>
     </div>
     <div class="card">
       <div class="card-body" style="padding:12px 16px">
@@ -2980,7 +2980,7 @@ function _buildMasterShell() {
 
   document.getElementById('mainContent').innerHTML = `
     <div class="page-header">
-      <h1><span class="material-icons">storage</span>Master Data</h1>
+      <h1><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;color:var(--primary)"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>Master Data</h1>
     </div>
     <div style="background:white;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,0.07);margin-bottom:16px">
       <div style="display:flex;gap:0;padding:0 8px;overflow-x:auto;border-bottom:1px solid #e2e8f0">
@@ -3201,7 +3201,7 @@ async function _savePenandatangan(noInd) {
 async function renderRanking() {
   document.getElementById('mainContent').innerHTML = `
     <div class="page-header">
-      <h1><span class="material-icons">emoji_events</span>Ranking Puskesmas</h1>
+      <h1><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;color:var(--primary)"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>Ranking Puskesmas</h1>
     </div>
     <div class="card">
       <div class="card-body" style="padding:14px 16px;border-bottom:1px solid var(--border,#f1f5f9)">

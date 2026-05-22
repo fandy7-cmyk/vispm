@@ -725,38 +725,51 @@ async function showTandaTanganLoginPopup() {
 function buildSidebar() {
   const role = currentUser.role;
   const nav = document.getElementById('sidebarNav');
+  // SVG icons sidebar — identik dengan PAGE_ICONS di topbar
+  const SIDEBAR_SVG = {
+    dashboard:       `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>`,
+    verifikasi:      `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`,
+    laporan:         `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>`,
+    ranking:         `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>`,
+    'kelola-usulan': `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/><polyline points="9 9 10 9 11 9"/></svg>`,
+    'master-data':   `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>`,
+    input:           `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`,
+    'buku-panduan':  `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>`,
+    lock:            `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-left:auto"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`,
+  };
+
   const menuMap = {
     'Admin': [
       { label: 'Menu', items: [
-        { id: 'dashboard', icon: 'dashboard', label: 'Dashboard' },
-        { id: 'verifikasi', icon: 'verified', label: 'Verifikasi' },
-        { id: 'laporan', icon: 'bar_chart', label: 'Laporan' },
-        { id: 'kelola-usulan', icon: 'manage_accounts', label: 'Kelola Usulan' },
-        { id: 'ranking', icon: 'emoji_events', label: 'Ranking' }
+        { id: 'dashboard',      label: 'Dashboard' },
+        { id: 'verifikasi',     label: 'Verifikasi' },
+        { id: 'laporan',        label: 'Laporan' },
+        { id: 'kelola-usulan',  label: 'Kelola Usulan' },
+        { id: 'ranking',        label: 'Ranking' }
       ]},
       { label: 'Kelola Master', items: [
-        { id: 'master-data', icon: 'storage', label: 'Master Data' },
+        { id: 'master-data',    label: 'Master Data' },
       ]}
     ],
     'Operator': [
       { label: 'Menu', items: [
-        { id: 'dashboard', icon: 'dashboard', label: 'Dashboard' },
-        { id: 'input', icon: 'edit', label: 'Input Usulan' },
-        { id: 'laporan', icon: 'bar_chart', label: 'Laporan' }
+        { id: 'dashboard',  label: 'Dashboard' },
+        { id: 'input',      label: 'Input Usulan' },
+        { id: 'laporan',    label: 'Laporan' }
       ]}
     ],
     'Kepala Puskesmas': [
       { label: 'Menu', items: [
-        { id: 'dashboard', icon: 'dashboard', label: 'Dashboard' },
-        { id: 'verifikasi', icon: 'verified', label: 'Verifikasi' },
-        { id: 'laporan', icon: 'bar_chart', label: 'Laporan' }
+        { id: 'dashboard',  label: 'Dashboard' },
+        { id: 'verifikasi', label: 'Verifikasi' },
+        { id: 'laporan',    label: 'Laporan' }
       ]}
     ],
     'Pengelola Program': [
       { label: 'Menu', items: [
-        { id: 'dashboard', icon: 'dashboard', label: 'Dashboard' },
-        { id: 'verifikasi', icon: 'verified', label: 'Verifikasi' },
-        { id: 'laporan', icon: 'bar_chart', label: 'Laporan' }
+        { id: 'dashboard',  label: 'Dashboard' },
+        { id: 'verifikasi', label: 'Verifikasi' },
+        { id: 'laporan',    label: 'Laporan' }
       ]}
     ]
   };
@@ -766,17 +779,17 @@ function buildSidebar() {
   for (const section of sections) {
     html += `<div class="sidebar-section">${section.label}</div>`;
     for (const item of section.items) {
+      const svgIcon = SIDEBAR_SVG[item.id] || '';
       // Disable menu Input Usulan jika tidak ada periode aktif
       const isInputMenu = item.id === 'input';
       const noPeriodeAktif = isInputMenu && !(window._periodeAktifList || []).some(p => p.isAktifToday);
       if (isInputMenu && noPeriodeAktif) {
         html += `<div class="menu-item" id="nav-${item.id}" title="Tidak ada periode input aktif" style="opacity:0.45;cursor:not-allowed;pointer-events:none">
-          <span class="material-icons">${item.icon}</span><span>${item.label}</span>
-          <span class="material-icons" style="font-size:14px;margin-left:auto;color:#fbbf24">lock</span>
+          ${svgIcon}<span>${item.label}</span>${SIDEBAR_SVG.lock}
         </div>`;
       } else {
         html += `<div class="menu-item" id="nav-${item.id}" onclick="loadPage('${item.id}')">
-          <span class="material-icons">${item.icon}</span><span>${item.label}</span>
+          ${svgIcon}<span>${item.label}</span>
         </div>`;
       }
     }
@@ -785,8 +798,7 @@ function buildSidebar() {
   html += `
     <div style="margin-top:auto;border-top:1px solid rgba(255,255,255,0.15);padding-top:6px;">
       <div class="menu-item" onclick="openBukuPanduan()" title="Lihat Buku Panduan VISPM">
-        <span class="material-icons">menu_book</span>
-        <span>Buku Panduan</span>
+        ${SIDEBAR_SVG['buku-panduan']}<span>Buku Panduan</span>
       </div>
     </div>`;
 
@@ -862,6 +874,21 @@ function setActiveNav(page) {
 }
 
 // ============== ROUTING ==============
+const PAGE_ICONS = {
+  dashboard:       `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>`,
+  verifikasi:      `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`,
+  laporan:         `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>`,
+  ranking:         `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>`,
+  'master-data':   `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>`,
+  users:           `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
+  jabatan:         `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>`,
+  pkm:             `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`,
+  indikator:       `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>`,
+  periode:         `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`,
+  input:           `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`,
+  'kelola-usulan': `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/><polyline points="9 9 10 9 11 9"/></svg>`,
+  'target-tahunan':`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>`,
+};
 const PAGE_TITLES = {
   dashboard: 'Dashboard', verifikasi: 'Verifikasi', laporan: 'Laporan', ranking: 'Ranking Puskesmas',
   'master-data': 'Master Data', users: 'Kelola User', jabatan: 'Kelola Jabatan', pkm: 'Kelola Puskesmas',
@@ -883,7 +910,9 @@ function loadPage(page) {
   try { sessionStorage.setItem('spm_last_page', page); } catch(e) {}
   closeSidebar();
   setActiveNav(page);
-  document.getElementById('topbarTitle').textContent = PAGE_TITLES[page] || page;
+  const icon = PAGE_ICONS[page] || '';
+  const titleEl = document.getElementById('topbarTitle');
+  titleEl.innerHTML = icon + (PAGE_TITLES[page] || page);
   setLoading(true);
 
   const role = currentUser.role;

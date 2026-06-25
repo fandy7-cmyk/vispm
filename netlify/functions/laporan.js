@@ -62,9 +62,16 @@ exports.handler = async (event) => {
     const [dataResult, countResult] = await Promise.all([
       pool.query(
         `SELECT uh.*, p.nama_puskesmas,
-          (SELECT COUNT(*) FROM usulan_indikator ui WHERE ui.id_usulan=uh.id_usulan) as total_indikator
+          (SELECT COUNT(*) FROM usulan_indikator ui WHERE ui.id_usulan=uh.id_usulan) as total_indikator,
+          CASE WHEN (
+            COALESCE(pi.tanggal_selesai_verif, pi.tanggal_selesai) IS NOT NULL
+            AND (NOW() AT TIME ZONE 'Asia/Makassar') >
+              (COALESCE(pi.tanggal_selesai_verif, pi.tanggal_selesai)::date
+               + COALESCE(pi.jam_selesai_verif, pi.jam_selesai, '23:59')::time)
+          ) THEN true ELSE false END AS periode_expired
          FROM usulan_header uh
          LEFT JOIN master_puskesmas p ON uh.kode_pkm = p.kode_pkm
+         LEFT JOIN periode_input pi ON pi.tahun = uh.tahun AND pi.bulan = uh.bulan
          ${whereStr}
          ORDER BY uh.tahun DESC, uh.bulan DESC, p.nama_puskesmas
          LIMIT ${limit} OFFSET ${offset}`,
@@ -102,7 +109,8 @@ exports.handler = async (event) => {
       finalApprovedBy: r.final_approved_by || '',
       finalApprovedAt: r.final_approved_at,
       waktuSelesai: r.waktu_selesai || null,
-      adminApprovedAt: r.admin_approved_at || null
+      adminApprovedAt: r.admin_approved_at || null,
+      periodeExpired: r.periode_expired === true || r.periode_expired === 't'
     }));
 
     return ok({

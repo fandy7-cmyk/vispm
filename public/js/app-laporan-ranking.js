@@ -150,19 +150,23 @@
       var globalIdx = pageStart + i;          // indeks global untuk rank & badge
       var isSelesai = r.statusGlobal === 'Selesai';
       var rank = isSelesai ? globalIdx + 1 : null;
-      return '<tr>'
+      return '<tr style="vertical-align:middle">'
         + '<td style="text-align:center!important;padding:10px 12px;vertical-align:middle">'
         + (isSelesai ? _badge(rank) : '<div style="text-align:center"><span style="font-size:12px;color:#94a3b8">—</span></div>')
         + '</td>'
         + '<td style="font-weight:600;padding:10px 12px;font-size:13px">' + (r.namaPKM || '-') + '</td>'
         + (showBulanCol ? '<td style="font-size:12px;color:var(--text-light);padding:10px 12px">' + (r.namaBulan || '') + ' ' + (r.tahun || '') + '</td>' : '')
-        + '<td style="font-size:12px;padding:10px 12px;color:var(--text-light)">' + _fmt(r.createdAt) + '</td>'
-        + '<td style="font-size:12px;padding:10px 12px;color:var(--text-light)">'
+        + '<td style="font-size:12px;padding:10px 12px;color:var(--text-light);vertical-align:middle">' + _fmt(r.createdAt) + '</td>'
+        + '<td style="font-size:12px;padding:10px 12px;color:var(--text-light);vertical-align:middle">'
         + (isSelesai
             ? _fmt(r.waktuSelesai || r.updatedAt || r.createdAt)
-            : '<span title="Sedang diproses" style="display:inline-flex;align-items:center;gap:5px;color:#f59e0b;font-size:12px;font-weight:600">'
-            + '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>'
-            + 'Sedang diproses</span>')
+            : _isPeriodeExpired(r)
+              ? '<span title="Periode sudah berakhir" style="display:inline-flex;align-items:center;gap:5px;color:#ef4444;font-size:12px;font-weight:600">'
+                + '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>'
+                + 'Periode Berakhir</span>'
+              : '<span title="Sedang diproses" style="display:inline-flex;align-items:center;gap:5px;color:#f59e0b;font-size:12px;font-weight:600">'
+                + '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>'
+                + 'Sedang diproses</span>')
         + '</td>'
         + '<td style="font-weight:700;color:#0d9488;padding:10px 12px">' + parseFloat(r.indeksSPM || 0).toFixed(2) + '</td>'
         + '<td style="padding:10px 12px">' + statusBadge(r.statusGlobal) + '</td>'
@@ -234,6 +238,12 @@
   }
 
   /* ── Mini helpers ────────────────────────────────────────── */
+
+  function _isPeriodeExpired(r) {
+    // Field periodeExpired dihitung langsung di backend (JOIN periode_input)
+    return r.periodeExpired === true;
+  }
+
   function _th() {
     return 'background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;white-space:nowrap';
   }

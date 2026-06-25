@@ -134,6 +134,7 @@ async function loadLaporan() {
     _lapAllData = rawData;
     window._lapAllData = rawData;
 
+
     const prevTahun  = document.getElementById('lapTahun')?.value  ?? '';
     const prevBulan  = document.getElementById('lapBulan')?.value  || '';
     const prevStatus = document.getElementById('lapStatus')?.value || '';
@@ -3237,6 +3238,7 @@ async function renderRanking() {
       _lapAllData = [];
     }
   }
+
 
   // Gunakan fungsi dari app-laporan-ranking.js
   if (typeof window._rankPopulateFilters === 'function') {

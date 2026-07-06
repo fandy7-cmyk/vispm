@@ -130,7 +130,7 @@ async function operatorStats(pool, email, tahun) {
 
 async function kapusStats(pool, kodePKM, tahun) {
   const tahunFilter = tahun ? `AND tahun = ${tahun}` : '';
-  const [result, periodeResult, usulanPeriodeResult] = await Promise.all([
+  const [result, periodeResult] = await Promise.all([
     pool.query(
       `SELECT
         COUNT(*) FILTER(WHERE status_global='Menunggu Kepala Puskesmas') as menunggu,
@@ -142,16 +142,9 @@ async function kapusStats(pool, kodePKM, tahun) {
     pool.query(
       `SELECT tahun, bulan, nama_bulan, tanggal_mulai, tanggal_selesai, jam_mulai, jam_selesai, tanggal_mulai_verif, tanggal_selesai_verif, jam_mulai_verif, jam_selesai_verif
        FROM periode_input WHERE status='Aktif' ORDER BY tahun, bulan`
-    ),
-    // Ambil tahun-bulan yang punya usulan untuk PKM ini
-    pool.query(
-      `SELECT DISTINCT tahun, bulan FROM usulan_header WHERE kode_pkm=$1`,
-      [kodePKM]
     )
   ]);
   const s = result.rows[0];
-  // Set tahun-bulan yang ada usulannya — untuk filter periode
-  const usulanSet = new Set(usulanPeriodeResult.rows.map(r => `${r.tahun}-${r.bulan}`));
   const _nowWita = new Date(Date.now() + 8 * 3600000);
   const _todayStr = _nowWita.toISOString().slice(0, 10);
   const _nowTime  = _nowWita.toISOString().slice(11, 16);
@@ -167,9 +160,9 @@ async function kapusStats(pool, kodePKM, tahun) {
     terverifikasi: parseInt(s.terverifikasi) || 0,
     total: parseInt(s.total) || 0,
     tahunFilter: tahun || null,
-    // Hanya tampilkan periode yang ada usulannya untuk PKM ini
+    // Tampilkan semua periode Aktif (jangan dibatasi ke usulan yang sudah ada,
+    // deadline verifikasi berlaku global untuk PKM ini)
     periodeAktifList: periodeResult.rows
-      .filter(r => usulanSet.has(`${r.tahun}-${r.bulan}`))
       .map(r => ({
         ...r,
         namaBulan: r.nama_bulan,
@@ -274,24 +267,12 @@ async function programStats(pool, email, tahun) {
 
   const s = totalResult.rows[0];
 
-  // Ambil semua periode aktif untuk PP — filter jam di JS
-  // Sekaligus ambil tahun-bulan usulan yang ditugaskan ke PP ini
-  const [pvResult, usulanPPResult] = await Promise.all([
-    pool.query(
-      `SELECT tahun, bulan, nama_bulan, tanggal_mulai, tanggal_selesai, jam_mulai, jam_selesai,
-              tanggal_mulai_verif, tanggal_selesai_verif, jam_mulai_verif, jam_selesai_verif
-       FROM periode_input WHERE status='Aktif' ORDER BY tahun, bulan`
-    ).catch(() => ({ rows: [] })),
-    pool.query(
-      `SELECT DISTINCT uh.tahun, uh.bulan
-       FROM verifikasi_program vp
-       JOIN usulan_header uh ON vp.id_usulan = uh.id_usulan
-       WHERE LOWER(vp.email_program)=LOWER($1)`,
-      [email]
-    ).catch(() => ({ rows: [] }))
-  ]);
-  // Set tahun-bulan yang ada usulan untuk PP ini
-  const usulanPPSet = new Set(usulanPPResult.rows.map(r => `${r.tahun}-${r.bulan}`));
+  // Ambil semua periode aktif — filter jam di JS
+  const pvResult = await pool.query(
+    `SELECT tahun, bulan, nama_bulan, tanggal_mulai, tanggal_selesai, jam_mulai, jam_selesai,
+            tanggal_mulai_verif, tanggal_selesai_verif, jam_mulai_verif, jam_selesai_verif
+     FROM periode_input WHERE status='Aktif' ORDER BY tahun, bulan`
+  ).catch(() => ({ rows: [] }));
   const _nowWita2 = new Date(Date.now() + 8 * 3600000);
   const _todayStr2 = _nowWita2.toISOString().slice(0, 10);
   const _nowTime2  = _nowWita2.toISOString().slice(11, 16);
@@ -307,9 +288,9 @@ async function programStats(pool, email, tahun) {
   const pv = pvAktif;
   const isVerifToday = !!pv.tanggal_mulai_verif && !!pv.tanggal_selesai_verif
     && _inRange2(pv.tanggal_mulai_verif, pv.jam_mulai_verif, pv.tanggal_selesai_verif, pv.jam_selesai_verif);
-  // periodeAktifList untuk banner verif — hanya periode yang ada usulan PP ini
+  // periodeAktifList untuk banner verif — tampilkan semua periode Aktif
+  // (jangan dibatasi ke usulan yang sudah ditugaskan, deadline verifikasi berlaku global)
   const periodeAktifList = pvResult.rows
-    .filter(r => usulanPPSet.has(`${r.tahun}-${r.bulan}`))
     .map(r => ({
     ...r,
     namaBulan: r.nama_bulan,

@@ -33,8 +33,7 @@ async function renderInput() {
 
   // Info banner periode - tampilkan semua periode aktif (sama seperti dashboard)
   const _bSvgCal  = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>';
-  const _bSvgOpen = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
-  const _bSvgClos = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+  const _bSvgSend = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>';
   const _bSvgNoti = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>';
   const _bSvgWarn = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
   let periodeBanner = '';
@@ -43,19 +42,16 @@ async function renderInput() {
       const nm  = pr.namaBulan || pr.nama_bulan || '';
       const jm  = fmt24(pr.jamMulai  || pr.jam_mulai)  || '08:00';
       const js  = fmt24(pr.jamSelesai|| pr.jam_selesai) || '17:00';
-      const mul = formatDate(pr.tanggalMulai  || pr.tanggal_mulai);
-      const sel = formatDate(pr.tanggalSelesai|| pr.tanggal_selesai);
+      const tglMulai = pr.tanggalMulai  || pr.tanggal_mulai;
+      const tglSelesai = pr.tanggalSelesai|| pr.tanggal_selesai;
       const not = pr.notifOperator || pr.notif_operator || '';
       const timerId = `inputPeriodeTimer_${idx}`;
       return `<div style="border:1.5px solid #a7f3d0;border-radius:10px;overflow:hidden;background:var(--surface,white);box-shadow:0 1px 4px rgba(13,148,136,0.08)">`
         + `<div style="background:linear-gradient(135deg,#0d9488,#06b6d4);padding:8px 14px;color:white;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:space-between;gap:7px">`
-        + `<span style="display:flex;align-items:center;gap:7px"><span style="opacity:0.9;display:flex">${_bSvgCal}</span> Periode Aktif: ${nm} ${pr.tahun}</span>`
+        + `<span style="display:flex;align-items:center;gap:7px"><span style="opacity:0.9;display:flex">${_bSvgCal}</span> ${nm} ${pr.tahun}</span>`
         + `<span id="${timerId}" style="font-size:11px;font-weight:700;background:rgba(0,0,0,0.2);padding:3px 8px;border-radius:20px;letter-spacing:0.3px;white-space:nowrap">--:--:--</span>`
         + `</div>`
-        + `<div style="display:grid;grid-template-columns:1fr 1fr">`
-        + `<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--success-light,#f0fdf9);border-right:1px solid var(--border,#d1fae5)"><span style="color:#0d9488;display:flex;flex-shrink:0">${_bSvgOpen}</span><div><div style="font-size:10px;color:var(--text-light,#64748b);font-weight:600;text-transform:uppercase;letter-spacing:0.4px">Dibuka</div><div style="font-size:12px;font-weight:700;color:var(--text,#0f172a);">${mul} <span style="letter-spacing:0.03em">${jm}</span> WITA</div></div></div>`
-        + `<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--danger-light,#fef2f2)"><span style="color:#ef4444;display:flex;flex-shrink:0">${_bSvgClos}</span><div><div style="font-size:10px;color:var(--text-light,#64748b);font-weight:600;text-transform:uppercase;letter-spacing:0.4px">Ditutup</div><div style="font-size:12px;font-weight:700;color:var(--text,#0f172a);">${sel} <span style="letter-spacing:0.03em">${js}</span> WITA</div></div></div>`
-        + `</div>`
+        + _pTimelineRow('Submit / Re-submit', _bSvgSend, '#0d9488', '#d1fae5', tglMulai, jm, tglSelesai, js, false, timerId, true)
         + (not ? `<div style="display:flex;align-items:flex-start;gap:8px;padding:8px 14px;background:var(--warning-light,#fffbeb);border-top:1px solid var(--border,#fcd34d)"><span style="color:#d97706;display:flex;flex-shrink:0;margin-top:1px">${_bSvgNoti}</span><div style="font-size:12px;color:#0f172a;line-height:1.5">${not}</div></div>` : '')
         + `</div>`;
     }).join('');
@@ -113,7 +109,9 @@ async function renderInput() {
     window._periodeTimers.forEach(t => clearInterval(t));
     window._periodeTimers = [];
     periodeOptions.forEach((pr, idx) => {
+      const jm = fmt24(pr.jamMulai || pr.jam_mulai) || '08:00';
       const js = fmt24(pr.jamSelesai || pr.jam_selesai) || '17:00';
+      const tglMulaiRaw = pr.tanggalMulai || pr.tanggal_mulai || '';
       const tglRaw = pr.tanggalSelesai || pr.tanggal_selesai || '';
       const tglDate = tglRaw ? new Date(tglRaw) : null;
       if (!tglDate || isNaN(tglDate)) return;
@@ -124,12 +122,18 @@ async function renderInput() {
         + String(_witaDate2.getUTCMonth()+1).padStart(2,'0') + '-'
         + String(_witaDate2.getUTCDate()).padStart(2,'0');
       const deadline = new Date(_tglWITA2 + 'T' + String(jsH).padStart(2,'0') + ':' + String(jsM).padStart(2,'0') + ':00+08:00');
-      const getEl = () => document.getElementById('inputPeriodeTimer_' + idx);
+      const startMs = _pEpochWITA(tglMulaiRaw, jm);
+      const timerId = 'inputPeriodeTimer_' + idx;
+      const getEl = () => document.getElementById(timerId);
       const tick = () => {
         const el2 = getEl();
         if (!el2) { clearInterval(tid); return; }
         const diff = deadline - Date.now();
-        if (diff <= 0) { el2.textContent = 'Ditutup'; el2.style.background = 'rgba(239,68,68,0.35)'; clearInterval(tid); return; }
+        if (diff <= 0) {
+          el2.textContent = 'Ditutup'; el2.style.background = 'rgba(239,68,68,0.35)';
+          _pTickTimelineRow(timerId, startMs, deadline.getTime());
+          clearInterval(tid); return;
+        }
         const h = Math.floor(diff / 3600000);
         const m = Math.floor((diff % 3600000) / 60000);
         const s = Math.floor((diff % 60000) / 1000);
@@ -137,6 +141,7 @@ async function renderInput() {
           ? Math.floor(h/24) + 'h ' + String(h%24).padStart(2,'0') + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0')
           : String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
         el2.style.background = diff < 3600000 ? 'rgba(239,68,68,0.4)' : 'rgba(0,0,0,0.2)';
+        _pTickTimelineRow(timerId, startMs, deadline.getTime());
       };
       let tid;
       tid = setInterval(tick, 1000);

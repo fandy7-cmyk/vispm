@@ -1735,6 +1735,106 @@ async function renderPeriode(el) {
   loadPeriodeGrid();
 }
 
+// ── Helper: hitung progress & status waktu berjalan untuk timeline periode ──
+function _pWDate(dateStr, timeStr) {
+  if (!dateStr) return null;
+  const [y, mo, d] = String(dateStr).slice(0, 10).split('-').map(Number);
+  const [hh, mm] = (timeStr || '00:00').split(':').map(Number);
+  if (!y || !mo || !d) return null;
+  return Date.UTC(y, mo - 1, d, hh || 0, mm || 0);
+}
+function _pNowWita() {
+  const s = new Date(Date.now() + 8 * 3600000);
+  return Date.UTC(s.getUTCFullYear(), s.getUTCMonth(), s.getUTCDate(), s.getUTCHours(), s.getUTCMinutes());
+}
+// Konversi tanggal (dari DB, boleh UTC midnight) + jam WITA -> epoch ms yang benar (real UTC instant).
+// Dipakai bareng sama badge timer (tick) supaya statusText/progress bar ikut live, bukan cuma badge-nya doang.
+function _pEpochWITA(dateStr, timeStr) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  if (isNaN(d)) return null;
+  const [hh, mm] = (timeStr || '00:00').split(':').map(Number);
+  const witaMs = d.getTime() + 8 * 3600000;
+  const witaDate = new Date(witaMs);
+  const tglWITA = witaDate.getUTCFullYear() + '-'
+    + String(witaDate.getUTCMonth() + 1).padStart(2, '0') + '-'
+    + String(witaDate.getUTCDate()).padStart(2, '0');
+  return new Date(tglWITA + 'T' + String(hh || 0).padStart(2, '0') + ':' + String(mm || 0).padStart(2, '0') + ':00+08:00').getTime();
+}
+// Format sisa waktu jadi "D hari HH:MM:SS" (atau "HH:MM:SS" doang kalau udah di bawah 1 hari)
+function _pFormatCountdown(ms) {
+  const totalSec = Math.max(0, Math.floor(ms / 1000));
+  const d = Math.floor(totalSec / 86400);
+  const h = Math.floor((totalSec % 86400) / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  const hh = String(h).padStart(2, '0'), mm = String(m).padStart(2, '0'), ss = String(s).padStart(2, '0');
+  return d > 0 ? `${d} hari ${hh}:${mm}:${ss}` : `${hh}:${mm}:${ss}`;
+}
+// Update statusText + progress bar sebuah _pTimelineRow secara live, dipanggil dari dalam tick() badge timer
+// biar sisa waktu ikut sinkron detik demi detik, bukan nyangkut di nilai render awal.
+function _pTickTimelineRow(rowId, startMs, endMs, nowMs) {
+  const elStatus = document.getElementById(rowId + '_status');
+  const elBar = document.getElementById(rowId + '_barfill');
+  if (!elStatus && !elBar) return;
+  if (startMs == null || endMs == null || endMs <= startMs) return;
+  const now = nowMs != null ? nowMs : Date.now();
+  const pct = Math.max(0, Math.min(100, Math.round((now - startMs) / (endMs - startMs) * 100)));
+  if (elBar) elBar.style.width = (100 - pct) + '%';
+  if (elStatus) {
+    let statusText;
+    if (now < startMs) statusText = 'Belum dimulai';
+    else if (now > endMs) statusText = 'Berakhir';
+    else statusText = _pFormatCountdown(endMs - now) + ' lagi';
+    elStatus.textContent = statusText;
+  }
+}
+function _pProgress(mulaiTgl, mulaiJam, selesaiTgl, selesaiJam) {
+  const start = _pWDate(mulaiTgl, mulaiJam);
+  const end = _pWDate(selesaiTgl, selesaiJam);
+  const now = _pNowWita();
+  if (start == null || end == null || end <= start) return { pct: 0, statusText: '' };
+  const pct = Math.max(0, Math.min(100, Math.round((now - start) / (end - start) * 100)));
+  let statusText;
+  if (now < start) statusText = 'Belum dimulai';
+  else if (now > end) statusText = 'Berakhir';
+  else {
+    const daysLeft = Math.ceil((end - now) / 86400000);
+    statusText = daysLeft <= 0 ? 'Berakhir hari ini' : daysLeft === 1 ? 'Berakhir besok' : `${daysLeft} hari lagi`;
+  }
+  return { pct, statusText };
+}
+function _pTimelineRow(label, icon, color, colorLight, mulaiTgl, mulaiJam, selesaiTgl, selesaiJam, muted, rowId, hideStatus) {
+  const { pct, statusText } = _pProgress(mulaiTgl, mulaiJam, selesaiTgl, selesaiJam);
+  const lblColor = muted ? '#94a3b8' : color;
+  const dateColor = muted ? '#94a3b8' : 'var(--text,#334155)';
+  const barTrack = muted ? '#e2e8f0' : 'linear-gradient(90deg,#22c55e,#84cc16,#eab308,#f97316,#ef4444)';
+  const statusId = rowId ? ` id="${rowId}_status"` : '';
+  const barId = rowId ? ` id="${rowId}_barfill"` : '';
+  const barFill  = muted
+    ? `<div style="position:absolute;left:0;top:0;bottom:0;width:${pct}%;background:#94a3b8;border-radius:3px"></div>`
+    : `<div${barId} style="position:absolute;top:0;bottom:0;right:0;width:${100 - pct}%;background:var(--border-light,#e2e8f0);transition:width .3s"></div>`;
+  const svgStart = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>';
+  const svgEnd = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
+  // hideStatus: dipakai kalau kartu ini udah punya badge live di header (HH:MM:SS) — teks "X hari lagi"
+  // jadi duplikat & rawan keliatan gak sinkron (gara-gara pembulatan ceil), jadi cukup progress bar aja.
+  const statusSpan = hideStatus ? '' : `<span${statusId} style="font-size:11px;font-weight:600;color:var(--text-light,#64748b)">${statusText}</span>`;
+  return `<div style="padding:10px 16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="color:${lblColor};display:flex">${icon}</span>
+        <span style="font-size:11px;font-weight:700;color:${lblColor};text-transform:uppercase;letter-spacing:0.4px">${label}</span>
+      </div>
+      ${statusSpan}
+    </div>
+    <div style="position:relative;height:6px;border-radius:3px;overflow:hidden;background:${barTrack}">${barFill}</div>
+    <div style="display:flex;justify-content:space-between;margin-top:5px;font-size:11px;color:${dateColor};font-weight:600">
+      <span style="display:flex;align-items:center;gap:4px"><span style="display:flex;color:${muted?'#94a3b8':'#16a34a'}">${svgStart}</span>${formatDate(mulaiTgl)} · ${mulaiJam} WITA</span>
+      <span style="display:flex;align-items:center;gap:4px"><span style="display:flex;color:${muted?'#94a3b8':'#dc2626'}">${svgEnd}</span>${formatDate(selesaiTgl)} · ${selesaiJam} WITA</span>
+    </div>
+  </div>`;
+}
+
 async function loadPeriodeGrid() {
   const tahun = document.getElementById('filterTahunPeriode')?.value;
   if (!tahun) return;
@@ -1749,55 +1849,70 @@ async function loadPeriodeGrid() {
     grid.innerHTML = rows.map(p => {
       const isActive = p.isAktifToday;
       const isTidakAktif = p.status === 'Tidak Aktif';
+      const _svgClock = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>';
+      const _svgShield= '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>';
 
       if (isActive) {
-        const _svgCal  = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>';
-        const _svgOpen = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
-        const _svgClose= '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+        const _svgCal   = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>';
         const jm  = fmt24(p.jamMulai)  || '08:00';
         const js  = fmt24(p.jamSelesai) || '17:00';
+        const jmv = fmt24(p.jamMulaiVerif) || '08:00';
+        const jsv = fmt24(p.jamSelesaiVerif) || '17:00';
+        const rowIdSubmit = `periodeGridSubmit_${p.tahun}_${p.bulan}`;
+        const rowIdVerif = `periodeGridVerif_${p.tahun}_${p.bulan}`;
         return `<div style="border:1.5px solid #a7f3d0;border-radius:10px;overflow:hidden;background:var(--surface,white);box-shadow:0 1px 4px rgba(13,148,136,0.08);cursor:pointer" onclick="editPeriode(${p.tahun},${p.bulan})">
           <div style="background:linear-gradient(135deg,#0d9488,#06b6d4);padding:8px 14px;color:white;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:space-between">
             <div style="display:flex;align-items:center;gap:7px"><span style="opacity:0.9;display:flex">${_svgCal}</span> Periode Aktif: ${p.namaBulan} ${p.tahun}</div>
             <span class="badge badge-success" style="background:rgba(255,255,255,0.25);color:white;border:1px solid rgba(255,255,255,0.4);font-size:10px">Aktif Hari Ini</span>
           </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr">
-            <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--success-light,#f0fdf9);border-right:1px solid var(--border,#d1fae5)">
-              <span style="color:#0d9488;display:flex;flex-shrink:0">${_svgOpen}</span>
-              <div><div style="font-size:10px;color:var(--text-light,#64748b);font-weight:600;text-transform:uppercase;letter-spacing:0.4px">Dibuka</div>
-              <div style="font-size:12px;font-weight:700;color:var(--text,#0f172a);">${formatDate(p.tanggalMulai)} <span style="letter-spacing:0.03em">${jm}</span> WITA</div></div>
-            </div>
-            <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--danger-light,#fef2f2)">
-              <span style="color:#ef4444;display:flex;flex-shrink:0">${_svgClose}</span>
-              <div><div style="font-size:10px;color:var(--text-light,#64748b);font-weight:600;text-transform:uppercase;letter-spacing:0.4px">Ditutup</div>
-              <div style="font-size:12px;font-weight:700;color:var(--text,#0f172a);">${formatDate(p.tanggalSelesai)} <span style="letter-spacing:0.03em">${js}</span> WITA</div></div>
-            </div>
-          </div>
-          ${p.tanggalMulaiVerif ? `<div style="display:flex;align-items:center;gap:8px;padding:8px 14px;background:#f0fdf4;border-top:1px solid #bbf7d0"><span class="material-icons" style="font-size:15px;color:#15803d">verified_user</span><div style="font-size:12px;color:#15803d"><span style="font-weight:700">Verifikasi:</span> ${formatDate(p.tanggalMulaiVerif)} ${fmt24(p.jamMulaiVerif) || '08:00'} WITA — ${formatDate(p.tanggalSelesaiVerif)} ${fmt24(p.jamSelesaiVerif) || '17:00'} WITA</div></div>` : ''}
+          ${_pTimelineRow('Submit / Re-submit', _svgClock, '#0d9488', '#d1fae5', p.tanggalMulai, jm, p.tanggalSelesai, js, false, rowIdSubmit)}
+          ${p.tanggalMulaiVerif ? `<div style="border-top:1px dashed var(--border,#e2e8f0)"></div>${_pTimelineRow('Verifikasi / Re-verifikasi', _svgShield, '#0d9488', '#d1fae5', p.tanggalMulaiVerif, jmv, p.tanggalSelesaiVerif, jsv, false, rowIdVerif)}` : ''}
         </div>`;
       }
 
       // Tampilkan abu-abu (disabled) jika: status Tidak Aktif ATAU status Aktif tapi di luar rentang waktu (isAktifToday=false)
       const isDisabled = isTidakAktif || (!isActive && p.status === 'Aktif');
-      const borderColor = isDisabled ? '#e2e8f0' : 'var(--primary)';
+      const borderColor = isDisabled ? '#e2e8f0' : '#a7d8d3';
       const bg = isDisabled ? '#f8fafc' : 'var(--surface)';
       const badgeHtml = isTidakAktif
         ? '<span class="badge badge-default" style="color:#94a3b8">Tidak Aktif</span>'
         : isDisabled
           ? '<span class="badge badge-default" style="color:#94a3b8">Di Luar Rentang</span>'
           : '<span class="badge badge-info">Aktif</span>';
-      return `<div style="border:2px solid ${borderColor};border-radius:12px;padding:16px;background:${bg};cursor:pointer;opacity:${isDisabled?'0.65':'1'}" onclick="editPeriode(${p.tahun},${p.bulan})">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-          <span style="font-weight:700;font-size:15px">${p.namaBulan} ${p.tahun}</span>
+      const jm2  = fmt24(p.jamMulai)  || '08:00';
+      const js2  = fmt24(p.jamSelesai) || '17:00';
+      const jmv2 = fmt24(p.jamMulaiVerif) || '08:00';
+      const jsv2 = fmt24(p.jamSelesaiVerif) || '17:00';
+      return `<div style="border:1.5px solid ${borderColor};border-radius:10px;overflow:hidden;background:${bg};cursor:pointer;opacity:${isDisabled?'0.75':'1'}" onclick="editPeriode(${p.tahun},${p.bulan})">
+        <div style="padding:12px 16px 0;display:flex;justify-content:space-between;align-items:center">
+          <span style="font-weight:700;font-size:14px;color:var(--text,#1e293b)">${p.namaBulan} ${p.tahun}</span>
           ${badgeHtml}
         </div>
-        <div style="font-size:12px;color:var(--text-light);display:flex;flex-direction:column;gap:3px">
-          <div>Mulai: ${formatDate(p.tanggalMulai)}${p.jamMulai ? ` pukul ${fmt24(p.jamMulai)}` : ''}</div>
-          <div>Selesai: ${formatDate(p.tanggalSelesai)}${p.jamSelesai ? ` pukul ${fmt24(p.jamSelesai)}` : ''}</div>
-          ${p.tanggalMulaiVerif ? `<div style="margin-top:6px;padding:5px 8px;background:#f0fdf4;border-radius:6px;font-size:11px;border-left:3px solid #16a34a;color:#15803d"><span style="font-weight:600">Verifikasi:</span> ${formatDate(p.tanggalMulaiVerif)} ${fmt24(p.jamMulaiVerif) || '08:00'} WITA — ${formatDate(p.tanggalSelesaiVerif)} ${fmt24(p.jamSelesaiVerif) || '17:00'} WITA</div>` : ''}
-        </div>
+        ${_pTimelineRow('Submit / Re-submit', _svgClock, '#0d9488', '#d1fae5', p.tanggalMulai, jm2, p.tanggalSelesai, js2, isDisabled)}
+        ${p.tanggalMulaiVerif ? `<div style="border-top:1px dashed var(--border,#e2e8f0)"></div>${_pTimelineRow('Verifikasi / Re-verifikasi', _svgShield, '#0d9488', '#d1fae5', p.tanggalMulaiVerif, jmv2, p.tanggalSelesaiVerif, jsv2, isDisabled)}` : ''}
       </div>`;
     }).join('');
+
+    // Countdown detail (hari:jam:menit:detik) → refresh tiap detik, dan langsung jalanin sekali
+    // biar gak nunggu 1 detik dulu buat nampilin nilai awalnya.
+    clearInterval(window._periodeGridTick);
+    const activeRows = rows.filter(p => p.isAktifToday);
+    if (activeRows.length) {
+      const _tickGrid = () => {
+        activeRows.forEach(p => {
+          const jm  = fmt24(p.jamMulai)  || '08:00';
+          const js  = fmt24(p.jamSelesai) || '17:00';
+          const jmv = fmt24(p.jamMulaiVerif) || '08:00';
+          const jsv = fmt24(p.jamSelesaiVerif) || '17:00';
+          _pTickTimelineRow(`periodeGridSubmit_${p.tahun}_${p.bulan}`, _pEpochWITA(p.tanggalMulai, jm), _pEpochWITA(p.tanggalSelesai, js));
+          if (p.tanggalMulaiVerif) {
+            _pTickTimelineRow(`periodeGridVerif_${p.tahun}_${p.bulan}`, _pEpochWITA(p.tanggalMulaiVerif, jmv), _pEpochWITA(p.tanggalSelesaiVerif, jsv));
+          }
+        });
+      };
+      _tickGrid();
+      window._periodeGridTick = setInterval(_tickGrid, 1000);
+    }
   } catch (e) { if (!window._verifSilentReload) toast(e.message, 'error'); }
 }
 

@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SAPA Perencanaan</title>
+
+  <!-- Open Graph / WhatsApp Preview -->
+  <meta property="og:type"         content="website" />
+  <meta property="og:site_name"    content="SAPA Perencanaan" />
+  <meta property="og:title"        content="SAPA Perencanaan" />
+  <meta property="og:description"  content="Portal link resmi Sub Bagian Perencanaan Dinas Kesehatan PPKB Kabupaten Banggai Laut" />
+  <meta property="og:image"        content="https://sapa-dinkesp2kb.netlify.app/favicon.png" />
+  <meta property="og:image:width"  content="512" />
+  <meta property="og:image:height" content="512" />
+  <meta property="og:url"          content="https://sapa-dinkesp2kb.netlify.app" />
+  <!-- Twitter Card -->
+  <meta name="twitter:card"        content="summary" />
+  <meta name="twitter:title"       content="SAPA Perencanaan" />
+  <meta name="twitter:image"       content="https://sapa-dinkesp2kb.netlify.app/favicon.png" />
+  <link rel="icon" type="image/png" href="/favicon.png" />
+  <link rel="apple-touch-icon" href="/favicon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/styles.css" />
+  <style>
+    /* additional inline for lucide icons consistency if needed */
+    .item-icon svg, .state-icon svg, .item-arrow svg {
+      display: block;
+      width: 1.25em;
+      height: 1.25em;
+      stroke-width: 1.75;
+    }
+    .item-arrow svg {
+      width: 1rem;
+      height: 1rem;
+      stroke-width: 2;
+    }
+    .item-card .item-icon svg {
+      width: 1.35rem;
+      height: 1.35rem;
+    }
+    .state-icon svg {
+      width: 2rem;
+      height: 2rem;
+      stroke-width: 1.5;
+    }
+  </style>
+</head>
+<body class="bundle-page">
+<div class="page-wrap">
+
+  <!-- HEADER -->
+  <div class="bundle-header" id="bundleHeader">
+    <!-- Logo partner row (same as dashboard) -->
+    <div class="logo-partner-row">
+      <img src="/logokemenkes.png" alt="Kemenkes RI" />
+      <div class="logo-divider"></div>
+      <img src="/logobkkbn.png" alt="BKKBN" />
+      <div class="logo-divider"></div>
+      <img src="/logobalut.png" alt="Kabupaten Banggai Laut" />
+    </div>
+    <div id="headerContent">
+      <!-- diisi JS -->
+      <div class="skeleton" style="height:22px;width:60%;margin:0 auto 10px;border-radius:8px"></div>
+      <div class="skeleton" style="height:14px;width:80%;margin:0 auto;border-radius:6px"></div>
+    </div>
+  </div>
+
+  <!-- ITEMS -->
+  <div id="itemsContainer">
+    <!-- skeleton items -->
+    <div class="items-list">
+      <div style="display:flex;align-items:center;gap:14px;background:var(--putih);border-radius:var(--radius);padding:14px 18px;box-shadow:var(--shadow-sm)">
+        <div class="skeleton" style="width:42px;height:42px;border-radius:10px;flex-shrink:0"></div>
+        <div style="flex:1"><div class="skeleton" style="height:14px;width:70%;margin-bottom:8px;border-radius:6px"></div><div class="skeleton" style="height:10px;width:45%;border-radius:6px"></div></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:14px;background:var(--putih);border-radius:var(--radius);padding:14px 18px;box-shadow:var(--shadow-sm)">
+        <div class="skeleton" style="width:42px;height:42px;border-radius:10px;flex-shrink:0"></div>
+        <div style="flex:1"><div class="skeleton" style="height:14px;width:55%;margin-bottom:8px;border-radius:6px"></div><div class="skeleton" style="height:10px;width:40%;border-radius:6px"></div></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:14px;background:var(--putih);border-radius:var(--radius);padding:14px 18px;box-shadow:var(--shadow-sm)">
+        <div class="skeleton" style="width:42px;height:42px;border-radius:10px;flex-shrink:0"></div>
+        <div style="flex:1"><div class="skeleton" style="height:14px;width:65%;margin-bottom:8px;border-radius:6px"></div><div class="skeleton" style="height:10px;width:35%;border-radius:6px"></div></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div id="toastContainer"></div>
+
+<!-- BRAND FOOTER -->
+<div class="brand-footer">
+  <img src="/favicon.png" alt="SAPA" />
+  <span>Sub Bagian Perencanaan</span>
+  <span>Dinas Kesehatan, Pengendalian Penduduk dan Keluarga Berencana</span>
+  <span>Kabupaten Banggai Laut</span>
+  <span>© 2026 All rights reserved</span>
+</div>
+
+<script>
+// ======================== HELPER =========================
+function esc(str) {
+  return String(str||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function toast(msg, type='success') {
+  const c = document.getElementById('toastContainer');
+  const t = document.createElement('div');
+  t.className = 'toast ' + type;
+  t.textContent = msg;
+  c.appendChild(t);
+  setTimeout(() => { t.style.animation='toastOut .3s ease forwards'; setTimeout(()=>t.remove(),300); }, 2500);
+}
+
+// ---------- MODERN LUCIDE ICONS (SVG STRINGS) ----------
+const Icons = {
+  // for error / not found state (bundle tidak ditemukan)
+  fileX: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22h14a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v4"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="m10 14 4 4"/><path d="m14 14-4 4"/></svg>`,
+  // warning / inactive bundle
+  triangleAlert: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>`,
+  // empty state: inbox
+  inbox: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>`,
+  // generic link icon for items fallback
+  link: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>`,
+  // external arrow (chevron-right)
+  arrowRight: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>`,
+  // server / connection error state
+  serverCrash: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/><path d="M12 6h6"/><path d="M12 18h6"/></svg>`,
+  // mild warning icon for generic issues
+  alertCircle: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`
+};
+
+// get fallback icon for item (ikon from DB or default Link)
+function getItemIcon(ikonRaw) {
+  if (ikonRaw && ikonRaw.trim() !== "") {
+    // if custom ikon is already an svg markup? we assume stored as safe html but we will use as is
+    // but to ensure modern appearance, if it's plain text we map? However system expects emoji/text? 
+    // But per initial code, ikon could be raw html/svg, but we keep db custom. 
+    // For upgrade: if contains "<svg", we return it directly; else we treat as simple char/emoji but also provide lucide fallback?
+    // But better allow user icon if exists else modern link.
+    if (ikonRaw.includes("<svg")) return ikonRaw;
+    // otherwise just a text/emoji keep it, but ensure it's wrapped in span
+    return `<span style="font-size:1.5rem; line-height:1;">${esc(ikonRaw)}</span>`;
+  }
+  return Icons.link;
+}
+
+// arrow icon for item
+function getArrowIcon() {
+  return Icons.arrowRight;
+}
+
+// ── Ambil slug dari path: /SLUG ──────────────────────
+// Prioritas: ?slug=... → pathname segment pertama
+const _params = new URLSearchParams(location.search);
+const _pathSlug = location.pathname.split('/').filter(Boolean)[0] || '';
+const slug = _params.get('slug') || _pathSlug;
+
+if (!slug) {
+  document.getElementById('headerContent').innerHTML = `
+    <div class="state-box">
+      <div class="state-icon">${Icons.fileX}</div>
+      <h2>Bundle tidak ditemukan</h2>
+      <p>Alamat bundle tidak valid.</p>
+    </div>`;
+  document.getElementById('itemsContainer').innerHTML = '';
+} else {
+  loadBundle(slug);
+}
+
+async function loadBundle(slug) {
+  try {
+    const r = await fetch(`/api/bundles/${slug}`);
+    if (!r.ok) {
+      const isInactive = r.status === 403;
+      document.getElementById('headerContent').innerHTML = `
+        <div class="state-box">
+          <div class="state-icon">
+            ${isInactive ? Icons.triangleAlert : Icons.fileX}
+          </div>
+          <h2>${isInactive ? 'Bundle Tidak Tersedia' : 'Bundle Tidak Ditemukan'}</h2>
+          <p>${isInactive
+            ? 'Bundle link ini sedang dinonaktifkan dan tidak dapat diakses saat ini.'
+            : 'Link bundle mungkin sudah tidak aktif atau alamatnya salah.'
+          }</p>
+        </div>`;
+      document.getElementById('itemsContainer').innerHTML = '';
+      return;
+    }
+    const { bundle, items } = await r.json();
+
+    // Update page title
+    document.title = `SAPA Perencanaan`;
+
+    // Render header
+    document.getElementById('headerContent').innerHTML = `
+      <div class="bundle-brand-name">${esc(bundle.judul)}</div>
+      ${bundle.deskripsi ? `<div class="bundle-brand-sub">${esc(bundle.deskripsi)}</div>` : ''}`;
+
+    // Render items
+    if (!items.length) {
+      document.getElementById('itemsContainer').innerHTML = `
+        <div class="state-box">
+          <div class="state-icon">${Icons.inbox}</div>
+          <h2>Bundle masih kosong</h2>
+          <p>Belum ada link yang ditambahkan ke bundle ini.</p>
+        </div>`;
+      return;
+    }
+
+    document.getElementById('itemsContainer').innerHTML = `
+      <div class="items-list">
+        ${items.map((item, i) => {
+          const iconHtml = getItemIcon(item.ikon);
+          const arrowHtml = getArrowIcon();
+          return `
+          <a class="item-card" href="${esc(item.url)}" target="_blank" rel="noopener"
+             style="animation-delay:${i * 0.05}s">
+            <div class="item-icon">${iconHtml}</div>
+            <div class="item-body">
+              <div class="item-title">${esc(item.judul)}</div>
+              ${item.deskripsi ? `<div class="item-desc">${esc(item.deskripsi)}</div>` : ''}
+            </div>
+            <div class="item-arrow">${arrowHtml}</div>
+          </a>`;
+        }).join('')}
+      </div>`;
+
+  } catch (err) {
+    console.error(err);
+    document.getElementById('headerContent').innerHTML = `
+      <div class="state-box">
+        <div class="state-icon">${Icons.serverCrash}</div>
+        <h2>Gagal memuat bundle</h2>
+        <p>Terjadi kesalahan koneksi. Coba muat ulang halaman.</p>
+      </div>`;
+    document.getElementById('itemsContainer').innerHTML = '';
+  }
+}
+</script>
+</body>
+</html>

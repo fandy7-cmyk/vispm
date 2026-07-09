@@ -1,0 +1,93 @@
+const { getPool, ok, err, conflict, cors } = require('./db');
+const bcrypt = require('bcryptjs');
+
+let _migrated = false;
+
+/**
+ * Handler: /api/users
+ *
+ * GET  — Daftar semua user (kecuali Super Admin)
+ *         Response: [{ email, nama, nip, role, kodePKM, namaPKM, indikatorAkses, jabatan, aktif, tandaTangan }]
+ *
+ * POST — Tambah user baru
+ *         Body: { email, nama, nip, role, kodePKM, indikatorAkses, jabatan }
+ *         Password default: 'Balut2026'
+ *         409 — Email sudah terdaftar
+ *
+ * PUT  — Update user (termasuk tanda tangan)
+ *         Body: { email, nama, nip, role, kodePKM, indikatorAkses, jabatan, aktif, tandaTangan? }
+ *
+ * DELETE — Hapus user
+ *         Body: { email }
+ */
+exports.handler = async (event) => {
+  if (event.httpMethod === 'OPTIONS') return cors();
+  const pool = getPool();
+  const method = event.httpMethod;
+  try {
+    if (!_migrated) {
+      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS tanda_tangan TEXT`).catch(()=>{});
+      _migrated = true;
+    }
+    if (method === 'GET') {
+      const r = await pool.query(
+        `SELECT u.email, u.nama, u.nip, u.role, u.kode_pkm, u.indikator_akses, u.jabatan, u.aktif,
+                u.tanda_tangan, p.nama_puskesmas
+         FROM users u LEFT JOIN master_puskesmas p ON u.kode_pkm=p.kode_pkm
+         WHERE u.role != 'Super Admin' ORDER BY u.nama`
+      );
+      return ok(r.rows.map(x => ({
+        email: x.email, nama: x.nama, nip: x.nip || '',
+        role: x.role, kodePKM: x.kode_pkm || '', namaPKM: x.nama_puskesmas || '',
+        indikatorAkses: x.indikator_akses ? x.indikator_akses.toString() : '',
+        jabatan: x.jabatan || '', aktif: x.aktif,
+        tandaTangan: x.tanda_tangan || ''
+      })));
+    }
+    const body = JSON.parse(event.body || '{}');
+    if (method === 'POST') {
+      const { email, nama, nip, role, kodePKM, indikatorAkses, jabatan } = body;
+      if (!email || !nama || !role) return err('Email, nama, dan role diperlukan');
+      if (!email.includes('@') || email.split('@').length !== 2) return err('Format email tidak valid');
+      const exists = await pool.query('SELECT email FROM users WHERE LOWER(email)=LOWER($1)', [email]);
+      if (exists.rows.length > 0) return conflict('Email sudah terdaftar di sistem');
+      if (role === 'Super Admin') return err('Role Super Admin tidak dapat dibuat melalui sistem.');
+      const DEFAULT_PASSWORD = 'Balut2026';
+      const hashedPassword = await bcrypt.hash(DEFAULT_PASSWORD, 10);
+      await pool.query(
+        `INSERT INTO users (email, nama, nip, role, kode_pkm, indikator_akses, jabatan, aktif, password_hash)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,true,$8)`,
+        [email.trim().toLowerCase(), nama, nip||null, role, kodePKM||null, indikatorAkses||null, jabatan||null, hashedPassword]
+      );
+      return ok({ message: 'User berhasil ditambahkan. Password default: ' + DEFAULT_PASSWORD });
+    }
+    if (method === 'PUT') {
+      const { email, nama, nip, role, kodePKM, indikatorAkses, jabatan, aktif, tandaTangan } = body;
+      if (!email) return err('Email diperlukan');
+      if (tandaTangan !== undefined) {
+        await pool.query(
+          `UPDATE users SET nama=$1, nip=$2, role=$3, kode_pkm=$4, indikator_akses=$5, jabatan=$6, aktif=$7, tanda_tangan=$8
+           WHERE LOWER(email)=LOWER($9)`,
+          [nama, nip||null, role, kodePKM||null, indikatorAkses||null, jabatan||null, aktif!==false, tandaTangan||null, email]
+        );
+      } else {
+        await pool.query(
+          `UPDATE users SET nama=$1, nip=$2, role=$3, kode_pkm=$4, indikator_akses=$5, jabatan=$6, aktif=$7
+           WHERE LOWER(email)=LOWER($8)`,
+          [nama, nip||null, role, kodePKM||null, indikatorAkses||null, jabatan||null, aktif!==false, email]
+        );
+      }
+      return ok({ message: 'User berhasil diupdate' });
+    }
+    if (method === 'DELETE') {
+      const { email } = body;
+      if (!email) return err('Email diperlukan');
+      await pool.query('DELETE FROM users WHERE LOWER(email)=LOWER($1)', [email]);
+      return ok({ message: 'User berhasil dihapus' });
+    }
+    return err('Method tidak diizinkan', 405);
+  } catch(e) {
+    console.error('Users error:', e);
+    return err('Error: ' + e.message, 500);
+  }
+};

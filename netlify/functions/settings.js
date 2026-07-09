@@ -1,59 +1,36 @@
-const { getPool, ok, err, cors } = require('./db');
+// netlify/functions/settings.js
+import { getDb, jsonResponse, errorResponse, parseBody } from './_db.js';
+import { requireAdmin } from './_auth.js';
 
-const CURRENT_YEAR = new Date().getFullYear();
+export const handler = async (event) => {
+  if (event.httpMethod === 'OPTIONS') return jsonResponse({});
+  const sql = getDb();
 
-let _migrated = false;
-
-exports.handler = async (event) => {
-  if (event.httpMethod === 'OPTIONS') return cors();
-  const pool = getPool();
-  try {
-    if (!_migrated) {
-      await pool.query(`
-        CREATE TABLE IF NOT EXISTS app_settings (
-          key VARCHAR(100) PRIMARY KEY,
-          value TEXT NOT NULL,
-          updated_at TIMESTAMPTZ DEFAULT NOW()
-        )
-      `);
-      await pool.query(`
-        INSERT INTO app_settings (key, value) VALUES
-          ('tahun_awal',  $1),
-          ('tahun_akhir', $2)
-        ON CONFLICT (key) DO NOTHING
-      `, [String(CURRENT_YEAR), String(CURRENT_YEAR + 2)]);
-      _migrated = true;
-    }
-
-    if (event.httpMethod === 'GET') {
-      const res = await pool.query('SELECT key, value FROM app_settings');
-      const data = {};
-      res.rows.forEach(r => { data[r.key] = r.value; });
-      return ok({
-        tahun_awal:  parseInt(data.tahun_awal)  || CURRENT_YEAR,
-        tahun_akhir: parseInt(data.tahun_akhir) || CURRENT_YEAR + 2,
-      });
-    }
-
-    if (event.httpMethod === 'POST') {
-      const body = JSON.parse(event.body || '{}');
-      const { tahun_awal, tahun_akhir } = body;
-      if (!tahun_awal || !tahun_akhir) return err('tahun_awal dan tahun_akhir diperlukan');
-      if (parseInt(tahun_awal) > parseInt(tahun_akhir)) return err('Tahun awal tidak boleh lebih besar dari tahun akhir');
-      await pool.query(
-        `INSERT INTO app_settings (key, value, updated_at) VALUES ('tahun_awal',$1,NOW())
-         ON CONFLICT (key) DO UPDATE SET value=$1, updated_at=NOW()`, [String(tahun_awal)]
-      );
-      await pool.query(
-        `INSERT INTO app_settings (key, value, updated_at) VALUES ('tahun_akhir',$1,NOW())
-         ON CONFLICT (key) DO UPDATE SET value=$1, updated_at=NOW()`, [String(tahun_akhir)]
-      );
-      return ok({ message: 'Pengaturan berhasil disimpan', tahun_awal, tahun_akhir });
-    }
-
-    return err('Method tidak diizinkan', 405);
-  } catch (e) {
-    console.error('Settings error:', e);
-    return err('Error: ' + e.message, 500);
+  if (event.httpMethod === 'GET') {
+    // Auth required (bukan publik lagi)
+    const auth = requireAdmin(event);
+    if (!auth) return errorResponse('Unauthorized', 401);
+    try {
+      const rows = await sql`SELECT key, value FROM settings`;
+      const settings = Object.fromEntries(rows.map(r => [r.key, r.value]));
+      return jsonResponse({ settings });
+    } catch (err) { return errorResponse('Gagal mengambil settings'); }
   }
+
+  if (event.httpMethod === 'PUT') {
+    const admin = requireAdmin(event);
+    if (!admin) return errorResponse('Unauthorized', 401);
+    const body = parseBody(event);
+    try {
+      for (const [key, value] of Object.entries(body)) {
+        await sql`
+          INSERT INTO settings (key, value, updated_at) VALUES (${key}, ${value}, NOW())
+          ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
+        `;
+      }
+      return jsonResponse({ ok: true });
+    } catch (err) { return errorResponse('Gagal menyimpan settings'); }
+  }
+
+  return errorResponse('Not found', 404);
 };

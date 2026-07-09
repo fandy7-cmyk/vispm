@@ -1,171 +1,114 @@
-const { getPool, ok, err, cors } = require('./db');
+// netlify/functions/pengumuman.js
+// GET    /api/pengumuman        → publik (aktif saja), auth → semua
+// POST   /api/pengumuman        → admin only
+// PUT    /api/pengumuman/:id    → admin only
+// DELETE /api/pengumuman/:id    → admin only
 
-let _migrated = false;
+import { getDb, jsonResponse, errorResponse, parseBody } from './_db.js';
+import { requireAuth } from './_auth.js';
 
-async function migrate(pool) {
-  if (_migrated) return;
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS pengumuman_sistem (
-      id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      judul         VARCHAR(200)  NOT NULL,
-      isi           TEXT          NOT NULL,
-      tipe          VARCHAR(20)   NOT NULL DEFAULT 'info',
-      aktif         BOOLEAN       NOT NULL DEFAULT true,
-      tanggal_mulai DATE          NOT NULL,
-      tanggal_selesai DATE        NOT NULL,
-      dibuat_oleh   VARCHAR(200),
-      dibuat_pada   TIMESTAMPTZ   DEFAULT NOW(),
-      diperbarui_pada TIMESTAMPTZ DEFAULT NOW()
-    )
-  `);
-  _migrated = true;
-}
+export const handler = async (event) => {
+  if (event.httpMethod === 'OPTIONS') return jsonResponse({});
 
-exports.handler = async (event) => {
-  if (event.httpMethod === 'OPTIONS') return cors();
+  const sql = getDb();
 
-  const pool = getPool();
+  // Parse id dari path
+  const rawPath = event.path.replace(/^.*\/pengumuman\/?/, '') || '';
+  const segments = rawPath.split('/').filter(Boolean);
+  const id = segments[0] && !isNaN(segments[0]) ? parseInt(segments[0]) : null;
 
-  try {
-    await migrate(pool);
-
-    // ── GET — ambil semua atau hanya yang aktif ──
-    if (event.httpMethod === 'GET') {
-      const params = event.queryStringParameters || {};
-      let query, values;
-
-      if (params.aktif === 'true') {
-        // Hanya yang aktif=true (dipakai popup login)
-        query  = `SELECT * FROM pengumuman_sistem WHERE aktif = true ORDER BY dibuat_pada DESC`;
-        values = [];
+  // ── GET /api/pengumuman ─────────────────────────────────────
+  if (event.httpMethod === 'GET' && !id) {
+    const auth = requireAuth(event);
+    try {
+      let rows;
+      if (auth && auth.is_admin) {
+        // Admin: semua pengumuman yang belum dihapus
+        rows = await sql`
+          SELECT * FROM pengumuman
+          WHERE deleted_at IS NULL
+          ORDER BY created_at DESC
+        `;
       } else {
-        // Semua (dipakai halaman kelola Admin)
-        query  = `SELECT * FROM pengumuman_sistem ORDER BY dibuat_pada DESC`;
-        values = [];
+        // Publik: hanya yang aktif & belum dihapus, max 10
+        rows = await sql`
+          SELECT id, judul, isi, tipe, created_at
+          FROM pengumuman
+          WHERE aktif = true AND deleted_at IS NULL
+          ORDER BY created_at DESC
+          LIMIT 10
+        `;
       }
-
-      const result = await pool.query(query, values);
-      return ok(result.rows.map(_fmt));
+      return jsonResponse({ pengumuman: rows });
+    } catch (err) {
+      console.error('[GET /api/pengumuman]', err);
+      return errorResponse('Gagal mengambil pengumuman: ' + err.message);
     }
-
-    // ── POST — buat baru ──
-    if (event.httpMethod === 'POST') {
-      const body = JSON.parse(event.body || '{}');
-      const { judul, isi, tipe, aktif, tanggal_mulai, tanggal_selesai, dibuat_oleh } = body;
-
-      if (!judul || !judul.trim())           return err('Judul wajib diisi');
-      if (!isi   || !isi.trim())             return err('Isi pengumuman wajib diisi');
-      if (!tanggal_mulai)                    return err('Tanggal mulai wajib diisi');
-      if (!tanggal_selesai)                  return err('Tanggal selesai wajib diisi');
-      if (tanggal_selesai < tanggal_mulai)   return err('Tanggal selesai tidak boleh sebelum tanggal mulai');
-
-      const result = await pool.query(
-        `INSERT INTO pengumuman_sistem
-          (judul, isi, tipe, aktif, tanggal_mulai, tanggal_selesai, dibuat_oleh)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
-         RETURNING *`,
-        [
-          judul.trim(),
-          isi.trim(),
-          tipe || 'info',
-          aktif !== false,
-          tanggal_mulai,
-          tanggal_selesai,
-          dibuat_oleh || null,
-        ]
-      );
-      return ok(_fmt(result.rows[0]));
-    }
-
-    // ── PUT — update ──
-    if (event.httpMethod === 'PUT') {
-      const body = JSON.parse(event.body || '{}');
-      const { id, judul, isi, tipe, aktif, tanggal_mulai, tanggal_selesai } = body;
-
-      if (!id)                               return err('ID pengumuman diperlukan');
-      if (!judul || !judul.trim())           return err('Judul wajib diisi');
-      if (!isi   || !isi.trim())             return err('Isi pengumuman wajib diisi');
-      if (!tanggal_mulai)                    return err('Tanggal mulai wajib diisi');
-      if (!tanggal_selesai)                  return err('Tanggal selesai wajib diisi');
-      if (tanggal_selesai < tanggal_mulai)   return err('Tanggal selesai tidak boleh sebelum tanggal mulai');
-
-      const result = await pool.query(
-        `UPDATE pengumuman_sistem
-         SET judul=$1, isi=$2, tipe=$3, aktif=$4,
-             tanggal_mulai=$5, tanggal_selesai=$6,
-             diperbarui_pada=NOW()
-         WHERE id=$7
-         RETURNING *`,
-        [
-          judul.trim(),
-          isi.trim(),
-          tipe || 'info',
-          aktif !== false,
-          tanggal_mulai,
-          tanggal_selesai,
-          id,
-        ]
-      );
-      if (!result.rows.length) return err('Pengumuman tidak ditemukan', 404);
-      return ok(_fmt(result.rows[0]));
-    }
-
-    // ── DELETE ──
-    if (event.httpMethod === 'DELETE') {
-      const body = JSON.parse(event.body || '{}');
-      const { id } = body;
-      if (!id) return err('ID pengumuman diperlukan');
-
-      const result = await pool.query(
-        `DELETE FROM pengumuman_sistem WHERE id=$1 RETURNING id`,
-        [id]
-      );
-      if (!result.rows.length) return err('Pengumuman tidak ditemukan', 404);
-      return ok({ deleted: true, id });
-    }
-
-    return err('Method tidak diizinkan', 405);
-
-  } catch (e) {
-    console.error('Pengumuman error:', e);
-    return err('Error: ' + e.message, 500);
   }
+
+  // Auth + admin required untuk POST/PUT/DELETE
+  const auth = requireAuth(event);
+  if (!auth) return errorResponse('Unauthorized', 401);
+  if (!auth.is_admin) return errorResponse('Akses ditolak - hanya admin', 403);
+
+  // ── POST /api/pengumuman ────────────────────────────────────
+  if (event.httpMethod === 'POST' && !id) {
+    const body = parseBody(event);
+    const { judul, isi, tipe, aktif, aksi } = body;
+    if (!judul || !isi) return errorResponse('Judul dan isi wajib diisi', 400);
+    const tipeVal = ['penting', 'info', 'biasa'].includes(tipe) ? tipe : 'info';
+    const aksiVal = Array.isArray(aksi) ? JSON.stringify(aksi) : null;
+    try {
+      const rows = await sql`
+        INSERT INTO pengumuman (judul, isi, tipe, aktif, aksi)
+        VALUES (${judul}, ${isi}, ${tipeVal}, ${aktif !== false}, ${aksiVal}::jsonb)
+        RETURNING *
+      `;
+      return jsonResponse({ pengumuman: rows[0] }, 201);
+    } catch (err) {
+      return errorResponse('Gagal menyimpan pengumuman: ' + err.message);
+    }
+  }
+
+  // ── PUT /api/pengumuman/:id ─────────────────────────────────
+  if (event.httpMethod === 'PUT' && id) {
+    const body = parseBody(event);
+    const { judul, isi, tipe, aktif, aksi } = body;
+    const tipeVal = tipe && ['penting', 'info', 'biasa'].includes(tipe) ? tipe : null;
+    const aksiVal = Array.isArray(aksi) ? JSON.stringify(aksi) : aksi === null ? null : undefined;
+    try {
+      const rows = await sql`
+        UPDATE pengumuman SET
+          judul      = COALESCE(${judul ?? null}, judul),
+          isi        = COALESCE(${isi ?? null}, isi),
+          tipe       = COALESCE(${tipeVal}, tipe),
+          aktif      = COALESCE(${aktif ?? null}, aktif),
+          aksi       = CASE WHEN ${aksiVal !== undefined} THEN ${aksiVal ?? null}::jsonb ELSE aksi END,
+          updated_at = NOW()
+        WHERE id = ${id}
+        RETURNING *
+      `;
+      if (!rows.length) return errorResponse('Pengumuman tidak ditemukan', 404);
+      return jsonResponse({ pengumuman: rows[0] });
+    } catch (err) {
+      return errorResponse('Gagal mengupdate pengumuman: ' + err.message);
+    }
+  }
+
+  // ── DELETE /api/pengumuman/:id ──────────────────────────────
+  if (event.httpMethod === 'DELETE' && id) {
+    try {
+      const rows = await sql`
+        UPDATE pengumuman SET deleted_at = NOW()
+        WHERE id = ${id} AND deleted_at IS NULL
+        RETURNING id
+      `;
+      if (!rows.length) return errorResponse('Pengumuman tidak ditemukan', 404);
+      return jsonResponse({ ok: true });
+    } catch (err) {
+      return errorResponse('Gagal menghapus pengumuman: ' + err.message);
+    }
+  }
+
+  return errorResponse('Not found', 404);
 };
-
-/** Format row DB → objek frontend */
-function _fmt(r) {
-  return {
-    id:               r.id,
-    judul:            r.judul,
-    isi:              r.isi,
-    tipe:             r.tipe,
-    aktif:            r.aktif,
-    tanggal_mulai:    _fmtDate(r.tanggal_mulai),
-    tanggal_selesai:  _fmtDate(r.tanggal_selesai),
-    dibuat_oleh:      r.dibuat_oleh,
-    dibuat_pada:      r.dibuat_pada,
-  };
-}
-
-/**
- * Konversi nilai tanggal dari PostgreSQL ke format YYYY-MM-DD.
- * Neon/pg mengembalikan kolom DATE sebagai objek Date JS, bukan string —
- * sehingga String(dateObj).slice(0,10) menghasilkan "Thu Apr 23" bukan "2026-04-23".
- */
-function _fmtDate(val) {
-  if (!val) return null;
-  // Sudah string ISO → ambil 10 karakter pertama
-  if (typeof val === 'string') {
-    // Coba cocokkan YYYY-MM-DD di mana saja dalam string
-    const m = val.match(/(\d{4}-\d{2}-\d{2})/);
-    return m ? m[1] : val.slice(0, 10);
-  }
-  // Objek Date dari driver pg/Neon
-  if (val instanceof Date) {
-    const y  = val.getUTCFullYear();
-    const mo = String(val.getUTCMonth() + 1).padStart(2, '0');
-    const d  = String(val.getUTCDate()).padStart(2, '0');
-    return `${y}-${mo}-${d}`;
-  }
-  return null;
-}

@@ -141,6 +141,9 @@ const API = {
   // Laporan
   getLaporan: (params) => API.get('laporan', params),
 
+  // Bukti Rekap (download data dukung per indikator, lintas usulan/puskesmas)
+  getBuktiRekap: (params) => API.get('bukti-rekap', params),
+
   // Jabatan
   getJabatan:    ()     => API.get('jabatan'),
   createJabatan: (data) => API.post('jabatan', data),

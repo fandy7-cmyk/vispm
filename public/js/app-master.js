@@ -30,6 +30,10 @@ async function renderLaporan() {
             style="background:transparent;border:none;padding:4px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">
             <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"/><path d="m7 11 5 5 5-5"/><path d="M4 19c0 1.1 1.8 2 4 2h8c2.2 0 4-.9 4-2"/></svg>
           </button>
+          <button onclick="openBuktiRekapModal()" title="Download Data Dukung per Indikator (ZIP)"
+            style="background:transparent;border:none;padding:4px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0d9488" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          </button>
         </div>
       </div>
       <div class="card-body">
@@ -314,6 +318,286 @@ async function downloadRekapLaporan() {
   } catch(e) {
     pw.document.write('<html><body style="font-family:Arial;padding:40px;color:#ef4444"><p>Gagal memuat rekap: ' + e.message + '</p></body></html>');
     toast('Gagal membuka rekap: ' + e.message, 'error');
+  }
+}
+
+// ============== DOWNLOAD DATA DUKUNG PER INDIKATOR (ZIP, lintas usulan) ==============
+async function openBuktiRekapModal() {
+  let modal = document.getElementById('buktiRekapModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'buktiRekapModal';
+    modal.className = 'modal';
+    modal.addEventListener('click', e => { if (e.target === modal) closeModal('buktiRekapModal'); });
+    document.body.appendChild(modal);
+  }
+
+  let indikatorList = [];
+  try { indikatorList = (await API.getIndikator()).filter(i => i.aktif !== false); } catch(e) {}
+
+  // Pengelola Program hanya boleh lihat & download data dukung indikator yang
+  // jadi tanggung jawabnya (sama seperti pembatasan di tombol Download Laporan Final PP)
+  const isPP = currentUser.role === 'Pengelola Program';
+  if (isPP) {
+    const aksesArr = Array.isArray(currentUser.indikatorAkses)
+      ? currentUser.indikatorAkses.map(n => parseInt(n)).filter(n => !isNaN(n))
+      : parseIndikatorAksesString(currentUser.indikatorAkses || '');
+    indikatorList = indikatorList.filter(i => aksesArr.includes(parseInt(i.no)));
+  }
+
+  // Pakai data laporan yang sudah dimuat (sesuai hak akses user login) utk isi tahun & puskesmas
+  const rows = window._lapAllData || [];
+  const years = [...new Set(rows.map(r => parseInt(r.tahun)).filter(Boolean))].sort((a,b) => b-a);
+  const pkmMap = new Map();
+  rows.forEach(r => { if (r.kodePKM && r.namaPKM) pkmMap.set(r.kodePKM, r.namaPKM); });
+  const pkmSorted = [...pkmMap.entries()].sort((a,b) => a[1].localeCompare(b[1]));
+
+  const bulanNamaBR = ['','Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  const bulanOptionsBR = (sel) => bulanNamaBR.map((n,i) => i===0?'':`<option value="${i}" ${i==sel?'selected':''}>${n}</option>`).join('');
+
+  modal.innerHTML = `
+    <div class="modal-card" style="max-width:480px">
+      <div class="modal-header">
+        <span class="material-icons" style="color:#0d9488">folder_zip</span>
+        <span>Download Data Dukung per Indikator</span>
+        <button class="btn-icon" onclick="closeModal('buktiRekapModal')"><span class="material-icons">close</span></button>
+      </div>
+      <div class="modal-body" style="padding:20px">
+        <div class="form-group">
+          <label>Indikator</label>
+          ${indikatorList.length ? `
+          <select class="form-control" id="brIndikator" onchange="_brRefreshBulanAvailability()">
+            ${indikatorList.map(i => `<option value="${i.no}">#${i.no} — ${i.nama}</option>`).join('')}
+          </select>` : `
+          <div style="font-size:12.5px;color:#ef4444;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px 12px">
+            ${isPP ? 'Belum ada indikator yang di-assign ke akun Anda. Hubungi Admin.' : 'Tidak ada indikator aktif.'}
+          </div>`}
+        </div>
+        <div class="form-group">
+          <label>Tahun</label>
+          <select class="form-control" id="brTahun" onchange="_brRefreshBulanAvailability()">
+            ${years.length ? years.map(y => `<option value="${y}">${y}</option>`).join('') : `<option value="${CURRENT_YEAR}">${CURRENT_YEAR}</option>`}
+          </select>
+        </div>
+        <div id="brBulanRow" style="display:flex;gap:10px">
+          <div class="form-group" style="flex:1">
+            <label>Bulan Dari</label>
+            <select class="form-control" id="brBulanFrom">${bulanOptionsBR(1)}</select>
+          </div>
+          <div class="form-group" style="flex:1">
+            <label>Bulan Sampai</label>
+            <select class="form-control" id="brBulanTo">${bulanOptionsBR(CURRENT_BULAN)}</select>
+          </div>
+        </div>
+        <div id="brBulanInfo" style="font-size:11px;color:#94a3b8;margin:-8px 0 12px">Mengecek ketersediaan data...</div>
+        <div class="form-group">
+          <label style="display:flex;align-items:center;justify-content:space-between">
+            <span>Puskesmas</span>
+            <span style="font-weight:400;font-size:12px"><input type="checkbox" id="brPkmAll" checked onchange="_brToggleAllPkm(this.checked)"> Pilih Semua</span>
+          </label>
+          <div id="brPkmList" style="max-height:160px;overflow-y:auto;border:1px solid var(--border,#e2e8f0);border-radius:8px;padding:8px">
+            ${pkmSorted.map(([kode,nama]) => `
+              <label style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:13px;font-weight:400">
+                <input type="checkbox" class="brPkmChk" value="${kode}" checked> ${nama}
+              </label>`).join('') || '<span style="font-size:12px;color:#94a3b8">Tidak ada data puskesmas</span>'}
+          </div>
+        </div>
+        <div id="brProgress" style="display:none;margin-top:10px">
+          <div style="font-size:12px;color:#64748b;margin-bottom:4px" id="brProgressText">Menyiapkan...</div>
+          <div style="height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden">
+            <div id="brProgressBar" style="height:100%;width:0%;background:#0d9488;transition:width .2s"></div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('buktiRekapModal')">Batal</button>
+        <button class="btn btn-primary" id="brDownloadBtn" onclick="_brStartDownload()">
+          <span class="material-icons" style="font-size:16px">download</span> Download ZIP
+        </button>
+      </div>
+    </div>`;
+  showModal('buktiRekapModal');
+
+  if (!indikatorList.length) {
+    const btn = document.getElementById('brDownloadBtn');
+    if (btn) btn.disabled = true;
+  }
+
+  // Ganti <select> native jadi custom dropdown (samakan tampilan dgn form lain),
+  // karena modal ini di luar #mainContent yang di-observe otomatis oleh custom-select.js
+  setTimeout(() => {
+    if (window.CustomSelect && typeof window.CustomSelect.replaceAll === 'function') {
+      window.CustomSelect.replaceAll(modal);
+    }
+    // Cek bulan mana yang beneran ada data dukungnya, untuk indikator+tahun default
+    if (indikatorList.length) _brRefreshBulanAvailability();
+  }, 60);
+}
+
+// Cek ke server: untuk Indikator + Tahun yang dipilih, bulan apa saja yang beneran
+// punya data dukung (lintas semua puskesmas). Dropdown Bulan Dari/Sampai hanya
+// akan menampilkan bulan-bulan tersebut, biar tidak ada pilihan bulan kosong.
+let _brCheckToken = 0;
+async function _brRefreshBulanAvailability() {
+  const noIndikator = document.getElementById('brIndikator')?.value;
+  const tahun       = document.getElementById('brTahun')?.value;
+  const infoEl      = document.getElementById('brBulanInfo');
+  const fromSel     = document.getElementById('brBulanFrom');
+  const toSel       = document.getElementById('brBulanTo');
+  const downloadBtn = document.getElementById('brDownloadBtn');
+  if (!noIndikator || !tahun || !fromSel || !toSel) return;
+
+  const myToken = ++_brCheckToken; // cegah race condition kalau user ganti-ganti cepat
+  if (infoEl) { infoEl.style.color = '#94a3b8'; infoEl.textContent = 'Mengecek ketersediaan data...'; }
+  if (downloadBtn) downloadBtn.disabled = true;
+
+  const bulanNamaBR2 = ['','Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+
+  try {
+    // Ambil 1 tahun penuh (tanpa filter puskesmas) hanya untuk tahu bulan mana yang berisi file
+    const result = await API.getBuktiRekap({ noIndikator, tahun, bulanFrom: 1, bulanTo: 12 });
+    if (myToken !== _brCheckToken) return; // sudah keburu diganti user, buang hasil ini
+
+    const bulanTersedia = [...new Set((result.files || []).map(f => parseInt(f.bulan)))].sort((a,b) => a-b);
+    window._brBulanTersedia = bulanTersedia;
+
+    if (downloadBtn) downloadBtn.disabled = false;
+
+    const prevFrom = parseInt(fromSel.value) || 0;
+    const prevTo   = parseInt(toSel.value)   || 0;
+    const bulanRow = document.getElementById('brBulanRow');
+
+    if (!bulanTersedia.length) {
+      if (infoEl) { infoEl.style.color = '#ef4444'; infoEl.textContent = 'Belum ada data dukung untuk indikator & tahun ini.'; }
+      if (downloadBtn) downloadBtn.disabled = true;
+      if (bulanRow) bulanRow.innerHTML = `
+        <div class="form-group" style="flex:1">
+          <label>Bulan Dari</label>
+          <select class="form-control" id="brBulanFrom"><option value="">-</option></select>
+        </div>
+        <div class="form-group" style="flex:1">
+          <label>Bulan Sampai</label>
+          <select class="form-control" id="brBulanTo"><option value="">-</option></select>
+        </div>`;
+    } else {
+      if (infoEl) {
+        infoEl.style.color = '#0d9488';
+        infoEl.textContent = `Tersedia: ${bulanTersedia.map(b => bulanNamaBR2[b]).join(', ')}`;
+      }
+      const finalFrom = bulanTersedia.includes(prevFrom) ? prevFrom : bulanTersedia[0];
+      const finalTo   = bulanTersedia.includes(prevTo)   ? prevTo   : bulanTersedia[bulanTersedia.length - 1];
+      const optHtml = (selected) => bulanTersedia.map(b =>
+        `<option value="${b}" ${b === selected ? 'selected' : ''}>${bulanNamaBR2[b]}</option>`).join('');
+      // Bikin ulang elemen <select> dari nol (bukan cuma ganti innerHTML-nya) —
+      // custom-select.js cuma mem-bungkus <select> sekali (flag _csReplaced),
+      // jadi kalau <option> diganti di select yang sama, trigger button & panel
+      // dropdown-nya jadi tidak ikut ke-refresh dan masih nampilin daftar lama.
+      // Dengan bikin elemen <select> baru, custom-select.js mau mem-bungkus ulang.
+      if (bulanRow) bulanRow.innerHTML = `
+        <div class="form-group" style="flex:1">
+          <label>Bulan Dari</label>
+          <select class="form-control" id="brBulanFrom">${optHtml(finalFrom)}</select>
+        </div>
+        <div class="form-group" style="flex:1">
+          <label>Bulan Sampai</label>
+          <select class="form-control" id="brBulanTo">${optHtml(finalTo)}</select>
+        </div>`;
+    }
+
+    // Bungkus ulang <select> Bulan Dari/Sampai yang baru dibuat jadi custom dropdown
+    if (window.CustomSelect && typeof window.CustomSelect.replaceAll === 'function') {
+      window.CustomSelect.replaceAll(document.getElementById('buktiRekapModal'));
+    }
+  } catch (e) {
+    if (myToken !== _brCheckToken) return;
+    if (infoEl) { infoEl.style.color = '#ef4444'; infoEl.textContent = 'Gagal mengecek ketersediaan data: ' + e.message; }
+    if (downloadBtn) downloadBtn.disabled = false;
+  }
+}
+
+function _brToggleAllPkm(checked) {
+  document.querySelectorAll('.brPkmChk').forEach(el => el.checked = checked);
+}
+
+async function _brStartDownload() {
+  const noIndikator   = document.getElementById('brIndikator')?.value;
+  const namaIndikator = document.getElementById('brIndikator')?.selectedOptions[0]?.textContent || '';
+  const tahun     = document.getElementById('brTahun')?.value;
+  const bulanFrom = document.getElementById('brBulanFrom')?.value;
+  const bulanTo   = document.getElementById('brBulanTo')?.value;
+  const kodePkm   = [...document.querySelectorAll('.brPkmChk:checked')].map(el => el.value);
+
+  if (!noIndikator || !tahun) return toast('Lengkapi filter terlebih dahulu', 'warning');
+  if (parseInt(bulanFrom) > parseInt(bulanTo)) return toast('Bulan Dari harus <= Bulan Sampai', 'warning');
+  if (!kodePkm.length) return toast('Pilih minimal 1 puskesmas', 'warning');
+
+  const btn = document.getElementById('brDownloadBtn');
+  const progWrap = document.getElementById('brProgress');
+  const progText = document.getElementById('brProgressText');
+  const progBar  = document.getElementById('brProgressBar');
+  btn.disabled = true;
+  progWrap.style.display = 'block';
+  progText.textContent = 'Mengambil daftar file...';
+
+  try {
+    const result = await API.getBuktiRekap({ noIndikator, tahun, bulanFrom, bulanTo, kodePkm: kodePkm.join(',') });
+    const files = result.files || [];
+
+    if (!files.length) {
+      toast('Tidak ada data dukung untuk filter ini', 'warning');
+      return;
+    }
+
+    progText.textContent = `Mengunduh 0 / ${files.length} file...`;
+
+    const zip = new JSZip();
+    let done = 0, gagal = 0;
+
+    // Concurrency terbatas biar tidak membebani browser & Netlify function sekaligus
+    const CONCURRENCY = 4;
+    let cursor = 0;
+    async function worker() {
+      while (cursor < files.length) {
+        const f = files[cursor++];
+        try {
+          const proxyUrl = `/.netlify/functions/sign-url?url=${encodeURIComponent(f.fileUrl)}&name=${encodeURIComponent(f.fileName)}&mode=download`;
+          const res = await fetch(proxyUrl);
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          const blob = await res.blob();
+          const folder = `${f.namaPkm}`.replace(/[\/\\]/g, '_');
+          const fname  = `${String(f.bulan).padStart(2,'0')}_${f.namaBulan}_${f.fileName}`.replace(/[\/\\]/g, '_');
+          zip.file(`${folder}/${fname}`, blob);
+        } catch (e) {
+          console.error('Gagal ambil file:', f.fileUrl, e.message);
+          gagal++;
+        }
+        done++;
+        progText.textContent = `Mengunduh ${done} / ${files.length} file...`;
+        progBar.style.width = Math.round((done / files.length) * 90) + '%';
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, files.length) }, worker));
+
+    progText.textContent = 'Membungkus ZIP...';
+    progBar.style.width = '95%';
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
+    progBar.style.width = '100%';
+
+    const zipName = `DataDukung_${namaIndikator.replace(/[^a-zA-Z0-9]+/g,'_')}_${tahun}_${bulanFrom}-${bulanTo}.zip`;
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(zipBlob);
+    a.download = zipName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    toast(gagal > 0 ? `Selesai dengan ${gagal} file gagal diunduh` : 'Download ZIP berhasil', gagal > 0 ? 'warning' : 'success');
+    closeModal('buktiRekapModal');
+  } catch (e) {
+    toast('Gagal: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    progWrap.style.display = 'none';
   }
 }
 

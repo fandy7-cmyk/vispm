@@ -327,11 +327,11 @@ function _renderPgmTable(containerId) {
       <td style="padding:12px 14px;font-size:12.5px;color:var(--text-light);white-space:nowrap">${_fmtTglPgm(selesai)}</td>
       <td style="padding:12px 14px">${statusBadgeHtml}</td>
       <td style="padding:12px 14px;white-space:nowrap;text-align:right">
-        <button class="btn-icon" title="Edit" onclick="openFormPengumuman('${p.id}','${containerId}')" style="color:var(--primary)">
-          <span class="material-icons" style="font-size:18px">edit</span>
+        <button class="btn-icon edit" title="Edit" onclick="openFormPengumuman('${p.id}','${containerId}')">
+          <span class="material-icons">edit</span>
         </button>
-        <button class="btn-icon" title="Hapus" onclick="_confirmHapusPengumuman('${p.id}','${_escHtml(p.judul)}','${containerId}')" style="color:#ef4444;margin-left:2px">
-          <span class="material-icons" style="font-size:18px">delete</span>
+        <button class="btn-icon del" title="Hapus" onclick="_confirmHapusPengumuman('${p.id}','${_escHtml(p.judul)}','${containerId}')">
+          <span class="material-icons">delete</span>
         </button>
       </td>
     </tr>`;
@@ -341,13 +341,13 @@ function _renderPgmTable(containerId) {
     <div style="overflow-x:auto;border-radius:10px;border:1px solid var(--border)">
       <table style="width:100%;border-collapse:collapse;min-width:560px">
         <thead>
-          <tr style="background:var(--bg-secondary,#f8fafc)">
-            <th style="padding:10px 14px;font-size:12px;font-weight:700;color:var(--text-light);text-align:left;border-bottom:1px solid var(--border)">Judul / Isi</th>
-            <th style="padding:10px 14px;font-size:12px;font-weight:700;color:var(--text-light);text-align:left;border-bottom:1px solid var(--border)">Tipe</th>
-            <th style="padding:10px 14px;font-size:12px;font-weight:700;color:var(--text-light);text-align:left;border-bottom:1px solid var(--border)">Mulai</th>
-            <th style="padding:10px 14px;font-size:12px;font-weight:700;color:var(--text-light);text-align:left;border-bottom:1px solid var(--border)">Selesai</th>
-            <th style="padding:10px 14px;font-size:12px;font-weight:700;color:var(--text-light);text-align:left;border-bottom:1px solid var(--border)">Status</th>
-            <th style="padding:10px 14px;font-size:12px;font-weight:700;color:var(--text-light);text-align:right;border-bottom:1px solid var(--border)">Aksi</th>
+          <tr style="background:#0d9488">
+            <th style="background:#0d9488;color:white;padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;text-align:left">Judul / Isi</th>
+            <th style="background:#0d9488;color:white;padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;text-align:left">Tipe</th>
+            <th style="background:#0d9488;color:white;padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;text-align:left">Mulai</th>
+            <th style="background:#0d9488;color:white;padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;text-align:left">Selesai</th>
+            <th style="background:#0d9488;color:white;padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;text-align:left">Status</th>
+            <th style="background:#0d9488;color:white;padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;text-align:right">Aksi</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
@@ -419,7 +419,7 @@ async function openFormPengumuman(id, containerId) {
       <div class="modal-header">
         <span class="material-icons" style="color:#0d9488">campaign</span>
         <h3>${id ? 'Edit' : 'Buat'} Pengumuman</h3>
-        <button class="btn-icon" onclick="closeModal('pgmFormModal')"><span class="material-icons">close</span></button>
+        <button class="btn-icon" title="Tutup" onclick="closeModal('pgmFormModal')"><span class="material-icons">close</span></button>
       </div>
       <div class="modal-body" style="display:flex;flex-direction:column;gap:14px">
 

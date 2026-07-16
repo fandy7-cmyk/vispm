@@ -60,11 +60,16 @@ function _lapRebuildFilters(rows, selTahun, selBulan, selStatus, selPKM) {
   if (tahunSel) {
     const years = [...new Set(rows.map(r => parseInt(r.tahun)).filter(Boolean))].sort((a,b) => b - a);
     const finalYears = years.length > 0 ? years : [CURRENT_YEAR];
-    // selTahun === '' berarti Semua Tahun, undefined/null berarti default ke tahun terbaru
-    const picked = (selTahun !== undefined && selTahun !== null) ? selTahun : finalYears[0];
-    tahunSel.innerHTML =
-      `<option value="" ${picked === '' ? 'selected' : ''}>Semua Tahun</option>` +
-      finalYears.map(y => `<option value="${y}" ${y == picked ? 'selected':''}>${y}</option>`).join('');
+    if (finalYears.length === 1) {
+      // Cuma 1 tahun tersedia — auto-select, tanpa opsi "Semua Tahun"
+      tahunSel.innerHTML = `<option value="${finalYears[0]}" selected>${finalYears[0]}</option>`;
+    } else {
+      // selTahun === '' berarti Semua Tahun, undefined/null berarti default ke tahun terbaru
+      const picked = (selTahun !== undefined && selTahun !== null) ? selTahun : finalYears[0];
+      tahunSel.innerHTML =
+        `<option value="" ${picked === '' ? 'selected' : ''}>Semua Tahun</option>` +
+        finalYears.map(y => `<option value="${y}" ${y == picked ? 'selected':''}>${y}</option>`).join('');
+    }
   }
 
   // '' = Semua Tahun (tidak filter tahun)
@@ -102,6 +107,11 @@ function _lapRebuildFilters(rows, selTahun, selBulan, selStatus, selPKM) {
     statusSet.forEach(s => { if (!statusSorted.includes(s)) statusSorted.push(s); });
     statusSel.innerHTML = '<option value="">Semua Status</option>'
       + statusSorted.map(s => `<option value="${s}" ${selStatus === s ? 'selected':''}>${s}</option>`).join('');
+  }
+
+  // Sinkronkan label tombol custom-select (innerHTML rebuild tidak otomatis ke-refresh)
+  if (window.CustomSelect) {
+    [tahunSel, bulanSel, pkmSel, statusSel].forEach(el => el && window.CustomSelect.sync(el));
   }
 }
 
@@ -360,7 +370,7 @@ async function openBuktiRekapModal() {
       <div class="modal-header">
         <span class="material-icons" style="color:#0d9488">folder_zip</span>
         <span>Download Data Dukung per Indikator</span>
-        <button class="btn-icon" onclick="closeModal('buktiRekapModal')"><span class="material-icons">close</span></button>
+        <button class="btn-icon" title="Tutup" onclick="closeModal('buktiRekapModal')"><span class="material-icons">close</span></button>
       </div>
       <div class="modal-body" style="padding:20px">
         <div class="form-group">
@@ -857,7 +867,7 @@ async function renderUsers(el) {
     <div class="modal" id="userModal">
       <div class="modal-card">
         <div class="modal-header"><span class="material-icons">person_add</span><h3 id="userModalTitle">Tambah User</h3>
-          <button class="btn-icon" onclick="closeModal('userModal')"><span class="material-icons">close</span></button></div>
+          <button class="btn-icon" title="Tutup" onclick="closeModal('userModal')"><span class="material-icons">close</span></button></div>
         <div class="modal-body" style="padding:24px;overflow:hidden;display:flex;flex-direction:column">
           <div id="userModalGrid" style="display:grid;grid-template-columns:1fr;gap:20px;flex:1;min-height:0">
 
@@ -986,10 +996,10 @@ function renderUsersTable(users, page) {
       <td style="font-size:12px">${u.role === 'Pengelola Program' ? (u.jabatan ? u.jabatan.split('|').map(j=>'<div style="font-weight:600;color:var(--primary);font-size:11px;white-space:nowrap">'+j.trim()+'</div>').join('') : '') + '<div style="color:var(--text-light);font-size:11px">'+(u.indikatorAkses || '')+'</div>' : ''}</td>
       <td>${u.aktif ? '<span class="badge badge-success">Aktif</span>' : '<span class="badge badge-default">Non-aktif</span>'}</td>
       <td style="display:flex;gap:4px">
-        <button class="btn-icon edit" onclick="editUser('${u.email}')"><span class="material-icons">edit</span></button>
+        <button class="btn-icon edit" title="Edit" onclick="editUser('${u.email}')"><span class="material-icons">edit</span></button>
         <button class="btn-icon" title="Reset Password" style="color:#0d9488" onclick="resetUserPassword('${u.email}','${u.nama}')"><span class="material-icons">lock_reset</span></button>
         ${['Kepala Puskesmas','Pengelola Program'].includes(u.role) ? (()=>{ const _hasTT = !!(u.tandaTangan && (u.tandaTangan.startsWith('data:image') || u.tandaTangan.startsWith('http'))); return `<span title="${_hasTT ? 'Lihat Tanda Tangan' : 'Tanda tangan belum diupload'}" style="display:inline-flex;cursor:${_hasTT ? 'pointer' : 'not-allowed'}"><button class="btn-icon" style="color:${_hasTT ? '#7c3aed' : '#cbd5e1'};opacity:${_hasTT ? '1' : '0.4'};pointer-events:${_hasTT ? 'auto' : 'none'}" ${_hasTT ? `onclick="previewTandaTanganUser('${u.email}','${u.nama.replace(/'/g,"\\'").replace(/"/g,'&quot;')}','${u.role}')"` : 'disabled'}><span class="material-icons">draw</span></button></span>`; })() : ''}
-        <button class="btn-icon del" onclick="deleteUser('${u.email}')"><span class="material-icons">delete</span></button>
+        <button class="btn-icon del" title="Hapus" onclick="deleteUser('${u.email}')"><span class="material-icons">delete</span></button>
       </td>
     </tr>`).join('');
   el.innerHTML = '<div class="table-container"><table>'
@@ -1041,7 +1051,7 @@ function previewTandaTanganUser(email, nama, role) {
     + '<div class="modal-header">'
     + '<span class="material-icons" style="color:#7c3aed">draw</span>'
     + '<h3>Tanda Tangan</h3>'
-    + '<button class="btn-icon" onclick="closeModal(\'ttPreviewModal\')"><span class="material-icons">close</span></button>'
+    + '<button class="btn-icon" title="Tutup" onclick="closeModal(\'ttPreviewModal\')"><span class="material-icons">close</span></button>'
     + '</div>'
     + '<div class="modal-body">'
     + '<div style="margin-bottom:14px"><div style="font-size:13px;color:var(--text-light);margin-bottom:2px">Nama</div><div style="font-weight:600;font-size:14px">' + nama + '</div></div>'
@@ -1342,7 +1352,7 @@ async function renderJabatan(el) {
         <div class="modal-header">
           <span class="material-icons">badge</span>
           <span id="jabatanModalTitle">Tambah Jabatan</span>
-          <button class="btn-icon" onclick="closeModal('jabatanModal')"><span class="material-icons">close</span></button>
+          <button class="btn-icon" title="Tutup" onclick="closeModal('jabatanModal')"><span class="material-icons">close</span></button>
         </div>
         <div class="modal-body">
           <div class="form-group">
@@ -1484,7 +1494,7 @@ async function renderPKM(el) {
     <div class="modal" id="pkmModal">
       <div class="modal-card">
         <div class="modal-header"><span class="material-icons">local_hospital</span><h3 id="pkmModalTitle">Tambah Puskesmas</h3>
-          <button class="btn-icon" onclick="closeModal('pkmModal')"><span class="material-icons">close</span></button></div>
+          <button class="btn-icon" title="Tutup" onclick="closeModal('pkmModal')"><span class="material-icons">close</span></button></div>
         <div class="modal-body">
           <div class="form-group"><label>Kode *</label><input class="form-control" id="pKode" placeholder="Maks 10 karakter" maxlength="10"></div>
           <div class="form-group"><label>Nama Puskesmas *</label><input class="form-control" id="pNama" placeholder="Nama lengkap puskesmas"></div>
@@ -1530,8 +1540,8 @@ function renderPKMTable(pkm, page) {
       + '<td class="rasio-cell">'+parseFloat(p.indeksKesulitan||0).toFixed(2)+'</td>'
       + '<td>'+(p.aktif ? '<span class="badge badge-success">Aktif</span>' : '<span class="badge badge-default">Non-aktif</span>')+'</td>'
       + '<td style="display:flex;gap:4px">'
-      + `<button class="btn-icon edit" onclick="editPKM('${kodeQ}')"><span class="material-icons">edit</span></button>`
-      + `<button class="btn-icon del" onclick="deletePKM('${kodeQ}')"><span class="material-icons">delete</span></button>`
+      + `<button class="btn-icon edit" title="Edit" onclick="editPKM('${kodeQ}')"><span class="material-icons">edit</span></button>`
+      + `<button class="btn-icon del" title="Hapus" onclick="deletePKM('${kodeQ}')"><span class="material-icons">delete</span></button>`
       + '</td></tr>';
   }).join('');
   el.innerHTML = '<div class="table-container"><table>'
@@ -1727,7 +1737,7 @@ async function renderIndikator(el) {
     <div class="modal" id="indModal">
       <div class="modal-card">
         <div class="modal-header"><span class="material-icons">monitor_heart</span><h3 id="indModalTitle">Tambah Indikator</h3>
-          <button class="btn-icon" onclick="closeModal('indModal')"><span class="material-icons">close</span></button></div>
+          <button class="btn-icon" title="Tutup" onclick="closeModal('indModal')"><span class="material-icons">close</span></button></div>
         <div class="modal-body">
           <div class="form-group"><label>No Indikator *</label><input class="form-control" id="iNo" type="number" min="1" placeholder="1, 2, 3..."></div>
           <div class="form-group"><label>Nama Indikator *</label><input class="form-control" id="iNama" placeholder="Nama lengkap indikator"></div>
@@ -1771,8 +1781,8 @@ function renderIndTable(inds, page) {
       <td style="text-align:center"><span style="font-family:">${i.bobot}</span></td>
       <td>${i.aktif ? '<span class="badge badge-success">Aktif</span>' : '<span class="badge badge-default">Non-aktif</span>'}</td>
       <td style="display:flex;gap:4px">
-        <button class="btn-icon edit" onclick="editInd(${i.no})"><span class="material-icons">edit</span></button>
-        <button class="btn-icon del" onclick="deleteInd(${i.no})"><span class="material-icons">delete</span></button>
+        <button class="btn-icon edit" title="Edit" onclick="editInd(${i.no})"><span class="material-icons">edit</span></button>
+        <button class="btn-icon del" title="Hapus" onclick="deleteInd(${i.no})"><span class="material-icons">delete</span></button>
       </td>
     </tr>`).join('');
   el.innerHTML = '<div class="table-container"><table>'
@@ -1908,7 +1918,7 @@ async function renderPeriode(el) {
         <div class="modal-header">
           <span class="material-icons">edit_calendar</span>
           <h3 id="periodeModalTitle">Tambah Periode Input</h3>
-          <button class="btn-icon" onclick="closeModal('periodeModal')"><span class="material-icons">close</span></button>
+          <button class="btn-icon" title="Tutup" onclick="closeModal('periodeModal')"><span class="material-icons">close</span></button>
         </div>
         <div class="modal-body" style="padding:16px 20px">
           <!-- Baris Tahun + Bulan + Status -->
@@ -2678,11 +2688,16 @@ function _kuRebuildFilters(rows, selTahun, selBulan, selStatus) {
   if (tahunSel) {
     const years = [...new Set(rows.map(u => parseInt(u.tahun)).filter(Boolean))].sort((a,b) => b - a);
     const finalYears = years.length > 0 ? years : [CURRENT_YEAR];
-    // selTahun === '' berarti "Semua Tahun", undefined/null berarti default ke tahun terbaru
-    const picked = (selTahun !== undefined && selTahun !== null) ? selTahun : finalYears[0];
-    tahunSel.innerHTML =
-      `<option value="" ${picked === '' ? 'selected' : ''}>Semua Tahun</option>` +
-      finalYears.map(y => `<option value="${y}" ${y == picked ? 'selected':''}>${y}</option>`).join('');
+    if (finalYears.length === 1) {
+      // Cuma 1 tahun tersedia — auto-select, tanpa opsi "Semua Tahun"
+      tahunSel.innerHTML = `<option value="${finalYears[0]}" selected>${finalYears[0]}</option>`;
+    } else {
+      // selTahun === '' berarti "Semua Tahun", undefined/null berarti default ke tahun terbaru
+      const picked = (selTahun !== undefined && selTahun !== null) ? selTahun : finalYears[0];
+      tahunSel.innerHTML =
+        `<option value="" ${picked === '' ? 'selected' : ''}>Semua Tahun</option>` +
+        finalYears.map(y => `<option value="${y}" ${y == picked ? 'selected':''}>${y}</option>`).join('');
+    }
   }
 
   // '' berarti Semua Tahun (tahunPilih = 0 = tidak filter)
@@ -2712,6 +2727,11 @@ function _kuRebuildFilters(rows, selTahun, selBulan, selStatus) {
     statusSet.forEach(s => { if (!statusSorted.includes(s)) statusSorted.push(s); });
     statusSel.innerHTML = '<option value="">Semua Status</option>'
       + statusSorted.map(s => `<option value="${s}" ${selStatus === s ? 'selected':''}>${s}</option>`).join('');
+  }
+
+  // Sinkronkan label tombol custom-select (innerHTML rebuild tidak otomatis ke-refresh)
+  if (window.CustomSelect) {
+    [tahunSel, bulanSel, statusSel].forEach(el => el && window.CustomSelect.sync(el));
   }
 }
 
@@ -2902,7 +2922,7 @@ const _masterTabs = [
   { id: 'target-tahunan',  icon: 'track_changes',   label: 'Target Tahunan' },
   { id: 'pejabat',         icon: 'draw',            label: 'Pejabat' },
   { id: 'penandatangan',   icon: 'assignment_ind',  label: 'Penandatangan' },
-  { id: 'pengumuman',      icon: 'campaign',        label: 'Pengumuman' },
+  { id: 'pengumuman',      icon: 'notifications_active', label: 'Pengumuman' },
   { id: 'audit-trail',     icon: 'manage_search',   label: 'Audit Trail' },
 ];
 

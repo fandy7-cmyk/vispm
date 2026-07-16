@@ -658,6 +658,20 @@
     attrObs.observe(select, { attributes: true, attributeFilter: ['disabled'] });
   }
 
+  /* ─── Sinkronisasi manual: refresh teks trigger dari opsi <select> saat ini ─
+     Dipakai saat kode luar nge-rebuild opsi lewat innerHTML (bukan lewat .value),
+     misalnya dropdown Tahun di halaman Laporan yang dibangun ulang dari data. ── */
+  function syncTrigger(select) {
+    if (!select) return;
+    const wrap = select.closest('.cs-wrap');
+    if (!wrap) return;
+    const triggerText = wrap.querySelector('.cs-trigger-text');
+    if (!triggerText) return;
+    const txt = getSelectedText(select);
+    triggerText.textContent = txt || select.getAttribute('placeholder') || 'Pilih...';
+    triggerText.classList.toggle('cs-placeholder', isPlaceholder(select));
+  }
+
   /* ─── Replace semua select di container ─────────────────── */
   function replaceAllInContainer(container) {
     const selects = (container || document).querySelectorAll('select.form-control, select.filter-select');
@@ -714,6 +728,7 @@
     window.CustomSelect = {
       replace: replaceSelect,
       replaceAll: replaceAllInContainer,
+      sync: syncTrigger,
       closeAll,
     };
   }

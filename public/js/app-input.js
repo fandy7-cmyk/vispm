@@ -246,11 +246,11 @@ function _renderMyUsulanRow(u) {
               </div>` : ''}
           </td>
           <td>
-            <button class="btn-icon view" onclick="viewDetail('${u.idUsulan}')"><span class="material-icons">visibility</span></button>
+            <button class="btn-icon view" title="Detail" onclick="viewDetail('${u.idUsulan}')"><span class="material-icons">visibility</span></button>
             ${getDownloadBtn(u, 20, 'operator')}
             <button class="btn-icon" onclick="openLogAktivitas('${u.idUsulan}')" title="Riwayat Aktivitas" style="background:transparent;border:none;color:#64748b"><span class="material-icons" style="font-size:18px">history</span></button>
-            ${u.statusGlobal === 'Draft' ? `<button class="btn-icon edit" onclick="openIndikatorModal('${u.idUsulan}')"><span class="material-icons">edit</span></button>` : ''}
-            ${u.statusGlobal === 'Draft' ? `<button class="btn-icon del" onclick="deleteUsulan('${u.idUsulan}')"><span class="material-icons">delete</span></button>` : ''}
+            ${u.statusGlobal === 'Draft' ? `<button class="btn-icon edit" title="Input" onclick="openIndikatorModal('${u.idUsulan}')"><span class="material-icons">edit</span></button>` : ''}
+            ${u.statusGlobal === 'Draft' ? `<button class="btn-icon del" title="Hapus" onclick="deleteUsulan('${u.idUsulan}')"><span class="material-icons">delete</span></button>` : ''}
             ${(['Ditolak','Ditolak Sebagian'].includes(u.statusGlobal) && u.ditolakOleh !== 'Admin')
               ? `<button class="btn-icon" onclick="openIndikatorModal('${u.idUsulan}')" title="Perbaiki & Ajukan Ulang" style="background:transparent;border:none;color:#f59e0b"><span class="material-icons" style="font-size:17px">restart_alt</span></button>`
               : `<button class="btn-icon" disabled title="${u.statusGlobal === 'Menunggu Pengelola Program' || u.ditolakOleh === 'Admin' ? 'Menunggu respon Pengelola Program' : 'Tidak perlu perbaikan'}" style="background:transparent;border:none;color:#cbd5e1;opacity:0.3;cursor:not-allowed"><span class="material-icons" style="font-size:17px">restart_alt</span></button>`}
@@ -2126,7 +2126,7 @@ async function openLogAktivitas(idUsulan) {
           title="Download tersedia setelah verifikasi selesai">
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10"/><path d="m8 9 4 4 4-4"/><path d="M4 17c0 2.2 1.8 4 4 4h8c2.2 0 4-1.8 4-4"/></svg>
         </button>
-        <button class="btn-icon" onclick="closeModal('logAktivitasModal')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+        <button class="btn-icon" title="Tutup" onclick="closeModal('logAktivitasModal')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
       </div>
       <div class="modal-body" id="logAktivitasBody" style="padding:20px;flex:1;overflow-y:auto">
         <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:12px;padding:60px 0">

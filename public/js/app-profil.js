@@ -36,7 +36,7 @@ function openEditProfil() {
         <div class="modal-header">
           <span class="material-icons" style="color:#0d9488">account_circle</span>
           <h3>Edit Profil</h3>
-          <button class="btn-icon" onclick="closeModal('editProfilModal')"><span class="material-icons">close</span></button>
+          <button class="btn-icon" title="Tutup" onclick="closeModal('editProfilModal')"><span class="material-icons">close</span></button>
         </div>
         <div class="modal-body">
           <div class="form-group">

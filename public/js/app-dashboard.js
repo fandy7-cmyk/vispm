@@ -46,7 +46,14 @@ async function _renderDashTahunDropdown(selectedTahun) {
   const list = await _loadDashTahunList();
   // Pastikan CURRENT_YEAR selalu ada di list
   const allTahun = [...new Set([...list, CURRENT_YEAR])].sort((a,b) => b - a);
-  return `<select id="dashTahunFilter" onchange="renderDashboard()"
+  if (allTahun.length === 1) {
+    // Cuma 1 tahun tersedia — auto-select, tanpa opsi "Semua Tahun"
+    return `<select id="dashTahunFilter" class="form-control" onchange="renderDashboard()"
+    style="border:1px solid var(--border,#e2e8f0);border-radius:7px;padding:5px 10px;font-size:12px;outline:none;font-family:inherit;background:var(--surface,white);color:var(--text);cursor:pointer">
+    <option value="${allTahun[0]}" selected>${allTahun[0]}</option>
+  </select>`;
+  }
+  return `<select id="dashTahunFilter" class="form-control" onchange="renderDashboard()"
     style="border:1px solid var(--border,#e2e8f0);border-radius:7px;padding:5px 10px;font-size:12px;outline:none;font-family:inherit;background:var(--surface,white);color:var(--text);cursor:pointer">
     <option value="">Semua Tahun</option>
     ${allTahun.map(t => `<option value="${t}" ${t == selectedTahun ? 'selected' : ''}>${t}</option>`).join('')}
@@ -63,7 +70,7 @@ function renderAdminDashboard(el, d, tahunDipilih) {
       <h1 style="margin:0"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;color:var(--primary)"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</h1>
       <div style="display:flex;align-items:center;gap:8px">
         <span style="font-size:12px;color:var(--text-light);font-weight:600">Filter Tahun:</span>
-        <div id="dashTahunWrap"><select id="dashTahunFilter" onchange="renderDashboard()"
+        <div id="dashTahunWrap"><select id="dashTahunFilter" class="form-control" onchange="renderDashboard()"
           style="border:1px solid var(--border,#e2e8f0);border-radius:7px;padding:5px 10px;font-size:12px;outline:none;font-family:inherit;background:var(--surface,white);color:var(--text);cursor:pointer">
           <option value="">Memuat...</option>
         </select></div>
@@ -131,15 +138,15 @@ function renderAdminDashboard(el, d, tahunDipilih) {
           <input id="adminAllSearch" type="text" placeholder="Cari ID / Puskesmas..."
             oninput="filterAdminAllUsulan()"
             style="border:1px solid var(--border,#e2e8f0);border-radius:7px;padding:5px 10px;font-size:12px;width:150px;outline:none;font-family:inherit;color:var(--text);background:var(--surface,white)" />
-          <select id="adminAllFilterPKM" onchange="filterAdminAllUsulan()"
+          <select id="adminAllFilterPKM" class="form-control" onchange="filterAdminAllUsulan()"
             style="border:1px solid var(--border,#e2e8f0);border-radius:7px;padding:5px 10px;font-size:12px;outline:none;font-family:inherit;background:var(--surface,white);color:var(--text)">
             <option value="">Semua Puskesmas</option>
           </select>
-          <select id="adminAllFilterTahun" onchange="filterAdminAllUsulan()"
+          <select id="adminAllFilterTahun" class="form-control" onchange="filterAdminAllUsulan()"
             style="border:1px solid var(--border,#e2e8f0);border-radius:7px;padding:5px 10px;font-size:12px;outline:none;font-family:inherit;background:var(--surface,white);color:var(--text)">
             <option value="">Semua Tahun</option>
           </select>
-          <select id="adminAllFilterStatus" onchange="filterAdminAllUsulan()"
+          <select id="adminAllFilterStatus" class="form-control" onchange="filterAdminAllUsulan()"
             style="border:1px solid var(--border,#e2e8f0);border-radius:7px;padding:5px 10px;font-size:12px;outline:none;font-family:inherit;background:var(--surface,white);color:var(--text)">
             <option value="">Semua Status</option>
           </select>
@@ -157,8 +164,15 @@ function renderAdminDashboard(el, d, tahunDipilih) {
     const sel = document.getElementById('dashTahunFilter');
     if (!sel) return;
     const allTahun = [...new Set([...list, CURRENT_YEAR])].sort((a,b) => b - a);
-    sel.innerHTML = `<option value="">Semua Tahun</option>`
-      + allTahun.map(t => `<option value="${t}" ${t == tahunDipilih ? 'selected' : ''}>${t}</option>`).join('');
+    if (allTahun.length === 1) {
+      // Cuma 1 tahun tersedia — auto-select, tanpa opsi "Semua Tahun"
+      sel.innerHTML = `<option value="${allTahun[0]}" selected>${allTahun[0]}</option>`;
+    } else {
+      sel.innerHTML = `<option value="">Semua Tahun</option>`
+        + allTahun.map(t => `<option value="${t}" ${t == tahunDipilih ? 'selected' : ''}>${t}</option>`).join('');
+    }
+    // Sync teks trigger custom-select (innerHTML tidak lewat setter .value)
+    if (window.CustomSelect) window.CustomSelect.sync(sel); else sel.value = sel.value;
   });
 
   // Load usulan menunggu Admin
@@ -213,7 +227,12 @@ async function loadAdminAllUsulan() {
     const tahunSet = [...new Set(_adminAllUsulanData.map(u => u.tahun).filter(Boolean))].sort((a,b) => b - a);
     const tahunSel = document.getElementById('adminAllFilterTahun');
     if (tahunSel) {
-      tahunSel.innerHTML = `<option value="">Semua Tahun</option>` + tahunSet.map(t => `<option value="${t}">${t}</option>`).join('');
+      if (tahunSet.length === 1) {
+        // Cuma 1 tahun tersedia — auto-select, tanpa opsi "Semua Tahun"
+        tahunSel.innerHTML = `<option value="${tahunSet[0]}" selected>${tahunSet[0]}</option>`;
+      } else {
+        tahunSel.innerHTML = `<option value="">Semua Tahun</option>` + tahunSet.map(t => `<option value="${t}">${t}</option>`).join('');
+      }
     }
     // Populate filter status — hanya tampilkan status yang benar-benar ada di data
     const statusOrder = ['Draft','Menunggu Kepala Puskesmas','Menunggu Pengelola Program','Menunggu Admin','Selesai','Ditolak','Ditolak Sebagian'];
@@ -223,6 +242,10 @@ async function loadAdminAllUsulan() {
     const statusSel = document.getElementById('adminAllFilterStatus');
     if (statusSel) {
       statusSel.innerHTML = `<option value="">Semua Status</option>` + statusSorted.map(s => `<option value="${s}">${s}</option>`).join('');
+    }
+    // Sinkronkan label tombol custom-select (innerHTML rebuild tidak otomatis ke-refresh)
+    if (window.CustomSelect) {
+      [pkmSel, tahunSel, statusSel].forEach(el => el && window.CustomSelect.sync(el));
     }
   } catch(e) {
     el.innerHTML = `<div class="empty-state" style="padding:32px"><span class="material-icons">inbox</span><p>Gagal memuat data</p></div>`;
@@ -415,7 +438,7 @@ renderOperatorDashboard(el, d, tahunDipilih) {
       <h1 style="margin:0"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;color:var(--primary)"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</h1>
       <div style="display:flex;align-items:center;gap:8px">
         <span style="font-size:12px;color:var(--text-light);font-weight:600">Filter Tahun:</span>
-        <select id="dashTahunFilter" onchange="renderDashboard()"
+        <select id="dashTahunFilter" class="form-control" onchange="renderDashboard()"
           style="border:1px solid var(--border,#e2e8f0);border-radius:7px;padding:5px 10px;font-size:12px;outline:none;font-family:inherit;background:var(--surface,white);color:var(--text);cursor:pointer">
           <option value="">Memuat...</option>
         </select>
@@ -459,8 +482,15 @@ renderOperatorDashboard(el, d, tahunDipilih) {
     const sel = document.getElementById('dashTahunFilter');
     if (!sel) return;
     const allTahun = [...new Set([...list, CURRENT_YEAR])].sort((a,b) => b - a);
-    sel.innerHTML = `<option value="">Semua Tahun</option>`
-      + allTahun.map(t => `<option value="${t}" ${t == tahunDipilih ? 'selected' : ''}>${t}</option>`).join('');
+    if (allTahun.length === 1) {
+      // Cuma 1 tahun tersedia — auto-select, tanpa opsi "Semua Tahun"
+      sel.innerHTML = `<option value="${allTahun[0]}" selected>${allTahun[0]}</option>`;
+    } else {
+      sel.innerHTML = `<option value="">Semua Tahun</option>`
+        + allTahun.map(t => `<option value="${t}" ${t == tahunDipilih ? 'selected' : ''}>${t}</option>`).join('');
+    }
+    // Sync teks trigger custom-select (innerHTML tidak lewat setter .value)
+    if (window.CustomSelect) window.CustomSelect.sync(sel); else sel.value = sel.value;
   });
 
   const _opTahunParam = { email_operator: currentUser.email };
@@ -685,7 +715,7 @@ function renderKepalasDashboard(el, d, tahunDipilih) {
       <h1 style="margin:0"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;color:var(--primary)"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</h1>
       <div style="display:flex;align-items:center;gap:8px">
         <span style="font-size:12px;color:var(--text-light);font-weight:600">Filter Tahun:</span>
-        <select id="dashTahunFilter" onchange="renderDashboard()"
+        <select id="dashTahunFilter" class="form-control" onchange="renderDashboard()"
           style="border:1px solid var(--border,#e2e8f0);border-radius:7px;padding:5px 10px;font-size:12px;outline:none;font-family:inherit;background:var(--surface,white);color:var(--text);cursor:pointer">
           <option value="">Memuat...</option>
         </select>
@@ -727,8 +757,15 @@ function renderKepalasDashboard(el, d, tahunDipilih) {
     const sel = document.getElementById('dashTahunFilter');
     if (!sel) return;
     const allTahun = [...new Set([...list, CURRENT_YEAR])].sort((a,b) => b - a);
-    sel.innerHTML = `<option value="">Semua Tahun</option>`
-      + allTahun.map(t => `<option value="${t}" ${t == tahunDipilih ? 'selected' : ''}>${t}</option>`).join('');
+    if (allTahun.length === 1) {
+      // Cuma 1 tahun tersedia — auto-select, tanpa opsi "Semua Tahun"
+      sel.innerHTML = `<option value="${allTahun[0]}" selected>${allTahun[0]}</option>`;
+    } else {
+      sel.innerHTML = `<option value="">Semua Tahun</option>`
+        + allTahun.map(t => `<option value="${t}" ${t == tahunDipilih ? 'selected' : ''}>${t}</option>`).join('');
+    }
+    // Sync teks trigger custom-select (innerHTML tidak lewat setter .value)
+    if (window.CustomSelect) window.CustomSelect.sync(sel); else sel.value = sel.value;
   });
 
   // Update _periodeAktifList dari data dashboard agar _isPeriodeVerifOpenFor() akurat
@@ -801,7 +838,7 @@ function renderProgramDashboard(el, d, tahunDipilih) {
       <h1 style="margin:0"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;color:var(--primary)"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</h1>
       <div style="display:flex;align-items:center;gap:8px">
         <span style="font-size:12px;color:var(--text-light);font-weight:600">Filter Tahun:</span>
-        <select id="dashTahunFilter" onchange="renderDashboard()"
+        <select id="dashTahunFilter" class="form-control" onchange="renderDashboard()"
           style="border:1px solid var(--border,#e2e8f0);border-radius:7px;padding:5px 10px;font-size:12px;outline:none;font-family:inherit;background:var(--surface,white);color:var(--text);cursor:pointer">
           <option value="">Memuat...</option>
         </select>
@@ -840,8 +877,15 @@ function renderProgramDashboard(el, d, tahunDipilih) {
     const sel = document.getElementById('dashTahunFilter');
     if (!sel) return;
     const allTahun = [...new Set([...list, CURRENT_YEAR])].sort((a,b) => b - a);
-    sel.innerHTML = `<option value="">Semua Tahun</option>`
-      + allTahun.map(t => `<option value="${t}" ${t == tahunDipilih ? 'selected' : ''}>${t}</option>`).join('');
+    if (allTahun.length === 1) {
+      // Cuma 1 tahun tersedia — auto-select, tanpa opsi "Semua Tahun"
+      sel.innerHTML = `<option value="${allTahun[0]}" selected>${allTahun[0]}</option>`;
+    } else {
+      sel.innerHTML = `<option value="">Semua Tahun</option>`
+        + allTahun.map(t => `<option value="${t}" ${t == tahunDipilih ? 'selected' : ''}>${t}</option>`).join('');
+    }
+    // Sync teks trigger custom-select (innerHTML tidak lewat setter .value)
+    if (window.CustomSelect) window.CustomSelect.sync(sel); else sel.value = sel.value;
   });
 
   // Fetch indikator dulu, lalu render info card dengan nama lengkap

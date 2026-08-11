@@ -1,5 +1,58 @@
 // ============== DASHBOARD ==============
 
+// Skeleton loading ditampilkan di #mainContent saat renderDashboard() masih fetch data,
+// menggantikan spinner global (loadPage sudah tidak pakai setLoading untuk page dashboard).
+function dashboardSkeleton() {
+  const statCardSkel = `<div class="skel-statcard">
+    <div style="display:flex;align-items:center;gap:7px">
+      <div class="skel" style="width:24px;height:24px;border-radius:6px;flex-shrink:0"></div>
+      <div class="skel" style="width:60%;height:11px"></div>
+    </div>
+    <div class="skel" style="width:40%;height:20px"></div>
+  </div>`;
+  const tableRowsSkel = (n, cols) => Array.from({ length: n }).map(() =>
+    `<div class="skel-row">${cols.map(w => `<div class="skel" style="height:12px;width:${w}"></div>`).join('')}</div>`
+  ).join('');
+  return `
+    <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:14px">
+      <div class="skel" style="width:160px;height:22px"></div>
+      <div class="skel" style="width:110px;height:30px;border-radius:7px"></div>
+    </div>
+    <div class="stats-grid">
+      ${statCardSkel}${statCardSkel}${statCardSkel}${statCardSkel}${statCardSkel}
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;align-items:stretch;margin-bottom:14px">
+      <div class="skel-card">
+        <div class="skel-card-header"><div class="skel" style="width:45%;height:14px"></div></div>
+        <div style="padding:16px;display:flex;align-items:flex-end;gap:10px;height:150px">
+          ${['55%','75%','40%','90%','60%','80%'].map(h => `<div class="skel" style="flex:1;height:${h}"></div>`).join('')}
+        </div>
+      </div>
+      <div class="skel-card">
+        <div class="skel-card-header"><div class="skel" style="width:45%;height:14px"></div></div>
+        <div style="padding:16px;display:flex;flex-direction:column;gap:10px">
+          <div class="skel" style="width:100%;height:12px"></div>
+          <div class="skel" style="width:85%;height:12px"></div>
+          <div class="skel" style="width:70%;height:12px"></div>
+        </div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;align-items:stretch;margin-bottom:14px">
+      <div class="skel-card">
+        <div class="skel-card-header"><div class="skel" style="width:55%;height:14px"></div></div>
+        ${tableRowsSkel(4, ['20%','35%','20%','15%'])}
+      </div>
+      <div class="skel-card">
+        <div class="skel-card-header"><div class="skel" style="width:55%;height:14px"></div></div>
+        ${tableRowsSkel(4, ['20%','35%','20%','15%'])}
+      </div>
+    </div>
+    <div class="skel-card">
+      <div class="skel-card-header"><div class="skel" style="width:40%;height:14px"></div></div>
+      ${tableRowsSkel(6, ['10%','25%','20%','15%','15%'])}
+    </div>`;
+}
+
 // Ambil daftar tahun yang tersedia dari semua usulan (dipakai filter dashboard)
 let _dashTahunList = [];
 async function _loadDashTahunList() {
@@ -69,7 +122,7 @@ function renderAdminDashboard(el, d, tahunDipilih) {
     <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:14px">
       <h1 style="margin:0"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;color:var(--primary)"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</h1>
       <div style="display:flex;align-items:center;gap:8px">
-        <span style="font-size:12px;color:var(--text-light);font-weight:600">Filter Tahun:</span>
+        <span style="font-size:12px;color:var(--text-light);font-weight:600">Filter</span>
         <div id="dashTahunWrap"><select id="dashTahunFilter" class="form-control" onchange="renderDashboard()"
           style="border:1px solid var(--border,#e2e8f0);border-radius:7px;padding:5px 10px;font-size:12px;outline:none;font-family:inherit;background:var(--surface,white);color:var(--text);cursor:pointer">
           <option value="">Memuat...</option>
@@ -77,9 +130,10 @@ function renderAdminDashboard(el, d, tahunDipilih) {
       </div>
     </div>
     <div class="stats-grid">
-      ${statCard('blue','assignment','Total Usulan', d.totalUsulan, d.totalUsulan > 0 ? `${d.selesai} selesai · ${d.menunggu} proses` : 'Belum ada usulan')}
+      <div id="dashStatTotal">${statCard('blue','assignment','Total Usulan', d.totalUsulan, d.totalUsulan > 0 ? `${d.selesai} selesai · ${d.menunggu} belum selesai` : 'Belum ada usulan')}</div>
       ${statCard('green','check_circle','Selesai', d.selesai, d.totalUsulan > 0 ? `${Math.round((d.selesai/d.totalUsulan)*100)}% dari total` : '-')}
-      ${statCard('orange','pending','Menunggu Verifikasi', d.menunggu, d.menunggu > 0 ? 'Perlu tindakan' : 'Semua tertangani')}
+      <div id="dashStatMenunggu">${statCard('orange','pending','Menunggu Verifikasi', '…', 'Memuat...')}</div>
+      <div id="dashStatBerakhir">${statCard('red','error','Periode Berakhir', '…', 'Memuat...')}</div>
       ${statCard('purple','local_hospital','Puskesmas Aktif', d.puskesmasAktif, 'Terdaftar & aktif')}
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;align-items:stretch;margin-bottom:14px">
@@ -88,12 +142,11 @@ function renderAdminDashboard(el, d, tahunDipilih) {
           <span class="card-title"><span class="material-icons">timeline</span>${chartTitle}</span>
         </div>
         <div class="card-body" style="padding:12px 16px;flex:1;display:flex;flex-direction:column;justify-content:center">
-          <div style="display:flex;align-items:flex-end;gap:16px">
+          <div class="dash-chart-row" style="display:flex;align-items:flex-end;gap:16px">
             <div style="flex:1;min-width:0">
               ${renderChart(d.chartData, chartMode)}
             </div>
-            <div style="flex-shrink:0;border-left:1px solid var(--border);padding-left:16px">
-              ${renderDonutChart(d.selesai||0, d.menunggu||0, Math.max(0,(d.totalUsulan||0)-(d.selesai||0)-(d.menunggu||0)))}
+            <div id="dashDonutWrap" class="dash-donut-wrap" style="flex-shrink:0;border-left:1px solid var(--border);padding-left:16px;min-width:180px;display:flex;align-items:center;justify-content:center">
             </div>
           </div>
         </div>
@@ -102,7 +155,7 @@ function renderAdminDashboard(el, d, tahunDipilih) {
         <div class="card-header-bar">
           <span class="card-title"><span class="material-icons">bar_chart</span>Ringkasan Status</span>
         </div>
-        <div class="card-body" style="padding:12px 14px;flex:1;display:flex;flex-direction:column;justify-content:center">
+        <div class="card-body" style="padding:12px 14px;flex:1;display:flex;flex-direction:column;justify-content:center;opacity:0.6" id="adminStatusSummary">
           ${renderStatusSummary(d)}
         </div>
       </div>
@@ -201,6 +254,32 @@ function renderAdminDashboard(el, d, tahunDipilih) {
   const _pkmTahunParam = tahunDipilih ? { tahun: tahunDipilih } : {};
   API.getUsulan(_pkmTahunParam).then(rows => {
     renderPKMProgressTable(rows);
+    // Perbarui Ringkasan Status dengan breakdown "Periode Berakhir" (butuh data per-baris,
+    // tidak tersedia dari agregat backend awal)
+    const summaryEl = document.getElementById('adminStatusSummary');
+    if (summaryEl) { summaryEl.innerHTML = renderStatusSummaryFromRows(rows); summaryEl.style.opacity = '1'; }
+    // Perbarui statcard "Periode Berakhir" dgn hitungan real dari data per-baris
+    const berakhirCount = (rows || []).filter(isPeriodeBerakhir).length;
+    const berakhirEl = document.getElementById('dashStatBerakhir');
+    if (berakhirEl) berakhirEl.innerHTML = statCard('red','error','Periode Berakhir', berakhirCount, berakhirCount > 0 ? 'Perlu tindakan' : 'Tidak ada');
+    // Perbarui statcard "Menunggu Verifikasi" — hanya hitung yang periodenya MASIH AKTIF,
+    // biar tidak dobel/ambigu dgn "Periode Berakhir" (agregat awal dari backend belum
+    // pisahkan expired vs aktif).
+    const menungguAktifCount = (rows || []).filter(u => !STATUS_FINAL_LIST.includes(u.statusGlobal) && !isPeriodeBerakhir(u)).length;
+    const menungguEl = document.getElementById('dashStatMenunggu');
+    if (menungguEl) menungguEl.innerHTML = statCard('orange','pending','Menunggu Verifikasi', menungguAktifCount, menungguAktifCount > 0 ? 'Perlu tindakan' : 'Semua tertangani');
+    // Perbarui donut chart & subtitle "Total Usulan" dgn breakdown akurat per-baris,
+    // agar usulan yang periodenya sudah berakhir tidak ikut kehitung/berlabel "Proses".
+    const selesaiCount = (rows || []).filter(u => u.statusGlobal === 'Selesai').length;
+    const ditolakCount = (rows || []).filter(u => u.statusGlobal === 'Ditolak' || u.statusGlobal === 'Ditolak Sebagian').length;
+    const donutEl = document.getElementById('dashDonutWrap');
+    if (donutEl) donutEl.innerHTML = renderDonutChart(selesaiCount, menungguAktifCount, berakhirCount, ditolakCount);
+    const totalEl = document.getElementById('dashStatTotal');
+    if (totalEl) {
+      const totalCount = (rows || []).length;
+      totalEl.innerHTML = statCard('blue','assignment','Total Usulan', totalCount,
+        totalCount > 0 ? `${selesaiCount} selesai · ${menungguAktifCount} proses · ${berakhirCount} berakhir` : 'Belum ada usulan');
+    }
   }).catch(() => {});
 
   // Load semua usulan terbaru (Admin)
@@ -236,12 +315,18 @@ async function loadAdminAllUsulan() {
     }
     // Populate filter status — hanya tampilkan status yang benar-benar ada di data
     const statusOrder = ['Draft','Menunggu Kepala Puskesmas','Menunggu Pengelola Program','Menunggu Admin','Selesai','Ditolak','Ditolak Sebagian'];
-    const statusSet = new Set(_adminAllUsulanData.map(u => u.statusGlobal).filter(Boolean));
+    // Opsi status "biasa" cuma muncul kalau ada usulan dgn status itu yang periodenya
+    // masih aktif — biar tidak dobel/ambigu dgn opsi "Periode Berakhir".
+    const statusSet = new Set(_adminAllUsulanData.filter(u => !isPeriodeBerakhir(u)).map(u => u.statusGlobal).filter(Boolean));
     const statusSorted = statusOrder.filter(s => statusSet.has(s));
     statusSet.forEach(s => { if (!statusSorted.includes(s)) statusSorted.push(s); });
+    // "Periode Berakhir" adalah status turunan (belum final tapi periodeExpired true),
+    // tambahkan sebagai opsi filter terpisah kalau memang ada datanya.
+    const adaBerakhir = _adminAllUsulanData.some(isPeriodeBerakhir);
     const statusSel = document.getElementById('adminAllFilterStatus');
     if (statusSel) {
-      statusSel.innerHTML = `<option value="">Semua Status</option>` + statusSorted.map(s => `<option value="${s}">${s}</option>`).join('');
+      statusSel.innerHTML = `<option value="">Semua Status</option>` + statusSorted.map(s => `<option value="${s}">${s}</option>`).join('')
+        + (adaBerakhir ? `<option value="__periode_berakhir__">Periode Berakhir</option>` : '');
     }
     // Sinkronkan label tombol custom-select (innerHTML rebuild tidak otomatis ke-refresh)
     if (window.CustomSelect) {
@@ -255,18 +340,17 @@ async function loadAdminAllUsulan() {
 function filterAdminAllUsulan(resetPage = true) {
   if (resetPage) _adminAllPage = 1; // reset ke halaman pertama saat filter berubah
   const pkmVal    = (document.getElementById('adminAllFilterPKM')?.value    || '').toLowerCase();
-  const statusVal = (document.getElementById('adminAllFilterStatus')?.value  || '').toLowerCase();
+  const statusVal = document.getElementById('adminAllFilterStatus')?.value  || '';
   const tahunVal  = (document.getElementById('adminAllFilterTahun')?.value   || '');
   const searchVal = (document.getElementById('adminAllSearch')?.value  || '').toLowerCase();
 
   const filtered = _adminAllUsulanData.filter(u => {
     const nama = (u.namaPKM || u.kodePKM || '').toLowerCase();
-    const status = (u.statusGlobal || '').toLowerCase();
     const tahun  = String(u.tahun || '');
     const id     = (u.idUsulan || '').toLowerCase();
     const periode = (u.namaBulan || '').toLowerCase();
     if (pkmVal    && !nama.includes(pkmVal))       return false;
-    if (statusVal && !status.includes(statusVal))  return false;
+    if (!matchStatusFilter(u, statusVal)) return false;
     if (tahunVal  && tahun !== tahunVal)            return false;
     if (searchVal && !id.includes(searchVal) && !nama.includes(searchVal) && !periode.includes(searchVal)) return false;
     return true;
@@ -295,11 +379,22 @@ function renderStatusSummary(d) {
   const selesai  = d.selesai || 0;
   const menunggu = d.menunggu || 0;
   const ditolak  = Math.max(0, total - selesai - menunggu);
+  // NOTE: baris "Periode Berakhir" belum bisa dihitung akurat di sini karena
+  // agregat awal dari backend (d) belum pisahkan expired vs aktif — butuh data
+  // per-baris dari API.getUsulan() yang baru datang belakangan (async).
+  // Tetap ditampilkan sebagai placeholder loading ("…") dari awal, biar struktur
+  // 4 baris sudah konsisten sejak render pertama & tidak "muncul belakangan"
+  // saat renderStatusSummaryFromRows() menggantikannya setelah fetch selesai.
   const items = [
-    { label: 'Selesai',       val: selesai,  color: '#10b981', bg: _dk ? 'rgba(16,185,129,0.12)'  : '#ecfdf5' },
-    { label: 'Dalam Proses',  val: menunggu, color: '#f59e0b', bg: _dk ? 'rgba(245,158,11,0.12)'  : '#fffbeb' },
-    { label: 'Ditolak/Draft', val: ditolak,  color: '#ef4444', bg: _dk ? 'rgba(239,68,68,0.12)'   : '#fef2f2' },
+    { label: 'Selesai',          val: selesai,  color: '#10b981', bg: _dk ? 'rgba(16,185,129,0.12)'  : '#ecfdf5' },
+    { label: 'Dalam Proses',     val: menunggu, color: '#f59e0b', bg: _dk ? 'rgba(245,158,11,0.12)'  : '#fffbeb' },
+    { label: 'Periode Berakhir', val: '…',      color: '#991b1b', bg: _dk ? 'rgba(220,38,38,0.15)'   : '#fee2e2' },
+    { label: 'Ditolak/Draft',    val: ditolak,  color: '#ef4444', bg: _dk ? 'rgba(239,68,68,0.12)'   : '#fef2f2' },
   ];
+  return renderStatusSummaryItems(items);
+}
+
+function renderStatusSummaryItems(items) {
   return `
     <div style="display:flex;flex-direction:column;gap:8px">
       ${items.map(it => `
@@ -308,6 +403,26 @@ function renderStatusSummary(d) {
           <span style="font-size:16px;font-weight:900;color:${it.color}">${it.val}</span>
         </div>`).join('')}
     </div>`;
+}
+
+// Ringkasan status Admin yang lebih akurat: pecah bucket "Dalam Proses" jadi
+// "Dalam Proses" (periode masih jalan) vs "Periode Berakhir" (habis waktu, belum final)
+// dihitung langsung dari data usulan (sudah bawa field periodeExpired dari backend).
+function renderStatusSummaryFromRows(rows) {
+  const _dk = document.documentElement.getAttribute('data-theme') === 'dark';
+  const list = rows || [];
+  const selesai = list.filter(u => u.statusGlobal === 'Selesai').length;
+  const ditolak = list.filter(u => u.statusGlobal === 'Ditolak').length;
+  const sisaMenunggu = list.filter(u => !['Selesai','Ditolak'].includes(u.statusGlobal));
+  const berakhir = sisaMenunggu.filter(u => u.periodeExpired).length;
+  const proses   = sisaMenunggu.length - berakhir;
+  const items = [
+    { label: 'Selesai',         val: selesai,  color: '#10b981', bg: _dk ? 'rgba(16,185,129,0.12)'  : '#ecfdf5' },
+    { label: 'Dalam Proses',    val: proses,   color: '#f59e0b', bg: _dk ? 'rgba(245,158,11,0.12)'  : '#fffbeb' },
+    { label: 'Periode Berakhir',val: berakhir, color: '#991b1b', bg: _dk ? 'rgba(220,38,38,0.15)'   : '#fee2e2' },
+    { label: 'Ditolak/Draft',   val: ditolak,  color: '#ef4444', bg: _dk ? 'rgba(239,68,68,0.12)'   : '#fef2f2' },
+  ];
+  return renderStatusSummaryItems(items);
 }
 
 
@@ -331,22 +446,24 @@ function _renderPKMProgressPaged(pg) {
   _pkmProgressData.forEach(u => {
     const k = u.kodePKM || u.kode_pkm || '-';
     const n = u.namaPKM || u.nama_puskesmas || k;
-    if (!map[k]) map[k] = { nama: n, total: 0, selesai: 0, menunggu: 0, ditolak: 0 };
+    if (!map[k]) map[k] = { nama: n, total: 0, selesai: 0, menunggu: 0, berakhir: 0, ditolak: 0 };
     map[k].total++;
     if (u.statusGlobal === 'Selesai') map[k].selesai++;
     else if (['Ditolak','Ditolak Sebagian'].includes(u.statusGlobal)) map[k].ditolak++;
+    else if (u.periodeExpired) map[k].berakhir++;
     else map[k].menunggu++;
   });
   const allPkms = Object.values(map).sort((a,b) => b.total - a.total);
   const { items: pkms, page: p, totalPages, total } = paginateDash(allPkms, pg);
   _pkmProgressPage = p;
   window._pkmProgressGoTo = (newPg) => { _pkmProgressPage = newPg; _renderPKMProgressPaged(newPg); };
-  el.innerHTML = `<div style="overflow-x:auto;-webkit-overflow-scrolling:touch"><table style="min-width:420px;width:100%">
+  el.innerHTML = `<div style="overflow-x:auto;-webkit-overflow-scrolling:touch"><table style="min-width:520px;width:100%">
     <thead><tr style="background:#0d9488">
       <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Puskesmas</th>
       <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 8px;text-align:center;white-space:nowrap">Total</th>
       <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 8px;text-align:center;white-space:nowrap">Selesai</th>
       <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 8px;text-align:center;white-space:nowrap">Proses</th>
+      <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 8px;text-align:center;white-space:nowrap">Habis Waktu</th>
       <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 8px;text-align:center;white-space:nowrap">Tolak</th>
       <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;min-width:100px">Progres</th>
     </tr></thead>
@@ -358,6 +475,7 @@ function _renderPKMProgressPaged(pg) {
         <td style="text-align:center;padding:10px 8px">${pkm.total}</td>
         <td style="text-align:center;padding:10px 8px"><span style="color:#10b981;font-weight:700">${pkm.selesai}</span></td>
         <td style="text-align:center;padding:10px 8px"><span style="color:#f59e0b;font-weight:700">${pkm.menunggu}</span></td>
+        <td style="text-align:center;padding:10px 8px"><span style="color:#991b1b;font-weight:700">${pkm.berakhir}</span></td>
         <td style="text-align:center;padding:10px 8px"><span style="color:#ef4444;font-weight:700">${pkm.ditolak}</span></td>
         <td style="padding:10px 12px">
           <div style="display:flex;align-items:center;gap:5px">
@@ -379,14 +497,17 @@ function renderOperatorStatusSummary(rows) {
   if (total === 0) return `<div class="empty-state" style="padding:16px"><span class="material-icons">inbox</span><p>Belum ada usulan</p></div>`;
   const selesai = rows.filter(u => u.statusGlobal === 'Selesai').length;
   const ditolak = rows.filter(u => ['Ditolak','Ditolak Sebagian'].includes(u.statusGlobal)).length;
-  const proses  = rows.filter(u => !['Selesai','Ditolak','Ditolak Sebagian','Draft'].includes(u.statusGlobal)).length;
+  const prosesRows = rows.filter(u => !['Selesai','Ditolak','Ditolak Sebagian','Draft'].includes(u.statusGlobal));
+  const berakhir = prosesRows.filter(u => u.periodeExpired).length;
+  const proses   = prosesRows.length - berakhir;
   const draft   = rows.filter(u => u.statusGlobal === 'Draft').length;
   // Dual bar: selesai (hijau tua) + sudah diajukan/dalam proses (hijau muda)
   const items = [
-    { label: 'Selesai',      val: selesai, color: '#10b981' },
-    { label: 'Dalam Proses', val: proses,  color: '#f59e0b' },
-    { label: 'Ditolak',      val: ditolak, color: '#ef4444' },
-    { label: 'Draft',        val: draft,   color: '#94a3b8' },
+    { label: 'Selesai',         val: selesai,  color: '#10b981' },
+    { label: 'Dalam Proses',    val: proses,   color: '#f59e0b' },
+    { label: 'Periode Berakhir',val: berakhir, color: '#991b1b' },
+    { label: 'Ditolak',         val: ditolak,  color: '#ef4444' },
+    { label: 'Draft',           val: draft,    color: '#94a3b8' },
   ];
   return `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
@@ -404,7 +525,9 @@ renderKapusStatusSummary(rows) {
   if (total === 0) return `<div class="empty-state" style="padding:16px"><span class="material-icons">inbox</span><p>Belum ada usulan</p></div>`;
   const selesai = rows.filter(u => u.statusGlobal === 'Selesai').length;
   const menungguKapus = rows.filter(u => u.statusGlobal === 'Menunggu Kepala Puskesmas').length;
-  const proses  = rows.filter(u => !['Selesai','Ditolak','Ditolak Sebagian','Draft','Menunggu Kepala Puskesmas'].includes(u.statusGlobal)).length;
+  const prosesRows = rows.filter(u => !['Selesai','Ditolak','Ditolak Sebagian','Draft','Menunggu Kepala Puskesmas'].includes(u.statusGlobal));
+  const berakhir = prosesRows.filter(u => u.periodeExpired).length;
+  const proses   = prosesRows.length - berakhir;
   const ditolak = rows.filter(u => ['Ditolak','Ditolak Sebagian'].includes(u.statusGlobal)).length;
   // FIX (b): Hitung dua segmen progress bar:
   // - Selesai (hijau tua) = sudah final
@@ -416,6 +539,7 @@ renderKapusStatusSummary(rows) {
     { label: 'Selesai',            val: selesai,       color: '#10b981', bg: _dk ? 'rgba(16,185,129,0.12)'  : '#ecfdf5' },
     { label: 'Menunggu Saya',      val: menungguKapus, color: '#f59e0b', bg: _dk ? 'rgba(245,158,11,0.12)'  : '#fffbeb' },
     { label: 'Lanjut ke PP/Admin', val: proses,        color: '#0d9488', bg: _dk ? 'rgba(13,148,136,0.12)'  : '#f0fdfa' },
+    { label: 'Periode Berakhir',   val: berakhir,      color: '#991b1b', bg: _dk ? 'rgba(220,38,38,0.15)'   : '#fee2e2' },
     { label: 'Ditolak',            val: ditolak,       color: '#ef4444', bg: _dk ? 'rgba(239,68,68,0.12)'   : '#fef2f2' },
   ];
   return `
@@ -437,7 +561,7 @@ renderOperatorDashboard(el, d, tahunDipilih) {
     <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:14px">
       <h1 style="margin:0"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;color:var(--primary)"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</h1>
       <div style="display:flex;align-items:center;gap:8px">
-        <span style="font-size:12px;color:var(--text-light);font-weight:600">Filter Tahun:</span>
+        <span style="font-size:12px;color:var(--text-light);font-weight:600">Filter</span>
         <select id="dashTahunFilter" class="form-control" onchange="renderDashboard()"
           style="border:1px solid var(--border,#e2e8f0);border-radius:7px;padding:5px 10px;font-size:12px;outline:none;font-family:inherit;background:var(--surface,white);color:var(--text);cursor:pointer">
           <option value="">Memuat...</option>
@@ -714,7 +838,7 @@ function renderKepalasDashboard(el, d, tahunDipilih) {
     <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:14px">
       <h1 style="margin:0"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;color:var(--primary)"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</h1>
       <div style="display:flex;align-items:center;gap:8px">
-        <span style="font-size:12px;color:var(--text-light);font-weight:600">Filter Tahun:</span>
+        <span style="font-size:12px;color:var(--text-light);font-weight:600">Filter</span>
         <select id="dashTahunFilter" class="form-control" onchange="renderDashboard()"
           style="border:1px solid var(--border,#e2e8f0);border-radius:7px;padding:5px 10px;font-size:12px;outline:none;font-family:inherit;background:var(--surface,white);color:var(--text);cursor:pointer">
           <option value="">Memuat...</option>
@@ -837,7 +961,7 @@ function renderProgramDashboard(el, d, tahunDipilih) {
     <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:14px">
       <h1 style="margin:0"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;color:var(--primary)"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</h1>
       <div style="display:flex;align-items:center;gap:8px">
-        <span style="font-size:12px;color:var(--text-light);font-weight:600">Filter Tahun:</span>
+        <span style="font-size:12px;color:var(--text-light);font-weight:600">Filter</span>
         <select id="dashTahunFilter" class="form-control" onchange="renderDashboard()"
           style="border:1px solid var(--border,#e2e8f0);border-radius:7px;padding:5px 10px;font-size:12px;outline:none;font-family:inherit;background:var(--surface,white);color:var(--text);cursor:pointer">
           <option value="">Memuat...</option>
@@ -1088,27 +1212,29 @@ function renderChart(data, chartMode) {
   return `<div class="chart-container" style="min-height:130px;padding:8px 0 4px;justify-content:space-between;gap:${isBulanMode ? '4' : '6'}px">${bars}</div>`;
 }
 
-function renderDonutChart(selesai, proses, ditolak) {
-  const total = selesai + proses + ditolak;
+function renderDonutChart(selesai, proses, berakhir, ditolak) {
+  berakhir = berakhir || 0;
+  ditolak  = ditolak  || 0;
+  const total = selesai + proses + berakhir + ditolak;
   if (total === 0) return '';
   const cx = 54, cy = 54, r = 40;
   const circ = 2 * Math.PI * r;
-  const pctSelesai = selesai / total;
-  const pctProses  = proses  / total;
-  const pctDitolak = ditolak / total;
-  const seg = (pct) => pct * circ;
-  const gap = 2;
-  const dSelesai = seg(pctSelesai);
-  const dProses  = seg(pctProses);
-  const dDitolak = seg(pctDitolak);
-  const offSelesai = 0;
-  const offProses  = dSelesai + gap;
-  const offDitolak = dSelesai + gap + dProses + gap;
-  const segments = [
-    { val: selesai, d: dSelesai, off: offSelesai, color: '#10b981', label: 'Selesai' },
-    { val: proses,  d: dProses,  off: offProses,  color: '#f59e0b', label: 'Proses' },
-    { val: ditolak, d: dDitolak, off: offDitolak, color: '#ef4444', label: 'Ditolak/Draft' },
+  const gap = 0;
+  const seg = (val) => (val / total) * circ;
+  // Hitung offset HANYA dari kategori yang nilainya > 0, biar tidak ada celah
+  // kosong (nampak abu2, warna track) di posisi kategori yang nilainya 0.
+  const raw = [
+    { val: selesai,  d: seg(selesai),  color: '#10b981', label: 'Selesai' },
+    { val: proses,   d: seg(proses),   color: '#f59e0b', label: 'Proses' },
+    { val: berakhir, d: seg(berakhir), color: '#991b1b', label: 'Periode Berakhir' },
+    { val: ditolak,  d: seg(ditolak),  color: '#ef4444', label: 'Ditolak/Draft' },
   ].filter(s => s.val > 0);
+  let cum = 0;
+  const segments = raw.map((s, i) => {
+    const off = cum;
+    cum += s.d + (i < raw.length - 1 ? gap : 0);
+    return { ...s, off };
+  });
   const pct = total > 0 ? Math.round((selesai / total) * 100) : 0;
   const uid = 'donut_' + Math.random().toString(36).slice(2,7);
   // Render dengan stroke-dasharray = 0 dulu, animasikan setelah mount
@@ -1134,7 +1260,7 @@ function renderDonutChart(selesai, proses, ditolak) {
       if (el) el.setAttribute('stroke-dasharray', `${s.d - gap} ${circ - s.d + gap}`);
     });
   }, 80);
-  return `<div style="display:flex;align-items:center;gap:12px;padding:4px 0">
+  return `<div style="display:flex;align-items:center;gap:12px;padding:4px 0;width:100%">
     <svg width="108" height="108" viewBox="0 0 108 108" style="flex-shrink:0">
       <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#e2e8f0" stroke-width="13"/>
       ${svgSegs}
@@ -1259,7 +1385,7 @@ function renderUsulanTable(rows, role) {
       <td>${u.namaBulan || ''} ${u.tahun}</td>
       <td class="rasio-cell" style="font-weight:700;color:var(--primary)">${parseFloat(u.indeksSPM||0).toFixed(2)}</td>
       <td>
-        ${statusBadge(u.statusGlobal)}${(() => {
+        ${statusBadge(u.statusGlobal, u)}${(() => {
           // Chip nomor indikator inline di sebelah badge — hanya untuk role BUKAN Operator
           // (Operator sudah punya block detail di bawah)
           if (role !== 'operator' && ['Ditolak','Ditolak Sebagian'].includes(u.statusGlobal) && u.ditolakOleh === 'Kepala Puskesmas') {

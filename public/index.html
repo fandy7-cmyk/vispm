@@ -25,6 +25,8 @@
   --info-light: #dbeafe;
   --purple: #7c3aed;
   --purple-light: #ede9fe;
+  --expired: #c2410c;
+  --expired-light: #ffedd5;
   --bg: #edf7f6;
   --surface: #ffffff;
   --sidebar-bg: #0f3a3a;
@@ -289,7 +291,7 @@ body {
   transition: transform 0.3s;
 }
 .sidebar-header {
-  padding: var(--sp-lg) var(--sp-md) var(--sp-md);    /* 21px top, 13px sides, 13px bottom */
+  padding: var(--sp-md);    /* top-bottom-left-right rata 13px, ga maksa ngejar tinggi topbar lagi */
   border-bottom: 1px solid rgba(13,148,136,0.2);
 }
 .sidebar-logo {
@@ -304,7 +306,7 @@ body {
 .sidebar-logo-icon img { width: var(--sp-xl); height: var(--sp-xl); object-fit: cover; border-radius: var(--sp-base); }
 .sidebar-logo-icon .material-icons { font-size: var(--fs-lg); color: white; }   /* 21px */
 .sidebar-logo-text { font-size: var(--fs-base); font-weight: 800; color: white; line-height: var(--lh-tight); }
-.sidebar-logo-sub { font-size: var(--fs-xs); color: rgba(255,255,255,0.4); font-weight: 400; }
+.sidebar-logo-sub { font-size: var(--fs-xs); color: rgba(255,255,255,0.78); font-weight: 500; }
 .sidebar-user {
   background: rgba(13,148,136,0.12); border-radius: var(--sp-base); padding: var(--sp-base) var(--sp-md);
   border: 1px solid rgba(13,148,136,0.2);
@@ -363,6 +365,16 @@ body {
   letter-spacing: -0.2px;
 }
 .topbar-title svg { flex-shrink: 0; opacity: 0.9; }
+
+/* Constellation drift — partikel teal melayang & berkedip di antara logo & profil (dari SAPA) */
+.topbar-constellation {
+  flex: 1 1 auto; min-width: 60px; align-self: stretch;
+  position: relative; overflow: hidden; pointer-events: none;
+}
+.topbar-constellation canvas { position: absolute; inset: 0; display: block; }
+@media (max-width: 768px) { .topbar-constellation { display: none; } }
+@media (prefers-reduced-motion: reduce) { .topbar-constellation { opacity: .6; } }
+
 .topbar-right { display: flex; align-items: center; gap: var(--sp-md); }           /* 13px gap */
 /* Notif button in topbar — inverted for dark topbar */
 #notifBtn { border-color: rgba(255,255,255,0.2) !important; background: rgba(255,255,255,0.08) !important; color: rgba(255,255,255,0.75) !important; }
@@ -483,6 +495,7 @@ tbody tr:hover td { background: #f8fafc; }
 .badge-info { background: var(--info-light); color: #1e40af; }
 .badge-primary { background: var(--purple-light); color: #5b21b6; }
 .badge-default { background: var(--border-light); color: var(--text-light); }
+.badge-expired { background: var(--danger-light); color: #991b1b; }
 
 /* ===== BUTTONS ===== */
 /* Button height φ-based: sp-2xl = 55px, but use pragmatic 34+8=42px for regular btns */
@@ -592,6 +605,16 @@ textarea.form-control { resize: vertical; }
 .loader-spinner { width: var(--sp-xl); height: var(--sp-xl); border: 3px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; }  /* 34px×34px */
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* ===== SKELETON LOADING ===== */
+.skel { background: linear-gradient(90deg, var(--border-light) 25%, var(--border) 37%, var(--border-light) 63%); background-size: 400% 100%; animation: skel-shimmer 1.4s ease infinite; border-radius: var(--radius-sm, 5px); }
+@keyframes skel-shimmer { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
+[data-theme="dark"] .skel { background: linear-gradient(90deg, rgba(255,255,255,0.06) 25%, rgba(255,255,255,0.14) 37%, rgba(255,255,255,0.06) 63%); background-size: 400% 100%; }
+.skel-statcard { border-radius: var(--radius-lg); padding: 10px 14px; height: 78px; border: 1px solid var(--border); background: var(--surface); display: flex; flex-direction: column; justify-content: space-between; }
+.skel-card { background: var(--surface); border-radius: var(--radius-lg); border: 1px solid var(--border); overflow: hidden; }
+.skel-card-header { padding: var(--sp-md) var(--sp-lg); border-bottom: 1px solid var(--border); }
+.skel-row { display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-bottom: 1px solid var(--border-light); }
+.skel-row:last-child { border-bottom: none; }
+
 /* ===== INFO CARDS ===== */
 .info-card { border-radius: var(--sp-base); padding: var(--sp-md) var(--sp-md); display: flex; align-items: flex-start; gap: var(--sp-base); margin-bottom: var(--sp-md); }
 .info-card.info { background: var(--info-light); }
@@ -696,6 +719,7 @@ textarea.form-control { resize: vertical; }
   --danger-light: rgba(220,38,38,0.18);
   --info-light: rgba(37,99,235,0.18);
   --purple-light: rgba(124,58,237,0.18);
+  --expired-light: rgba(194,65,12,0.2);
   --sidebar-bg1: #0a2e2e;
   --sidebar-bg2: #0b3d3d;
   --sidebar-bg3: #0a4747;
@@ -809,6 +833,7 @@ textarea.form-control { resize: vertical; }
 [data-theme="dark"] .badge-info { background: rgba(37,99,235,0.2); color: #93c5fd; }
 [data-theme="dark"] .badge-primary { background: rgba(124,58,237,0.2); color: #c4b5fd; }
 [data-theme="dark"] .badge-default { background: #273449; color: #94a3b8; }
+[data-theme="dark"] .badge-expired { background: rgba(220,38,38,0.2); color: #fca5a5; }
 
 /* Chart */
 [data-theme="dark"] .chart-bar-val { color: #f1f5f9; }
@@ -1244,7 +1269,7 @@ input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-o
 #rankTable th:first-child,
 #rankTable td:first-child { text-align: center !important; }
 </style>
-<link rel="stylesheet" href="/css/responsive.css?v=1.0.1">
+<link rel="stylesheet" href="/css/responsive.css?v=1.1.0">
 </head>
 <body>
 
@@ -1344,7 +1369,6 @@ input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-o
           <span class="material-icons" style="display:none">verified</span>
         </div>
         <div>
-          <div class="sidebar-logo-text">VISPM</div>
           <div class="sidebar-logo-sub">Verifikasi Indeks<br>Standar Pelayanan Minimal</div>
         </div>
       </div>
@@ -1368,6 +1392,12 @@ input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-o
         <button class="mobile-menu-btn" onclick="toggleSidebar()"><span class="material-icons">menu</span></button>
         <span class="topbar-title" id="topbarTitle">Dashboard</span>
       </div>
+
+      <div class="topbar-constellation" id="topbarConstellation" aria-hidden="true">
+        <canvas id="topbarConstellationCanvas"></canvas>
+      </div>
+      <script src="js/topbar_constellation.js?v=1.1.0"></script>
+
       <div class="topbar-right">
         <!-- NOTIF BUTTON -->
     <div id="notifBtnWrap" style="position:relative">
@@ -1651,19 +1681,19 @@ input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-o
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script src="/js/api.js?v=1.0.1"></script>
-<script src="/js/app-core.js?v=1.0.1"></script>
-<script src="/js/app-pagination.js?v=1.0.1"></script>
-<script src="/js/app-theme.js?v=1.0.1"></script>
-<script src="/js/app-notif.js?v=1.0.1"></script>
-<script src="/js/app-dashboard.js?v=1.0.1"></script>
-<script src="/js/app-input.js?v=1.0.1"></script>
-<script src="/js/app-verifikasi.js?v=1.0.1"></script>
-<script src="/js/app-profil.js?v=1.0.1"></script>
-<script src="/js/app-master.js?v=1.0.1"></script>
-<script src="/js/app-laporan-ranking.js?v=1.0.1"></script>
-<script src="/js/app-pengumuman.js?v=1.0.1"></script>
-<script src="/js/date-picker.js?v=1.0.1"></script> 
+<script src="/js/api.js?v=1.1.0"></script>
+<script src="/js/app-core.js?v=1.1.0"></script>
+<script src="/js/app-pagination.js?v=1.1.0"></script>
+<script src="/js/app-theme.js?v=1.1.0"></script>
+<script src="/js/app-notif.js?v=1.1.0"></script>
+<script src="/js/app-dashboard.js?v=1.1.0"></script>
+<script src="/js/app-input.js?v=1.1.0"></script>
+<script src="/js/app-verifikasi.js?v=1.1.0"></script>
+<script src="/js/app-profil.js?v=1.1.0"></script>
+<script src="/js/app-master.js?v=1.1.0"></script>
+<script src="/js/app-laporan-ranking.js?v=1.1.0"></script>
+<script src="/js/app-pengumuman.js?v=1.1.0"></script>
+<script src="/js/date-picker.js?v=1.1.0"></script> 
 <script>
 // Disable browser native validation styling pada semua input number
 document.addEventListener('DOMContentLoaded', function() {
@@ -1707,9 +1737,9 @@ function showForgotPasswordInfo() {
   box._hideTimer = setTimeout(() => { box.style.display = 'none'; }, 4000);
 }
 </script>
- <script src="/js/responsive-patch.js?v=1.0.1"></script>
- <script src="/js/custom-select.js?v=1.0.1"></script>
- <script src="/js/custom-tooltip.js?v=1.0.1"></script>
+ <script src="/js/responsive-patch.js?v=1.1.0"></script>
+ <script src="/js/custom-select.js?v=1.1.0"></script>
+ <script src="/js/custom-tooltip.js?v=1.1.0"></script>
 
 </body>
 </html>

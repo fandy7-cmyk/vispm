@@ -457,6 +457,98 @@ function fmtCapaianPct(capaian, target) {
   const fixed = pct.toFixed(1);
   return (fixed.endsWith('.0') ? pct.toFixed(0) : fixed) + '%';
 }
+// ============== LOKASI LOGIN (GPS presisi → reverse-geocode) ==============
+// Ambil lokasi presisi dari browser (GPS/WiFi via Geolocation API), lalu reverse-geocode
+// jadi alamat administratif (kecamatan, kabupaten/kota, provinsi).
+// Kalau user menolak izin lokasi / browser tidak mendukung / timeout → return null,
+// backend akan fallback otomatis ke IP-based lookup (cuma level kota).
+// Diporting dari SAPA — logic identik, dipakai bareng biar konsisten antar sistem.
+
+// Tambahkan label (mis. "Kec.") di depan nama wilayah, kecuali nama itu
+// sendiri sudah mengandung kata itu (mis. sumber data kadang sudah kasih
+// "Kecamatan Luwuk" langsung).
+function _labelWilayah(raw, label, fullWord) {
+  if (!raw) return null;
+  const lower = raw.toLowerCase();
+  if (lower.startsWith(fullWord.toLowerCase()) || lower.startsWith(label.toLowerCase().replace('.', ''))) {
+    return raw;
+  }
+  return `${label} ${raw}`;
+}
+
+// Susun 3 level administratif: Kec → Kab/Kota → Provinsi.
+// Level Desa/Kelurahan sengaja tidak dipakai — di daerah yang datanya minim
+// di OSM (mis. luar Jawa), Nominatim sering nempelin nama dusun/kampung
+// terdekat yang belum tentu akurat, jadi berpotensi menyesatkan.
+function _formatAlamatNominatim(addr) {
+  if (!addr) return null;
+  const parts = [];
+
+  const kecamatan = addr.city_district || addr.subdistrict || addr.district || addr.borough || addr.town || addr.municipality;
+  if (kecamatan) {
+    parts.push(_labelWilayah(kecamatan, 'Kecamatan', 'kecamatan'));
+  }
+
+  const kabKota = addr.county || addr.regency || addr.city || addr.state_district;
+  if (kabKota && kabKota !== kecamatan) {
+    parts.push(/kota/i.test(kabKota) ? kabKota : _labelWilayah(kabKota, 'Kabupaten', 'kabupaten'));
+  }
+
+  if (addr.state) {
+    parts.push(_labelWilayah(addr.state, 'Provinsi', 'provinsi'));
+  }
+
+  return parts.length ? parts.join(', ') : null;
+}
+
+// Coba TomTom dulu (via backend, API key disimpan aman di env var) — datanya
+// proprietary (bukan OSM), jadi coverage kecamatan di daerah terpencil bisa
+// lebih lengkap drpd Nominatim. Kalau gagal/kosong, fallback ke Nominatim.
+async function _getLokasiTomTom(latitude, longitude) {
+  try {
+    const r = await fetch('/api/reverse-geocode', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lat: latitude, lon: longitude }),
+      signal: AbortSignal.timeout(4000),
+    });
+    if (!r.ok) return null;
+    const d = await r.json();
+    return d?.data?.lokasi || d?.lokasi || null;
+  } catch {
+    return null;
+  }
+}
+
+async function _getLokasiNominatim(latitude, longitude) {
+  try {
+    const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&addressdetails=1&accept-language=id`, {
+      signal: AbortSignal.timeout(3500),
+      headers: { 'Accept': 'application/json' },
+    });
+    if (!r.ok) return null;
+    const d = await r.json();
+    return _formatAlamatNominatim(d.address) || d.display_name || null;
+  } catch {
+    return null;
+  }
+}
+
+async function _getBrowserLokasi() {
+  try {
+    if (!navigator.geolocation) return null;
+    const pos = await new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 3000, maximumAge: 600000 });
+    });
+    const { latitude, longitude } = pos.coords;
+    const tomtom = await _getLokasiTomTom(latitude, longitude);
+    if (tomtom) return tomtom;
+    return await _getLokasiNominatim(latitude, longitude);
+  } catch {
+    return null;
+  }
+}
+
 // ============== AUTH ==============
 async function doLogin() {
   const email = document.getElementById('authEmail').value.trim();
@@ -473,8 +565,12 @@ async function doLogin() {
     const user = await API.login(email, password);
     currentUser = user;
     sessionStorage.setItem('spm_user', JSON.stringify(user));
-    // Catat log login
-    API.logAudit({ module: 'auth', action: 'LOGIN', userEmail: user.email, userNama: user.nama, userRole: user.role, detail: 'Login berhasil' });
+    // Catat log login — minta lokasi GPS browser dulu (non-blocking thd UX,
+    // timeout 3-7 detik total), baru kirim ke audit trail. Kalau gagal/ditolak,
+    // backend otomatis fallback ke IP-based lookup.
+    _getBrowserLokasi().then(lokasi => {
+      API.logAudit({ module: 'auth', action: 'LOGIN', userEmail: user.email, userNama: user.nama, userRole: user.role, detail: 'Login berhasil', lokasi });
+    });
     startApp();
     startIdleWatcher();
   } catch (e) {
@@ -511,6 +607,10 @@ function doLogout() {
 function startApp() {
   document.getElementById('authScreen').style.display = 'none';
   document.getElementById('appLayout').style.display = 'flex';
+  // Langsung nyalain animasi konstelasi topbar sekarang (container baru saja
+  // punya ukuran nyata), jangan nunggu ResizeObserver yang bisa telat kena
+  // antre di belakang render dashboard di bawah.
+  if (window.__topbarConstellationKick) window.__topbarConstellationKick();
 
   // Normalisasi indikatorAkses: pastikan selalu berupa array integer
   // (dari DB/localStorage bisa berupa string "1,3,5-8" atau array)
@@ -656,10 +756,7 @@ async function showTandaTanganLoginPopup() {
       ttMissing = !tt || tt === 'null' || tt === '';
     } else if (role === 'Admin') {
       try {
-        const pjRes = await fetch('/api/pejabat');
-        if (!pjRes.ok) throw new Error('Gagal load pejabat');
-        const pjData = await pjRes.json();
-        const pjList = pjData.success ? pjData.data : [];
+        const pjList = await API.get('pejabat');
         // Cek semua pejabat yang terdaftar — jika ada yang belum punya tanda tangan, tampilkan popup
         // Tidak lagi hardcode jabatan tertentu agar fleksibel saat pejabat dihapus/ditambah
         ttMissing = pjList.length === 0 || pjList.some(p => !p.tanda_tangan);
@@ -912,7 +1009,7 @@ function loadPage(page) {
   setActiveNav(page);
   const icon = PAGE_ICONS[page] || '';
   const titleEl = document.getElementById('topbarTitle');
-  titleEl.innerHTML = icon + (PAGE_TITLES[page] || page);
+  titleEl.innerHTML = '';
   setLoading(true);
 
   const role = currentUser.role;
@@ -934,10 +1031,16 @@ function loadPage(page) {
 
   const fn = renders[page];
   if (fn) {
-    // 'master-data' mengelola setLoading(true/false) sendiri di dalam renderMasterData,
-    // sehingga tidak perlu setLoading(true) ganda dari loadPage — cukup panggil fn() langsung.
-    if (page === 'master-data') {
-      setLoading(false); // batalkan setLoading(true) di atas, serahkan ke renderMasterData
+    // 'master-data', 'ranking' & 'laporan' mengelola loading state sendiri (spinner lokal
+    // di dalam area kontennya), sehingga tidak perlu spinner global dari loadPage.
+    // 'dashboard' pakai skeleton loading (lebih cocok utk layout stat card/chart/tabel)
+    // dibanding spinner global yang nge-blur seluruh halaman.
+    if (page === 'dashboard') {
+      document.getElementById('mainContent').innerHTML = dashboardSkeleton();
+      setLoading(false);
+      Promise.resolve(fn());
+    } else if (page === 'master-data' || page === 'ranking' || page === 'laporan') {
+      setLoading(false); // batalkan setLoading(true) di atas, serahkan ke render fn masing-masing
       Promise.resolve(fn());
     } else {
       Promise.resolve(fn()).finally(() => setLoading(false));

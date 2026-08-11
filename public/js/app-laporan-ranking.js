@@ -137,6 +137,8 @@
     const rows         = selesai.concat(belumSelesai);
     const totalSelesai = selesai.length;
     const totalSemua   = rows.length;
+    const totalBerakhir = belumSelesai.filter(isPeriodeBerakhir).length;
+    const totalDiproses = totalSemua - totalSelesai - totalBerakhir;
     const showBulanCol = !_rankBulan;
 
     // ── Pagination ──────────────────────────────────────────
@@ -154,22 +156,22 @@
         + '<td style="text-align:center!important;padding:10px 12px;vertical-align:middle">'
         + (isSelesai ? _badge(rank) : '<div style="text-align:center"><span style="font-size:12px;color:#94a3b8">—</span></div>')
         + '</td>'
-        + '<td style="font-weight:600;padding:10px 12px;font-size:13px">' + (r.namaPKM || '-') + '</td>'
+        + '<td style="padding:10px 12px;font-size:13px">' + (r.namaPKM || '-') + '</td>'
         + (showBulanCol ? '<td style="font-size:12px;color:var(--text-light);padding:10px 12px">' + (r.namaBulan || '') + ' ' + (r.tahun || '') + '</td>' : '')
         + '<td style="font-size:12px;padding:10px 12px;color:var(--text-light);vertical-align:middle">' + _fmt(r.createdAt) + '</td>'
         + '<td style="font-size:12px;padding:10px 12px;color:var(--text-light);vertical-align:middle">'
         + (isSelesai
             ? _fmt(r.waktuSelesai || r.updatedAt || r.createdAt)
             : _isPeriodeExpired(r)
-              ? '<span title="Periode sudah berakhir" style="display:inline-flex;align-items:center;gap:5px;color:#ef4444;font-size:12px;font-weight:600">'
-                + '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>'
-                + 'Periode Berakhir</span>'
+              ? '<span title="Batas waktu periode sudah terlewati" style="display:inline-flex;align-items:center;gap:5px;color:#991b1b;font-size:12px">'
+                + 'Batas: ' + _fmt(r.periodeBatasWaktu)
+              + '</span>'
               : '<span title="Sedang diproses" style="display:inline-flex;align-items:center;gap:5px;color:#f59e0b;font-size:12px;font-weight:600">'
                 + '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>'
                 + 'Sedang diproses</span>')
         + '</td>'
         + '<td style="font-weight:700;color:#0d9488;padding:10px 12px">' + parseFloat(r.indeksSPM || 0).toFixed(2) + '</td>'
-        + '<td style="padding:10px 12px">' + statusBadge(r.statusGlobal) + '</td>'
+        + '<td style="padding:10px 12px">' + statusBadge(r.statusGlobal, r) + '</td>'
         + '<td style="white-space:nowrap;padding:10px 12px">'
         + '<button class="btn-icon view" onclick="viewDetail(\'' + r.idUsulan + '\')" title="Detail"><span class="material-icons">visibility</span></button>'
         + getDownloadBtn(r, 18, currentUser.role, currentUser.indikatorAkses)
@@ -177,42 +179,14 @@
         + '</tr>';
     }).join('');
 
-    // ── Pagination controls HTML ─────────────────────────────
-    var paginationHtml = '';
-    if (totalPages > 1) {
-      var pages = [];
-      for (var pi = 1; pi <= totalPages; pi++) {
-        if (pi === 1 || pi === totalPages || (pi >= _rankPage - 2 && pi <= _rankPage + 2)) {
-          pages.push(pi);
-        } else if (pages[pages.length - 1] !== '...') {
-          pages.push('...');
-        }
-      }
-      var pgBtnBase = 'padding:5px 10px;border-radius:6px;font-size:12px;cursor:pointer;border:1.5px solid ';
-      var pageButtonsHtml = pages.map(function(p) {
-        if (p === '...') return '<span style="padding:5px 4px;font-size:12px;color:#94a3b8">…</span>';
-        var isActive = p === _rankPage;
-        var style = isActive
-          ? pgBtnBase + '#0d9488;background:#0d9488;color:white;font-weight:700;cursor:default'
-          : pgBtnBase + '#e2e8f0;background:white;color:#334155';
-        return '<button style="' + style + '" ' + (isActive ? 'disabled' : 'onclick="_rankGoPage(' + p + ')"') + '>' + p + '</button>';
-      }).join('');
-      var dispStart = pageStart + 1;
-      var dispEnd   = Math.min(pageEnd, totalSemua);
-      paginationHtml =
-        '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-top:1px solid #f1f5f9;flex-wrap:wrap;gap:8px">'
-        + '<span style="font-size:12px;color:#64748b">Menampilkan ' + dispStart + '–' + dispEnd + ' dari ' + totalSemua + ' data</span>'
-        + '<div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">'
-        + '<button style="' + pgBtnBase + '#e2e8f0;background:white;color:#334155' + (_rankPage <= 1 ? ';opacity:0.4;cursor:not-allowed' : '') + '" ' + (_rankPage <= 1 ? 'disabled' : 'onclick="_rankGoPage(' + (_rankPage - 1) + ')"') + '>‹</button>'
-        + pageButtonsHtml
-        + '<button style="' + pgBtnBase + '#e2e8f0;background:white;color:#334155' + (_rankPage >= totalPages ? ';opacity:0.4;cursor:not-allowed' : '') + '" ' + (_rankPage >= totalPages ? 'disabled' : 'onclick="_rankGoPage(' + (_rankPage + 1) + ')"') + '>›</button>'
-        + '</div></div>';
-    }
+    // ── Pagination controls HTML — pakai helper bersama renderPagination() ──
+    var paginationHtml = renderPagination('rankTable', totalSemua, _rankPage, totalPages, function (p) { window._rankGoPage(p); }, _RANK_PER_PAGE);
 
     el.innerHTML =
       '<div style="padding:10px 16px;background:var(--bg-subtle,#f8fafc);border-bottom:1px solid var(--border,#f1f5f9);display:flex;align-items:center;gap:16px;flex-wrap:wrap">'
-      + '<div style="display:flex;align-items:center;gap:5px;font-size:12px"><span class="material-icons" style="font-size:15px;color:#10b981">check_circle</span><span style="color:var(--text-light)">Selesai:</span><span style="font-weight:700;color:#10b981">' + totalSelesai + '</span></div>'
-      + '<div style="display:flex;align-items:center;gap:5px;font-size:12px"><span class="material-icons" style="font-size:15px;color:#f59e0b">pending</span><span style="color:var(--text-light)">Belum Selesai:</span><span style="font-weight:700;color:#f59e0b">' + (totalSemua - totalSelesai) + '</span></div>'
+      + (totalSelesai > 0 ? '<div style="display:flex;align-items:center;gap:5px;font-size:12px"><span class="material-icons" style="font-size:15px;color:#10b981">check_circle</span><span style="color:var(--text-light)">Selesai:</span><span style="font-weight:700;color:#10b981">' + totalSelesai + '</span></div>' : '')
+      + (totalDiproses > 0 ? '<div style="display:flex;align-items:center;gap:5px;font-size:12px"><span class="material-icons" style="font-size:15px;color:#f59e0b">pending</span><span style="color:var(--text-light)">Sedang Diproses:</span><span style="font-weight:700;color:#f59e0b">' + totalDiproses + '</span></div>' : '')
+      + (totalBerakhir > 0 ? '<div style="display:flex;align-items:center;gap:5px;font-size:12px"><span class="material-icons" style="font-size:15px;color:#991b1b">error</span><span style="color:var(--text-light)">Periode Berakhir:</span><span style="font-weight:700;color:#991b1b">' + totalBerakhir + '</span></div>' : '')
       + '<div style="display:flex;align-items:center;gap:5px;font-size:12px"><span class="material-icons" style="font-size:15px;color:#64748b">local_hospital</span><span style="color:var(--text-light)">Total:</span><span style="font-weight:700;color:var(--text)">' + totalSemua + '</span></div>'
       + '<span style="margin-left:auto;font-size:11px;color:#94a3b8">Diurutkan berdasarkan tanggal penyelesaian tercepat</span>'
       // ── "Diperbarui" badge — lebih mencolok ──

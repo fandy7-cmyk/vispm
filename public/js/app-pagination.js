@@ -60,12 +60,15 @@ function renderPagination(containerId, total, page, totalPages, onPageChange, it
       ? `<span style="padding:5px 4px;font-size:12px;color:#94a3b8">…</span>`
       : `<button style="${btnStyle(p===page)}" ${p===page?'disabled':''} onclick="__pgGo('${cbKey}',${p})">${p}</button>`
   ).join('');
-  return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-top:1px solid #f1f5f9;flex-wrap:wrap;gap:8px">
-    <span style="font-size:12px;color:#64748b">Menampilkan ${start}–${end} dari ${total} data</span>
+  return `<div style="display:flex;align-items:center;justify-content:center;padding:10px 16px;border-top:1px solid #f1f5f9;flex-wrap:wrap;gap:12px">
+    <span style="font-size:12px;color:#64748b;white-space:nowrap">Menampilkan ${start}–${end} dari ${total} data</span>
+    <span style="width:1px;height:20px;background:#e2e8f0"></span>
     <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
+      <button style="${btnStyle(false)}${page<=1?';opacity:0.4;cursor:not-allowed':''}" ${page<=1?'disabled':''} onclick="__pgGo('${cbKey}',1)" title="Halaman awal">«</button>
       <button style="${btnStyle(false)}${page<=1?';opacity:0.4;cursor:not-allowed':''}" ${page<=1?'disabled':''} onclick="__pgGo('${cbKey}',${page-1})">‹</button>
       ${pageButtons}
       <button style="${btnStyle(false)}${page>=totalPages?';opacity:0.4;cursor:not-allowed':''}" ${page>=totalPages?'disabled':''} onclick="__pgGo('${cbKey}',${page+1})">›</button>
+      <button style="${btnStyle(false)}${page>=totalPages?';opacity:0.4;cursor:not-allowed':''}" ${page>=totalPages?'disabled':''} onclick="__pgGo('${cbKey}',${totalPages})" title="Halaman akhir">»</button>
     </div>
   </div>`;
 }

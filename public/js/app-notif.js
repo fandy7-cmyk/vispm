@@ -6,22 +6,20 @@ async function fetchNotifCount() {
   if (!currentUser) return;
   try {
     const role = currentUser.role;
-    const params = { role, email: currentUser.email, kode_pkm: currentUser.kodePKM };
-    const d = await API.dashboard(params);
-
     let count = 0;
     if (role === 'Operator') {
       // Usulan yang ditolak dan perlu diperbaiki
       const myUsulan = await API.getUsulan({ email_operator: currentUser.email }).catch(() => []);
       count = (myUsulan || []).filter(u => ['Ditolak','Ditolak Sebagian'].includes(u.statusGlobal)).length;
     } else if (role === 'Kepala Puskesmas') {
-      count = d.menunggu || 0;
+      const list = await API.getUsulan({ kode_pkm: currentUser.kodePKM }).catch(() => []);
+      count = (list || []).filter(u => ['Menunggu Kepala Puskesmas','Menunggu Re-verifikasi Kepala Puskesmas'].includes(u.statusGlobal) && !u.periodeExpired).length;
     } else if (role === 'Pengelola Program') {
       const ppList = await API.getUsulan({ email_program: currentUser.email }).catch(() => []);
-      count = (ppList || []).filter(u => ['Menunggu Pengelola Program','Menunggu Re-verifikasi PP'].includes(u.statusGlobal)).length;
+      count = (ppList || []).filter(u => ['Menunggu Pengelola Program','Menunggu Re-verifikasi PP'].includes(u.statusGlobal) && !u.periodeExpired).length;
     } else if (role === 'Admin') {
       const allUsulan = await API.getUsulan({}).catch(() => []);
-      count = (allUsulan || []).filter(u => u.statusGlobal === 'Menunggu Admin').length;
+      count = (allUsulan || []).filter(u => u.statusGlobal === 'Menunggu Admin' && !u.periodeExpired).length;
     }
 
     _notifCount = count;
@@ -110,7 +108,7 @@ async function loadNotifPanel() {
       });
     } else if (role === 'Kepala Puskesmas') {
       const list = await API.getUsulan({ kode_pkm: currentUser.kodePKM }).catch(() => []);
-      (list || []).filter(u => ['Menunggu Kepala Puskesmas','Menunggu Re-verifikasi Kepala Puskesmas'].includes(u.statusGlobal)).forEach(u => {
+      (list || []).filter(u => ['Menunggu Kepala Puskesmas','Menunggu Re-verifikasi Kepala Puskesmas'].includes(u.statusGlobal) && !u.periodeExpired).forEach(u => {
         items.push({ icon: 'hourglass_top', color: '#f59e0b', bg: '#fffbeb',
           title: `Menunggu Verifikasi Anda`,
           sub: `${u.idUsulan} · ${u.namaBulan} ${u.tahun}`,
@@ -118,7 +116,7 @@ async function loadNotifPanel() {
       });
     } else if (role === 'Pengelola Program') {
       const list = await API.getUsulan({ email_program: currentUser.email }).catch(() => []);
-      (list || []).filter(u => ['Menunggu Pengelola Program','Menunggu Re-verifikasi PP'].includes(u.statusGlobal)).forEach(u => {
+      (list || []).filter(u => ['Menunggu Pengelola Program','Menunggu Re-verifikasi PP'].includes(u.statusGlobal) && !u.periodeExpired).forEach(u => {
         const isReVerif = u.statusGlobal === 'Menunggu Re-verifikasi PP';
         items.push({ icon: isReVerif ? 'replay' : 'hourglass_top', color: isReVerif ? '#ea580c' : '#2563eb', bg: isReVerif ? '#fff7ed' : '#eff6ff',
           title: isReVerif ? `Re-verifikasi diperlukan` : `Menunggu Verifikasi Program`,
@@ -127,7 +125,7 @@ async function loadNotifPanel() {
       });
     } else if (role === 'Admin') {
       const list = await API.getUsulan({}).catch(() => []);
-      (list || []).filter(u => u.statusGlobal === 'Menunggu Admin').forEach(u => {
+      (list || []).filter(u => u.statusGlobal === 'Menunggu Admin' && !u.periodeExpired).forEach(u => {
         items.push({ icon: 'admin_panel_settings', color: '#8b5cf6', bg: '#f5f3ff',
           title: `Menunggu Persetujuan Admin`,
           sub: `${u.idUsulan} · ${u.namaPKM} · ${u.namaBulan} ${u.tahun}`,

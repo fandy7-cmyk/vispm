@@ -26,18 +26,21 @@ async function renderVerifikasi() {
       <div class="tab" onclick="loadVerifTab('Menunggu Admin',this)">Menunggu Admin</div>
       <div class="tab" onclick="loadVerifTab('Selesai',this)">Selesai</div>
       <div class="tab" onclick="loadVerifTab('Ditolak',this)">Ditolak</div>
+      <div class="tab" onclick="loadVerifTab('periode_berakhir',this)">Periode Berakhir</div>
     </div>` : ''}
     ${role === 'Kepala Puskesmas' ? `<div class="tabs" id="verifTabs">
       <div class="tab active" onclick="loadVerifTab('semua',this)">Semua Usulan</div>
       <div class="tab" onclick="loadVerifTab('Menunggu Kepala Puskesmas',this)">Menunggu Verifikasi</div>
       <div class="tab" onclick="loadVerifTab('Selesai',this)">Selesai</div>
       <div class="tab" onclick="loadVerifTab('Ditolak',this)">Ditolak</div>
+      <div class="tab" onclick="loadVerifTab('periode_berakhir',this)">Periode Berakhir</div>
     </div>` : ''}
     ${role === 'Pengelola Program' ? `<div class="tabs" id="verifTabs">
       <div class="tab active" onclick="loadVerifTab('semua',this)">Semua</div>
       <div class="tab" onclick="loadVerifTab('Menunggu Pengelola Program',this)">Menunggu Verifikasi</div>
       <div class="tab" onclick="loadVerifTab('Selesai',this)">Selesai</div>
       <div class="tab" onclick="loadVerifTab('Ditolak',this)">Ditolak</div>
+      <div class="tab" onclick="loadVerifTab('periode_berakhir',this)">Periode Berakhir</div>
     </div>` : ''}
     <div class="card">
       <div class="card-body" style="padding:0" id="verifTable">
@@ -69,7 +72,7 @@ async function loadVerifData(status) {
     params.kode_pkm = currentUser.kodePKM;
     params.email_kepala = currentUser.email;
     // Tab Selesai/Ditolak: filter status_global (scope tetap per kode_pkm)
-    if (status && status !== 'semua') params.status = status;
+    if (status && status !== 'semua' && status !== 'periode_berakhir') params.status = status;
   } else if (role === 'Pengelola Program') {
     params.email_program = currentUser.email;
     if (status === 'Menunggu Pengelola Program') {
@@ -86,7 +89,7 @@ async function loadVerifData(status) {
       // Tab "Semua" — tampilkan semua yang ditugaskan agar tombol hijau terlihat
       params.status_program = 'Menunggu Pengelola Program,Menunggu Re-verifikasi PP,Ditolak,Ditolak Sebagian,Selesai,Menunggu Admin,Menunggu Kepala Puskesmas,Menunggu Re-verifikasi Kepala Puskesmas';
     }
-  } else if (role === 'Admin' && status !== 'semua') {
+  } else if (role === 'Admin' && status !== 'semua' && status !== 'periode_berakhir') {
     params.status = status;
   }
 
@@ -101,7 +104,7 @@ async function loadVerifData(status) {
       if (Array.isArray(freshPeriode)) window._periodeAktifList = freshPeriode;
     } catch (_) { /* gunakan cache lama jika gagal */ }
 
-    window._verifRows = rows;
+    window._verifRows = (status === 'periode_berakhir') ? rows.filter(isPeriodeBerakhir) : rows;
     window._verifRole = verifRole;
     window._verifPage = 1;
     _renderVerifTablePaged(1);
@@ -248,9 +251,7 @@ async function openVerifikasi(idUsulan) {
     if (!tt || tt === 'null' || tt === '') _ttOk = false;
   } else if (_role === 'Admin') {
     try {
-      const pjRes = await fetch('/api/pejabat');
-      const pjData = await pjRes.json();
-      const pjList = pjData.success ? pjData.data : [];
+      const pjList = await API.get('pejabat');
       const kasubag = pjList.find(p => p.jabatan === 'Kepala Sub Bagian Perencanaan');
       if (!kasubag?.tanda_tangan) _ttOk = false;
     } catch(e) { _ttOk = false; }

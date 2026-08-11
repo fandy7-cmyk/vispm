@@ -48,7 +48,7 @@ async function renderLaporan() {
       </div>
     </div>
     ${role === 'Admin' ? `` : ``}
-    <div class=\"card\" id=\"lapTabelCard\" style=\"\">\n      <div class=\"card-body\" style=\"padding:0\" id=\"lapTable\"></div>\n    </div>`;
+    <div class=\"card\" id=\"lapTabelCard\" style=\"\">\n      <div class=\"card-body\" style=\"padding:0\" id=\"lapTable\">${loadingBlock('Memuat...')}</div>\n    </div>`;
 
   await loadLaporan();
 }
@@ -102,11 +102,17 @@ function _lapRebuildFilters(rows, selTahun, selBulan, selStatus, selPKM) {
   const statusSel = document.getElementById('lapStatus');
   if (statusSel) {
     const statusOrder = ['Draft','Menunggu Kepala Puskesmas','Menunggu Pengelola Program','Menunggu Admin','Selesai','Ditolak'];
-    const statusSet = new Set(rowsByTahun.map(r => r.statusGlobal).filter(Boolean));
+    // Opsi status "biasa" cuma muncul kalau ada usulan dgn status itu YANG PERIODENYA
+    // MASIH AKTIF (belum expired) — biar tidak dobel/ambigu dgn opsi "Periode Berakhir".
+    const statusSet = new Set(rowsByTahun.filter(r => !isPeriodeBerakhir(r)).map(r => r.statusGlobal).filter(Boolean));
     const statusSorted = statusOrder.filter(s => statusSet.has(s));
     statusSet.forEach(s => { if (!statusSorted.includes(s)) statusSorted.push(s); });
+    // "Periode Berakhir" bukan statusGlobal asli — ini status turunan (belum final tapi
+    // periodeExpired true). Tampilkan sebagai opsi filter terpisah kalau memang ada datanya.
+    const adaBerakhir = rowsByTahun.some(isPeriodeBerakhir);
     statusSel.innerHTML = '<option value="">Semua Status</option>'
-      + statusSorted.map(s => `<option value="${s}" ${selStatus === s ? 'selected':''}>${s}</option>`).join('');
+      + statusSorted.map(s => `<option value="${s}" ${selStatus === s ? 'selected':''}>${s}</option>`).join('')
+      + (adaBerakhir ? `<option value="__periode_berakhir__" ${selStatus === '__periode_berakhir__' ? 'selected':''}>Periode Berakhir</option>` : '');
   }
 
   // Sinkronkan label tombol custom-select (innerHTML rebuild tidak otomatis ke-refresh)
@@ -125,12 +131,13 @@ function _lapApplyFilter() {
   // Rebuild semua filter untuk tahun yang dipilih (termasuk PKM & bulan)
   _lapRebuildFilters(_lapAllData, tahun, bulan, status, pkm);
 
-  const filtered = _lapAllData.filter(r =>
-    (!tahun    || String(r.tahun) === String(tahun))  &&
-    (!bulan    || String(r.bulan) === String(bulan))  &&
-    (!status   || r.statusGlobal  === status)         &&
-    (!pkm      || r.kodePKM       === pkm)
-  );
+  const filtered = _lapAllData.filter(r => {
+    const statusOk = matchStatusFilter(r, status);
+    return (!tahun    || String(r.tahun) === String(tahun))  &&
+      (!bulan    || String(r.bulan) === String(bulan))  &&
+      statusOk                                          &&
+      (!pkm      || r.kodePKM       === pkm);
+  });
 
   _lapRenderTable(filtered);
 }
@@ -170,14 +177,17 @@ function _lapRenderTable(data) {
   // Hitung summary dari data yang sudah difilter
   const total   = data.length;
   const selesai = data.filter(r => r.statusGlobal === 'Selesai').length;
-  const pending = data.filter(r => !['Selesai','Ditolak'].includes(r.statusGlobal)).length;
+  const belumFinal = data.filter(r => !['Selesai','Ditolak'].includes(r.statusGlobal));
+  const berakhir = belumFinal.filter(isPeriodeBerakhir).length;
+  const pending  = belumFinal.length - berakhir;
   const indeks  = data.filter(r => parseFloat(r.indeksSPM) > 0).map(r => parseFloat(r.indeksSPM));
   const rataSPM = indeks.length ? (indeks.reduce((a,b)=>a+b,0)/indeks.length).toFixed(2) : '0';
 
   document.getElementById('lapStats').innerHTML = `
     ${statCard('blue','assignment','Total Usulan', total)}
     ${statCard('green','check_circle','Selesai', selesai)}
-    ${statCard('orange','pending','Pending', pending)}
+    ${statCard('orange','pending','Menunggu Verifikasi', pending)}
+    ${statCard('red','error','Periode Berakhir', berakhir)}
     ${statCard('purple','trending_up','Rata-rata Indeks SPM', rataSPM)}`;
 
   window._laporanData = data;
@@ -208,7 +218,7 @@ function _lapRenderPage(page) {
         <td>${r.namaBulan} ${r.tahun}</td>
         <td style="font-size:11.5px;color:var(--text-light)">${formatDateTime(r.createdAt)}</td>
         <td class="rasio-cell" style="font-weight:700;color:var(--primary)">${parseFloat(r.indeksSPM||0).toFixed(2)}</td>
-        <td>${statusBadge(r.statusGlobal)}</td>
+        <td>${statusBadge(r.statusGlobal, r)}</td>
         <td style="white-space:nowrap">
           <button class="btn-icon view" onclick="viewDetail('${r.idUsulan}')" title="Detail"><span class="material-icons">visibility</span></button>
           ${getDownloadBtn(r, 20, currentUser.role, currentUser.indikatorAkses)}
@@ -627,7 +637,6 @@ async function renderMasterData(tab) {
 
   const tc = document.getElementById('masterTabContent');
   tc.innerHTML = loadingBlock('Memuat...');
-  setLoading(true);
   try {
     if (activeTab === 'pejabat') {
       await renderPejabatTab(tc);
@@ -646,7 +655,7 @@ async function renderMasterData(tab) {
       const fn = fnMap[activeTab];
       if (fn) await _renderIntoTab(fn);
     }
-  } finally { setLoading(false); }
+  } finally { /* loadingBlock di atas sudah cukup, tidak perlu overlay tambahan */ }
 }
 
 async function renderSettingsTab(el) {
@@ -772,7 +781,7 @@ async function savePejabat(jabatan) {
   let tanda_tangan = ttPreview?.src && ttPreview.src !== window.location.href ? ttPreview.src : null;
   if (ttInput?._newTT !== undefined) tanda_tangan = ttInput._newTT;
   if (!nama) { toast('Nama pejabat tidak boleh kosong', 'error'); return; }
-  setLoading(true);
+  setMasterLoading(true);
   try {
     await API.post('pejabat', { jabatan, nama, nip, tandaTangan: tanda_tangan });
     toast('Data '+jabatan+' berhasil disimpan!', 'success');
@@ -794,7 +803,7 @@ async function savePejabat(jabatan) {
       } catch(_) {}
     }
   } catch(e) { toast(e.message, 'error'); }
-  finally { setLoading(false); }
+  finally { setMasterLoading(false); }
 }
 
 
@@ -804,7 +813,7 @@ async function saveSettings() {
   const status = document.getElementById('settingStatus');
   if (!awal || !akhir) { status.textContent = 'Tahun awal dan akhir wajib diisi'; return; }
   if (awal > akhir) { status.textContent = 'Tahun awal tidak boleh lebih besar dari tahun akhir'; return; }
-  setLoading(true);
+  setMasterLoading(true);
   try {
     await API.post('settings', { tahun_awal: awal, tahun_akhir: akhir });
 
@@ -833,7 +842,7 @@ async function saveSettings() {
     toast('Pengaturan berhasil disimpan!', 'success');
     status.textContent = '';
   } catch(e) { status.textContent = e.message; }
-  finally { setLoading(false); }
+  finally { setMasterLoading(false); }
 }
 
 
@@ -850,7 +859,7 @@ async function renderUsers(el) {
     <div class="card">
       <div class="card-body" style="padding:12px 16px">
         <div class="search-row">
-          <div class="search-input-wrap"><span class="material-icons search-icon">search</span><input class="search-input" id="searchUser" placeholder="Cari email atau nama..." oninput="filterUsers()" autocomplete="off"></div>
+          <div class="search-input-wrap"><span class="material-icons search-icon">search</span><input class="search-input" type="search" id="filterTeksKelola" name="filterTeksKelola" placeholder="Cari email atau nama..." oninput="filterUsers()" autocomplete="off" data-lpignore="true" data-1p-ignore="true"></div>
           <select class="form-control" id="filterRole" onchange="filterUsers()" style="min-width:170px">
             <option value="">Semua Role</option>
             <option>Operator</option><option>Kepala Puskesmas</option>
@@ -861,7 +870,7 @@ async function renderUsers(el) {
           </select>
         </div>
       </div>
-      <div style="padding:0" id="usersTable"></div>
+      <div style="padding:0" id="usersTable">${loadingBlock('Memuat...')}</div>
     </div>
     <!-- USER MODAL -->
     <div class="modal" id="userModal">
@@ -938,6 +947,11 @@ async function renderUsers(el) {
 
   // Load data
   try {
+    // Paksa kosongkan search box — beberapa browser (Chrome/Edge) suka
+    // auto-isi ulang dari histori autofill meskipun autocomplete="off"
+    const _su = document.getElementById('filterTeksKelola');
+    if (_su) _su.value = '';
+
     const [_rawU, _rawP, _rawI] = await Promise.all([API.getUsers(), API.getPKM(), API.getIndikator()]);
     allUsers = _rawU.filter(u => u.role !== 'Admin' && u.role !== 'Super Admin');
     allPKMList = _rawP; allIndList = _rawI;
@@ -964,7 +978,7 @@ async function renderUsers(el) {
 let _currentFilteredUsers = null; // menyimpan hasil filter aktif untuk pagination
 
 function filterUsers() {
-  const q = document.getElementById('searchUser').value.toLowerCase();
+  const q = document.getElementById('filterTeksKelola').value.toLowerCase();
   const role = document.getElementById('filterRole').value;
   const pkm = document.getElementById('filterPKM')?.value || '';
   const filtered = allUsers.filter(u =>
@@ -1102,13 +1116,13 @@ async function doResetPassword() {
   const statusEl = document.getElementById('rpStatus');
   if (!newPassword || newPassword.length < 6) { statusEl.textContent = 'Password minimal 6 karakter'; return; }
   if (newPassword !== confirm) { statusEl.textContent = 'Konfirmasi password tidak cocok'; return; }
-  setLoading(true);
+  setMasterLoading(true);
   try {
     await API.post('auth', { action: 'reset-password', email: currentUser.email, targetEmail: _resetTargetEmail, newPassword });
     closeModal('resetPasswordModal');
     toast(`Password berhasil direset!`, 'success');
   } catch(e) { statusEl.textContent = e.message; }
-  finally { setLoading(false); }
+  finally { setMasterLoading(false); }
 }
 
 function validateEmailInput(input) {
@@ -1290,7 +1304,7 @@ async function saveUser() {
   if (role === 'Pengelola Program' && !jabatan) return toast('Pilih minimal satu jabatan untuk Pengelola Program', 'error');
 
   const editEmail = document.getElementById('userModal').dataset.editEmail;
-  setLoading(true);
+  setMasterLoading(true);
   try {
     if (editEmail) {
       await API.updateUser({ email, nama, nip, role, kodePKM, indikatorAkses, jabatan, aktif });
@@ -1302,7 +1316,7 @@ async function saveUser() {
     allUsers = (await API.getUsers()).filter(u => u.role !== 'Admin' && u.role !== 'Super Admin');
     renderUsersTable(allUsers);
   } catch (e) { toast(e.message, 'error'); }
-  finally { setLoading(false); }
+  finally { setMasterLoading(false); }
 }
 
 async function deleteUser(email) {
@@ -1489,7 +1503,7 @@ async function renderPKM(el) {
           </select>
         </div>
       </div>
-      <div id="pkmTable" style="padding:0"></div>
+      <div id="pkmTable" style="padding:0">${loadingBlock('Memuat...')}</div>
     </div>
     <div class="modal" id="pkmModal">
       <div class="modal-card">
@@ -1581,7 +1595,7 @@ async function savePKM() {
   const aktif = document.getElementById('pAktif').value === 'true';
   if (!kode || !nama) return toast('Kode dan nama harus diisi', 'error');
   const editKode = document.getElementById('pkmModal').dataset.editKode;
-  setLoading(true);
+  setMasterLoading(true);
   try {
     if (editKode) await API.updatePKM({ kode, nama, indeks, indeksKesulitan, aktif });
     else await API.savePKM({ kode, nama, indeks, indeksKesulitan, aktif });
@@ -1590,7 +1604,7 @@ async function savePKM() {
     allPKM = await API.getPKM();
     renderPKMTable(allPKM);
   } catch (e) { toast(e.message, 'error'); }
-  finally { setLoading(false); }
+  finally { setMasterLoading(false); }
 }
 
 async function deletePKM(kode) {
@@ -1704,13 +1718,13 @@ async function saveTargetTahunan() {
     noIndikator: ind.noIndikator,
     sasaran: parseInt(document.getElementById(`tt-${ind.noIndikator}`)?.value) || 0
   }));
-  setLoading(true);
+  setMasterLoading(true);
   try {
     await API.post('target-tahunan', { kodePKM: _ttCurrentKode, tahun: parseInt(_ttCurrentTahun), targets });
     toast(`Target tahun ${_ttCurrentTahun} berhasil disimpan ✓`, 'success');
     await loadTargetTahunan();
   } catch(e) { toast(e.message, 'error'); }
-  finally { setLoading(false); }
+  finally { setMasterLoading(false); }
 }
 
 // ============== ADMIN - INDIKATOR ==============
@@ -1732,7 +1746,7 @@ async function renderIndikator(el) {
           Total Bobot Aktif: <strong id="totalBobot">0</strong>
         </div>
       </div>
-      <div id="indTable" style="padding:0"></div>
+      <div id="indTable" style="padding:0">${loadingBlock('Memuat...')}</div>
     </div>
     <div class="modal" id="indModal">
       <div class="modal-card">
@@ -1824,7 +1838,7 @@ async function saveInd() {
   const aktif = document.getElementById('iAktif').value === 'true';
   if (!no || !nama) return toast('Nomor dan nama harus diisi', 'error');
   const editNo = document.getElementById('indModal').dataset.editNo;
-  setLoading(true);
+  setMasterLoading(true);
   try {
     if (editNo) await API.updateIndikator({ no, nama, bobot, aktif, catatan });
     else await API.saveIndikator({ no, nama, bobot, aktif, catatan });
@@ -1833,7 +1847,7 @@ async function saveInd() {
     allIndikator = await API.getIndikator();
     renderIndTable(allIndikator);
   } catch (e) { toast(e.message, 'error'); }
-  finally { setLoading(false); }
+  finally { setMasterLoading(false); }
 }
 
 async function deleteInd(no) {
@@ -1908,7 +1922,7 @@ async function renderPeriode(el) {
       </div>
       <div class="card-body">
         <div class="info-card info"><span class="material-icons">info</span><div class="info-card-text">Periode aktif ditandai dengan warna hijau. Operator hanya bisa input pada periode yang aktif dan dalam rentang tanggal yang ditentukan.</div></div>
-        <div id="periodeGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin-top:16px"></div>
+        <div id="periodeGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin-top:16px">${loadingBlock('Memuat...')}</div>
       </div>
     </div>
 
@@ -2132,9 +2146,10 @@ function _pTimelineRow(label, icon, color, colorLight, mulaiTgl, mulaiJam, seles
 async function loadPeriodeGrid() {
   const tahun = document.getElementById('filterTahunPeriode')?.value;
   if (!tahun) return;
+  const grid = document.getElementById('periodeGrid');
+  if (grid) grid.innerHTML = loadingBlock('Memuat...');
   try {
     const rows = await API.getPeriode(tahun);
-    const grid = document.getElementById('periodeGrid');
     if (!grid) return;
     if (!rows.length) {
       grid.innerHTML = `<div class="empty-state"><p>Belum ada data periode untuk tahun ${tahun}</p></div>`;
@@ -2283,14 +2298,14 @@ async function hapusPeriode() {
     message: `Hapus periode <strong>${BULAN_NAMA[_editPeriodeBulan]} ${_editPeriodeTahun}</strong>?`,
     type: 'danger',
     onConfirm: async () => {
-      setLoading(true);
+      setMasterLoading(true);
       try {
         await API.del(`periode?tahun=${_editPeriodeTahun}&bulan=${_editPeriodeBulan}`, {});
         toast('Periode berhasil dihapus', 'success');
         closeModal('periodeModal');
         loadPeriodeGrid();
       } catch(e) { toast(e.message, 'error'); }
-      finally { setLoading(false); }
+      finally { setMasterLoading(false); }
     }
   });
 }
@@ -2312,14 +2327,14 @@ async function savePeriode() {
   if (!tanggalMulai || !tanggalSelesai) return toast('Tanggal mulai dan selesai harus diisi', 'error');
   if (tanggalMulaiVerif && !tanggalSelesaiVerif) return toast('Tanggal selesai verifikasi harus diisi', 'error');
   if (!tanggalMulaiVerif && tanggalSelesaiVerif) return toast('Tanggal mulai verifikasi harus diisi', 'error');
-  setLoading(true);
+  setMasterLoading(true);
   try {
     await API.savePeriode({ tahun, bulan, namaBulan: BULAN_NAMA[bulan], tanggalMulai, tanggalSelesai, jamMulai, jamSelesai, tanggalMulaiVerif, tanggalSelesaiVerif, jamMulaiVerif, jamSelesaiVerif, status });
     toast('Periode berhasil disimpan', 'success');
     closeModal('periodeModal');
     loadPeriodeGrid();
   } catch (e) { toast(e.message, 'error'); }
-  finally { setLoading(false); }
+  finally { setMasterLoading(false); }
 }
 
 // ── Periode modal helper: toggle sinkronisasi waktu verifikasi ──
@@ -2537,6 +2552,29 @@ function closeModal(id) {
 }
 function setLoading(show) { document.getElementById('globalLoader').classList.toggle('show', show); }
 
+// Versi lokal setLoading khusus Master Data — overlay hanya menutupi area
+// konten tab (#masterTabContent), bukan seluruh layar (sidebar/topbar tetap
+// bisa dipakai, tidak ikut ke-blur seperti spinner global).
+function setMasterLoading(show) {
+  const tc = document.getElementById('masterTabContent');
+  if (!tc) { setLoading(show); return; } // fallback jaga-jaga kalau shell belum ada
+  if (!tc.style.position || tc.style.position === 'static') tc.style.position = 'relative';
+  let ov = document.getElementById('masterLocalLoader');
+  if (show) {
+    if (!ov) {
+      ov = document.createElement('div');
+      ov.id = 'masterLocalLoader';
+      const _dk = document.documentElement.getAttribute('data-theme') === 'dark';
+      ov.style.cssText = `position:absolute;inset:0;background:${_dk ? 'rgba(15,23,42,0.7)' : 'rgba(255,255,255,0.7)'};backdrop-filter:blur(1px);display:flex;align-items:center;justify-content:center;z-index:50;border-radius:12px;min-height:120px`;
+      ov.innerHTML = spinnerHTML('lg', 'Memuat...');
+      tc.appendChild(ov);
+    }
+    ov.style.display = 'flex';
+  } else if (ov) {
+    ov.remove();
+  }
+}
+
 // Close modal on backdrop click
 document.addEventListener('click', (e) => {
   if (e.target.classList.contains('modal')) {
@@ -2718,15 +2756,19 @@ function _kuRebuildFilters(rows, selTahun, selBulan, selStatus) {
   // --- Status (dari data tahun terpilih) ---
   const statusSel = document.getElementById('kuStatus');
   if (statusSel) {
+    const rowsTahunIni = rows.filter(u => !tahunPilih || parseInt(u.tahun) === tahunPilih);
     const statusOrder = ['Draft','Menunggu Kepala Puskesmas','Menunggu Pengelola Program','Menunggu Admin','Selesai','Ditolak'];
-    const statusSet = new Set(
-      rows.filter(u => !tahunPilih || parseInt(u.tahun) === tahunPilih)
-          .map(u => u.statusGlobal).filter(Boolean)
-    );
+    // Opsi status "biasa" cuma muncul kalau ada usulan dgn status itu yang periodenya
+    // masih aktif — biar tidak dobel/ambigu dgn opsi "Periode Berakhir".
+    const statusSet = new Set(rowsTahunIni.filter(u => !isPeriodeBerakhir(u)).map(u => u.statusGlobal).filter(Boolean));
     const statusSorted = statusOrder.filter(s => statusSet.has(s));
     statusSet.forEach(s => { if (!statusSorted.includes(s)) statusSorted.push(s); });
+    // "Periode Berakhir" adalah status turunan (belum final tapi periodeExpired true),
+    // tambahkan sebagai opsi filter terpisah kalau memang ada datanya.
+    const adaBerakhir = rowsTahunIni.some(isPeriodeBerakhir);
     statusSel.innerHTML = '<option value="">Semua Status</option>'
-      + statusSorted.map(s => `<option value="${s}" ${selStatus === s ? 'selected':''}>${s}</option>`).join('');
+      + statusSorted.map(s => `<option value="${s}" ${selStatus === s ? 'selected':''}>${s}</option>`).join('')
+      + (adaBerakhir ? `<option value="__periode_berakhir__" ${selStatus === '__periode_berakhir__' ? 'selected':''}>Periode Berakhir</option>` : '');
   }
 
   // Sinkronkan label tombol custom-select (innerHTML rebuild tidak otomatis ke-refresh)
@@ -2777,7 +2819,7 @@ function _kuApplyFilter(page) {
   _kuRows = _kuAllRows.filter(u =>
     (!tahun  || String(u.tahun)       === String(tahun))  &&
     (!bulan  || String(u.bulan)       === String(bulan))  &&
-    (!status || u.statusGlobal        === status)
+    matchStatusFilter(u, status)
   );
 
   _kuRenderTable();
@@ -2795,7 +2837,7 @@ async function loadKelolaUsulan(page) {
   // Tampilkan loading spinner di area tabel
   const kuTableEl = document.getElementById('kuTable');
   if (kuTableEl) kuTableEl.innerHTML = loadingBlock('Memuat...');
-  setLoading(true);
+  setMasterLoading(true);
 
   try {
     // Fetch SEMUA usulan tanpa filter tahun agar dropdown tahun bisa dibangun dari data nyata
@@ -2825,7 +2867,7 @@ async function loadKelolaUsulan(page) {
     _kuSyncCustomSelects();
     _kuApplyFilter(1);
   } catch(e) { toast(e.message, 'error'); }
-  finally { setLoading(false); }
+  finally { setMasterLoading(false); }
 }
 
 function _kuRenderTable() {
@@ -2842,7 +2884,7 @@ function _kuRenderTable() {
       <td style="font-size:12px">${u._namaOperator || u.createdBy || '-'}</td>
       <td>${u.namaBulan || ''} ${u.tahun}</td>
       <td class="rasio-cell" style="font-weight:700;color:var(--primary)">${parseFloat(u.indeksSPM||0).toFixed(2)}</td>
-      <td>${statusBadge(u.statusGlobal)}</td>
+      <td>${statusBadge(u.statusGlobal, u)}</td>
       <td style="font-size:12px;color:var(--text-light)">${formatDateTime(u.createdAt)}</td>
       <td style="display:flex;gap:4px">
         <button class="btn-icon view" onclick="viewDetail('${u.idUsulan}')" title="Detail"><span class="material-icons">visibility</span></button>
@@ -2867,12 +2909,12 @@ async function adminResetUsulan(idUsulan) {
     title: 'Reset Usulan ke Draft', type: 'warning',
     message: `Reset usulan ${idUsulan} ke status Draft? Semua approve akan dibatalkan.`,
     onConfirm: async () => {
-      setLoading(true);
+      setMasterLoading(true);
       try {
         await API.post('usulan?action=admin-reset', { idUsulan, email: currentUser.email });
         toast(`Usulan ${idUsulan} berhasil direset ke Draft`);
         loadKelolaUsulan();
-      } catch(e) { toast(e.message,'error'); } finally { setLoading(false); }
+      } catch(e) { toast(e.message,'error'); } finally { setMasterLoading(false); }
     }
   });
 }
@@ -2882,13 +2924,13 @@ async function adminDeleteUsulan(idUsulan) {
     title: 'Hapus Usulan', type: 'danger',
     message: `Hapus permanen usulan ${idUsulan}? Semua data indikator dan verifikasi akan ikut terhapus dan tidak bisa dikembalikan.`,
     onConfirm: async () => {
-      setLoading(true);
+      setMasterLoading(true);
       try {
         await API.del('usulan', { idUsulan });
         toast(`Usulan ${idUsulan} berhasil dihapus`);
         loadKelolaUsulan();
       } catch(e) { toast(e.message, 'error'); }
-      finally { setLoading(false); }
+      finally { setMasterLoading(false); }
     }
   });
 }
@@ -2900,13 +2942,13 @@ async function restoreVerifAdmin(idUsulan) {
     icon: 'restore',
     message: `Status verifikasi Kepala Puskesmas dan Pengelola Program untuk usulan ${idUsulan} akan dipulihkan ke "Selesai".\n\nGunakan ini hanya jika data verifikasi hilang akibat bug ajukan ulang.`,
     onConfirm: async () => {
-      setLoading(true);
+      setMasterLoading(true);
       try {
         await API.post('usulan?action=restore-verif', { idUsulan, emailAdmin: currentUser.email });
         toast('Status verifikasi berhasil dipulihkan ✓', 'success');
         loadKelolaUsulan();
       } catch(e) { toast(e.message, 'error'); }
-      finally { setLoading(false); }
+      finally { setMasterLoading(false); }
     }
   });
 }
@@ -2987,19 +3029,14 @@ async function renderAuditTrail(el) {
             <label style="font-size:12px;font-weight:600;color:#64748b;display:block;margin-bottom:4px">Cari User</label>
             <input type="text" class="form-control" id="atUser" placeholder="Email atau nama...">
           </div>
-          <button class="btn btn-primary" onclick="setLoading(true);loadAuditTrail().finally(()=>setLoading(false))">
+          <button class="btn btn-primary" onclick="loadAuditTrail()">
             <span class="material-icons">search</span>Tampilkan
           </button>
         </div>
       </div>
     </div>
     <div class="card">
-      <div class="card-body" style="padding:0" id="auditTrailTable">
-        <div class="loading-state" style="padding:40px">
-          ${spinnerHTML('lg')}
-          <p>Memuat log 7 hari terakhir...</p>
-        </div>
-      </div>
+      <div class="card-body" style="padding:0" id="auditTrailTable"></div>
     </div>`;
 
   // Isi dropdown modul & aksi dari data nyata (tanpa filter tanggal, limit besar)
@@ -3043,12 +3080,13 @@ async function _populateAuditFilterOptions() {
   } catch(_) { /* silent — filter tetap berfungsi walau gagal */ }
 }
 
+let _atPage = 1;
+
 async function loadAuditTrail() {
   const el = document.getElementById('auditTrailTable');
   if (!el) return;
-  // Tidak memanggil setLoading di sini — caller (renderAuditTrail atau tombol Tampilkan)
-  // yang bertanggung jawab mengaktifkan/menonaktifkan spinner global.
-  el.innerHTML = '';
+  // Cukup overlay global — jangan tambah spinner lokal lagi (dulu numpuk 2 spinner)
+  setMasterLoading(true);
 
   const params = {};
   const df = document.getElementById('atDateFrom')?.value;
@@ -3064,82 +3102,62 @@ async function loadAuditTrail() {
 
   try {
     const data = await API.get('audit-trail', params);
-    window._auditTrailData = data;
-    window._auditTrailPage = 1;
+    window._auditTrailData = data || [];
+    _atPage = 1;
 
-    if (!data || !data.length) {
+    if (!window._auditTrailData.length) {
       el.innerHTML = `<div class="empty-state" style="padding:32px"><span class="material-icons">inbox</span><p>Tidak ada log untuk filter ini</p></div>`;
       return;
     }
 
-    renderAuditTrailPage(1);
+    _atRenderTable();
   } catch(e) {
     el.innerHTML = `<div class="empty-state" style="padding:32px"><span class="material-icons" style="color:#ef4444">error</span><p style="color:#ef4444">${e.message}</p></div>`;
+  } finally {
+    setMasterLoading(false);
   }
 }
 
-function renderAuditTrailPage(page) {
+// Ikon penanda sumber/akurasi lokasi, dideteksi dari FORMAT TEKSNYA sendiri
+// (tanpa kolom DB tambahan): lokasi dari GPS browser (reverse-geocode via
+// TomTom/Nominatim) selalu diawali level Kecamatan; fallback IP (ip-api.com)
+// cuma sampai level Kabupaten/Kota, gak pernah ada kata "Kecamatan".
+function _atLokasiIsAkurat(lokasi) {
+  return /\bkecamatan\b/i.test(lokasi || '');
+}
+
+function _atLokasiIcon(akurat) {
+  if (akurat) {
+    return `<span class="material-icons" style="font-size:12px;color:#16a34a" title="Lokasi akurat (GPS perangkat)">gps_fixed</span>`;
+  }
+  return `<span class="material-icons" style="font-size:12px;color:#d97706" title="Lokasi perkiraan dari IP, bisa kurang akurat">location_searching</span>`;
+}
+
+function _atRenderTable() {
   const el = document.getElementById('auditTrailTable');
   if (!el) return;
-  const data = window._auditTrailData || [];
-  if (!data.length) return;
+  const rows = window._auditTrailData || [];
+  if (!rows.length) return;
 
-  const PAGE_SIZE = 9;
-  const totalPages = Math.ceil(data.length / PAGE_SIZE);
-  page = Math.max(1, Math.min(page, totalPages));
-  window._auditTrailPage = page;
-
-  const start = (page - 1) * PAGE_SIZE;
-  const pageData = data.slice(start, start + PAGE_SIZE);
+  const { items, page: p, totalPages, total } = paginateData(rows, _atPage);
+  _atPage = p;
 
   const actionColor = { LOGIN:'#0d9488',CREATE:'#2563eb',UPDATE:'#f59e0b',DELETE:'#ef4444',SUBMIT:'#8b5cf6',APPROVE:'#10b981',REJECT:'#f43f5e' };
   const actionBg    = { LOGIN:'#f0fdf9',CREATE:'#eff6ff',UPDATE:'#fffbeb',DELETE:'#fef2f2',SUBMIT:'#f5f3ff',APPROVE:'#ecfdf5',REJECT:'#fff1f2' };
 
-  // Build pagination controls
-  function buildPagination() {
-    if (totalPages <= 1) return '';
-    const btn = (p, label, disabled = false, active = false) =>
-      `<button onclick="renderAuditTrailPage(${p})"
-        style="min-width:32px;height:32px;padding:0 10px;border-radius:6px;border:1px solid ${active ? '#0d9488' : '#e2e8f0'};
-        background:${active ? '#0d9488' : 'white'};color:${active ? 'white' : disabled ? '#cbd5e1' : '#374151'};
-        font-size:12px;font-weight:600;cursor:${disabled ? 'default' : 'pointer'};pointer-events:${disabled ? 'none' : 'auto'}"
-        ${disabled ? 'disabled' : ''}>${label}</button>`;
-
-    let pages = '';
-    const showPages = new Set([1, totalPages, page, page-1, page-2, page+1, page+2].filter(p => p >= 1 && p <= totalPages));
-    const sorted = [...showPages].sort((a,b) => a-b);
-    let prev = 0;
-    for (const p of sorted) {
-      if (prev && p - prev > 1) pages += `<span style="color:#94a3b8;padding:0 4px;line-height:32px">…</span>`;
-      pages += btn(p, p, false, p === page);
-      prev = p;
-    }
-
-    return `<div style="display:flex;align-items:center;gap:6px;padding:10px 16px;border-top:1px solid #f1f5f9;flex-wrap:wrap">
-      ${btn(page-1, '← Prev', page === 1)}
-      ${pages}
-      ${btn(page+1, 'Next →', page === totalPages)}
-      <span style="font-size:12px;color:#94a3b8;margin-left:8px">
-        Halaman <strong>${page}</strong> dari <strong>${totalPages}</strong>
-        &nbsp;·&nbsp; Total <strong>${data.length}</strong> entri
-        &nbsp;·&nbsp; Menampilkan ${start+1}–${Math.min(start+PAGE_SIZE, data.length)}
-      </span>
-    </div>`;
-  }
-
   el.innerHTML = `
-    <div class="table-container"><table>
+    <div class="table-container"><table style="table-layout:fixed;width:100%">
       <thead><tr style="background:#0d9488">
-        <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:160px">Waktu</th>
-        <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:90px">Modul</th>
-        <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:80px">Aksi</th>
-        <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">User</th>
-        <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:120px">Role</th>
-        <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Detail</th>
-        <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:110px">IP Address</th>
-        <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:150px">Lokasi</th>
+        <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:12%">Waktu</th>
+        <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:8%">Modul</th>
+        <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:8%">Aksi</th>
+        <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:14%">User</th>
+        <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:9%">Role</th>
+        <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:15%">Detail</th>
+        <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:11%">IP Address</th>
+        <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:23%">Lokasi</th>
       </tr></thead>
-      <tbody>${pageData.map(r => {
+      <tbody>${items.map(r => {
         const ac = (r.action||'').toUpperCase();
         const col = actionColor[ac] || '#64748b';
         const bg  = actionBg[ac]    || '#f8fafc';
@@ -3149,16 +3167,16 @@ function renderAuditTrailPage(page) {
           <td><span style="font-size:11px;font-weight:700;background:${bg};color:${col};padding:2px 8px;border-radius:20px;border:1px solid ${col}33">${ac||'-'}</span></td>
           <td style="font-size:12px"><div style="font-weight:600">${r.user_nama||'-'}</div><div style="font-size:11px;color:#94a3b8">${r.user_email||''}</div></td>
           <td style="font-size:12px;color:#64748b">${r.user_role||'-'}</td>
-          <td style="font-size:12px;max-width:280px;word-break:break-word">${r.detail||'-'}</td>
+          <td style="font-size:12px;word-break:break-word">${r.detail||'-'}</td>
           <td style="font-size:11px;color:#94a3b8">${r.ip_address||'-'}</td>
           <td style="font-size:11px;color:#64748b">${r.lokasi
-            ? `<span style="display:flex;align-items:center;gap:4px"><span class="material-icons" style="font-size:12px;color:#0d9488">location_on</span>${r.lokasi}</span>`
+            ? `<span style="display:flex;align-items:center;gap:4px">${_atLokasiIcon(_atLokasiIsAkurat(r.lokasi))}${r.lokasi}</span>`
             : '<span style="color:#cbd5e1">—</span>'}</td>
         </tr>`;
       }).join('')}
       </tbody>
     </table></div>
-    ${buildPagination()}`;
+    ${renderPagination('auditTrailTable', total, p, totalPages, pg => { _atPage = pg; _atRenderTable(); })}`;
 }
 
 function exportAuditTrail() {
@@ -3641,7 +3659,7 @@ async function renderRanking() {
           <span id="rankSubtitle" style="margin-left:auto;font-size:11.5px;color:var(--text-light)"></span>
         </div>
       </div>
-      <div id="rankTable" style="padding:0"></div>
+      <div id="rankTable" style="padding:0">${loadingBlock('Memuat...')}</div>
     </div>`;
 
   if (!window._lapAllData || !window._lapAllData.length) {

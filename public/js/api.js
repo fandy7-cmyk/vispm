@@ -281,8 +281,39 @@ function formatDateTime(d) {
   } catch { return '-'; }
 }
 
-function statusBadge(status) {
+// Status yang dianggap "final" — sudah tidak mungkin lagi kena label Periode Berakhir
+const STATUS_FINAL_LIST = ['Selesai', 'Ditolak', 'Ditolak Sebagian'];
+
+// True kalau usulan sedang tampil sebagai badge "Periode Berakhir" (belum final +
+// periodenya sudah lewat batas waktu). Dipakai bareng dgn statusBadge() supaya
+// filter status di seluruh sistem konsisten dgn apa yg ditampilkan di badge.
+function isPeriodeBerakhir(u) {
+  return !!(u && u.periodeExpired && !STATUS_FINAL_LIST.includes(u.statusGlobal));
+}
+
+// Cocokkan satu usulan terhadap satu pilihan filter status, termasuk pilihan
+// turunan "__periode_berakhir__". Status non-final (mis. "Menunggu Pengelola Program")
+// hanya dianggap cocok kalau periodenya MASIH AKTIF — begitu periode berakhir (dan belum
+// dibuka/diproses lagi sampai jadi final), usulan itu pindah ke bucket "Periode Berakhir"
+// saja, tidak dobel muncul di status asalnya. Kalau periode dibuka lagi / statusnya
+// berubah, periodeExpired otomatis balik false dari backend sehingga otomatis kembali
+// fleksibel masuk status aslinya.
+function matchStatusFilter(u, statusVal) {
+  if (!statusVal) return true;
+  if (statusVal === '__periode_berakhir__') return isPeriodeBerakhir(u);
+  return u.statusGlobal === statusVal && !isPeriodeBerakhir(u);
+}
+
+function statusBadge(status, usulan) {
+  // Jika usulan diberikan dan statusnya belum final, tapi periode (input/verifikasi)-nya
+  // sudah lewat batas waktu (dihitung di backend, field periodeExpired) → tampilkan
+  // "Periode Berakhir" agar tidak ambigu dengan status "dalam proses" yang periodenya masih jalan.
+  if (isPeriodeBerakhir(usulan)) {
+    const batasTxt = usulan.periodeBatasWaktu ? ' pada ' + formatDateTime(usulan.periodeBatasWaktu) : '';
+    return `<span class="badge badge-expired" style="text-align:left" title="Status masih '${status || '-'}', tapi periode sudah habis waktu${batasTxt}">Periode Berakhir</span>`;
+  }
   const map = {
+
     'Draft': 'badge-default',
     'Menunggu Kepala Puskesmas': 'badge-warning',
     'Menunggu Pengelola Program': 'badge-info',

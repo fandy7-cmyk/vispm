@@ -698,7 +698,11 @@ async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, namaP
 
       const res = await fetch("/.netlify/functions/upload", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: (() => {
+          const _u = (() => { try { return JSON.parse(sessionStorage.getItem('spm_user') || '{}'); } catch(e) { return {}; } })();
+          const _t = _u.sessionToken || '';
+          return { "Content-Type": "application/json", ...(_t ? { 'Authorization': 'Bearer ' + _t } : {}) };
+        })(),
         body: JSON.stringify({
           fileName: file.name,
           fileBase64: base64,
@@ -786,9 +790,11 @@ async function uploadBuktiIndikator(event, noIndikator, idUsulan, kodePKM, namaP
 async function _deleteFromCloudinary(publicId) {
   if (!publicId) return;
   try {
+    const _u = (() => { try { return JSON.parse(sessionStorage.getItem('spm_user') || '{}'); } catch(e) { return {}; } })();
+    const _t = _u.sessionToken || '';
     const res = await fetch('/.netlify/functions/delete-file', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(_t ? { 'Authorization': 'Bearer ' + _t } : {}) },
       body: JSON.stringify({ publicId })
     });
     if (!res.ok) console.warn('[delete-file] Status tidak OK:', res.status);

@@ -1,4 +1,5 @@
 const { getPool, ok, err, cors } = require('./db');
+const { validateSession } = require('./middleware');
 
 const CURRENT_YEAR = new Date().getFullYear();
 
@@ -6,6 +7,8 @@ let _migrated = false;
 
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors();
+  const _authErr = await validateSession(event);
+  if (_authErr) return _authErr;
   const pool = getPool();
   try {
     if (!_migrated) {

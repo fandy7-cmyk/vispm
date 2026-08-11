@@ -1,4 +1,5 @@
 const { getPool, ok, err, cors } = require('./db');
+const { validateSession } = require('./middleware');
 const zlib = require('zlib');
 const { promisify } = require('util');
 const gzip = promisify(zlib.gzip);
@@ -284,18 +285,18 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
 
     let signImg;
     if (!approved) {
-      signImg = `<div style="width:80px;height:80px;border:2px dashed #cbd5e1;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:#94a3b8;font-size:10px;margin-bottom:6px">Belum</div>
+      signImg = `<div style="width:68px;height:68px;border:2px dashed #cbd5e1;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:#94a3b8;font-size:10px;margin-bottom:4px">Belum</div>
                  <div style="font-size:9px;color:#94a3b8;margin-bottom:2px">Menunggu persetujuan</div>`;
     } else if (ttValid) {
-      signImg = `<div style="height:80px;display:flex;align-items:center;justify-content:center;margin-bottom:4px">
-                   <img src="${tt}" style="max-height:70px;max-width:160px;object-fit:contain;display:block;margin:0 auto">
+      signImg = `<div style="height:68px;display:flex;align-items:center;justify-content:center;margin-bottom:2px">
+                   <img src="${tt}" style="max-height:60px;max-width:150px;object-fit:contain;display:block;margin:0 auto">
                  </div>
                  <div style="font-size:9px;color:#2d7a47;font-weight:700;margin-bottom:2px;display:flex;align-items:center;justify-content:center;gap:4px"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"11\" height=\"11\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#2d7a47\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M22 11.08V12a10 10 0 1 1-5.93-9.14\"/><polyline points=\"22 4 12 14.01 9 11.01\"/></svg>Diverifikasi: ${fmtDT(verifiedAt)}</div>`;
     } else {
-      signImg = `<div style="display:inline-block;margin-bottom:6px">${approvedBadgeSVG()}</div>
+      signImg = `<div style="display:inline-block;margin-bottom:4px;transform:scale(0.85)">${approvedBadgeSVG()}</div>
                  <div style="font-size:9px;color:#2d7a47;font-weight:700;margin-bottom:2px;display:flex;align-items:center;justify-content:center;gap:4px"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"11\" height=\"11\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#2d7a47\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M22 11.08V12a10 10 0 1 1-5.93-9.14\"/><polyline points=\"22 4 12 14.01 9 11.01\"/></svg>Diverifikasi: ${fmtDT(verifiedAt)}</div>`;
     }
-    return `<div style="text-align:center;flex:1">
+    return `<div style="text-align:center;flex:1;page-break-inside:avoid;break-inside:avoid">
       <div style="font-size:11px;color:#334155;margin-bottom:4px;font-weight:600">${jabatan}</div>
       ${signImg}
       <div style="display:inline-block;text-align:center">
@@ -371,15 +372,17 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
     if (!slots.length) {
       return `<div style="display:flex;justify-content:flex-end"><div style="text-align:center">${dateLabel}${kapus}</div></div>`;
     }
-    const row1 = `${dateLabel}<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:20px">${signBlock(slots[0])}${kapus}</div>`;
+    const row1 = `${dateLabel}<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:20px;page-break-inside:avoid;break-inside:avoid">${signBlock(slots[0])}${kapus}</div>`;
     const rest = slots.slice(1);
     let extraRows = '';
     for (let i = 0; i < rest.length; i += 2) {
       const chunk = rest.slice(i, i + 2);
       const justify = chunk.length === 1 ? 'center' : 'space-between';
-      extraRows += `<div style="display:flex;justify-content:${justify};align-items:flex-start;gap:20px;margin-top:14px">${chunk.map(s => signBlock(s)).join('')}</div>`;
+      extraRows += `<div style="display:flex;justify-content:${justify};align-items:flex-start;gap:20px;margin-top:8px;page-break-inside:avoid;break-inside:avoid">${chunk.map(s => signBlock(s)).join('')}</div>`;
     }
-    return row1 + extraRows;
+    // Bungkus semua baris TTD jadi 1 unit — kalau memang tidak cukup ruang,
+    // seluruh grup pindah ke halaman berikutnya, bukan 1 TTD sendirian nyempil.
+    return `<div style="page-break-inside:avoid;break-inside:avoid">${row1}${extraRows}</div>`;
   }
 
   // Build pages
@@ -529,9 +532,9 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
             </tr>
           </tbody>
         </table>
-        ${catatan?`<div style="margin-bottom:20px;font-size:10px;color:#334155"><strong>Catatan :</strong> ${catatan}</div>`:''}
+        ${catatan?`<div style="margin-bottom:10px;font-size:10px;color:#334155"><strong>Catatan :</strong> ${catatan}</div>`:''}
         <!-- TANDA TANGAN -->
-        <div style="margin-top:28px">
+        <div style="margin-top:${slots.length >= 4 ? '14px' : '28px'}">
           ${buildSignLayout(slots, `Adean, ${fmtDT(h.kapus_approved_at)}`)}
         </div>
       </div>`;
@@ -1037,6 +1040,8 @@ exports.generateLaporanHtml = generateLaporanHtml;
 // ============================================================
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors();
+  const _authErr = await validateSession(event);
+  if (_authErr) return _authErr;
   const params = event.queryStringParameters || {};
   const idUsulan = params.id;
   const mode = params.mode || 'final'; // 'sementara' | 'final' | 'log' | 'rekap'

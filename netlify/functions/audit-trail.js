@@ -44,9 +44,12 @@ async function runMigrations(pool) {
  *                    user_role, detail, ip_address, lokasi }]
  *
  * POST — Tulis log aktivitas baru
- *        Body: { module, action, userEmail, userNama, userRole, detail, meta? }
+ *        Body: { module, action, userEmail, userNama, userRole, detail, meta?, lokasi? }
  *        IP address diambil otomatis dari header request.
- *        Untuk action=LOGIN: lookup lokasi otomatis via ip-api.com
+ *        lokasi: opsional, dikirim frontend dari GPS browser (via reverse-geocode,
+ *        lihat _getBrowserLokasi() di app-core.js) — jauh lebih akurat (level
+ *        kecamatan) drpd IP lookup. Kalau kosong dan action=LOGIN, fallback
+ *        otomatis ke ip-api.com (cuma level kota).
  */
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors();
@@ -107,7 +110,7 @@ exports.handler = async (event) => {
     // ===== POST: tulis log =====
     if (event.httpMethod === 'POST') {
       const body = JSON.parse(event.body || '{}');
-      const { module, action, userEmail, userNama, userRole, detail, meta } = body;
+      const { module, action, userEmail, userNama, userRole, detail, meta, lokasi: lokasiClient } = body;
 
       if (!module || !action) return err('module dan action diperlukan');
 
@@ -115,8 +118,13 @@ exports.handler = async (event) => {
         || event.headers?.['x-real-ip']
         || '-';
 
-      let lokasi = null;
-      if (action.toUpperCase() === 'LOGIN' && ip && ip !== '-' && ip !== '::1' && !ip.startsWith('127.') && !ip.startsWith('192.168.') && !ip.startsWith('10.')) {
+      // Prioritas: lokasi presisi dari browser (GPS/WiFi via Geolocation API,
+      // dikirim client via reverse-geocode) — jauh lebih akurat drpd IP
+      // geolocation, apalagi di daerah yg ISP-nya routing lewat kota lain.
+      // Fallback ke IP-based lookup (level kota saja) kalau user tidak
+      // mengizinkan/browser tidak mendukung, dan hanya untuk action LOGIN.
+      let lokasi = lokasiClient || null;
+      if (!lokasi && action.toUpperCase() === 'LOGIN' && ip && ip !== '-' && ip !== '::1' && !ip.startsWith('127.') && !ip.startsWith('192.168.') && !ip.startsWith('10.')) {
         try {
           const geoRes = await fetch(`http://ip-api.com/json/${ip}?fields=status,city,regionName,country,isp`, { signal: AbortSignal.timeout(2500) });
           const geo = await geoRes.json();

@@ -1,5 +1,6 @@
 const https = require('https');
 const crypto = require('crypto');
+const { validateSession } = require('./middleware');
 
 function cloudinaryRequest(path, data) {
   return new Promise((resolve, reject) => {
@@ -27,11 +28,14 @@ function cloudinaryRequest(path, data) {
 exports.handler = async (event) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
   };
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers, body: '' };
   if (event.httpMethod !== 'POST') return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method not allowed' }) };
+
+  const _authErr = await validateSession(event);
+  if (_authErr) return { ..._authErr, headers: { ...headers, ..._authErr.headers } };
 
   try {
     const { fileName, fileBase64, kodePKM, namaPKM, tahun, bulan, namaBulan, noIndikator, namaIndikator } = JSON.parse(event.body || '{}');

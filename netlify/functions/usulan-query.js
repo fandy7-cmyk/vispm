@@ -39,7 +39,19 @@ async function getUsulanList(pool, params) {
   const offset = (page - 1) * limit;
 
   const result = await pool.query(
-    `SELECT uh.*, p.nama_puskesmas FROM usulan_header uh LEFT JOIN master_puskesmas p ON uh.kode_pkm=p.kode_pkm ${ws} ORDER BY uh.created_at DESC LIMIT ${limit} OFFSET ${offset}`,
+    `SELECT uh.*, p.nama_puskesmas,
+      CASE WHEN (
+        COALESCE(pi.tanggal_selesai_verif, pi.tanggal_selesai) IS NOT NULL
+        AND (NOW() AT TIME ZONE 'Asia/Makassar') >
+          (COALESCE(pi.tanggal_selesai_verif, pi.tanggal_selesai)::date
+           + COALESCE(pi.jam_selesai_verif, pi.jam_selesai, '23:59')::time)
+      ) THEN true ELSE false END AS periode_expired,
+      (COALESCE(pi.tanggal_selesai_verif, pi.tanggal_selesai)::date
+       + COALESCE(pi.jam_selesai_verif, pi.jam_selesai, '23:59')::time) AT TIME ZONE 'Asia/Makassar' AS periode_batas_waktu
+     FROM usulan_header uh
+     LEFT JOIN master_puskesmas p ON uh.kode_pkm=p.kode_pkm
+     LEFT JOIN periode_input pi ON pi.tahun=uh.tahun AND pi.bulan=uh.bulan
+     ${ws} ORDER BY uh.created_at DESC LIMIT ${limit} OFFSET ${offset}`,
     qParams
   );
   if (result.rows.length === 0) return ok([]);
@@ -275,7 +287,20 @@ async function getUsulanList(pool, params) {
 async function getUsulanDetail(pool, idUsulan) {
   if (!idUsulan) return err('ID usulan diperlukan');
   const result = await pool.query(
-    `SELECT uh.*, p.nama_puskesmas, p.indeks_kesulitan_wilayah, u.nama as nama_pembuat FROM usulan_header uh LEFT JOIN master_puskesmas p ON uh.kode_pkm=p.kode_pkm LEFT JOIN users u ON uh.created_by=u.email WHERE uh.id_usulan=$1`,
+    `SELECT uh.*, p.nama_puskesmas, p.indeks_kesulitan_wilayah, u.nama as nama_pembuat,
+      CASE WHEN (
+        COALESCE(pi.tanggal_selesai_verif, pi.tanggal_selesai) IS NOT NULL
+        AND (NOW() AT TIME ZONE 'Asia/Makassar') >
+          (COALESCE(pi.tanggal_selesai_verif, pi.tanggal_selesai)::date
+           + COALESCE(pi.jam_selesai_verif, pi.jam_selesai, '23:59')::time)
+      ) THEN true ELSE false END AS periode_expired,
+      (COALESCE(pi.tanggal_selesai_verif, pi.tanggal_selesai)::date
+       + COALESCE(pi.jam_selesai_verif, pi.jam_selesai, '23:59')::time) AT TIME ZONE 'Asia/Makassar' AS periode_batas_waktu
+     FROM usulan_header uh
+     LEFT JOIN master_puskesmas p ON uh.kode_pkm=p.kode_pkm
+     LEFT JOIN users u ON uh.created_by=u.email
+     LEFT JOIN periode_input pi ON pi.tahun=uh.tahun AND pi.bulan=uh.bulan
+     WHERE uh.id_usulan=$1`,
     [idUsulan]
   );
   if (result.rows.length === 0) return err('Usulan tidak ditemukan', 404);

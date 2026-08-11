@@ -1,4 +1,5 @@
 const { getPool, ok, err, cors } = require('./db');
+const { validateSession } = require('./middleware');
 
 /**
  * Handler: /api/laporan
@@ -22,6 +23,8 @@ const { getPool, ok, err, cors } = require('./db');
  */
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors();
+  const _authErr = await validateSession(event);
+  if (_authErr) return _authErr;
 
   const pool = getPool();
   const params = event.queryStringParameters || {};
@@ -68,7 +71,9 @@ exports.handler = async (event) => {
             AND (NOW() AT TIME ZONE 'Asia/Makassar') >
               (COALESCE(pi.tanggal_selesai_verif, pi.tanggal_selesai)::date
                + COALESCE(pi.jam_selesai_verif, pi.jam_selesai, '23:59')::time)
-          ) THEN true ELSE false END AS periode_expired
+          ) THEN true ELSE false END AS periode_expired,
+          (COALESCE(pi.tanggal_selesai_verif, pi.tanggal_selesai)::date
+           + COALESCE(pi.jam_selesai_verif, pi.jam_selesai, '23:59')::time) AT TIME ZONE 'Asia/Makassar' AS periode_batas_waktu
          FROM usulan_header uh
          LEFT JOIN master_puskesmas p ON uh.kode_pkm = p.kode_pkm
          LEFT JOIN periode_input pi ON pi.tahun = uh.tahun AND pi.bulan = uh.bulan
@@ -110,7 +115,8 @@ exports.handler = async (event) => {
       finalApprovedAt: r.final_approved_at,
       waktuSelesai: r.waktu_selesai || null,
       adminApprovedAt: r.admin_approved_at || null,
-      periodeExpired: r.periode_expired === true || r.periode_expired === 't'
+      periodeExpired: r.periode_expired === true || r.periode_expired === 't',
+      periodeBatasWaktu: r.periode_batas_waktu || null
     }));
 
     return ok({

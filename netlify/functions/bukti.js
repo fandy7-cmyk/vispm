@@ -1,4 +1,5 @@
 const { getPool, ok, err, cors } = require('./db');
+const { validateSession } = require('./middleware');
 
 exports.handler = async (event) => {
   // Handle CORS
@@ -13,6 +14,8 @@ exports.handler = async (event) => {
       body: ''
     };
   }
+  const _authErr = await validateSession(event);
+  if (_authErr) return _authErr;
 
   const pool = getPool();
   const params = event.queryStringParameters || {};

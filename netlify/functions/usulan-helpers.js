@@ -70,7 +70,12 @@ function mapHeader(r) {
     driveFolderUrl:r.drive_folder_url||'', driveFolderId:r.drive_folder_id||'',
     ditolakOleh: isDitolak ? (r.ditolak_oleh || ditolakOleh) : (r.ditolak_oleh || null),
     konteksPenolakan: r.konteks_penolakan || null,
-    alasanTolak
+    alasanTolak,
+    // true jika periode (input/verifikasi) untuk tahun+bulan usulan ini sudah lewat batas waktu.
+    // Dihitung di query (JOIN periode_input) — lihat usulan-query.js. Dipakai FE untuk
+    // menandai status "Periode Berakhir" agar tidak ambigu dengan status "dalam proses" biasa.
+    periodeExpired: r.periode_expired === true || r.periode_expired === 't',
+    periodeBatasWaktu: r.periode_batas_waktu || null
   };
 }
 

@@ -1,5 +1,6 @@
 const https = require('https');
 const crypto = require('crypto');
+const { validateSession } = require('./middleware');
 
 const headers = {
   'Content-Type': 'application/json',
@@ -45,11 +46,14 @@ function cloudinaryDelete(publicId, resourceType, apiKey, apiSecret, cloudName) 
 
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 200, headers: { ...headers, 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' }, body: '' };
+    return { statusCode: 200, headers: { ...headers, 'Access-Control-Allow-Headers': 'Content-Type, Authorization', 'Access-Control-Allow-Methods': 'POST, OPTIONS' }, body: '' };
   }
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, headers, body: JSON.stringify({ success: false, error: 'Method not allowed' }) };
   }
+
+  const _authErr = await validateSession(event);
+  if (_authErr) return { ..._authErr, headers: { ...headers, ..._authErr.headers } };
 
   try {
     const { publicId } = JSON.parse(event.body || '{}');

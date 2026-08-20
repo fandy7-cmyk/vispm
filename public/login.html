@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VISPM | Verifikasi Indeks SPM</title>
+<link rel="icon" type="image/png" href="/favicon.png">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="theme-color" content="#0d9488">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="VISPM">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+<link rel="stylesheet" href="/css/app.css?v=1.1.1">
+<link rel="stylesheet" href="/css/responsive.css?v=1.1.1">
+<script>
+// Cek paling awal, sebelum body sempet di-render: kalau sesi masih ada,
+// langsung lempar ke app tanpa nge-flash form login dulu.
+(function() {
+  try {
+    var user = sessionStorage.getItem('spm_user');
+    if (!user) return;
+    JSON.parse(user);
+    window.location.replace('/');
+  } catch (e) {
+    sessionStorage.removeItem('spm_user');
+  }
+})();
+</script>
+</head>
+<body>
+
+<!-- AUTH SCREEN -->
+<div id="authScreen">
+  <div class="auth-modal">
+    <!-- Kiri: Info aplikasi -->
+    <div class="auth-left">
+      <!-- Logo Kemenkes + Balut di tengah -->
+      <div class="auth-left-logos">
+        <div class="auth-left-logo-item">
+          <img src="/logokemenkes.png" alt="Kemenkes">
+        </div>
+        <div class="auth-left-logo-divider"></div>
+        <div class="auth-left-logo-item">
+          <img src="/logobalut.png" alt="Kab. Banggai Laut">
+        </div>
+      </div>
+      <!-- Judul -->
+      <div class="auth-left-title">
+        <h1>VI<span>SPM</span></h1>
+        <p>Verifikasi Indeks<br>Standar Pelayanan Minimal</p>
+      </div>
+      <!-- Fitur -->
+      <div class="auth-left-features">
+        <div class="auth-left-features-inner">
+        <div class="auth-left-feature">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#5eead4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/><path d="m9 10 2 2 4-4"/></svg>
+          <span>Digitalisasi Verifikasi</span>
+        </div>
+        <div class="auth-left-feature">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#5eead4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/><circle cx="12" cy="12" r="3"/></svg>
+          <span>Verifikasi Berjenjang Terintegrasi</span>
+        </div>
+        <div class="auth-left-feature">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#5eead4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          <span>Monitoring Indeks SPM Real-Time</span>
+        </div>
+        </div>
+      </div>
+      <!-- Copyright -->
+      <div class="auth-left-footer">
+        <p><strong>Dinas Kesehatan, Pengendalian Penduduk dan Keluarga Berencana</strong><br>Kabupaten Banggai Laut &copy; 2026</p>
+      </div>
+    </div>
+    <!-- Kanan: Form login -->
+    <div class="auth-right">
+      <div class="auth-right-logo">
+        <img src="/favicon.png" alt="VISPM" onerror="this.outerHTML='<span class=\'material-icons\' style=\'font-size:24px;color:white\'>verified</span>'">
+      </div>
+      <h2>Selamat Datang</h2>
+      <p class="auth-right-sub">Masuk menggunakan akun VISPM Anda</p>
+      <div class="auth-field">
+        <label>Email</label>
+        <div style="position:relative">
+          <span class="material-icons" style="position:absolute;left:13px;top:50%;transform:translateY(-50%);font-size:var(--fs-md);color:var(--text-xlight);pointer-events:none">mail_outline</span>
+          <input type="email" id="authEmail" class="auth-input" placeholder="email@example.com" autocomplete="email" style="padding-left:38px" onkeydown="if(event.key==='Enter')document.getElementById('authPassword').focus()">
+        </div>
+      </div>
+      <div class="auth-field">
+        <label>Password</label>
+        <div class="auth-pw-wrap">
+          <span class="material-icons" style="position:absolute;left:13px;top:50%;transform:translateY(-50%);font-size:var(--fs-md);color:var(--text-xlight);pointer-events:none;z-index:1">lock_outline</span>
+          <input type="password" id="authPassword" class="auth-input" placeholder="password" autocomplete="current-password" style="padding-left:38px" onkeydown="if(event.key==='Enter')doLogin()">
+          <button class="auth-pw-toggle" type="button" onclick="toggleAuthPw()" tabindex="-1">
+            <span class="material-icons" id="authPwIcon" style="font-size:20px">visibility_off</span>
+          </button>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;margin-top:-6px;margin-bottom:var(--sp-md)">
+        <button type="button" onclick="showForgotPasswordInfo()" style="background:none;border:none;cursor:pointer;font-size:var(--fs-xs);color:var(--primary);font-family:inherit;font-weight:600;padding:0;line-height:var(--lh-base)">Lupa password?</button>
+      </div>
+      <button class="auth-btn" id="authBtn" onclick="doLogin()">
+        <span class="material-icons">login</span>
+        Login
+      </button>
+      <div class="auth-status" id="authStatus"></div>
+      <div id="forgotInfoBox" style="display:none;margin-top:var(--sp-md);background:var(--primary-light);border:1px solid rgba(13,148,136,0.2);border-radius:var(--sp-base);padding:var(--sp-base) var(--sp-md);display:none;align-items:flex-start;gap:var(--sp-base)">
+        <span class="material-icons" style="font-size:var(--fs-md);color:var(--primary);flex-shrink:0;margin-top:1px">info</span>
+        <span style="font-size:var(--fs-xs);color:var(--text-md);line-height:var(--lh-base)">Akun dikelola oleh <strong>Admin</strong>. Hubungi Admin jika belum terdaftar atau ingin reset password.</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<script src="/js/api.js?v=1.1.1"></script>
+<script>
+function _labelWilayah(raw, label, fullWord) {
+  if (!raw) return null;
+  const lower = raw.toLowerCase();
+  if (lower.startsWith(fullWord.toLowerCase()) || lower.startsWith(label.toLowerCase().replace('.', ''))) {
+    return raw;
+  }
+  return `${label} ${raw}`;
+}
+
+// Susun 3 level administratif: Kec → Kab/Kota → Provinsi.
+// Level Desa/Kelurahan sengaja tidak dipakai — di daerah yang datanya minim
+// di OSM (mis. luar Jawa), Nominatim sering nempelin nama dusun/kampung
+// terdekat yang belum tentu akurat, jadi berpotensi menyesatkan.
+function _formatAlamatNominatim(addr) {
+  if (!addr) return null;
+  const parts = [];
+
+  const kecamatan = addr.city_district || addr.subdistrict || addr.district || addr.borough || addr.town || addr.municipality;
+  if (kecamatan) {
+    parts.push(_labelWilayah(kecamatan, 'Kecamatan', 'kecamatan'));
+  }
+
+  const kabKota = addr.county || addr.regency || addr.city || addr.state_district;
+  if (kabKota && kabKota !== kecamatan) {
+    parts.push(/kota/i.test(kabKota) ? kabKota : _labelWilayah(kabKota, 'Kabupaten', 'kabupaten'));
+  }
+
+  if (addr.state) {
+    parts.push(_labelWilayah(addr.state, 'Provinsi', 'provinsi'));
+  }
+
+  return parts.length ? parts.join(', ') : null;
+}
+
+// Coba TomTom dulu (via backend, API key disimpan aman di env var) — datanya
+// proprietary (bukan OSM), jadi coverage kecamatan di daerah terpencil bisa
+// lebih lengkap drpd Nominatim. Kalau gagal/kosong, fallback ke Nominatim.
+async function _getLokasiTomTom(latitude, longitude) {
+  try {
+    const r = await fetch('/api/reverse-geocode', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lat: latitude, lon: longitude }),
+      signal: AbortSignal.timeout(4000),
+    });
+    if (!r.ok) return null;
+    const d = await r.json();
+    return d?.data?.lokasi || d?.lokasi || null;
+  } catch {
+    return null;
+  }
+}
+
+async function _getLokasiNominatim(latitude, longitude) {
+  try {
+    const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&addressdetails=1&accept-language=id`, {
+      signal: AbortSignal.timeout(3500),
+      headers: { 'Accept': 'application/json' },
+    });
+    if (!r.ok) return null;
+    const d = await r.json();
+    return _formatAlamatNominatim(d.address) || d.display_name || null;
+  } catch {
+    return null;
+  }
+}
+
+async function _getBrowserLokasi() {
+  try {
+    if (!navigator.geolocation) return null;
+    const pos = await new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 3000, maximumAge: 600000 });
+    });
+    const { latitude, longitude } = pos.coords;
+    const tomtom = await _getLokasiTomTom(latitude, longitude);
+    if (tomtom) return tomtom;
+    return await _getLokasiNominatim(latitude, longitude);
+  } catch {
+    return null;
+  }
+}
+
+// ============== AUTH ==============
+async function doLogin() {
+  const email = document.getElementById('authEmail').value.trim();
+  if (!email) return setAuthStatus('Masukkan email Anda', 'error');
+
+  const password = document.getElementById('authPassword')?.value || '';
+
+  const btn = document.getElementById('authBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spm-spinner sm white"><div class="sr1"></div><div class="sr2"></div><div class="sr3"></div></div> Loading...';
+  setAuthStatus('Memeriksa kredensial...', '');
+
+  try {
+    const user = await API.login(email, password);
+    sessionStorage.setItem('spm_user', JSON.stringify(user));
+    // Catat log login — minta lokasi GPS browser dulu (non-blocking thd UX,
+    // timeout 3-7 detik total), baru kirim ke audit trail. Kalau gagal/ditolak,
+    // backend otomatis fallback ke IP-based lookup.
+    _getBrowserLokasi().then(lokasi => {
+      API.logAudit({ module: 'auth', action: 'LOGIN', userEmail: user.email, userNama: user.nama, userRole: user.role, detail: 'Login berhasil', lokasi });
+    });
+    // login.html udah gak nyimpen markup appLayout/modal lagi - full
+    // navigation ke index.html, biar boot sequence (restore session ->
+    // startApp, lihat app-master.js) yang ngurus sisanya.
+    window.location.href = '/';
+  } catch (e) {
+    setAuthStatus(e.message, 'error');
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-icons">login</span> Login';
+    setTimeout(() => setAuthStatus('', ''), 2000);
+  }
+}
+
+
+function toggleAuthPw() {
+  const inp = document.getElementById('authPassword');
+  const icon = document.getElementById('authPwIcon');
+  if (inp.type === 'password') { inp.type = 'text'; icon.textContent = 'visibility'; }
+  else { inp.type = 'password'; icon.textContent = 'visibility_off'; }
+}
+
+function setAuthStatus(msg, type) {
+  const el = document.getElementById('authStatus');
+  el.textContent = msg;
+  el.className = 'auth-status' + (type ? ' ' + type : '');
+}
+
+function showForgotPasswordInfo() {
+  const box = document.getElementById('forgotInfoBox');
+  if (!box) return;
+  box.style.display = 'flex';
+  clearTimeout(box._hideTimer);
+  box._hideTimer = setTimeout(() => { box.style.display = 'none'; }, 4000);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  document.getElementById('authEmail').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') doLogin();
+  });
+});
+</script>
+
+</body>
+</html>

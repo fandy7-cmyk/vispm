@@ -605,7 +605,10 @@ function doLogout() {
 
 // ============== APP INIT ==============
 function startApp() {
-  document.getElementById('authScreen').style.display = 'none';
+  // authScreen udah pindah total ke login.html (gak dirender lagi di
+  // sini), jadi gak perlu di-hide lagi disini - null-check biar aman.
+  const _authScreen = document.getElementById('authScreen');
+  if (_authScreen) _authScreen.style.display = 'none';
   document.getElementById('appLayout').style.display = 'flex';
   // Langsung nyalain animasi konstelasi topbar sekarang (container baru saja
   // punya ukuran nyata), jangan nunggu ResizeObserver yang bisa telat kena

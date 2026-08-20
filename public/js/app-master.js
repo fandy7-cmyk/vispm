@@ -2669,9 +2669,9 @@ function startIdleWatcher() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('authEmail').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') doLogin();
-  });
+  // Enter-key handler buat form login udah dipindah ke login.html
+  // (index.html gak punya #authEmail lagi sejak app-shell dipisah dari
+  // halaman login).
 
   // Restore session dari localStorage
   try {

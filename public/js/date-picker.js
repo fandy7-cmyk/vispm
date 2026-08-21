@@ -17,21 +17,21 @@
     s.id = 'vdp-style';
     s.textContent = `
       .vdp-btn {
-        display: flex; align-items: center; gap: 7px;
-        width: 100%; height: 100%; min-height: 44px; padding: 0 10px;
+        display: flex; align-items: center; gap: 6px;
+        width: 100%; height: 100%; min-height: 40px; padding: 0 10px;
         border: 1.5px solid var(--border, #cbd5e1);
         border-radius: 8px; background: var(--surface, #fff);
         cursor: pointer; user-select: none;
         transition: border-color .15s, box-shadow .15s;
-        font-size: 13px; font-weight: 600; color: var(--text-dark, #0f172a);
+        font-size: 12px; font-weight: 600; color: var(--text-dark, #0f172a);
         box-sizing: border-box;
       }
+      .vdp-btn svg { width: 13px; height: 13px; color: #0d9488; flex-shrink: 0; }
       .vdp-btn:hover  { border-color: #0d9488; }
       .vdp-btn.vdp-open {
         border-color: #0d9488;
         box-shadow: 0 0 0 3px rgba(13,148,136,.12);
       }
-      .vdp-btn svg { color: #0d9488; flex-shrink: 0; }
       .vdp-btn span { flex: 1; text-align: left; }
       .vdp-btn span.vdp-ph { color: var(--text-xlight, #94a3b8); font-weight: 400; }
 

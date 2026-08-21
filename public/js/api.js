@@ -75,6 +75,9 @@ const API = {
 
   // Auth
   login: (email, password) => API.post('auth', { email, password }),
+  // keepalive:true — request tetap dikirim browser walau tab pindah/di-background
+  // sebelum fetch selesai (penting utk log LOGIN yg nunggu GPS di background)
+  logAudit: (data) => API.call('audit-trail', { method: 'POST', body: JSON.stringify(data), keepalive: true }),
   logout: () => {
     const _user = (() => { try { return JSON.parse(sessionStorage.getItem('spm_user') || '{}'); } catch(e) { return {}; } })();
     const token = _user.sessionToken || '';
@@ -153,7 +156,6 @@ const API = {
   saveJabatan: (data)   => API.post('jabatan', data),
 
   // Audit Trail
-  logAudit:      (data)   => API.post('audit-trail', data).catch(() => {}),
   getAuditTrail: (params) => API.get('audit-trail', params),
 
   // Konfigurasi Penandatangan Per Indikator

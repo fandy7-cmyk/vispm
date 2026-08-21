@@ -113,7 +113,7 @@ body {
 #authScreen {
   position: fixed; inset: 0; z-index: 9999;
   display: flex; align-items: center; justify-content: center;
-  background: url('/bg.jpg') center/cover no-repeat;
+  background: linear-gradient(135deg, #f8fafc 0%, #e6fffa 18%, #99f6e4 45%, #7ce8d4 72%, #5eead4 100%);
 }
 
 .auth-modal {

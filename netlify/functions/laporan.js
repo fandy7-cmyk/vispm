@@ -85,10 +85,17 @@ exports.handler = async (event) => {
       pool.query(
         `SELECT
           COUNT(*) as total,
-          COUNT(*) FILTER(WHERE status_global='Selesai') as selesai,
-          COUNT(*) FILTER(WHERE status_global NOT IN ('Selesai','Ditolak')) as pending,
-          AVG(NULLIF(indeks_spm,0)) as rata_spm
-         FROM usulan_header uh ${whereStr}`,
+          COUNT(*) FILTER(WHERE uh.status_global='Selesai') as selesai,
+          COUNT(*) FILTER(WHERE uh.status_global='Menunggu Admin' AND NOT (
+            COALESCE(pi.tanggal_selesai_verif, pi.tanggal_selesai) IS NOT NULL
+            AND (NOW() AT TIME ZONE 'Asia/Makassar') >
+              (COALESCE(pi.tanggal_selesai_verif, pi.tanggal_selesai)::date
+               + COALESCE(pi.jam_selesai_verif, pi.jam_selesai, '23:59')::time)
+          )) as pending,
+          AVG(NULLIF(uh.indeks_spm,0)) as rata_spm
+         FROM usulan_header uh
+         LEFT JOIN periode_input pi ON pi.tahun = uh.tahun AND pi.bulan = uh.bulan
+         ${whereStr}`,
         qParams
       )
     ]);

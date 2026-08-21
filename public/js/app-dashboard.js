@@ -262,10 +262,16 @@ function renderAdminDashboard(el, d, tahunDipilih) {
     const berakhirCount = (rows || []).filter(isPeriodeBerakhir).length;
     const berakhirEl = document.getElementById('dashStatBerakhir');
     if (berakhirEl) berakhirEl.innerHTML = statCard('red','error','Periode Berakhir', berakhirCount, berakhirCount > 0 ? 'Perlu tindakan' : 'Tidak ada');
-    // Perbarui statcard "Menunggu Verifikasi" — hanya hitung yang periodenya MASIH AKTIF,
-    // biar tidak dobel/ambigu dgn "Periode Berakhir" (agregat awal dari backend belum
-    // pisahkan expired vs aktif).
-    const menungguAktifCount = (rows || []).filter(u => !STATUS_FINAL_LIST.includes(u.statusGlobal) && !isPeriodeBerakhir(u)).length;
+    // Perbarui statcard "Menunggu Verifikasi" — HARUS match persis dgn filter
+    // yg dipakai list "Menunggu Verifikasi Admin" di atas (awaiting_admin=true
+    // → status_global='Menunggu Admin', lihat usulan-query.js), supaya angka di
+    // statcard tidak pernah nyasar dari isi listnya.
+    // BUG SEBELUMNYA: pakai `!STATUS_FINAL_LIST.includes(...)` — itu menghitung
+    // SEMUA usulan yg masih berjalan di seluruh pipeline (termasuk yg masih di
+    // tangan Kepala Puskesmas / Pengelola Program, belum sampai giliran Admin),
+    // bukan cuma yg benar-benar perlu tindakan Admin. Makanya statcard bisa
+    // tampil "1" padahal list "Menunggu Verifikasi Admin" di bawahnya kosong.
+    const menungguAktifCount = (rows || []).filter(u => u.statusGlobal === 'Menunggu Admin' && !isPeriodeBerakhir(u)).length;
     const menungguEl = document.getElementById('dashStatMenunggu');
     if (menungguEl) menungguEl.innerHTML = statCard('orange','pending','Menunggu Verifikasi', menungguAktifCount, menungguAktifCount > 0 ? 'Perlu tindakan' : 'Semua tertangani');
     // Perbarui donut chart & subtitle "Total Usulan" dgn breakdown akurat per-baris,

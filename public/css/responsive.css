@@ -272,16 +272,13 @@
   }
 }
 
-/* Input & select ukuran lebih user-friendly di mobile */
-@media (max-width: 768px) {
-  .form-control,
-  .auth-input {
-    font-size: 16px !important; /* Cegah iOS zoom otomatis */
-  }
-  select.form-control {
-    font-size: 16px !important;
-  }
-}
+/* Input & select: font-size SENGAJA tidak di-override lagi di sini.
+ * Sebelumnya dikunci ke 16px buat cegah iOS Safari auto-zoom pas fokus
+ * input, tapi efeknya font di mobile jadi lebih besar dari desktop
+ * (16px vs var(--fs-sm)=11px / var(--fs-base)=13px), jadi terlihat beda.
+ * Sesuai permintaan: ukuran disamakan ke desktop, jadi cukup warisi
+ * font-size dari .form-control / .auth-input di app.css (tanpa override).
+ * Trade-off: Safari iOS mungkin auto-zoom sedikit saat input difokus. */
 
 
 /* ============================================================
@@ -318,18 +315,36 @@
   .filter-row {
     flex-direction: column !important;
     gap: 8px !important;
+    align-items: stretch !important;
   }
   .filter-row .form-control,
   .filter-row .cs-wrap {
     min-width: 0 !important;
     width: 100% !important;
   }
+  /* Tombol aksi (mis. "Tampilkan") di dalam filter-row: full-width, bukan kiri-mepet */
+  .filter-row > .btn {
+    width: 100% !important;
+    justify-content: center;
+  }
   .search-row {
     flex-direction: column !important;
     gap: 8px !important;
+    align-items: stretch !important;
   }
   .search-input-wrap,
   .search-row .cs-wrap {
+    min-width: 0 !important;
+    width: 100% !important;
+    /* Reset flex-basis: di layout row, 180px berarti lebar; begitu berubah ke
+       column di HP, flex-basis yang sama dibaca sebagai TINGGI (bug: kotak
+       search jadi tinggi kosong dengan ikon kaca pembesar melayang di tengah) */
+    flex: 1 1 auto !important;
+  }
+  /* Select biasa (bukan .cs-wrap) di dalam search-row, mis. filter Role/Puskesmas
+     di Kelola User — sebelumnya tetap mempertahankan min-width inline (170-200px)
+     sehingga sempit/terpotong di HP kecil */
+  .search-row select.form-control {
     min-width: 0 !important;
     width: 100% !important;
   }
@@ -389,7 +404,8 @@
   }
   .auth-input {
     height: 48px !important;
-    font-size: 16px !important; /* cegah iOS zoom */
+    /* font-size mengikuti desktop (var(--fs-base)=13px di app.css), tidak
+       dikunci 16px lagi — lihat catatan section 8 di atas */
   }
   .auth-btn {
     height: 48px !important;
@@ -575,6 +591,55 @@
 .badge {
   max-width: 100%;
   word-break: break-word;
+}
+
+/* Badge DI DALAM TABEL (Tipe/Status dsb): jangan ikut word-break.
+ * Masalah: tabel auto-layout akan "mengorbankan" kolom yang paling elastis
+ * saat lebar tak cukup — karena badge di atas boleh break-word (nyaris 0
+ * min-content), browser sering menciutkan justru kolom badge itu sampai
+ * teksnya pecah per-huruf ("Info" -> "I/n/f/o"), sementara kolom lain yang
+ * white-space:nowrap dibiarkan utuh. Kunci badge dalam tabel supaya kolom
+ * itu ikut kaku juga — biar yang mengalah adalah scroll horizontal tabel,
+ * bukan bentuk badge-nya.
+ */
+table .badge {
+  white-space: nowrap;
+}
+
+/* Header list (search + chip ringkasan, mis. "Total Bobot Aktif") — stack
+ * rapi di mobile supaya chip tidak berdesakan dengan search box */
+@media (max-width: 600px) {
+  #indHeaderRow {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+  #indHeaderRow .search-row {
+    min-width: 0 !important;
+  }
+  #indHeaderRow .badge {
+    align-self: flex-start;
+  }
+}
+
+/* Jaring pengaman: chip info/summary ad-hoc lain (background var(--info-light)
+ * dkk dengan font-size 13px langsung di style, pola lama sebelum dipindah ke
+ * .badge) — turunkan agar konsisten dengan skala .badge (10px) di mobile,
+ * jangan sampai ada elemen sejenis yang kelewat besar dibanding sekitarnya */
+@media (max-width: 600px) {
+  [style*="background:var(--info-light);padding"][style*="font-size:13px"],
+  [style*="background: var(--info-light); padding"][style*="font-size: 13px"] {
+    font-size: 11px !important;
+  }
+}
+
+
+/* Custom date picker (VDP) — cegah popup kalender kelebar dari layar
+ * di HP sangat kecil (<300px lebar viewport) */
+@media (max-width: 320px) {
+  #vdp-portal {
+    width: calc(100vw - 16px) !important;
+    max-width: 268px;
+  }
 }
 
 
@@ -974,6 +1039,28 @@ body { overflow-x: hidden; }
   #mainContent .table-container table {
     font-size: 12px;
     min-width: 480px;
+  }
+}
+
+/* Tabel Audit Trail: 8 kolom (Waktu/Modul/Aksi/User/Role/Detail/IP/Lokasi) —
+ * min-width 480px umum di atas kepanjangan kalau dipaksa table-layout:fixed,
+ * jadinya teks kepotong & tumpang-tindih antar kolom. Lepas fixed-layout khusus
+ * tabel ini di HP dan kasih scroll horizontal supaya tiap kolom dapat ruang wajar. */
+@media (max-width: 768px) {
+  #auditTrailTable table {
+    table-layout: auto !important;
+    width: max-content !important;
+    min-width: 920px;
+  }
+  #auditTrailTable th,
+  #auditTrailTable td {
+    white-space: nowrap;
+  }
+  /* Kolom Detail & Lokasi boleh tetap wrap normal (isinya kalimat, bukan label pendek) */
+  #auditTrailTable td[style*="word-break"],
+  #auditTrailTable td:last-child {
+    white-space: normal;
+    min-width: 200px;
   }
 }
 
@@ -1403,6 +1490,36 @@ body { overflow-x: hidden; }
 
 
 /* ────────────────────────────────────────────────────────────
+ * M0. PENANDATANGAN — chip jabatan per indikator (tab Master Data)
+ *    Masalah: label "Indikator N" pakai kolom tetap 180px, sisa ruang
+ *    buat chip di HP jadi sempit banget → teks chip kepaksa wrap
+ *    per-suku-kata karena chip di-flex-shrink sampai lebih kecil
+ *    dari kontennya. Solusi: stack label di atas, chip dapat lebar
+ *    penuh, dan chip sendiri dikunci nowrap (kalau kepanjangan,
+ *    chip yang pindah baris, bukan teksnya yang pecah).
+ * ────────────────────────────────────────────────────────────  */
+@media (max-width: 600px) {
+  .pen-row-flex {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 6px !important;
+  }
+  .pen-row-label {
+    min-width: 0 !important;
+    flex: 0 0 auto !important;
+  }
+  .pen-tags {
+    flex: 1 1 100% !important;
+    min-width: 100% !important;
+  }
+  .pen-tag-chip {
+    max-width: 100%;
+    white-space: nowrap;
+  }
+}
+
+
+/* ────────────────────────────────────────────────────────────
  * M. TANDA TANGAN PREVIEW MODAL (dibuat via JS di app-master)
  *    Masalah: modal-card max-width:480px + padding bisa overflow
  * ────────────────────────────────────────────────────────────  */
@@ -1446,10 +1563,29 @@ body { overflow-x: hidden; }
     white-space: normal !important;
   }
 
-  /* Badge status: bisa wrap teks */
-  #mainContent .badge,
-  #mainContent [style*="border-radius:20px"],
-  #mainContent [style*="border-radius: 20px"] {
+  /* Badge status: bisa wrap teks.
+   * DIPERSEMPIT ke tabel dashboard usulan saja (#pendingTable / #ppDoneTable /
+   * #kapusAllTable / #recentTable) — badge di tabel INI memang bisa punya teks
+   * panjang ("Menunggu Pengelola Program") dan kolom Status sudah dikunci
+   * min-width 140px di <th>, jadi aman untuk wrap.
+   * JANGAN pakai selector global `#mainContent .badge` di sini — itu ikut
+   * menimpa aturan "table .badge { white-space:nowrap }" di section 21 untuk
+   * SEMUA tabel lain (mis. tabel Pengumuman kolom Tipe), yang kolomnya sempit
+   * dan tanpa min-width, sehingga badge pendek seperti "Info" malah pecah
+   * huruf-per-huruf ("I/n/f/o") karena kolom diciutkan browser.
+   */
+  #pendingTable .badge,
+  #ppDoneTable .badge,
+  #kapusAllTable .badge,
+  #recentTable .badge,
+  #pendingTable [style*="border-radius:20px"],
+  #ppDoneTable [style*="border-radius:20px"],
+  #kapusAllTable [style*="border-radius:20px"],
+  #recentTable [style*="border-radius:20px"],
+  #pendingTable [style*="border-radius: 20px"],
+  #ppDoneTable [style*="border-radius: 20px"],
+  #kapusAllTable [style*="border-radius: 20px"],
+  #recentTable [style*="border-radius: 20px"] {
     white-space: normal !important;
     word-break: break-word !important;
     text-align: center !important;

@@ -565,12 +565,38 @@ async function doLogin() {
     const user = await API.login(email, password);
     currentUser = user;
     sessionStorage.setItem('spm_user', JSON.stringify(user));
-    // Catat log login — minta lokasi GPS browser dulu (non-blocking thd UX,
-    // timeout 3-7 detik total), baru kirim ke audit trail. Kalau gagal/ditolak,
-    // backend otomatis fallback ke IP-based lookup.
-    _getBrowserLokasi().then(lokasi => {
-      API.logAudit({ module: 'auth', action: 'LOGIN', userEmail: user.email, userNama: user.nama, userRole: user.role, detail: 'Login berhasil', lokasi });
-    });
+    // Catat log login. Sebelumnya: nunggu GPS dulu (bisa sampai ~10 detik
+    // berantai: GPS 3dtk → TomTom 4dtk → Nominatim 3.5dtk) baru kirim log,
+    // fire-and-forget tanpa keepalive & error ditelan diam-diam — kalau user
+    // keburu pindah tab/halaman sebelum rantai itu kelar, log LOGIN hilang
+    // tanpa jejak sama sekali (sesi login-nya sendiri tetap valid & tidak
+    // terganggu, makanya user tetap bisa lanjut kerja seperti biasa).
+    // FIX: batasi waktu tunggu lokasi maks 2.5 detik (kalau lebih lama,
+    // kirim log duluan tanpa lokasi drpd tidak terkirim sama sekali),
+    // request pakai keepalive (lihat api.js), dan retry sekali + console.warn
+    // kalau tetap gagal supaya tidak lagi silent-fail.
+    (async () => {
+      let lokasi = null;
+      try {
+        lokasi = await Promise.race([
+          _getBrowserLokasi(),
+          new Promise(resolve => setTimeout(() => resolve(null), 2500)),
+        ]);
+      } catch (_) { /* biarkan null, jangan gagalkan pengiriman log */ }
+
+      const logPayload = { module: 'auth', action: 'LOGIN', userEmail: user.email, userNama: user.nama, userRole: user.role, detail: 'Login berhasil', lokasi };
+      try {
+        await API.logAudit(logPayload);
+      } catch (e1) {
+        // Retry sekali setelah jeda singkat — jaringan mobile sering flaky
+        // tepat di detik-detik awal setelah login
+        setTimeout(() => {
+          API.logAudit(logPayload).catch(e2 => {
+            console.warn('[audit] Gagal mencatat log LOGIN setelah retry:', e2?.message || e2);
+          });
+        }, 1500);
+      }
+    })();
     startApp();
     startIdleWatcher();
   } catch (e) {
@@ -599,7 +625,7 @@ function doLogout() {
     title: 'Keluar dari Sistem',
     message: 'Yakin ingin keluar dari sistem?',
     type: 'warning',
-    onConfirm: () => { window._intentionalLogout = true; clearInterval(window._notifInterval); sessionStorage.removeItem('spm_user'); try { sessionStorage.removeItem('spm_last_page'); } catch(e) {} if(currentUser) { API.logout(); API.logAudit({module:'auth',action:'LOGOUT',userEmail:currentUser.email,userNama:currentUser.nama,userRole:currentUser.role,detail:'Logout manual'}); } currentUser = null; location.reload(); }
+    onConfirm: () => { window._intentionalLogout = true; clearInterval(window._notifInterval); sessionStorage.removeItem('spm_user'); try { sessionStorage.removeItem('spm_last_page'); } catch(e) {} if(currentUser) { API.logout(); API.logAudit({module:'auth',action:'LOGOUT',userEmail:currentUser.email,userNama:currentUser.nama,userRole:currentUser.role,detail:'Logout manual'}).catch(()=>{}); } currentUser = null; location.reload(); }
   });
 }
 

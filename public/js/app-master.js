@@ -179,7 +179,11 @@ function _lapRenderTable(data) {
   const selesai = data.filter(r => r.statusGlobal === 'Selesai').length;
   const belumFinal = data.filter(r => !['Selesai','Ditolak'].includes(r.statusGlobal));
   const berakhir = belumFinal.filter(isPeriodeBerakhir).length;
-  const pending  = belumFinal.length - berakhir;
+  // Samakan dgn definisi Dashboard Admin: cuma status_global='Menunggu Admin'
+  // yang dihitung "Menunggu Verifikasi" (bukan semua status non-final —
+  // status lain seperti "Menunggu Kepala Puskesmas"/"Menunggu Pengelola Program"
+  // bukan giliran Admin, jadi jangan ikut kehitung di sini).
+  const pending  = data.filter(r => r.statusGlobal === 'Menunggu Admin' && !isPeriodeBerakhir(r)).length;
   const indeks  = data.filter(r => parseFloat(r.indeksSPM) > 0).map(r => parseFloat(r.indeksSPM));
   const rataSPM = indeks.length ? (indeks.reduce((a,b)=>a+b,0)/indeks.length).toFixed(2) : '0';
 
@@ -1738,13 +1742,11 @@ async function renderIndikator(el) {
       <button class="btn btn-primary" onclick="openIndModal()"><span class="material-icons">add</span>Tambah Indikator</button>
     </div>
     <div class="card">
-      <div class="card-body" style="padding:12px 16px;display:flex;justify-content:space-between;align-items:center">
-        <div class="search-row" style="margin:0;flex:1">
+      <div class="card-body" id="indHeaderRow" style="padding:12px 16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+        <div class="search-row" style="margin:0;flex:1;min-width:180px">
           <div class="search-input-wrap"><span class="material-icons search-icon">search</span><input class="search-input" id="searchInd" placeholder="Cari nomor atau nama..." oninput="filterInd()"></div>
         </div>
-        <div style="background:var(--info-light);padding:8px 14px;border-radius:8px;font-size:13px;margin-left:12px">
-          Total Bobot Aktif: <strong id="totalBobot">0</strong>
-        </div>
+        <span class="badge badge-info" style="flex-shrink:0">Total Bobot Aktif: <strong id="totalBobot">0</strong></span>
       </div>
       <div id="indTable" style="padding:0">${loadingBlock('Memuat...')}</div>
     </div>
@@ -3004,14 +3006,14 @@ async function renderAuditTrail(el) {
         </button>
       </div>
       <div class="card-body" style="padding:12px 16px">
-        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
-          <div>
+        <div class="filter-row" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+          <div style="width:150px">
             <label style="font-size:12px;font-weight:600;color:#64748b;display:block;margin-bottom:4px">Tanggal Mulai</label>
-            <input type="date" class="form-control" id="atDateFrom" value="${fmt(weekAgo)}" style="width:150px">
+            <input type="hidden" id="atDateFrom" value="${fmt(weekAgo)}">
           </div>
-          <div>
+          <div style="width:150px">
             <label style="font-size:12px;font-weight:600;color:#64748b;display:block;margin-bottom:4px">Tanggal Akhir</label>
-            <input type="date" class="form-control" id="atDateTo" value="${fmt(today)}" style="width:150px">
+            <input type="hidden" id="atDateTo" value="${fmt(today)}">
           </div>
           <div>
             <label style="font-size:12px;font-weight:600;color:#64748b;display:block;margin-bottom:4px">Modul</label>
@@ -3038,6 +3040,13 @@ async function renderAuditTrail(el) {
     <div class="card">
       <div class="card-body" style="padding:0" id="auditTrailTable"></div>
     </div>`;
+
+  // Custom date picker (VDP) — samakan dengan filter tanggal lain di seluruh sistem,
+  // ganti kalender bawaan browser pada input Tanggal Mulai/Akhir
+  if (window.VDP) {
+    VDP.init('atDateFrom');
+    VDP.init('atDateTo');
+  }
 
   // Isi dropdown modul & aksi dari data nyata (tanpa filter tanggal, limit besar)
   // Keduanya di-await agar spinner global tidak mati sebelum data selesai dimuat
@@ -3522,10 +3531,10 @@ function _renderPenandatanganRow(ind, currentJabatan, jabatanOptions) {
 
   // Tags urutan yang sudah dipilih
   const tagsHtml = currentJabatan.map((j, i) => `
-    <div id="ptag-${ind.no}-${i}" style="display:inline-flex;align-items:center;gap:4px;background:#e0f2fe;border:1px solid #7dd3fc;border-radius:20px;padding:3px 10px;font-size:12px;color:#0369a1;font-weight:600;margin:2px">
+    <div id="ptag-${ind.no}-${i}" class="pen-tag-chip" style="display:inline-flex;align-items:center;gap:4px;background:#e0f2fe;border:1px solid #7dd3fc;border-radius:20px;padding:3px 10px;font-size:12px;color:#0369a1;font-weight:600;margin:2px;white-space:nowrap">
       <span style="background:#0369a1;color:white;border-radius:50%;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0">${i+1}</span>
-      ${j}
-      <button onclick="_uncheckPenandatangan(${ind.no}, '${j.replace(/'/g, "\\\'")}', ${i})" style="background:none;border:none;cursor:pointer;color:#0369a1;padding:0;display:flex;line-height:1;margin-left:2px">
+      <span style="white-space:nowrap">${j}</span>
+      <button onclick="_uncheckPenandatangan(${ind.no}, '${j.replace(/'/g, "\\\'")}', ${i})" style="background:none;border:none;cursor:pointer;color:#0369a1;padding:0;display:flex;line-height:1;margin-left:2px;flex-shrink:0">
         <span class="material-icons" style="font-size:14px">close</span>
       </button>
     </div>`).join('');
@@ -3536,12 +3545,12 @@ function _renderPenandatanganRow(ind, currentJabatan, jabatanOptions) {
       <div onclick="_togglePenandatanganRow(${ind.no})"
         style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;cursor:pointer;user-select:none"
         onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''">
-        <div style="display:flex;align-items:flex-start;gap:12px;flex:1;min-width:0">
-          <div style="min-width:180px;flex:0 0 180px">
+        <div class="pen-row-flex" style="display:flex;align-items:flex-start;gap:12px;flex:1;min-width:0">
+          <div class="pen-row-label" style="min-width:180px;flex:0 0 180px">
             <div style="font-weight:700;font-size:13px;color:#0f172a">Indikator ${ind.no}</div>
             <div style="font-size:12px;color:#64748b;margin-top:2px;line-height:1.4">${ind.nama}</div>
           </div>
-          <div id="ptags-${ind.no}" style="display:flex;flex-wrap:wrap;gap:2px;align-items:center;flex:1;min-width:0">
+          <div id="ptags-${ind.no}" class="pen-tags" style="display:flex;flex-wrap:wrap;gap:2px;align-items:center;flex:1;min-width:0">
             ${tagsHtml || '<span style="font-size:12px;color:#cbd5e1;font-style:italic">Belum ada penandatangan — klik untuk konfigurasi</span>'}
           </div>
         </div>
@@ -3613,10 +3622,10 @@ function _refreshPenandatanganTags(noInd) {
     return;
   }
   tagsEl.innerHTML = state.map((j, i) => `
-    <div id="ptag-${noInd}-${i}" style="display:inline-flex;align-items:center;gap:4px;background:#e0f2fe;border:1px solid #7dd3fc;border-radius:20px;padding:3px 10px;font-size:12px;color:#0369a1;font-weight:600;margin:2px">
+    <div id="ptag-${noInd}-${i}" class="pen-tag-chip" style="display:inline-flex;align-items:center;gap:4px;background:#e0f2fe;border:1px solid #7dd3fc;border-radius:20px;padding:3px 10px;font-size:12px;color:#0369a1;font-weight:600;margin:2px;white-space:nowrap">
       <span style="background:#0369a1;color:white;border-radius:50%;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0">${i+1}</span>
-      ${j}
-      <button onclick="event.stopPropagation();_uncheckPenandatangan(${noInd}, '${j.replace(/'/g, "\\\'")}', ${i})" style="background:none;border:none;cursor:pointer;color:#0369a1;padding:0;display:flex;line-height:1;margin-left:2px">
+      <span style="white-space:nowrap">${j}</span>
+      <button onclick="event.stopPropagation();_uncheckPenandatangan(${noInd}, '${j.replace(/'/g, "\\\'")}', ${i})" style="background:none;border:none;cursor:pointer;color:#0369a1;padding:0;display:flex;line-height:1;margin-left:2px;flex-shrink:0">
         <span class="material-icons" style="font-size:14px">close</span>
       </button>
     </div>`).join('');

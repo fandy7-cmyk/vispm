@@ -32,17 +32,17 @@ exports.handler = async (event) => {
   try {
     await migrate(pool);
 
-    // ── GET — ambil semua atau hanya yang aktif ──
+    
     if (event.httpMethod === 'GET') {
       const params = event.queryStringParameters || {};
       let query, values;
 
       if (params.aktif === 'true') {
-        // Hanya yang aktif=true (dipakai popup login)
+        
         query  = `SELECT * FROM pengumuman_sistem WHERE aktif = true ORDER BY dibuat_pada DESC`;
         values = [];
       } else {
-        // Semua (dipakai halaman kelola Admin)
+        
         query  = `SELECT * FROM pengumuman_sistem ORDER BY dibuat_pada DESC`;
         values = [];
       }
@@ -51,7 +51,7 @@ exports.handler = async (event) => {
       return ok(result.rows.map(_fmt));
     }
 
-    // ── POST — buat baru ──
+    
     if (event.httpMethod === 'POST') {
       const body = JSON.parse(event.body || '{}');
       const { judul, isi, tipe, aktif, tanggal_mulai, tanggal_selesai, dibuat_oleh } = body;
@@ -80,7 +80,7 @@ exports.handler = async (event) => {
       return ok(_fmt(result.rows[0]));
     }
 
-    // ── PUT — update ──
+    
     if (event.httpMethod === 'PUT') {
       const body = JSON.parse(event.body || '{}');
       const { id, judul, isi, tipe, aktif, tanggal_mulai, tanggal_selesai } = body;
@@ -113,7 +113,7 @@ exports.handler = async (event) => {
       return ok(_fmt(result.rows[0]));
     }
 
-    // ── DELETE ──
+    
     if (event.httpMethod === 'DELETE') {
       const body = JSON.parse(event.body || '{}');
       const { id } = body;
@@ -135,7 +135,6 @@ exports.handler = async (event) => {
   }
 };
 
-/** Format row DB → objek frontend */
 function _fmt(r) {
   return {
     id:               r.id,
@@ -150,20 +149,15 @@ function _fmt(r) {
   };
 }
 
-/**
- * Konversi nilai tanggal dari PostgreSQL ke format YYYY-MM-DD.
- * Neon/pg mengembalikan kolom DATE sebagai objek Date JS, bukan string —
- * sehingga String(dateObj).slice(0,10) menghasilkan "Thu Apr 23" bukan "2026-04-23".
- */
 function _fmtDate(val) {
   if (!val) return null;
-  // Sudah string ISO → ambil 10 karakter pertama
+  
   if (typeof val === 'string') {
-    // Coba cocokkan YYYY-MM-DD di mana saja dalam string
+    
     const m = val.match(/(\d{4}-\d{2}-\d{2})/);
     return m ? m[1] : val.slice(0, 10);
   }
-  // Objek Date dari driver pg/Neon
+  
   if (val instanceof Date) {
     const y  = val.getUTCFullYear();
     const mo = String(val.getUTCMonth() + 1).padStart(2, '0');

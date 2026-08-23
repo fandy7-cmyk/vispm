@@ -8,9 +8,9 @@ const { parseIndikatorAkses, logAktivitas, mapHeader, adminResetUsulan, restoreV
 let _migrated = false;
 async function runMigrations(pool) {
   if (_migrated) return;
-  _migrated = true; // Set optimistically to prevent concurrent duplicate runs
+  _migrated = true; 
 
-  // Tahap 1: DDL paralel yang tidak saling bergantung
+  
   await Promise.all([
     pool.query(`ALTER TABLE verifikasi_program ADD COLUMN IF NOT EXISTS nip_program VARCHAR(50)`).catch(()=>{}),
     pool.query(`ALTER TABLE verifikasi_program ADD COLUMN IF NOT EXISTS jabatan_program TEXT`).catch(()=>{}),
@@ -26,8 +26,8 @@ async function runMigrations(pool) {
     pool.query(`ALTER TABLE usulan_header ADD COLUMN IF NOT EXISTS admin_approved_by VARCHAR(200)`).catch(()=>{}),
     pool.query(`ALTER TABLE usulan_header ADD COLUMN IF NOT EXISTS admin_approved_at TIMESTAMPTZ`).catch(()=>{}),
     pool.query(`ALTER TABLE usulan_header ADD COLUMN IF NOT EXISTS operator_catatan TEXT`).catch(()=>{}),
-    // Poin 2: kolom tracking siklus re-verifikasi Admin ↔ PP
-    // Direset ke 0 saat Admin approve semua (Selesai), increment tiap Admin tolak ke PP
+    
+    
     pool.query(`ALTER TABLE usulan_header ADD COLUMN IF NOT EXISTS reverif_count INT DEFAULT 0`).catch(()=>{}),
     pool.query(`ALTER TABLE usulan_header ADD COLUMN IF NOT EXISTS waktu_selesai TIMESTAMPTZ`).catch(()=>{}),
     pool.query(`CREATE TABLE IF NOT EXISTS penolakan_indikator (
@@ -44,15 +44,15 @@ async function runMigrations(pool) {
     )`).catch(()=>{}),
   ]);
 
-  // Tahap 2: isi email_program yang NULL/kosong dengan email_admin
-  // Harus selesai SEBELUM SET NOT NULL dan sebelum tambah constraint baru
+  
+  
   await pool.query(
     `UPDATE penolakan_indikator SET email_program = email_admin
      WHERE email_program IS NULL OR email_program = ''`
   ).catch(()=>{});
 
-  // Tahap 3: ubah struktur constraint (sequential karena saling bergantung)
-  // 3a. Hapus constraint lama jika masih ada
+  
+  
   await pool.query(`
     DO $$ BEGIN
       IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname='penolakan_indikator_id_usulan_no_indikator_key') THEN
@@ -61,7 +61,7 @@ async function runMigrations(pool) {
     END $$;
   `).catch(()=>{});
 
-  // 3b. Tambah constraint baru jika belum ada
+  
   await pool.query(`
     DO $$ BEGIN
       IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='penolakan_indikator_id_usulan_no_indikator_email_program_key') THEN
@@ -71,17 +71,17 @@ async function runMigrations(pool) {
     END $$;
   `).catch(()=>{});
 
-  // 3c. Set NOT NULL setelah data sudah bersih
+  
   await pool.query(
     `ALTER TABLE penolakan_indikator ALTER COLUMN email_program SET NOT NULL`
   ).catch(()=>{});
 
-  // Tahap 4: Tambah kolom dibuat_oleh untuk membedakan penolakan dari Kapus / PP / Admin
+  
   await pool.query(
     `ALTER TABLE penolakan_indikator ADD COLUMN IF NOT EXISTS dibuat_oleh VARCHAR(20)`
   ).catch(()=>{});
 
-  // Tahap 5: Isi dibuat_oleh untuk data lama berdasarkan aksi yang ada
+  
   await pool.query(
     `UPDATE penolakan_indikator SET dibuat_oleh='Kapus'
      WHERE dibuat_oleh IS NULL AND aksi IN ('kapus-setuju','kapus-verif')`
@@ -94,15 +94,13 @@ async function runMigrations(pool) {
     `UPDATE penolakan_indikator SET dibuat_oleh='Admin'
      WHERE dibuat_oleh IS NULL AND aksi='tolak'`
   ).catch(()=>{});
-  // Sisa NULL (aksi=NULL dari Kapus tolak) → Kapus
+  
   await pool.query(
     `UPDATE penolakan_indikator SET dibuat_oleh='Kapus' WHERE dibuat_oleh IS NULL`
   ).catch(()=>{});
 
-
 }
 
-// Validasi teks: harus mengandung minimal 1 huruf atau angka (bukan hanya simbol/spasi)
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors();
 
@@ -133,9 +131,9 @@ exports.handler = async (event) => {
     if (method === 'POST' && path === 'admin-reset') return await adminResetUsulan(pool, body);
     if (method === 'POST' && path === 'restore-verif') return await restoreVerifStatus(pool, body);
     if (method === 'DELETE') {
-      const { idUsulan } = body; // body sudah di-parse di atas
+      const { idUsulan } = body; 
       if (!idUsulan) return err('idUsulan diperlukan');
-      // Hapus cascade manual karena mungkin belum ada foreign key
+      
       await pool.query('DELETE FROM log_aktivitas WHERE id_usulan=$1', [idUsulan]).catch(()=>{});
       await pool.query('DELETE FROM penolakan_indikator WHERE id_usulan=$1', [idUsulan]).catch(()=>{});
       await pool.query('DELETE FROM verifikasi_program WHERE id_usulan=$1', [idUsulan]).catch(()=>{});

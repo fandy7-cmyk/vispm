@@ -4,23 +4,6 @@ const bcrypt = require('bcryptjs');
 
 let _migrated = false;
 
-/**
- * Handler: /api/users
- *
- * GET  — Daftar semua user (kecuali Super Admin)
- *         Response: [{ email, nama, nip, role, kodePKM, namaPKM, indikatorAkses, jabatan, aktif, tandaTangan }]
- *
- * POST — Tambah user baru
- *         Body: { email, nama, nip, role, kodePKM, indikatorAkses, jabatan }
- *         Password default: 'Balut2026'
- *         409 — Email sudah terdaftar
- *
- * PUT  — Update user (termasuk tanda tangan)
- *         Body: { email, nama, nip, role, kodePKM, indikatorAkses, jabatan, aktif, tandaTangan? }
- *
- * DELETE — Hapus user
- *         Body: { email }
- */
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors();
   const _authErr = await validateSession(event);

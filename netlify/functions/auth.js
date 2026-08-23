@@ -4,29 +4,9 @@ const crypto = require('crypto');
 let bcrypt;
 try { bcrypt = require('bcryptjs'); } catch(e) { bcrypt = null; }
 
-const MAX_ATTEMPTS  = 3;   // lockout setelah 3 gagal
-const LOCKOUT_MINS  = 15;  // kunci selama 15 menit
+const MAX_ATTEMPTS  = 3;   
+const LOCKOUT_MINS  = 15;  
 
-/**
- * Handler: /api/auth
- *
- * POST — Login / Ganti Password / Reset Password (Admin)
- *   Body (login)          : { email, password }
- *   Body (change-password): { action:'change-password', email, oldPassword, newPassword }
- *   Body (reset-password) : { action:'reset-password', email, targetEmail, newPassword }
- *
- * Response sukses: { success:true, data: { email, nama, role, kodePKM, ... } }
- * Response error : { success:false, message }
- *   401 — Password salah / perlu reset
- *   403 — Email tidak ditemukan / tidak aktif / akses ditolak
- *   429 — Akun terkunci karena terlalu banyak percobaan gagal
- *   500 — Error sistem
- *
- * CATATAN: Migrasi tabel (ALTER TABLE, CREATE TABLE) sudah dipindahkan ke
- * migration.sql dan dijalankan sekali langsung di Neon SQL Editor.
- * Jangan tambahkan DDL di sini — setiap request login akan menjalankannya
- * dan itu yang menyebabkan compute Neon cepat habis.
- */
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors();
 
@@ -36,7 +16,7 @@ exports.handler = async (event) => {
     const body = JSON.parse(event.body || '{}');
     const { email, password, action, oldPassword, newPassword, targetEmail, token } = body;
 
-    // ===== CHANGE PASSWORD =====
+    
     if (action === 'change-password') {
       if (!email || !oldPassword || !newPassword) return err('Data tidak lengkap');
       if (newPassword.length < 6) return err('Password minimal 6 karakter');
@@ -57,17 +37,17 @@ exports.handler = async (event) => {
       return ok({ message: 'Password berhasil diubah' });
     }
 
-    // ===== LOGOUT =====
+    
     if (action === 'logout') {
       if (!token) return err('Token tidak ditemukan');
       await pool.query(`DELETE FROM user_sessions WHERE token = $1`, [token]);
       return ok({ message: 'Logout berhasil' });
     }
 
-    // ===== RESET PASSWORD (admin) =====
+    
     if (action === 'reset-password') {
       if (!email || !newPassword || !targetEmail) return err('Data tidak lengkap');
-      // Verifikasi pemanggil adalah Admin
+      
       const adminCheck = await pool.query(
         `SELECT role FROM users WHERE LOWER(email)=LOWER($1) AND aktif=true`, [email.trim()]
       );
@@ -78,7 +58,7 @@ exports.handler = async (event) => {
       return ok({ message: 'Password berhasil direset' });
     }
 
-    // ===== LOGIN =====
+    
     if (!email) return err('Email diperlukan');
 
     const result = await pool.query(
@@ -97,18 +77,18 @@ exports.handler = async (event) => {
 
     const user = result.rows[0];
 
-    // Cek apakah akun aktif
+    
     if (!user.aktif) {
       return err(`Email ${email} tidak terdaftar atau tidak aktif. Hubungi Admin.`, 403);
     }
 
-    // ── Cek lockout ──
+    
     if (user.locked_until && new Date() < new Date(user.locked_until)) {
       const menitSisa = Math.ceil((new Date(user.locked_until) - new Date()) / 60000);
       return err(`Akun terkunci sementara karena terlalu banyak percobaan login gagal. Coba lagi dalam ${menitSisa} menit.`, 429);
     }
 
-    // Validasi password
+    
     const hash = user.password_hash;
     if (hash) {
       if (!password) return err('Password diperlukan', 401);
@@ -120,7 +100,7 @@ exports.handler = async (event) => {
         try { match = await bcrypt.compare(password, hash); } catch(e) { match = false; }
       }
       if (!match) {
-        // ── Increment login_attempts ──
+        
         const newAttempts = (parseInt(user.login_attempts) || 0) + 1;
         if (newAttempts >= MAX_ATTEMPTS) {
           const lockUntil = new Date(Date.now() + LOCKOUT_MINS * 60 * 1000).toISOString();
@@ -139,13 +119,13 @@ exports.handler = async (event) => {
       }
     }
 
-    // ── Login berhasil — reset attempts ──
+    
     await pool.query(
       `UPDATE users SET login_attempts=0, locked_until=NULL WHERE LOWER(email)=LOWER($1)`,
       [email.trim()]
     );
 
-    // Normalisasi role lama → nama baru
+    
     const roleMap = {
       'Kapus': 'Kepala Puskesmas',
       'kapus': 'Kepala Puskesmas',
@@ -159,7 +139,7 @@ exports.handler = async (event) => {
       indikatorList = parseIndikatorAkses(user.indikator_akses.toString());
     }
 
-    // ── Buat session token baru ──
+    
     const sessionToken = crypto.randomUUID();
     const deviceInfo = (event.headers?.['user-agent'] || '').slice(0, 255);
 

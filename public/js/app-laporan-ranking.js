@@ -1,14 +1,9 @@
-// ============================================================
-//  RANKING PUSKESMAS — Fitur tambahan di halaman Laporan Admin
-//  Tab bar sudah di-render langsung oleh renderLaporan() di app-master.js
-//  File ini hanya berisi logika switching tab & render tabel ranking
-// ============================================================
+
 
 (function () {
   'use strict';
 
-  /* ── State ─────────────────────────────────────────────── */
-  let _rankTab   = 'tabel';
+    let _rankTab   = 'tabel';
   let _rankTahun = '';
   let _rankBulan = '';
   let _rankPage  = 1;
@@ -40,8 +35,7 @@
     }
   };
 
-  /* ── Dipanggil dari onchange filter ranking ─────────────── */
-  window._rankApplyFilter = function () {
+    window._rankApplyFilter = function () {
     _rankTahun = document.getElementById('rankTahun')?.value || '';
     _rankBulan = document.getElementById('rankBulan')?.value || '';
 
@@ -117,7 +111,6 @@
       (!_rankBulan || String(r.bulan) === String(_rankBulan))
     );
 
-
     if (!filtered.length) {
       el.innerHTML = '<div class="empty-state" style="padding:40px"><span class="material-icons">inbox</span><p>Tidak ada data untuk filter ini</p></div>';
       return;
@@ -141,7 +134,7 @@
     const totalDiproses = totalSemua - totalSelesai - totalBerakhir;
     const showBulanCol = !_rankBulan;
 
-    // ── Pagination ──────────────────────────────────────────
+    
     const totalPages = Math.ceil(totalSemua / _RANK_PER_PAGE) || 1;
     _rankPage = Math.max(1, Math.min(_rankPage, totalPages));
     const pageStart = (_rankPage - 1) * _RANK_PER_PAGE;
@@ -149,7 +142,7 @@
     const pageRows  = rows.slice(pageStart, pageEnd);
 
     var rowsHtml = pageRows.map(function(r, i) {
-      var globalIdx = pageStart + i;          // indeks global untuk rank & badge
+      var globalIdx = pageStart + i;          
       var isSelesai = r.statusGlobal === 'Selesai';
       var rank = isSelesai ? globalIdx + 1 : null;
       return '<tr style="vertical-align:middle">'
@@ -230,7 +223,7 @@
   }
 
   function _fmtNow() {
-    // Waktu sekarang dalam WITA (UTC+8)
+    
     var now = new Date(Date.now() + 8 * 3600000);
     var dd  = String(now.getUTCDate()).padStart(2, '0');
     var mm  = String(now.getUTCMonth() + 1).padStart(2, '0');
@@ -250,8 +243,7 @@
     } catch(e) { return val; }
   }
 
-  /* ── Patch _lapRenderTable: sync data ke ranking jika tab aktif ── */
-  var _origLapRenderTable = window._lapRenderTable;
+    var _origLapRenderTable = window._lapRenderTable;
   if (typeof _origLapRenderTable === 'function') {
     window._lapRenderTable = function (data) {
       _origLapRenderTable.call(this, data);

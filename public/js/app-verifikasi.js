@@ -1,11 +1,7 @@
-// ============== VERIFIKASI ==============
 
-// FIX B: Storage badge indikator bermasalah untuk PP.
-// Diisi oleh renderDashboard (atau fungsi load stats PP) setelah fetch API dashboard.
-// Dipakai oleh renderUsulanTable untuk tampilkan badge "Re-verif: Ind. #1, #2" di row usulan.
+
 window._indikatorBermasalahMap = {};
 
-// Render badge kuning "Re-verif: Ind. #X, #Y" — dipanggil di dalam cell row/card usulan PP.
 function renderBadgeIndikatorBermasalah(idUsulan) {
   const nos = (window._indikatorBermasalahMap || {})[idUsulan];
   if (!nos || !nos.length) return '';
@@ -58,7 +54,7 @@ async function loadVerifTab(status, el) {
 }
 
 async function loadVerifData(status) {
-  // Tampilkan spinner di tabel sebelum fetch
+  
   const verifTableEl = document.getElementById('verifTable');
   if (verifTableEl) {
     verifTableEl.innerHTML = `<div class="loading-state"><div class="spm-spinner lg"><div class="sr1"></div><div class="sr2"></div><div class="sr3"></div></div><p>Memuat data...</p></div>`;
@@ -71,22 +67,22 @@ async function loadVerifData(status) {
     if (!currentUser.kodePKM) { toast('Akun Kepala Puskesmas tidak terhubung ke puskesmas. Hubungi Admin.', 'error'); return; }
     params.kode_pkm = currentUser.kodePKM;
     params.email_kepala = currentUser.email;
-    // Tab Selesai/Ditolak: filter status_global (scope tetap per kode_pkm)
+    
     if (status && status !== 'semua' && status !== 'periode_berakhir') params.status = status;
   } else if (role === 'Pengelola Program') {
     params.email_program = currentUser.email;
     if (status === 'Menunggu Pengelola Program') {
-      // Tab "Menunggu Verifikasi" — tampilkan yang belum/perlu diverifikasi PP
+      
       params.status_program = 'Menunggu Pengelola Program,Menunggu Re-verifikasi PP';
     } else if (status === 'Selesai') {
-      // Tab Selesai: sama seperti Admin — statusGlobal = 'Selesai'
-      // email_program tetap dikirim agar hanya usulan yang ditugaskan ke PP ini
+      
+      
       params.status = 'Selesai';
     } else if (status === 'Ditolak') {
-      // Tab Ditolak: statusGlobal Ditolak/Ditolak Sebagian
+      
       params.status_program = 'Ditolak,Ditolak Sebagian';
     } else {
-      // Tab "Semua" — tampilkan semua yang ditugaskan agar tombol hijau terlihat
+      
       params.status_program = 'Menunggu Pengelola Program,Menunggu Re-verifikasi PP,Ditolak,Ditolak Sebagian,Selesai,Menunggu Admin,Menunggu Kepala Puskesmas,Menunggu Re-verifikasi Kepala Puskesmas';
     }
   } else if (role === 'Admin' && status !== 'semua' && status !== 'periode_berakhir') {
@@ -97,12 +93,12 @@ async function loadVerifData(status) {
     const rows = await API.getUsulan(params);
     const verifRole = role === 'Kepala Puskesmas' ? 'kepala-puskesmas' : role === 'Pengelola Program' ? 'program' : 'admin';
 
-    // Refresh _periodeAktifList setiap kali load verif agar perubahan periode (perpanjang/aktifkan)
-    // langsung terdeteksi tanpa perlu re-login.
+    
+    
     try {
       const freshPeriode = await API.get('periode');
       if (Array.isArray(freshPeriode)) window._periodeAktifList = freshPeriode;
-    } catch (_) { /* gunakan cache lama jika gagal */ }
+    } catch (_) {  }
 
     window._verifRows = (status === 'periode_berakhir') ? rows.filter(isPeriodeBerakhir) : rows;
     window._verifRole = verifRole;
@@ -121,8 +117,6 @@ function _renderVerifTablePaged(page) {
     + renderPagination('verifTable', total, p, totalPages, pg => _renderVerifTablePaged(pg));
 }
 
-
-// Tampilkan/hide banner TT di modal verifikasi + enable/disable tombol
 function _updateVerifTTBanner(ttOk, role) {
   const isAdmin = role === 'Admin';
   const SVG_WARN = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
@@ -137,10 +131,10 @@ function _updateVerifTTBanner(ttOk, role) {
     if (modalBody) modalBody.insertBefore(ttBanner, modalBody.firstChild);
   }
 
-  window._verifTTOk = ttOk; // simpan state global untuk dicek saat data load
+  window._verifTTOk = ttOk; 
 
   if (!ttOk) {
-    // Banner MERAH — wajib, harus diisi sebelum verifikasi
+    
     ttBanner.innerHTML = `
       <div style="background:#fef2f2;border:1.5px solid #fca5a5;border-radius:10px;padding:12px 16px;margin-bottom:14px;display:flex;align-items:flex-start;gap:10px">
         <span style="color:#dc2626;flex-shrink:0;margin-top:1px;display:flex">${SVG_WARN}</span>
@@ -158,7 +152,7 @@ function _updateVerifTTBanner(ttOk, role) {
         </div>
       </div>`;
   } else {
-    // TT sudah ada — bersihkan banner, reset tombol
+    
     ttBanner.innerHTML = '';
     // Aktifkan btnSubmitVerif dan re-render modal verifikasi supaya kolom Setuju/Tolak muncul
     const btnSubmit = document.getElementById('btnSubmitVerif');
@@ -172,7 +166,6 @@ function _updateVerifTTBanner(ttOk, role) {
     // Jika perlu reload setelah upload TT, panggil openVerifikasi() dari luar fungsi ini.
   }
 }
-
 
 // Tampilkan/hide banner periode tutup di modal verifikasi
 function _updateVerifPeriodeBanner(isOpen, periodeInfo) {
@@ -227,12 +220,12 @@ async function openVerifikasi(idUsulan) {
   document.getElementById('verifModalId').textContent = idUsulan;
 
   showModal('verifikasiModal');
-  // Reset semua panel & banner agar tidak carry-over dari usulan sebelumnya
+  
   const adminPanelReset = document.getElementById('adminRejectPanel');
   if (adminPanelReset) adminPanelReset.style.display = 'none';
   const programPanelReset = document.getElementById('programRejectPanel');
   if (programPanelReset) programPanelReset.style.display = 'none';
-  // Bersihkan banner TT, periode, re-verif, penolakan agar tidak stale
+  
   ['verifTTBanner','verifPeriodeBanner','verifReVerifBanner','verifPenolakanBanner'].forEach(bid => {
     const b = document.getElementById(bid); if (b) b.innerHTML = '';
   });
@@ -243,7 +236,7 @@ async function openVerifikasi(idUsulan) {
   if (_detailGrid) _detailGrid.innerHTML = '';
   document.getElementById('verifIndikatorBody').innerHTML = `<tr><td colspan="7"><div class="loading-state"><div class="spm-spinner lg"><div class="sr1"></div><div class="sr2"></div><div class="sr3"></div></div><p>Memuat...</p></div></td></tr>`;
 
-  // ===== CEK TANDA TANGAN =====
+  
   let _ttOk = true;
   const _role = currentUser.role;
   if (_role === 'Kepala Puskesmas' || _role === 'Pengelola Program') {
@@ -257,7 +250,7 @@ async function openVerifikasi(idUsulan) {
     } catch(e) { _ttOk = false; }
   }
 
-  // Update banner & tombol sesuai status tanda tangan
+  
   _updateVerifTTBanner(_ttOk, _role);
 
   try {
@@ -266,7 +259,7 @@ async function openVerifikasi(idUsulan) {
       API.getIndikatorUsulan(idUsulan)
     ]);
     const periodeList = await API.getPeriode(detail.tahun).catch(() => []);
-    // Cek apakah periode verifikasi untuk usulan ini masih aktif
+    
     const _periodeForUsulan = (periodeList || []).find(p => p.tahun == detail.tahun && p.bulan == detail.bulan);
     const _nowWita = new Date(Date.now() + 8 * 3600000);
     const _todayStr = _nowWita.toISOString().slice(0, 10);
@@ -293,17 +286,17 @@ async function openVerifikasi(idUsulan) {
 
     document.getElementById('verifDetailGrid').innerHTML = renderHeaderInfo(detail);
 
-    // Filter inds for program role
+    
     let displayInds = inds;
     let _isPPFiltered = false;
     let _isPPReVerif = false;
     if (currentUser.role === 'Pengelola Program') {
       const myAkses = currentUser.indikatorAkses || [];
 
-      // Kumpulkan semua penolakan aktif yang relevan untuk PP ini:
-      // 1. Penolakan dari PP sendiri (dibuat_oleh='PP') — siklus PP tolak
-      // 2. Penolakan dari Admin (dibuat_oleh='Admin') — hanya baris dengan email_program milik PP ini
-      // 3. Penolakan tanpa dibuat_oleh (data lama) yang bukan dari Kapus
+      
+      
+      
+      
       const myEmail = (currentUser.email || '').toLowerCase();
       const penolakanAktif = (detail.penolakanIndikator || []).filter(p => {
         // Abaikan baris yang sudah direspons oleh PP ini — berarti sudah selesai
@@ -313,7 +306,7 @@ async function openVerifikasi(idUsulan) {
         const aksiOk = !aksi || aksi === 'tolak' || aksi === 'sanggah' || aksi === 'reset'
           || aksi === 'kapus-ok' || aksi === 'kapus-setuju';
         if (!aksiOk) return false;
-        // Penolakan dari Admin: hanya tampilkan baris yang email_program-nya milik PP ini
+        
         if (dibuat === 'Admin') return (p.email_program || '').toLowerCase() === myEmail;
         // Penolakan dari PP atau data lama (bukan dari Kapus)
         return dibuat === 'PP' || (!p.dari_kapus && !dibuat);
@@ -328,13 +321,13 @@ async function openVerifikasi(idUsulan) {
         _isPPFiltered = true;
         _isPPReVerif = true;
       } else if (myAkses.length > 0) {
-        // Verifikasi pertama: filter berdasarkan indikator_akses saja
+        
         displayInds = inds.filter(i => myAkses.includes(parseInt(i.no)));
         _isPPFiltered = true;
       }
     }
 
-    // Simpan state ke window agar submitIndVerifikasi bisa baca
+    
     window._verifDitolakOleh  = detail.ditolakOleh || '';
     window._verifKonteksPenolakan = detail.konteksPenolakan || '';
     window._verifIsPPReVerif  = _isPPReVerif;
@@ -359,26 +352,26 @@ const _keteranganExtra = _jumlahKapusOk > 0
 _ppBanner.innerHTML = `<span class="material-icons" style="color:#f59e0b;font-size:16px;flex-shrink:0">warning</span>
   <span style="font-size:12.5px;color:#92400e"><b>Verifikasi Ulang</b> — Hanya menampilkan <b>${displayInds.length} indikator</b> yang sebelumnya bermasalah dan perlu diverifikasi ulang.${_keteranganExtra}</span>`;
         _ppBanner.style.display = 'flex';
-        // ppCatatanWrap: set mode reVerif dan sembunyikan dulu
-        // akan muncul dinamis lewat setIndVerif() saat PP memilih 'setuju' (menyanggah Admin)
+        
+        
         const _ppCatatanWrap = document.getElementById('ppCatatanWrap');
         if (_ppCatatanWrap) {
           if (detail.ditolakOleh === 'Admin') {
-            _ppCatatanWrap.dataset.mode = 'reVerif'; // tandai agar setIndVerif tahu
-            _ppCatatanWrap.style.display = 'none';   // tersembunyi dulu, muncul saat ada yg setuju
+            _ppCatatanWrap.dataset.mode = 'reVerif'; 
+            _ppCatatanWrap.style.display = 'none';   
           } else {
             _ppCatatanWrap.dataset.mode = '';
             _ppCatatanWrap.style.display = 'none';
           }
         }
-        // Tampilkan alasan penolakan per indikator dari Admin
-        // Sumber utama: detail.adminCatatan (format "#1: alasan | #2: alasan | #3: alasan")
-        // — paling reliable karena langsung dari keputusan Admin, tidak bergantung pada
-        //   penolakan_indikator yang bisa ter-filter/exclude oleh query backend.
-        // Fallback: penolakanIndikator jika adminCatatan kosong.
+        
+        
+        
+        
+        
         if (detail.ditolakOleh === 'Admin') {
           const alasanMap = {};
-          // Parse dari adminCatatan
+          
           const adminCatatanStr = detail.adminCatatan || '';
           if (adminCatatanStr) {
             adminCatatanStr.split('|').forEach(part => {
@@ -400,7 +393,7 @@ _ppBanner.innerHTML = `<span class="material-icons" style="color:#f59e0b;font-si
             .map(no => ({ no, alasan: alasanMap[no] }));
           renderPenolakanBanner('verifPenolakanBanner', 'Admin', alasanDariAdmin);
         } else {
-          // Re-verif dari Kapus — tampilkan catatan Kapus jika ada
+          
           const _kapusCatatan = detail.kapusCatatan || '';
           const _vpb = document.getElementById('verifPenolakanBanner');
           if (_vpb) {
@@ -442,10 +435,10 @@ _ppBanner.innerHTML = `<span class="material-icons" style="color:#f59e0b;font-si
     let _isKapusReVerif = false;
     if (currentUser.role === 'Kepala Puskesmas') {
       const penolakanList = detail.penolakanIndikator || [];
-      // Re-verifikasi hanya jika ada penolakan AKTIF (ditolak_oleh tidak null)
-      // Mencegah data penolakan lama dari siklus sebelumnya mempengaruhi tampilan
+      
+      
       const adaPenolakanAktif = penolakanList.length > 0 && !!detail.ditolakOleh;
-      // Tambah: status 'Menunggu Re-verifikasi Kepala Puskesmas' = selalu re-verif Admin
+      
       const isReVerifAdminKapus = detail.statusGlobal === 'Menunggu Re-verifikasi Kepala Puskesmas';
       if (adaPenolakanAktif || isReVerifAdminKapus) {
         const bermasalahNos = penolakanList.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'sanggah').map(p => parseInt(p.noIndikator || p.no_indikator));
@@ -453,10 +446,10 @@ _ppBanner.innerHTML = `<span class="material-icons" style="color:#f59e0b;font-si
         _isKapusReVerif = true;
         window._verifIsKapusReVerif = true;
       }
-      // Jika penolakanList kosong = verifikasi pertama kali → tampilkan semua
-      // Banner info re-verifikasi Kapus (gunakan elemen yang sama dengan PP banner)
+      
+      
       const _reVerifBanner = document.getElementById('verifReVerifBanner');
-      // _isPPLoop dideklarasikan di luar if(_reVerifBanner) agar accessible untuk kapusCatatanWrap
+      
       const _isPPLoop = _isKapusReVerif && (detail.ditolakOleh === 'Pengelola Program');
       const _isAdminLoop = isReVerifAdminKapus || (detail.ditolakOleh === 'Admin' || detail.konteksPenolakan === 'Admin');
       if (_reVerifBanner) {
@@ -472,19 +465,19 @@ _ppBanner.innerHTML = `<span class="material-icons" style="color:#f59e0b;font-si
               </div>
             </div>`;
             _reVerifBanner.style.display = 'flex';
-            // Tampilkan alasan penolakan dari Admin
+            
             const alasanAdmin = (detail.penolakanIndikator || [])
               .filter(p => !p.aksi || p.aksi === 'tolak')
               .map(p => ({ no: parseInt(p.noIndikator || p.no_indikator), alasan: p.alasan || '-' }));
             renderPenolakanBanner('verifPenolakanBanner', 'Admin', alasanAdmin);
-            // kapusCatatanWrap: muncul hanya saat Kapus klik Setuju (mode reVerif)
+            
             const _kapusCatatanWrap = document.getElementById('kapusCatatanWrap');
             if (_kapusCatatanWrap) {
               _kapusCatatanWrap.dataset.mode = 'reVerif';
               _kapusCatatanWrap.style.display = 'none';
             }
           } else if (_isPPLoop) {
-            // Loop PP→Kapus: PP tolak, dikembalikan ke Kapus untuk re-verifikasi
+            
             _reVerifBanner.innerHTML = `<div style="width:100%">
               <div style="display:flex;align-items:center;gap:6px">
                 <span class="material-icons" style="color:#f59e0b;font-size:16px;flex-shrink:0">warning</span>
@@ -492,14 +485,14 @@ _ppBanner.innerHTML = `<span class="material-icons" style="color:#f59e0b;font-si
               </div>
             </div>`;
             _reVerifBanner.style.display = 'flex';
-            // Tampilkan alasan penolakan per indikator dari PP
+            
             const alasanDariPP = (detail.penolakanIndikator || [])
               .filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'reset' || p.aksi === 'sanggah')
               .map(p => ({ no: parseInt(p.noIndikator || p.no_indikator), alasan: p.alasan || '-' }));
             renderPenolakanBanner('verifPenolakanBanner', 'Pengelola Program', alasanDariPP);
           } else {
-            // Loop Operator↔Kapus: tampilkan catatan sanggahan dari Operator jika ada
-            // Sembunyikan banner alasan PP (tidak relevan di loop ini)
+            
+            
             const _vpb = document.getElementById('verifPenolakanBanner');
             if (_vpb) { _vpb.style.display = 'none'; _vpb.innerHTML = ''; }
             if (_opCatatan) {
@@ -525,12 +518,12 @@ _ppBanner.innerHTML = `<span class="material-icons" style="color:#f59e0b;font-si
               _reVerifBanner.style.display = 'flex';
             }
           }
-          // kapusCatatanWrap: aktif saat loop PP↔Kapus (menyanggah PP) atau saat re-verif Admin
+          
           const _kapusCatatanWrap = document.getElementById('kapusCatatanWrap');
           if (_kapusCatatanWrap && !_isAdminLoop) {
             const _needsCatatan = _isKapusReVerif && _isPPLoop;
             _kapusCatatanWrap.dataset.mode = _needsCatatan ? 'reVerif' : '';
-            _kapusCatatanWrap.style.display = 'none'; // selalu hidden, muncul via setIndVerif saat klik Setuju
+            _kapusCatatanWrap.style.display = 'none'; 
           }
         } else {
           _reVerifBanner.style.display = 'none';
@@ -548,16 +541,16 @@ _ppBanner.innerHTML = `<span class="material-icons" style="color:#f59e0b;font-si
     let _bermasalahNos = [];
     if (currentUser.role === 'Admin') {
       const penolakanList = detail.penolakanIndikator || [];
-      // BUG FIX 8: cek konteks_penolakan='Admin' ATAU ditolakOleh='Admin' (setelah Fix 2, ditolakOleh di-null tapi konteks diset)
+      
       const isAdminLoop = detail.ditolakOleh === 'Admin' || detail.konteksPenolakan === 'Admin';
       if (isAdminLoop) {
         _isAdminReVerif = true;
         window._verifIsAdminReVerif = true;
 
-        // SUMBER 1 (UTAMA): adminCatatan — paling akurat karena Admin sendiri yang
-        // mengisi ini saat menolak, dan isinya persis indikator yang ditolak putaran ini.
-        // Setelah PP respond, baris penolakan_indikator Admin sudah dihapus dari DB,
-        // sehingga penolakanList tidak bisa diandalkan. adminCatatan tidak berubah.
+        
+        
+        
+        
         if (detail.adminCatatan) {
           const _seenAC = new Set();
           (detail.adminCatatan || '').split('|').forEach(part => {
@@ -584,9 +577,9 @@ _ppBanner.innerHTML = `<span class="material-icons" style="color:#f59e0b;font-si
             .map(p => parseInt(p.noIndikator || p.no_indikator));
         }
 
-        // SUMBER 3 (FALLBACK TERAKHIR): VP Menunggu — hanya jika dua sumber di atas kosong.
-        // TIDAK dijadikan fallback utama karena VP dengan indikator_akses='' (akses semua)
-        // akan mengembalikan SEMUA indikator, padahal Admin hanya menolak sebagian.
+        
+        
+        
         if (_bermasalahNos.length === 0) {
           const vpMenunggu = (detail.verifikasiProgram || []).filter(vp => vp.status === 'Menunggu');
           const _seenVP = new Set();
@@ -613,10 +606,10 @@ _ppBanner.innerHTML = `<span class="material-icons" style="color:#f59e0b;font-si
       const _reVerifBanner = document.getElementById('verifReVerifBanner');
       if (_reVerifBanner) {
         if (_isAdminReVerif) {
-          // Kumpulkan catatan sanggahan PP dari penolakan_indikator.catatan_program
-          // (PP mengisi catatan saat respond penolakan Admin)
-          // Kumpulkan semua PP yang bertanggung jawab atas indikator bermasalah
-          // dari verifikasiProgram (bukan hanya dari catatan_program)
+          
+          
+          
+          
           const catatanMap = {};
           (detail.penolakanIndikator || []).forEach(p => {
             if (p.catatan_program && p.email_program) {
@@ -625,7 +618,7 @@ _ppBanner.innerHTML = `<span class="material-icons" style="color:#f59e0b;font-si
               catatanMap[key].push({ no: parseInt(p.no_indikator||p.noIndikator), catatan: p.catatan_program });
             }
           });
-          // Semua PP yang aksesnya overlap dengan indikator bermasalah
+          
           const ppTerkena = (detail.verifikasiProgram || []).filter(vp => {
             const akses = (vp.indikator_akses || '').split(',').map(s => parseInt(s.trim())).filter(Boolean);
             if (akses.length === 0) return _bermasalahNos.length > 0; // PP akses semua
@@ -666,7 +659,7 @@ _ppBanner.innerHTML = `<span class="material-icons" style="color:#f59e0b;font-si
       }
     }
 
-    // Untuk Admin: isi panel pilih indikator bermasalah
+    
     const adminPanel = document.getElementById('adminRejectPanel');
     const adminList = document.getElementById('adminRejectIndikatorList');
     if (adminPanel && adminList) {
@@ -690,14 +683,14 @@ _ppBanner.innerHTML = `<span class="material-icons" style="color:#f59e0b;font-si
             if (ta) ta.style.display = cb.checked ? 'block' : 'none';
           });
         });
-        // Panel tersembunyi dulu, ditampilkan saat klik tombol Tolak
+        
         adminPanel.style.display = 'none';
       } else {
         adminPanel.style.display = 'none';
       }
     }
 
-    // Thread catatan riwayat untuk Kapus dan PP (saat re-verif)
+    
     const _verifThread = document.getElementById('verifCatatanThread');
     if (_verifThread) {
       const showThread = (currentUser.role === 'Kepala Puskesmas' && _isKapusReVerif)
@@ -716,10 +709,10 @@ _ppBanner.innerHTML = `<span class="material-icons" style="color:#f59e0b;font-si
       sudahVerifUser = detail.statusKapus === 'Selesai' || detail.statusKapus === 'Ditolak';
     } else if (currentUser.role === 'Pengelola Program') {
       const myRecord = (detail.verifikasiProgram || []).find(v => v.email_program?.toLowerCase() === currentUser.email?.toLowerCase());
-      // sudahVerif = true jika VP status Selesai/Ditolak DAN tidak ada lagi penolakan aktif
-      // milik PP ini yang belum direspons (dibuat_oleh='Admin', responded_at NULL).
-      // CATATAN: setelah PP respond, baris Admin dihapus dari DB → tidak akan muncul di
-      // penolakanIndikator. Jadi cek responded_at tidak diperlukan — cukup cek ada/tidaknya baris.
+      
+      
+      
+      
       const myEmail2 = (currentUser.email || '').toLowerCase();
       const masihAdaPenolakanAktif = (detail.penolakanIndikator || []).some(p =>
         (p.email_program || '').toLowerCase() === myEmail2 &&
@@ -729,7 +722,7 @@ _ppBanner.innerHTML = `<span class="material-icons" style="color:#f59e0b;font-si
       if (myRecord && myRecord.status === 'Menunggu') {
         sudahVerifUser = false;
       } else if (masihAdaPenolakanAktif) {
-        // Masih ada penolakan Admin yang belum direspons → belum selesai
+        
         sudahVerifUser = false;
       } else {
         sudahVerifUser = !!(myRecord && (myRecord.status === 'Selesai' || myRecord.status === 'Ditolak'));
@@ -744,10 +737,10 @@ _ppBanner.innerHTML = `<span class="material-icons" style="color:#f59e0b;font-si
       (role === 'Pengelola Program' && ['Menunggu Pengelola Program', 'Menunggu Re-verifikasi PP', 'Ditolak Sebagian'].includes(detail.statusGlobal)) ||
       (role === 'Admin' && detail.statusGlobal === 'Menunggu Admin')
     );
-    // Semua role verifikasi menggunakan sistem per-indikator
+    
     const usePerIndikator = ['Kepala Puskesmas', 'Pengelola Program', 'Admin'].includes(role);
 
-    // ======= THEAD =======
+    
     const thead = document.getElementById('verifIndikatorHead');
     if (thead) {
       if (usePerIndikator && canAct && window._verifTTOk) {
@@ -757,7 +750,7 @@ _ppBanner.innerHTML = `<span class="material-icons" style="color:#f59e0b;font-si
       }
     }
 
-    // ======= TBODY =======
+    
     document.getElementById('verifIndikatorBody').innerHTML = displayInds.map(i => {
       let buktiHtml = '-';
       if (i.linkFile) {
@@ -970,10 +963,10 @@ async function submitIndVerifikasi(idUsulan, displayInds, role) {
     }
   }
 
-  // Tentukan action dan payload berdasarkan konteks
-  // PP saat respond penolakan Admin (ditolakOleh='Admin' & _isPPReVerif):
-  //   → respond-penolakan dengan responList (sanggah/tolak per penolakan)
-  // Semua lainnya → verif-kapus / verif-program / verif-admin
+  
+  
+  
+  
   const _isRespondPenolakan = role === 'Pengelola Program'
     && (window._verifDitolakOleh === 'Admin' || window._verifKonteksPenolakan === 'Admin')
     && window._verifIsPPReVerif === true;
@@ -996,17 +989,17 @@ async function submitIndVerifikasi(idUsulan, displayInds, role) {
     if (adaYangSetuju && catatanProgram && !isValidText(catatanProgram)) return toast('Catatan / Sanggahan harus mengandung teks yang bermakna', 'warning');
   }
 
-  // Untuk respond-penolakan: ubah format dari indikatorList → responList
-  // Sanggah (aksi='setuju' di UI) = PP tidak setuju dengan penolakan Admin → data sudah benar
-  // Terima  (aksi='tolak'  di UI) = PP membenarkan penolakan Admin → akan diperbaiki
+  
+  
+  
   if (_isRespondPenolakan) {
     for (const item of indikatorList) {
-      // 'setuju' di UI = 'sanggah' (PP tidak setuju Admin) → pakai catatanProgram
-      // 'tolak' di UI = PP membenarkan Admin (Terima) → pakai item.alasan yang sudah divalidasi di atas
+      
+      
       const catatan = item.aksi === 'tolak' ? item.alasan : (catatanProgram || '');
       if (item.aksi === 'setuju' && (!catatan || !catatan.trim())) return toast(`Isi catatan sanggahan untuk indikator #${item.noIndikator}`, 'warning');
       if (item.aksi === 'setuju' && catatan && !isValidText(catatan)) return toast(`Catatan untuk indikator #${item.noIndikator} harus mengandung teks yang bermakna`, 'warning');
-      // item.aksi === 'tolak' (Terima) → alasan sudah divalidasi di loop atas
+      
     }
   }
 
@@ -1014,9 +1007,9 @@ async function submitIndVerifikasi(idUsulan, displayInds, role) {
   try {
     let payload, result;
     if (_isRespondPenolakan) {
-      // respond-penolakan: konversi indikatorList → responList
-      // aksi 'setuju' (tombol Sanggah) → 'sanggah' (PP tidak setuju Admin, data sudah benar)
-      // aksi 'tolak'  (tombol Terima)  → 'tolak'   (PP membenarkan Admin, akan diperbaiki)
+      
+      
+      
       const responList = indikatorList.map(i => ({
         noIndikator: i.noIndikator,
         aksi: i.aksi === 'setuju' ? 'sanggah' : 'tolak',

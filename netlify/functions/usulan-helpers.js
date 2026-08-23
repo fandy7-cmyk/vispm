@@ -36,7 +36,7 @@ function mapHeader(r) {
       ditolakOleh = 'Admin';
       alasanTolak = r.admin_catatan || '';
     } else if ((r.ditolak_oleh||'') === 'Pengelola Program') {
-      // Gunakan kolom ditolak_oleh dari DB sebagai sumber utama (lebih akurat)
+      
       ditolakOleh = 'Pengelola Program';
       alasanTolak = r.admin_catatan || '';
     } else if (r.ditolak_oleh) {

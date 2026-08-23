@@ -1,22 +1,6 @@
 const { getPool, ok, err, conflict, cors } = require('./db');
 const { validateSession } = require('./middleware');
 
-/**
- * Handler: /api/puskesmas
- *
- * GET    — Daftar puskesmas. Query: ?aktif=true untuk filter aktif saja
- *           Response: [{ kode, nama, indeks, indeksKesulitan, aktif }]
- *
- * POST   — Tambah puskesmas baru
- *           Body: { kode, nama, indeks, indeksKesulitan, aktif }
- *           409 — Kode sudah ada
- *
- * PUT    — Update puskesmas
- *           Body: { kode, nama, indeks, indeksKesulitan, aktif }
- *
- * DELETE — Hapus puskesmas
- *           Body: { kode }
- */
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors();
   const _authErr = await validateSession(event);

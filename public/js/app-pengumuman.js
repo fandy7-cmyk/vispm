@@ -1,38 +1,5 @@
-// ============================================================
-//  PENGUMUMAN SISTEM — Admin kelola, user lihat saat login
-//  Endpoint: /api/pengumuman
-//
-//  Struktur data per pengumuman:
-//  {
-//    id         : string (auto dari backend, misal UUID/timestamp)
-//    judul      : string
-//    isi        : string  (HTML diizinkan, tapi sanitasi di backend)
-//    tipe       : 'info' | 'warning' | 'success' | 'danger'
-//    tanggal_mulai  : string ISO (date)
-//    tanggal_selesai: string ISO (date)  — kapan tidak ditampilkan lagi
-//    aktif      : boolean
-//    dibuat_oleh: string (email admin)
-//    dibuat_pada: string ISO datetime
-//  }
-//
-//  Cara integrasi:
-//  1. Tambahkan API.getPengumuman / savePengumuman / deletePengumuman di api.js
-//     (lihat snippet di bawah file ini)
-//  2. Di app-core.js, panggil setelah login berhasil (setelah startNotifPoller()):
-//       setTimeout(() => showPengumumanLoginPopup(), 500);
-//  3. Untuk halaman Admin → Master Data, tambahkan tab "Pengumuman" yang
-//     memanggil renderKelolaPengumuman('containerId')
-// ============================================================
 
-// ─────────────────────────────────────────────
-//  TAMPIL POPUP PENGUMUMAN UNTUK USER (saat login)
-// ─────────────────────────────────────────────
 
-/**
- * Ambil pengumuman yang aktif & masih dalam rentang tanggal, lalu tampilkan
- * sebagai popup bertingkat (satu per satu, bisa ada beberapa).
- * Pengumuman yang sudah pernah "Tutup" pada sesi ini tidak ditampilkan ulang.
- */
 async function showPengumumanLoginPopup() {
   if (!currentUser) return;
   try {
@@ -40,16 +7,16 @@ async function showPengumumanLoginPopup() {
     if (!semua || !semua.length) return;
 
     const today = _isoDateOnly(new Date().toISOString());
-    const sesi  = _getPengumumanSesiDismissed(); // array id yang sudah ditutup di sesi ini
-    const perma = _getPengumumanPermaDismissed(); // array id yang "jangan tampilkan lagi"
+    const sesi  = _getPengumumanSesiDismissed(); 
+    const perma = _getPengumumanPermaDismissed(); 
 
     const tampil = semua.filter(p => {
       if (sesi.includes(String(p.id)))  return false;
       if (perma.includes(String(p.id))) return false;
-      // Normalisasi: ambil hanya bagian YYYY-MM-DD (DB bisa kirim datetime penuh)
+      
       const mulai   = _isoDateOnly(p.tanggal_mulai)   || '1970-01-01';
       const selesai = _isoDateOnly(p.tanggal_selesai) || '2999-12-31';
-      // aktif bisa datang sebagai boolean atau integer 0/1 dari DB
+      
       const isAktif = p.aktif === true || p.aktif === 1 || p.aktif === '1' || p.aktif === 't';
       if (!isAktif) return false;
       return today >= mulai && today <= selesai;
@@ -57,19 +24,17 @@ async function showPengumumanLoginPopup() {
 
     if (!tampil.length) return;
 
-    // Tampilkan popup pertama; sisanya di-queue
+    
     _showSatuPengumuman(tampil, 0);
-  } catch(e) { /* silent — jangan ganggu login */ }
+  } catch(e) {  }
 }
 
-/** Ambil set id pengumuman yang sudah ditutup di sesi ini (pakai sessionStorage) */
 function _getPengumumanSesiDismissed() {
   try {
     return JSON.parse(sessionStorage.getItem('pgm_dismissed') || '[]');
   } catch { return []; }
 }
 
-/** Tandai pengumuman sudah ditutup di sesi ini */
 function _markPengumumanDismissed(id) {
   try {
     const arr = _getPengumumanSesiDismissed();
@@ -77,9 +42,8 @@ function _markPengumumanDismissed(id) {
   } catch {}
 }
 
-/** Ambil set id pengumuman yang sudah ditandai "jangan tampilkan lagi" (localStorage) */
 function _pgmPermaKey() {
-  // currentUser.email sudah pasti ada karena dipanggil setelah login
+  
   return 'pgm_perma_dismissed__' + (currentUser?.email || 'guest');
 }
 
@@ -98,12 +62,11 @@ function _markPengumumanPermaDismissed(id) {
   } catch {}
 }
 
-/** Tampilkan satu pengumuman dari list; setelah tutup, tampilkan berikutnya */
 function _showSatuPengumuman(list, idx) {
   if (idx >= list.length) return;
   const p = list[idx];
 
-  // Hapus popup lama jika ada
+  
   const lama = document.getElementById('pengumumanLoginPopup');
   if (lama) lama.remove();
 
@@ -170,7 +133,6 @@ ${sisa > 0 ? `<button class="pgm-btn-next" onclick="_dismissPengumuman('${p.id}'
   document.body.appendChild(overlay);
 }
 
-/** Tutup popup & lanjut ke pengumuman berikutnya (jika ada) */
 function _dismissPengumuman(id, lanjut, list, nextIdx, perma) {
   if (perma) {
     _markPengumumanPermaDismissed(id);
@@ -184,7 +146,6 @@ function _dismissPengumuman(id, lanjut, list, nextIdx, perma) {
   }
 }
 
-/** Escape HTML untuk judul */
 function _escHtml(str) {
   return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
@@ -231,13 +192,7 @@ function _fmtTglPgm(iso) {
   } catch { return iso; }
 }
 
-
-// ─────────────────────────────────────────────
-//  HALAMAN KELOLA PENGUMUMAN (untuk Admin)
-//  Panggil: renderKelolaPengumuman('id-container')
-// ─────────────────────────────────────────────
-
-let _pgmList   = [];   // cache list
+let _pgmList   = [];   
 let _pgmPage   = 1;
 
 async function renderKelolaPengumuman(containerId) {
@@ -380,7 +335,6 @@ function _confirmHapusPengumuman(id, judul, containerId) {
   });
 }
 
-
 // ─────────────────────────────────────────────
 //  FORM BUAT / EDIT PENGUMUMAN (modal)
 // ─────────────────────────────────────────────
@@ -520,7 +474,7 @@ async function openFormPengumuman(id, containerId) {
 
       <div class="modal-footer">
         <button class="btn btn-cancel" onclick="closeModal('pgmFormModal')">
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:5px;vertical-align:middle;flex-shrink:0"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>Batal
+          <svg xmlns="http:
         </button>
         <button class="btn btn-primary" onclick="savePengumuman('${id || ''}','${containerId}')">
           <span class="material-icons">save</span>${id ? 'Simpan Perubahan' : 'Buat Pengumuman'}
@@ -567,7 +521,7 @@ async function openFormPengumuman(id, containerId) {
 }
 
 async function savePengumuman(id, containerId) {
-  // Sync konten rich-text editor ke hidden textarea
+  
   const rte = document.getElementById('pgmRte');
   const hiddenIsi = document.getElementById('pgmIsi');
   if (rte && hiddenIsi) hiddenIsi.value = rte.innerHTML.trim();
@@ -611,12 +565,6 @@ async function savePengumuman(id, containerId) {
   } finally { setLoading(false); }
 }
 
-
-// ─────────────────────────────────────────────
-//  PRATINJAU PENGUMUMAN (Admin bisa lihat dulu)
-// ─────────────────────────────────────────────
-
-/** Admin bisa preview tampilan popup sebelum publish */
 function previewPengumuman() {
   const judul   = document.getElementById('pgmJudul')?.value.trim();
   const rteEl   = document.getElementById('pgmRte');
@@ -631,7 +579,7 @@ function previewPengumuman() {
   }
 
   const fakeData = [{ id: '__preview__', judul, isi, tipe, tanggal_mulai: mulai, tanggal_selesai: selesai }];
-  // Reset dismissed agar preview selalu tampil
+  
   try {
     const arr = _getPengumumanSesiDismissed().filter(x => x !== '__preview__');
     sessionStorage.setItem('pgm_dismissed', JSON.stringify(arr));

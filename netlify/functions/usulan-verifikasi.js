@@ -1,7 +1,6 @@
 const { ok, err } = require('./db');
 const { isValidText, parseIndikatorAkses, logAktivitas } = require('./usulan-helpers');
 
-// ============== VERIFIKASI PROGRAM (PP) ==============
 async function verifProgram(pool, body) {
   const { idUsulan, email, indikatorList, catatanProgram } = body;
   if (!idUsulan || !email) return err('Data tidak lengkap');
@@ -15,7 +14,7 @@ async function verifProgram(pool, body) {
   if (!['Menunggu Pengelola Program','Menunggu Re-verifikasi PP','Ditolak','Ditolak Sebagian'].includes(headerRes.rows[0].status_global))
     return err('Usulan tidak dalam tahap verifikasi program');
 
-  // Cek periode verifikasi
+  
   const { tahun: tahunVP, bulan: bulanVP } = headerRes.rows[0];
   const pvResVP = await pool.query(
     `SELECT tanggal_mulai_verif, tanggal_selesai_verif, jam_mulai_verif, jam_selesai_verif FROM periode_input WHERE tahun=$1 AND bulan=$2 AND status='Aktif'`,
@@ -32,9 +31,9 @@ async function verifProgram(pool, body) {
     if (nowStr > selesaiStr) return err(`Periode verifikasi sudah ditutup pada ${new Date(pv.tanggal_selesai_verif).toLocaleDateString('id-ID')} pukul ${pv.jam_selesai_verif || '23:59'} WITA.`);
   }
 
-  // Validasi: catatan PP wajib hanya pada re-verifikasi dari Admin, jika ada indikator yang disanggah (tombol Sanggah)
-  // Catatan penamaan: aksi='setuju' di sini artinya PP MENYANGGAH Admin (bukan menyetujui usulan).
-  // PP yang setuju atas penolakan Admin menggunakan respondPenolakan (aksi='tolak'), bukan verifProgram.
+  
+  
+  
   const isReVerifAdmin = headerRes.rows[0].ditolak_oleh === 'Admin';
   const adaYangSanggahAdmin = indikatorList.some(i => i.aksi === 'setuju');
   if (isReVerifAdmin && adaYangSanggahAdmin && !isValidText(catatanProgram)) return err('Catatan / Sanggahan wajib diisi dengan teks yang bermakna jika ada indikator yang disanggah');
@@ -44,12 +43,12 @@ async function verifProgram(pool, body) {
     [idUsulan, email]
   );
   if (!vpCheck.rows.length) return err('Anda tidak terdaftar sebagai pengelola program untuk usulan ini');
-  // BUG FIX 1: Blokir hanya jika status Selesai/Ditolak DAN ini bukan sesi re-verifikasi.
-  // Saat re-verif (Kapus approve → VP di-reset ke 'Menunggu'), status sudah 'Menunggu' lagi.
-  // Namun ada edge case: VP masih 'Selesai'/'Ditolak' tapi status_global sudah 'Menunggu Pengelola Program'
-  // (bug lain / race condition) — cek status_global untuk keputusan final.
+  
+  
+  
+  
   if (vpCheck.rows[0].status === 'Selesai' && headerRes.rows[0].status_global === 'Menunggu Pengelola Program') {
-    // Izinkan hanya jika ada penolakan aktif milik PP ini (re-verif dari Admin)
+    
     const piCheck = await pool.query(
       `SELECT COUNT(*) as ct FROM penolakan_indikator
        WHERE id_usulan=$1 AND LOWER(email_program)=LOWER($2)
@@ -62,20 +61,20 @@ async function verifProgram(pool, body) {
     return err('Anda sudah memverifikasi usulan ini');
   }
   if (vpCheck.rows[0].status === 'Ditolak' && headerRes.rows[0].status_global === 'Menunggu Pengelola Program') {
-    // Izinkan re-verif: VP status 'Ditolak' bisa verif lagi setelah Kapus reset
-    // (VP sudah di-reset ke 'Menunggu' oleh verifKapus — ini fallback safety)
+    
+    
   } else if (vpCheck.rows[0].status === 'Ditolak') {
     return err('Anda sudah menolak usulan ini');
   }
 
-  // Ambil indikator_akses terkini dari tabel users (bukan dari VP record yang mungkin stale)
-  // Ini menangani kasus Admin mengubah indikator PP setelah VP record dibuat
+  
+  
   const _freshUserRes = await pool.query(
     `SELECT indikator_akses FROM users WHERE LOWER(email)=LOWER($1) AND aktif=true`, [email]
   ).catch(() => ({ rows: [] }));
   const _freshAksesStr = _freshUserRes.rows[0]?.indikator_akses ?? vpCheck.rows[0].indikator_akses;
 
-  // Sync ke verifikasi_program jika berbeda, agar data konsisten
+  
   if (_freshAksesStr !== vpCheck.rows[0].indikator_akses) {
     await pool.query(
       `UPDATE verifikasi_program SET indikator_akses=$1 WHERE id_usulan=$2 AND LOWER(email_program)=LOWER($3)`,
@@ -96,8 +95,8 @@ async function verifProgram(pool, body) {
     : null;
   const logLabel = adaTolak ? alasanGabungan : 'Semua indikator disetujui';
 
-  // Simpan catatanProgram ke baris penolakan milik PP ini saja (filter email_program)
-  // Jangan update baris milik PP lain — setiap PP punya baris sendiri
+  
+  
   if (catatanProgram) {
     await pool.query(
       `UPDATE penolakan_indikator SET catatan_program=$1, responded_at=NOW()
@@ -113,21 +112,21 @@ async function verifProgram(pool, body) {
     [statusVP, alasanGabungan || null, catatanProgram || null, idUsulan, email]
   );
   
-  // aksiLog: bedakan konteks PP menolak sendiri vs PP menerima penolakan Admin
-  // - PP menolak (siklus normal/re-verif dari Kapus) → "Tolak" / "Tolak Sebagian"
-  // - PP menerima penolakan Admin → ditangani di respondPenolakan, bukan di sini
-  // - PP menyetujui semua saat re-verif Admin → "Re-verifikasi (Sanggah)"
+  
+  
+  
+  
   const adaTolakSebagian = adaTolak && indikatorList.some(i => i.aksi === 'setuju');
   const aksiLog = adaTolak
     ? (adaTolakSebagian ? 'Tolak (sebagian)' : 'Tolak')
     : (isReVerifAdmin ? 'Re-verifikasi (Sanggah)' : 'Approve');
-  // adaYangSanggahAdmin sudah didefinisikan di atas (rename dari adaYangSetuju)
+  
   const detailLog = adaTolak
     ? alasanGabungan + (catatanProgram ? ` | Catatan PP: ${catatanProgram}` : '')
     : (isReVerifAdmin && catatanProgram ? `Semua indikator disanggah — catatan: ${catatanProgram}` : logLabel);
   await logAktivitas(pool, email, 'Pengelola Program', aksiLog, idUsulan, detailLog);
 
-  // Cek status semua VP SETELAH update VP ini
+  
   const allVP = await pool.query('SELECT status FROM verifikasi_program WHERE id_usulan=$1', [idUsulan]);
   const stillWaiting = allVP.rows.some(r => r.status === 'Menunggu');
   const anyRejected  = allVP.rows.some(r => r.status === 'Ditolak');
@@ -136,16 +135,16 @@ async function verifProgram(pool, body) {
     return ok({ message: 'Verifikasi Anda disimpan. Menunggu pengelola program lain.', allDone: false });
   }
 
-  // Semua VP sudah verifikasi — baru proses hasilnya
+  
   if (!anyRejected) {
-    // Semua setuju → lanjutkan ke Admin (atau kembali ke Admin jika loop Admin↔PP)
+    
     const headerCheck = await pool.query('SELECT ditolak_oleh, konteks_penolakan FROM usulan_header WHERE id_usulan=$1', [idUsulan]);
     const ditolakOleh = headerCheck.rows[0]?.ditolak_oleh;
     const konteksPenolakan = headerCheck.rows[0]?.konteks_penolakan;
 
-    // Cek sisa baris penolakan Admin yang belum direspons (misal: indikator yang PP sanggah
-    // di putaran sebelumnya, lalu Kapus approve indikator lain dan clear konteks_penolakan).
-    // Jika masih ada, routing tetap ke Admin dengan konteks_penolakan='Admin'.
+    
+    
+    
     const sisaAdminRows = await pool.query(
       `SELECT COUNT(*) as ct FROM penolakan_indikator
        WHERE id_usulan=$1 AND dibuat_oleh='Admin'`,
@@ -155,15 +154,15 @@ async function verifProgram(pool, body) {
 
     const isReVerifAdmin = ditolakOleh === 'Admin' || konteksPenolakan === 'Admin' || adaSisaAdmin;
 
-    // PP approve semua → hapus penolakan milik PP saja
+    
     await pool.query(
       `DELETE FROM penolakan_indikator WHERE id_usulan=$1 AND dibuat_oleh='PP'`,
       [idUsulan]
     ).catch(() => {});
 
     if (isReVerifAdmin) {
-      // Semua PP selesai re-verif → naik ke Kapus dulu (bukan langsung Admin).
-      // Alur berjenjang: PP re-verif → Kapus konfirmasi → Admin final.
+      
+      
       await pool.query(
         `UPDATE usulan_header SET status_program='Selesai',
          status_global='Menunggu Re-verifikasi Kepala Puskesmas',
@@ -179,8 +178,8 @@ async function verifProgram(pool, body) {
     }
   }
 
-  // ========== ADA YANG MENOLAK ==========
-  // Kumpulkan semua indikator bermasalah dari SEMUA VP yang menolak
+  
+  
   const allVPRejected = await pool.query(
     `SELECT email_program, indikator_akses, catatan FROM verifikasi_program WHERE id_usulan=$1 AND status='Ditolak'`,
     [idUsulan]
@@ -202,7 +201,7 @@ async function verifProgram(pool, body) {
   }
   let nomorBermasalah = [...new Set(Object.keys(alasanMap).map(Number))];
 
-  // Reset indikator bermasalah ke Draft
+  
   for (const no of nomorBermasalah) {
     await pool.query(
       `UPDATE usulan_indikator SET status='Draft', approved_by=NULL, approved_role=NULL, approved_at=NULL, catatan=NULL
@@ -210,15 +209,15 @@ async function verifProgram(pool, body) {
     );
   }
 
-  // FIX BUG 1 & 2: Hapus SEMUA baris penolakan untuk indikator bermasalah (PP maupun Admin)
+  
   await pool.query(
     `DELETE FROM penolakan_indikator WHERE id_usulan=$1 AND no_indikator=ANY($2)`,
     [idUsulan, nomorBermasalah]
   );
 
-  // FIX BUG 3: Hapus baris PP lama untuk indikator yang sudah BERSIH (tidak masuk nomorBermasalah).
-  // Tanpa ini, baris dibuat_oleh='PP' dari siklus sebelumnya tetap ada di DB dan ikut ditampilkan
-  // sebagai Re-verif di dashboard Kapus, padahal indikator tersebut sudah disetujui di putaran ini.
+  
+  
+  
   await pool.query(
     `DELETE FROM penolakan_indikator
      WHERE id_usulan=$1
@@ -227,9 +226,9 @@ async function verifProgram(pool, body) {
     [idUsulan, nomorBermasalah.length > 0 ? nomorBermasalah : [0]]
   ).catch(() => {});
 
-  // FIX: Hapus baris kapus-ok/kapus-setuju yang indikatornya sudah disetujui semua PP putaran ini
-  // (tidak masuk nomorBermasalah). Baris ini sisa siklus sebelumnya dan tidak lagi relevan —
-  // jika dibiarkan, indikator yang sudah clear ikut tampil sebagai Re-verif di dashboard Kapus.
+  
+  
+  
   if (nomorBermasalah.length > 0) {
     await pool.query(
       `DELETE FROM penolakan_indikator
@@ -239,14 +238,14 @@ async function verifProgram(pool, body) {
       [idUsulan, nomorBermasalah]
     ).catch(() => {});
   } else {
-    // Semua indikator clear — hapus semua sisa kapus-ok
+    
     await pool.query(
       `DELETE FROM penolakan_indikator WHERE id_usulan=$1 AND aksi IN ('kapus-ok','kapus-setuju')`,
       [idUsulan]
     ).catch(() => {});
   }
 
-  // Buat map email PP yang menolak per indikator
+  
   const emailTolakMap = {};
   for (const vp of allVPRejected.rows) {
     const parts = (vp.catatan || '').split('|').map(s => s.trim()).filter(Boolean);
@@ -262,7 +261,7 @@ async function verifProgram(pool, body) {
     emailTolakMap[item.noIndikator] = email;
   }
 
-  // Insert ulang baris penolakan milik PP
+  
   for (const no of nomorBermasalah) {
     const emailPenolak = emailTolakMap[no] || email;
     await pool.query(
@@ -274,7 +273,7 @@ async function verifProgram(pool, body) {
     );
   }
 
-  // Reset VP yang punya irisan dengan indikator bermasalah
+  
   const allVPVerif = await pool.query(
     `SELECT email_program, indikator_akses FROM verifikasi_program WHERE id_usulan=$1`,
     [idUsulan]
@@ -319,8 +318,6 @@ async function verifProgram(pool, body) {
   return ok({ message: 'Indikator bermasalah dikembalikan ke Kepala Puskesmas untuk re-verifikasi.', allDone: true });
 }
 
-
-// ============== VERIFIKASI KEPALA PUSKESMAS ==============
 async function verifKapus(pool, body) {
   const { idUsulan, email, indikatorList, catatanKapus } = body;
   if (!idUsulan || !email) return err('Data tidak lengkap');
@@ -341,7 +338,7 @@ async function verifKapus(pool, body) {
   if (row.status_global !== 'Menunggu Kepala Puskesmas' && row.status_global !== 'Menunggu Re-verifikasi Kepala Puskesmas') return err('Usulan tidak dalam status Menunggu Kepala Puskesmas');
   if (row.kapus_pkm && row.kode_pkm !== row.kapus_pkm) return err('Anda hanya dapat memverifikasi usulan dari puskesmas Anda sendiri');
 
-  // Cek periode verifikasi
+  
   const hdrVerif = await pool.query(`SELECT tahun, bulan FROM usulan_header WHERE id_usulan=$1`, [idUsulan]);
   if (hdrVerif.rows.length) {
     const { tahun, bulan } = hdrVerif.rows[0];
@@ -363,7 +360,7 @@ async function verifKapus(pool, body) {
 
   const adaTolak = indikatorList.some(i => i.aksi === 'tolak');
 
-  // Simpan catatan/alasan setuju per indikator (opsional)
+  
   for (const item of indikatorList.filter(i => i.aksi === 'setuju' && i.alasan)) {
     await pool.query(
       `UPDATE usulan_indikator SET catatan=$1, approved_by=$2, approved_role='Kepala Puskesmas', approved_at=NOW()
@@ -373,7 +370,7 @@ async function verifKapus(pool, body) {
   }
 
   if (!adaTolak) {
-    // Semua setuju → cek ditolak_oleh untuk menentukan arah selanjutnya
+    
     const headerInfo = await pool.query(
       `SELECT ditolak_oleh, konteks_penolakan, status_global FROM usulan_header WHERE id_usulan=$1`, [idUsulan]
     );
@@ -383,14 +380,14 @@ async function verifKapus(pool, body) {
 
     const isReVerifPP = ditolakOleh === 'Pengelola Program';
 
-    // Konteks khusus: PP sudah akui penolakan Admin (Kasus 3 respondPenolakan).
-    // Kapus hanya perlu konfirmasi → approve berarti setuju kembalikan ke Operator (Ditolak).
-    // Berbeda dari isReVerifAdmin biasa yang approve-nya naik ke Admin lagi.
+    
+    
+    
     const isKonfirmasiAdminTerimaKapus = konteksPenolakan === 'AdminTerimaKapus';
     if (isKonfirmasiAdminTerimaKapus && !adaTolak) {
-      // Kapus konfirmasi → usulan Ditolak, Operator bisa perbaiki dan submit ulang berjenjang
-      // ditolak_oleh='Kepala Puskesmas' agar submitUsulan routing ke Menunggu Kepala Puskesmas
-      // konteks_penolakan=NULL agar siklus baru berjalan normal
+      
+      
+      
       await pool.query(
         `DELETE FROM penolakan_indikator WHERE id_usulan=$1 AND dibuat_oleh='Kapus'`, [idUsulan]
       ).catch(() => {});
@@ -405,9 +402,9 @@ async function verifKapus(pool, body) {
       return ok({ message: 'Dikonfirmasi — usulan dikembalikan ke Operator untuk diperbaiki.' });
     }
 
-    // isReVerifAdmin: HANYA saat status 'Menunggu Re-verifikasi Kepala Puskesmas'
-    // (PP sudah selesai re-verif penolakan Admin dengan sanggahan, Kapus konfirmasi → ke Admin)
-    // Kasus lain (KapusTolakAdmin, Kapus tolak biasa, AdminTerimaKapus) → alur normal
+    
+    
+    
     const sisaAdminKapus = await pool.query(
   `SELECT COUNT(*) as ct FROM penolakan_indikator
    WHERE id_usulan=$1 AND dibuat_oleh='Admin'`, [idUsulan]
@@ -418,7 +415,7 @@ const isReVerifAdmin = statusGlobalKapus === 'Menunggu Re-verifikasi Kepala Pusk
   || (konteksPenolakan === 'Admin' && !isKonfirmasiAdminTerimaKapus)
   || adaSisaAdminKapus;
 
-    // AFTER — tangkap juga baris lama dengan aksi='kapus-setuju' (data sebelum patch):
+    
 const piPPCheck = await pool.query(
   `SELECT COUNT(*) as ct FROM penolakan_indikator
    WHERE id_usulan=$1
@@ -427,22 +424,22 @@ const piPPCheck = await pool.query(
 );
 const adaSisaPP = parseInt(piPPCheck.rows[0]?.ct) > 0;
 
-    // Kapus approve semua → hapus penolakan milik Kapus saja
+    
     await pool.query(
       `DELETE FROM penolakan_indikator WHERE id_usulan=$1 AND dibuat_oleh='Kapus'`,
       [idUsulan]
     ).catch(() => {});
 
-    // Jika ini re-verifikasi dari konteks Admin (status 'Menunggu Re-verifikasi Kepala Puskesmas'):
-    // Kapus hanya konfirmasi → langsung naik ke Admin untuk keputusan final.
-    // Alur berjenjang: Admin tolak → PP re-verif → Kapus konfirmasi → Admin final.
+    
+    
+    
     if (isReVerifAdmin) {
-      // PENTING: Re-insert baris penolakan Admin untuk indikator yang PP sanggah.
-      // Saat PP respond (respondPenolakan), semua baris dibuat_oleh='Admin' dihapus dari DB.
-      // Jika ada indikator yang PP sanggah (Kasus 2: campuran akui+sanggah), baris tersebut
-      // tidak pernah di-insert ulang sehingga tabel penolakan_indikator kosong saat Admin buka
-      // modal verifikasi dan Admin melihat semua 12 indikator alih-alih hanya yang bermasalah.
-      // Solusi: insert ulang dari admin_catatan sebagai sumber kebenaran putaran ini.
+      
+      
+      
+      
+      
+      
       const adminCatatanRow = await pool.query(
         `SELECT admin_catatan FROM usulan_header WHERE id_usulan=$1`, [idUsulan]
       );
@@ -493,18 +490,18 @@ const adaSisaPP = parseInt(piPPCheck.rows[0]?.ct) > 0;
       return ok({ message: 'Dikonfirmasi — usulan diteruskan ke Admin untuk keputusan final.' });
     }
 
-    // BUG FIX 5: Hitung ditolak_oleh dengan benar sesuai arah re-verifikasi
-    // isReVerifPP → Kapus sudah approve, bola pindah ke PP → ditolak_oleh harus NULL
-    // (frontend pakai ditolak_oleh untuk filter indikator; kalau masih 'Pengelola Program',
-    //  PP akan lihat semua indikatornya, bukan hanya yang perlu di-re-verif)
+    
+    
+    
+    
     let ditolakOlehVal = null;
     if (isReVerifPP) {
-      ditolakOlehVal = null; // clear — Kapus sudah setuju, PP verif ulang normal
+      ditolakOlehVal = null; 
     } else if (adaSisaPP) {
-      // Ada sisa penolakan PP tapi bukan mode re-verif → Kapus approve semua, PP tetap perlu re-verif
+      
       ditolakOlehVal = 'Pengelola Program';
     } else {
-      ditolakOlehVal = null; // siklus normal, clear ditolak_oleh
+      ditolakOlehVal = null; 
     }
 
     await pool.query(
@@ -516,10 +513,10 @@ const adaSisaPP = parseInt(piPPCheck.rows[0]?.ct) > 0;
 
     const isReVerif = isReVerifPP || adaSisaPP;
 
-    // Kasus KapusTolakAdmin: Operator sudah perbaiki dan Kapus approve → siklus baru.
-    // VP lama bisa masih 'Selesai' (sisa dari siklus sebelumnya) → reset ke 'Menunggu'.
-    // Ini dilakukan di sini (bukan hanya di blok else) karena adaSisaPP bisa true
-    // akibat sisa baris penolakan_indikator dari PP putaran sebelumnya.
+    
+    
+    
+    
     if (konteksPenolakan === 'KapusTolakAdmin') {
       const allPPReset = await pool.query(`SELECT email FROM verifikasi_program WHERE id_usulan=$1`, [idUsulan]);
       for (const vp of allPPReset.rows) {
@@ -532,14 +529,14 @@ const adaSisaPP = parseInt(piPPCheck.rows[0]?.ct) > 0;
     }
 
     if (isReVerif) {
-      // Re-verifikasi dari PP atau Admin.
-      // Sumber indikator untuk reset VP = gabungan:
-      // 1. indikatorList (yang baru disetujui Kapus di putaran ini)
-      // 2. penolakan_indikator milik PP yang masih ada (dari putaran sebelumnya, belum di-re-verif PP)
-      // BUG FIX: Baca catatan VP SEBELUM di-clear, agar nomorDariCatatan tidak kosong
-      // Ambil SEMUA indikator yang PP pernah tolak dari verifikasi_program.catatan
-      // (format catatan: "#1: alasan | #4: alasan | #6: alasan")
-      // Ini lebih andal daripada penolakan_indikator karena baris PP bisa berubah aksinya
+      
+      
+      
+      
+      
+      
+      
+      
       const vpCatatanRows = await pool.query(
         `SELECT catatan FROM verifikasi_program WHERE id_usulan=$1 AND status IN ('Ditolak','Menunggu') AND catatan IS NOT NULL`,
         [idUsulan]
@@ -621,16 +618,16 @@ const adaSisaPP = parseInt(piPPCheck.rows[0]?.ct) > 0;
     return ok({ message: 'Semua indikator disetujui — diteruskan ke Pengelola Program.' });
   }
 
-  // ========== ADA YANG DITOLAK ==========
-  // FIX C: Pisahkan dua set — Kapus bisa campuran tolak + sanggah dalam satu submit.
-  // nomorTolakKapus  = Kapus setuju penolakan PP → dikembalikan ke Operator (reset Draft)
-  // nomorSanggahKapus = Kapus sanggah PP → tetap mengalir ke PP re-verif (JANGAN reset Draft)
+  
+  
+  
+  
   const nomorTolakKapus   = indikatorList.filter(i => i.aksi === 'tolak').map(i => parseInt(i.noIndikator));
   const nomorSanggahKapus = indikatorList.filter(i => i.aksi === 'setuju').map(i => parseInt(i.noIndikator));
   const alasanGabungan = indikatorList.filter(i => i.aksi === 'tolak')
     .map(i => '#' + i.noIndikator + ': ' + i.alasan).join(' | ');
 
-  // Simpan email_program dari penolakan PP yang asli (jika ada) SEBELUM dihapus
+  
   const piPPEmailRows = await pool.query(
     `SELECT no_indikator, email_program FROM penolakan_indikator WHERE id_usulan=$1 AND email_program IS NOT NULL`,
     [idUsulan]
@@ -640,17 +637,17 @@ const adaSisaPP = parseInt(piPPCheck.rows[0]?.ct) > 0;
     emailPPMap[r.no_indikator] = r.email_program;
   }
 
-  // Bersihkan penolakan milik Kapus saja — penolakan milik PP (dibuat_oleh='PP') harus tetap ada
+  
   await pool.query(`DELETE FROM penolakan_indikator WHERE id_usulan=$1 AND (dibuat_oleh='Kapus' OR dibuat_oleh IS NULL)`, [idUsulan]).catch(()=>{});
 
-  // Ambil indikator yang sudah ada penolakan PP (dibuat_oleh='PP') agar tidak ditimpa oleh insert Kapus
+  
   const piPPExisting = await pool.query(
     `SELECT no_indikator FROM penolakan_indikator WHERE id_usulan=$1 AND dibuat_oleh='PP'`,
     [idUsulan]
   ).catch(() => ({ rows: [] }));
   const nomorSudahAdaPP = new Set(piPPExisting.rows.map(r => parseInt(r.no_indikator)));
 
-  // Insert penolakan hanya untuk indikator yang Kapus TOLAK (→ Operator)
+  
   for (const item of indikatorList.filter(i => i.aksi === 'tolak')) {
     const no = parseInt(item.noIndikator);
     if (nomorSudahAdaPP.has(no)) continue;
@@ -664,8 +661,8 @@ const adaSisaPP = parseInt(piPPCheck.rows[0]?.ct) > 0;
     );
   }
 
-  // FIX C: Reset ke Draft HANYA indikator yang Kapus tolak (→ Operator harus perbaiki).
-  // nomorSanggahKapus TIDAK di-reset — statusnya tetap, mengalir ke PP untuk re-verif.
+  
+  
   for (const no of nomorTolakKapus) {
     await pool.query(
       `UPDATE usulan_indikator SET status='Draft', approved_by=NULL, approved_role=NULL, approved_at=NULL, catatan=NULL
@@ -674,28 +671,28 @@ const adaSisaPP = parseInt(piPPCheck.rows[0]?.ct) > 0;
     );
   }
 
-  // Cek konteks re-verifikasi
+  
   const headerReVerifCheck = await pool.query('SELECT ditolak_oleh, konteks_penolakan, status_global FROM usulan_header WHERE id_usulan=$1', [idUsulan]);
   const ditolakOlehKapusTolak = headerReVerifCheck.rows[0]?.ditolak_oleh;
   const konteksPenolakanKapusTolak = headerReVerifCheck.rows[0]?.konteks_penolakan;
   const statusGlobalKapusTolak = headerReVerifCheck.rows[0]?.status_global;
   const isReVerifPPKapusTolak = ditolakOlehKapusTolak === 'Pengelola Program';
-  // isReVerifAdminKapusTolak: Kapus dipanggil dari 'Menunggu Re-verifikasi Kepala Puskesmas'
-  // (setelah PP selesai re-verif penolakan Admin). Jika Kapus TOLAK = terima penolakan Admin
-  // → Operator harus perbaiki dan ajukan ulang dari awal (lewat Kapus → PP → Admin normal)
-  // PENTING: Jangan andalkan ditolak_oleh='Admin' saja karena nilainya bisa sisa siklus lama
-  // yang tidak di-clear dengan benar. Hanya percaya statusGlobal='Menunggu Re-verifikasi Kepala Puskesmas'
-  // atau konteks_penolakan='Admin' (bukan 'KapusTolakAdmin' yang merupakan siklus berbeda).
+  
+  
+  
+  
+  
+  
   const isReVerifAdminKapusTolak = statusGlobalKapusTolak === 'Menunggu Re-verifikasi Kepala Puskesmas'
     || konteksPenolakanKapusTolak === 'Admin';
 
-  // Insert/update kapus-ok untuk nomorSanggahKapus HANYA jika ini re-verif dari PP/Admin.
-  // Guard ini penting: siklus pertama tidak boleh insert kapus-ok karena akan membuat
-  // adaSisaPP=true saat Operator ajukan ulang, menyebabkan PP muncul sebagai re-verif
-  // padahal mereka belum pernah verifikasi sama sekali.
-  // PENTING: Tidak pakai guard nomorSudahAdaPP di sini — justru jika baris PP (aksi='tolak')
-  // sudah ada, kita HARUS update ke aksi='kapus-ok' via ON CONFLICT. Tanpa ini, baris tolak
-  // lama tetap ada di DB dengan dari_kapus=TRUE dan indikator sanggahan ikut tampil ke Operator.
+  
+  
+  
+  
+  
+  
+  
   if ((isReVerifPPKapusTolak || isReVerifAdminKapusTolak) && nomorSanggahKapus.length > 0) {
     for (const no of nomorSanggahKapus) {
       const emailPPAsli = emailPPMap[no] || email;
@@ -725,22 +722,22 @@ const adaSisaPP = parseInt(piPPCheck.rows[0]?.ct) > 0;
       ? 'Admin'
       : 'Kepala Puskesmas';
 
-  // FIX C: Bedakan status_global saat mixed tolak+sanggah vs tolak semua.
-  // - Mixed (ada yg ditolak + ada yg disanggah):
-  //     → status 'Ditolak Sebagian' — Operator perbaiki bagian tolak,
-  //       PP langsung re-verif bagian sanggah (ditolak_oleh='Pengelola Program' sudah cukup
-  //       sebagai sinyal, PP akan melihat indikator kapus-ok di penolakan_indikator)
-  // - Semua ditolak (tidak ada sanggahan):
-  //     → status 'Ditolak' seperti sebelumnya
-  //
-  // Untuk mixed, PP harus re-verifikasi bagian sanggahan terlepas dari status Operator.
-  // Caranya: langsung reset VP yang punya irisan dengan nomorSanggahKapus ke 'Menunggu',
-  // agar saat Operator ajukan ulang, PP sudah siap re-verif indikator sanggahan.
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
   const adaMixed = nomorTolakKapus.length > 0 && nomorSanggahKapus.length > 0;
   const statusGlobalFinal = adaMixed ? 'Ditolak Sebagian' : 'Ditolak';
 
-  // Saat Kapus tolak dalam konteks Admin loop, simpan penanda khusus agar
-  // submitUsulan tahu harus routing ke Kapus (bukan langsung ke PP/Admin)
+  
+  
   const konteksPenolakanFinal = isReVerifAdminKapusTolak ? 'KapusTolakAdmin' : null;
   await pool.query(
     `UPDATE usulan_header SET status_global=$4, status_kapus='Ditolak', is_locked=false,
@@ -748,9 +745,9 @@ const adaSisaPP = parseInt(piPPCheck.rows[0]?.ct) > 0;
     [alasanGabungan, ditolakOlehFinal, idUsulan, statusGlobalFinal, konteksPenolakanFinal]
   );
 
-  // Jika ada indikator yang disanggah Kapus (nomorSanggahKapus), reset VP yang punya irisan
-  // agar PP bisa langsung re-verifikasi bagian tersebut saat usulan diajukan ulang.
-  // (VP sudah di-reset ke status='Menunggu' → PP tahu harus re-verif via kapus-ok di penolakan_indikator)
+  
+  
+  
   if (nomorSanggahKapus.length > 0) {
     const allVPSanggah = await pool.query(
       `SELECT email_program, indikator_akses FROM verifikasi_program WHERE id_usulan=$1`, [idUsulan]
@@ -801,7 +798,7 @@ async function verifAdmin(pool, body) {
   if (!['Menunggu Admin'].includes(headerRes.rows[0].status_global))
     return err('Usulan tidak dalam status Menunggu Admin');
 
-  // Cek periode verifikasi
+  
   const { tahun, bulan } = headerRes.rows[0];
   const pvRes = await pool.query(
     `SELECT tanggal_mulai_verif, tanggal_selesai_verif, jam_mulai_verif, jam_selesai_verif FROM periode_input WHERE tahun=$1 AND bulan=$2 AND status='Aktif'`,
@@ -821,7 +818,7 @@ async function verifAdmin(pool, body) {
   const adaTolak = indikatorList.some(i => i.aksi === 'tolak');
 
   if (!adaTolak) {
-    // Semua disetujui → Selesai
+    
     await pool.query(
       `UPDATE usulan_header SET status_global='Selesai', status_final='Selesai',
        admin_approved_by=$1, admin_approved_at=NOW(),
@@ -831,13 +828,13 @@ async function verifAdmin(pool, body) {
        WHERE id_usulan=$2`,
       [email, idUsulan]
     );
-    // Hapus semua sisa penolakan (sudah selesai)
+    
     await pool.query(`DELETE FROM penolakan_indikator WHERE id_usulan=$1`, [idUsulan]).catch(() => {});
     await logAktivitas(pool, email, 'Admin', 'Selesai', idUsulan, 'Semua indikator disetujui — usulan selesai');
     return ok({ message: 'Usulan telah disetujui dan dinyatakan Selesai.' });
   }
 
-  // Ada yang ditolak → kembalikan ke PP untuk re-verifikasi
+  
   const nomorTolak = indikatorList.filter(i => i.aksi === 'tolak').map(i => parseInt(i.noIndikator));
   const alasanMap = {};
   for (const item of indikatorList.filter(i => i.aksi === 'tolak')) {
@@ -845,8 +842,8 @@ async function verifAdmin(pool, body) {
   }
   const alasanGabungan = nomorTolak.map(n => `#${n}: ${alasanMap[n]}`).join(' | ');
 
-  // Poin 2: Cek batas siklus re-verifikasi Admin ↔ PP
-  // Jika sudah >= 3 putaran, Admin tetap bisa lanjut tapi sistem log peringatan
+  
+  
   const MAX_REVIRIF_CYCLE = 3;
   const cycleCheckRes = await pool.query(
     `SELECT COALESCE(reverif_count, 0) as reverif_count FROM usulan_header WHERE id_usulan=$1`, [idUsulan]
@@ -857,7 +854,7 @@ async function verifAdmin(pool, body) {
     console.warn(`[verifAdmin] Usulan ${idUsulan} sudah melewati ${MAX_REVIRIF_CYCLE} siklus re-verifikasi Admin↔PP. Pertimbangkan tolak global.`);
   }
 
-  // Reset indikator bermasalah
+  
   for (const no of nomorTolak) {
     await pool.query(
       `UPDATE usulan_indikator SET status='Draft', approved_by=NULL, approved_role=NULL, approved_at=NULL, catatan=NULL
@@ -865,15 +862,15 @@ async function verifAdmin(pool, body) {
     );
   }
 
-  // Hapus penolakan lama untuk indikator ini, insert ulang milik Admin
+  
   await pool.query(
     `DELETE FROM penolakan_indikator WHERE id_usulan=$1 AND no_indikator=ANY($2)`,
     [idUsulan, nomorTolak]
   );
 
-  // Insert baris penolakan per PP yang punya irisan dengan indikator yang ditolak.
-  // Setiap PP mendapat baris sendiri (email_program unik per PP) agar masing-masing
-  // bisa respond secara independen — tidak saling ter-overwrite.
+  
+  
+  
   const allPPAdmin = await pool.query(
     `SELECT email, indikator_akses FROM users WHERE role='Pengelola Program' AND aktif=true`
   );
@@ -931,7 +928,7 @@ async function verifAdmin(pool, body) {
     [alasanGabunganFull, idUsulan]
   );
 
-  // Jika melewati batas, sertakan peringatan di response untuk ditampilkan Admin
+  
   const warningMsg = isOverLimit
     ? ` ⚠️ Perhatian: Usulan ini sudah melewati ${MAX_REVIRIF_CYCLE} putaran re-verifikasi. Pertimbangkan untuk menolak usulan secara keseluruhan jika data tidak kunjung diperbaiki.`
     : '';
@@ -941,8 +938,6 @@ async function verifAdmin(pool, body) {
   return ok({ message: 'Indikator bermasalah dikembalikan ke Pengelola Program untuk re-verifikasi.' + warningMsg, isOverLimit });
 }
 
-
-// ============== REJECT USULAN (Global oleh Admin) ==============
 async function rejectUsulan(pool, body) {
   const { idUsulan, email, alasan } = body;
   if (!idUsulan || !email) return err('Data tidak lengkap');
@@ -970,8 +965,6 @@ async function rejectUsulan(pool, body) {
   return ok({ message: 'Usulan telah ditolak.' });
 }
 
-
-// ============== GET PENOLAKAN INDIKATOR ==============
 async function getPenolakanIndikator(pool, params) {
   const { idUsulan } = params;
   if (!idUsulan) return err('idUsulan diperlukan');
@@ -987,8 +980,6 @@ async function getPenolakanIndikator(pool, params) {
   return ok(result.rows);
 }
 
-
-// ============== RESPOND PENOLAKAN (PP merespons penolakan Admin) ==============
 async function respondPenolakan(pool, body) {
   const { idUsulan, email, responList } = body;
   if (!idUsulan || !email) return err('Data tidak lengkap');
@@ -1004,29 +995,29 @@ async function respondPenolakan(pool, body) {
     `SELECT status_global, ditolak_oleh, konteks_penolakan FROM usulan_header WHERE id_usulan=$1`, [idUsulan]
   );
   if (!headerRes.rows.length) return err('Usulan tidak ditemukan');
-  // Izinkan respond-penolakan pada KEDUA status PP:
-  // 'Menunggu Pengelola Program' = siklus normal (PP verif pertama atau loop PP)
-  // 'Menunggu Re-verifikasi PP'  = setelah Admin tolak → PP harus respond penolakan Admin
+  
+  
+  
   if (!['Menunggu Pengelola Program', 'Menunggu Re-verifikasi PP'].includes(headerRes.rows[0].status_global))
     return err('Usulan tidak dalam tahap verifikasi program');
 
-  // Validasi: catatan wajib bermakna
+  
   for (const item of responList) {
     if (!isValidText(item.catatan)) return err(`Catatan untuk indikator #${item.noIndikator} harus diisi dengan teks yang bermakna`);
   }
 
   const logDetail = [];
   let adaSanggahSaya = false;
-  // Bangun string sanggahan per-indikator untuk disimpan ke verifikasi_program.sanggahan
-  // Format: "#2: Disanggah — alasan | #3: Dibenarkan — alasan"
-  // Ini memberi Admin konteks granular saat re-verifikasi
+  
+  
+  
   const sanggahanPerIndikator = [];
   for (const item of responList) {
-    const { noIndikator, aksi, catatan } = item; // aksi: 'sanggah' | 'tolak'
+    const { noIndikator, aksi, catatan } = item; 
     if (aksi === 'sanggah') adaSanggahSaya = true;
     const labelAksi = aksi === 'sanggah' ? 'Disanggah' : 'Dibenarkan';
     sanggahanPerIndikator.push(`#${noIndikator}: ${labelAksi} — ${catatan}`);
-    // Simpan sanggahan PP ke verifikasi_program.sanggahan juga
+    
     if (aksi === 'sanggah') {
       await pool.query(
         `UPDATE verifikasi_program SET sanggahan=$1 WHERE id_usulan=$2 AND LOWER(email_program)=LOWER($3)`,
@@ -1035,8 +1026,8 @@ async function respondPenolakan(pool, body) {
     }
     logDetail.push(`#${noIndikator}: ${aksi === 'sanggah' ? 'Disanggah' : 'Dibenarkan'} — ${catatan}`);
   }
-  // Simpan detail lengkap per-indikator ke sanggahan (overwrite dengan format gabungan)
-  // agar Admin bisa melihat semua keputusan PP ini dalam satu field
+  
+  
   if (sanggahanPerIndikator.length > 0) {
     await pool.query(
       `UPDATE verifikasi_program SET sanggahan=$1 WHERE id_usulan=$2 AND LOWER(email_program)=LOWER($3)`,
@@ -1044,11 +1035,11 @@ async function respondPenolakan(pool, body) {
     ).catch(() => {});
   }
 
-  // Simpan respons ke tabel terpisah untuk audit, lalu HAPUS baris milik PP ini.
-  // PENTING: Kumpulkan no_indikator yang PP ini TERIMA (benarkan Admin) SEBELUM dihapus.
-  // Nanti dipakai jika ternyata semua PP membenarkan → perlu tahu nomor yang perlu dikembalikan ke Operator.
+  
+  
+  
   const nomorDiterimaPP = responList
-    .filter(i => i.aksi === 'tolak') // 'tolak' di responList = PP membenarkan Admin
+    .filter(i => i.aksi === 'tolak') 
     .map(i => parseInt(i.noIndikator));
 
   await pool.query(
@@ -1058,14 +1049,14 @@ async function respondPenolakan(pool, body) {
     [idUsulan, email]
   );
 
-  // Update VP milik PP ini ke Selesai setelah respond
+  
   await pool.query(
     `UPDATE verifikasi_program SET status='Selesai', verified_at=NOW()
      WHERE id_usulan=$1 AND LOWER(email_program)=LOWER($2)`,
     [idUsulan, email]
   ).catch(() => {});
   
-  // Cek sisa baris — kalau masih ada, berarti PP lain belum respond
+  
   const pending = await pool.query(
     `SELECT COUNT(*) as ct FROM penolakan_indikator
      WHERE id_usulan=$1 AND dibuat_oleh='Admin'`,
@@ -1077,21 +1068,21 @@ async function respondPenolakan(pool, body) {
     return ok({ message: 'Respons disimpan. Menunggu respons pengelola program lain.', allDone: false });
   }
 
-  // Tidak ada sisa baris → semua PP sudah respond.
-  // ── Parse detail sanggahan per indikator dari semua VP ──
-  // Format field sanggahan: "#1: Disanggah — alasan | #2: Dibenarkan — alasan"
-  //
-  // ATURAN: "Akui menang atas Sanggah"
-  // Jika ada ≥1 PP yang "Akui & Perbaiki" pada suatu indikator → indikator SELALU
-  // dikembalikan ke Kapus untuk re-verifikasi, tidak peduli berapa PP lain menyanggah.
-  // Alasannya: 1 PP saja yang akui berarti ada masalah data yang perlu diperbaiki Operator.
-  // Indikator baru dianggap "murni disanggah" jika SEMUA PP yang beririsan menyanggahnya.
+  
+  
+  
+  
+  
+  
+  
+  
+  
   const allVPSanggahanRes = await pool.query(
     `SELECT sanggahan FROM verifikasi_program WHERE id_usulan=$1 AND sanggahan IS NOT NULL AND sanggahan != ''`,
     [idUsulan]
   );
-  const nomorDiakui    = new Set(); // ada ≥1 PP akui → ke Kapus (akui menang)
-  const nomorDisanggah = new Set(); // semua PP sanggah → ke Admin
+  const nomorDiakui    = new Set(); 
+  const nomorDisanggah = new Set(); 
 
   for (const vp of allVPSanggahanRes.rows) {
     (vp.sanggahan || '').split('|').map(s => s.trim()).filter(Boolean).forEach(part => {
@@ -1153,15 +1144,15 @@ async function respondPenolakan(pool, body) {
     return ok({ message: 'Semua pengelola program menyanggah — diteruskan ke Admin untuk re-verifikasi.', allDone: true });
   }
 
-  // ── KASUS 2: Campuran — sebagian indikator disanggah, sebagian diakui ──
-  // → Indikator DIAKUI: dikembalikan ke Kapus untuk re-verif (Operator perbaiki data)
-  // → Indikator DISANGGAH: akan diteruskan ke Admin setelah Kapus konfirmasi
-  // → Status: Menunggu Kepala Puskesmas (dengan konteks Admin)
+  
+  
+  
+  
   if (adaSanggah && adaAkui) {
     const nomorAkuiArr   = [...nomorDiakui];
     const nomorSanggahArr = [...nomorDisanggah];
 
-    // Ambil alasan dari admin_catatan untuk indikator yang diakui
+    
     const adminCatatanRes2 = await pool.query(
       `SELECT admin_catatan FROM usulan_header WHERE id_usulan=$1`, [idUsulan]
     );
@@ -1180,8 +1171,8 @@ async function respondPenolakan(pool, body) {
       );
     }
 
-    // Hapus penolakan Admin lama untuk indikator yang diakui, insert penolakan baru (dari PP)
-    // agar Kapus tahu indikator mana yang perlu dikembalikan ke Operator
+    
+    
     const allPPForInsert = await pool.query(
   `SELECT email, indikator_akses FROM users WHERE role='Pengelola Program' AND aktif=true`
 );
@@ -1242,14 +1233,14 @@ for (const no of nomorAkuiArr) {
     });
   }
 
-  // ── KASUS 3: Semua PP membenarkan penolakan Admin (tidak ada sanggahan) ──
-  // → Alur berjenjang: PP → Kapus → Operator (bukan langsung ke Operator)
-  // Kapus harus konfirmasi terlebih dahulu sebelum Operator diperintahkan memperbaiki data.
-  // Setelah Kapus konfirmasi (tolak), barulah status menjadi 'Ditolak' dan Operator bisa perbaiki.
+  
+  
+  
+  
   {
     const nomorTolak = [...new Set([...nomorDiterimaPP])];
 
-    // Reset indikator bermasalah ke Draft agar Kapus dan Operator tahu mana yang perlu diperbaiki
+    
     for (const no of nomorTolak) {
       await pool.query(
         `UPDATE usulan_indikator SET status='Draft', approved_by=NULL, approved_role=NULL, approved_at=NULL, catatan=NULL
@@ -1257,15 +1248,15 @@ for (const no of nomorAkuiArr) {
       );
     }
 
-    // Hapus baris penolakan Admin — ganti dengan baris baru dibuat_oleh='PP'
-    // agar Kapus tahu indikator mana yang diakui PP dan perlu dikonfirmasi
+    
+    
     if (nomorTolak.length > 0) {
       await pool.query(
         `DELETE FROM penolakan_indikator WHERE id_usulan=$1 AND no_indikator=ANY($2) AND dibuat_oleh='Admin'`,
         [idUsulan, nomorTolak]
       ).catch(() => {});
 
-      // Ambil alasan dari admin_catatan sebagai referensi untuk Kapus
+      
       const adminCatatanRes = await pool.query(
         `SELECT admin_catatan FROM usulan_header WHERE id_usulan=$1`, [idUsulan]
       );
@@ -1329,6 +1320,5 @@ for (const no of nomorAkuiArr) {
     return ok({ message: 'Penolakan Admin dibenarkan. Diteruskan ke Kepala Puskesmas untuk konfirmasi.', allDone: true });
   }
 }
-
 
 module.exports = { verifKapus, verifProgram, verifAdmin, rejectUsulan, getPenolakanIndikator, respondPenolakan };

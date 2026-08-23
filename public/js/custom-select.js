@@ -1,27 +1,9 @@
-/**
- * VISPM — CUSTOM SELECT COMPONENT
- * Menggantikan semua <select class="form-control"> native dengan dropdown custom
- * yang konsisten di semua platform (desktop, Android, iOS).
- *
- * Cara pakai:
- *   1. Tambahkan <script src="/js/custom-select.js"></script> di index.html SETELAH semua JS lain
- *   2. Semua <select class="form-control"> akan otomatis di-replace saat halaman load
- *      DAN setiap kali konten mainContent berubah (navigasi halaman).
- *
- * API:
- *   - Membaca/menulis .value pada elemen <select> asli tetap bekerja normal
- *   - Event 'change' pada <select> asli tetap ter-trigger
- *   - Mendukung: disabled, multiple classes, data-*, aria-label
- *   - Mendukung dark mode via CSS var
- *   - Mendukung search/filter untuk dropdown dengan banyak opsi (≥8 item)
- *   - Fully keyboard accessible (Tab, Enter, Space, Esc, Arrow keys)
- *   - Tutup otomatis saat klik di luar / scroll
- */
+
 
 (function () {
   'use strict';
 
-  /* ─── Inject CSS ─────────────────────────────────────────── */
+  
   const STYLE_ID = '__vispm_cs_style';
   if (!document.getElementById(STYLE_ID)) {
     const style = document.createElement('style');
@@ -287,10 +269,10 @@
     document.head.appendChild(style);
   }
 
-  /* ─── State ────────────────────────────────────────────── */
-  let _openWrap = null; // wrap yang panel-nya sedang terbuka
+  
+  let _openWrap = null; 
 
-  /* ─── Utility ───────────────────────────────────────────── */
+  
   function getSelectedText(select) {
     const opt = select.options[select.selectedIndex];
     return opt ? opt.text : '';
@@ -300,18 +282,18 @@
     return !opt || opt.value === '' || opt.dataset.placeholder === '1';
   }
 
-  /* ─── Posisi panel ──────────────────────────────────────── */
+  
   function positionPanel(wrap, panel) {
     const triggerEl = wrap.querySelector('.cs-trigger');
     const rect = triggerEl.getBoundingClientRect();
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    const panelH = 320; // estimasi max
+    const panelH = 320; 
     const panelW = Math.max(rect.width, 200);
 
     panel.style.width = Math.min(panelW, 420) + 'px';
 
-    // Vertikal: cek ruang bawah vs atas
+    
     const spaceBelow = vh - rect.bottom - 8;
     const spaceAbove = rect.top - 8;
 
@@ -325,14 +307,14 @@
       panel.classList.add('cs-panel-up');
     }
 
-    // Horizontal
+    
     let left = rect.left;
     if (left + panelW > vw - 8) left = vw - panelW - 8;
     if (left < 8) left = 8;
     panel.style.left = left + 'px';
   }
 
-  /* ─── Close panel ───────────────────────────────────────── */
+  
   function closeAll(except) {
     document.querySelectorAll('.cs-panel.cs-panel-open').forEach(p => {
       const w = p._csWrap;
@@ -355,7 +337,7 @@
     _openWrap = null;
   }
 
-  /* ─── Build panel ───────────────────────────────────────── */
+  
   function buildPanel(wrap, select) {
     const panel = document.createElement('div');
     panel.className = 'cs-panel';
@@ -363,8 +345,8 @@
     panel._csWrap = wrap;
     wrap._csPanel = panel;
 
-    // Kumpulkan semua opsi (termasuk optgroup)
-    const allOptions = []; // { el, text, value, group }
+    
+    const allOptions = []; 
     for (const child of select.children) {
       if (child.tagName === 'OPTGROUP') {
         for (const opt of child.children) {
@@ -377,7 +359,7 @@
 
     const useSearch = allOptions.length >= 8;
 
-    // Search input
+    
     let searchInput = null;
     if (useSearch) {
       const searchWrap = document.createElement('div');
@@ -391,7 +373,7 @@
       searchInput = searchWrap.querySelector('.cs-search');
     }
 
-    // List
+    
     const list = document.createElement('div');
     list.className = 'cs-list';
     list.setAttribute('role', 'presentation');
@@ -433,7 +415,7 @@
           <span>${opt.text}</span>
         `;
 
-        item.addEventListener('mousedown', e => e.preventDefault()); // jangan blur trigger
+        item.addEventListener('mousedown', e => e.preventDefault()); 
         item.addEventListener('click', () => {
           selectOption(opt.value, opt.text, wrap, select);
         });
@@ -451,7 +433,7 @@
       }
 
       focusedIdx = -1;
-      // Auto-focus item yang selected
+      
       const selItem = list.querySelector('.cs-option.cs-selected');
       if (selItem) {
         const i = visibleItems.indexOf(selItem);
@@ -464,7 +446,7 @@
         focusedIdx = idx;
       }
 
-      // Keyboard nav dari search
+      
       const keyHandler = (e) => {
         if (!panel.classList.contains('cs-panel-open')) return;
         if (e.key === 'ArrowDown') {
@@ -497,7 +479,7 @@
       });
     }
 
-    // Keyboard nav dari trigger (ketika panel open)
+    
     wrap._panelKeyHandler = (e) => {
       if (!panel.classList.contains('cs-panel-open')) return;
       if (panel._keyHandler) panel._keyHandler(e);
@@ -507,14 +489,14 @@
     return { panel, searchInput };
   }
 
-  /* ─── Select option ─────────────────────────────────────── */
+  
   function selectOption(value, text, wrap, select) {
     select.value = value;
-    // Trigger change event
+    
     const ev = new Event('change', { bubbles: true });
     select.dispatchEvent(ev);
 
-    // Update trigger text
+    
     const triggerText = wrap.querySelector('.cs-trigger-text');
     if (triggerText) {
       triggerText.textContent = text;
@@ -525,19 +507,19 @@
     wrap.querySelector('.cs-trigger').focus();
   }
 
-  /* ─── Open panel ────────────────────────────────────────── */
+  
   function openPanel(wrap, select) {
-    if (wrap._csPanel) { _closePanel(wrap); return; } // toggle
+    if (wrap._csPanel) { _closePanel(wrap); return; } 
     closeAll(wrap);
 
     const { panel, searchInput } = buildPanel(wrap, select);
     const trigger = wrap.querySelector('.cs-trigger');
     trigger.setAttribute('aria-expanded', 'true');
 
-    // Position sebelum animasi
+    
     positionPanel(wrap, panel);
 
-    // Animasi masuk (next frame)
+    
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         panel.classList.add('cs-panel-open');
@@ -551,49 +533,49 @@
     }
   }
 
-  /* ─── Replace satu <select> ─────────────────────────────── */
+  
   function replaceSelect(select) {
-    // Sudah di-replace sebelumnya? skip
+    
     if (select._csReplaced) return;
-    // Skip jika di dalam .cs-wrap (sudah wrapped)
+    
     if (select.closest('.cs-wrap')) return;
-    // Skip hidden
+    
     if (select.type === 'hidden') return;
 
     select._csReplaced = true;
 
-    // Wrap
+    
     const wrap = document.createElement('div');
     wrap.className = 'cs-wrap';
     if (select.disabled) wrap.classList.add('cs-disabled');
-    // Salin class tertentu dari select ke wrap (untuk filter-row dll)
+    
     ['flex-1', 'w-full'].forEach(c => { if (select.classList.contains(c)) wrap.classList.add(c); });
-    // Wariskan dimensi inline dari select asli ke wrapper
+    
     if (select.style.width)    wrap.style.width    = select.style.width;
     if (select.style.minWidth) wrap.style.minWidth = select.style.minWidth;
     if (select.style.maxWidth) wrap.style.maxWidth = select.style.maxWidth;
     if (select.style.flex)     wrap.style.flex     = select.style.flex;
-    // Jika tidak ada width/flex eksplisit dan bukan di dalam konteks flex parent,
-    // default ke width 100% hanya jika select asli juga 100% (atau tidak diset)
+    
+    
     if (!select.style.width && !select.style.flex) {
-      // Cek apakah parent adalah flex container (search-row / filter-row)
+      
       const parentStyle = window.getComputedStyle(select.parentNode);
       const isFlexParent = parentStyle.display === 'flex' || parentStyle.display === 'inline-flex';
       if (!isFlexParent) wrap.style.width = '100%';
     }
 
-    // Sembunyikan select asli
+    
     select.classList.add('cs-native-hidden');
 
-    // Sisipkan wrap sebelum select
+    
     select.parentNode.insertBefore(wrap, select);
     wrap.appendChild(select);
 
-    // Teks awal
+    
     const selText = getSelectedText(select);
     const isPlaceholderNow = isPlaceholder(select);
 
-    // Trigger button
+    
     const trigger = document.createElement('button');
     trigger.type = 'button';
     trigger.className = 'cs-trigger';
@@ -607,7 +589,7 @@
 
     wrap.insertBefore(trigger, select);
 
-    // Events
+    
     trigger.addEventListener('click', (e) => {
       e.stopPropagation();
       if (wrap.classList.contains('cs-disabled')) return;
@@ -628,7 +610,7 @@
       }
     });
 
-    // Sinkronisasi jika select.value berubah dari luar (JS)
+    
     const origDescriptor = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value');
     if (origDescriptor) {
       let _inSet = false;
@@ -658,9 +640,7 @@
     attrObs.observe(select, { attributes: true, attributeFilter: ['disabled'] });
   }
 
-  /* ─── Sinkronisasi manual: refresh teks trigger dari opsi <select> saat ini ─
-     Dipakai saat kode luar nge-rebuild opsi lewat innerHTML (bukan lewat .value),
-     misalnya dropdown Tahun di halaman Laporan yang dibangun ulang dari data. ── */
+  
   function syncTrigger(select) {
     if (!select) return;
     const wrap = select.closest('.cs-wrap');
@@ -672,20 +652,20 @@
     triggerText.classList.toggle('cs-placeholder', isPlaceholder(select));
   }
 
-  /* ─── Replace semua select di container ─────────────────── */
+  
   function replaceAllInContainer(container) {
     const selects = (container || document).querySelectorAll('select.form-control, select.filter-select');
     selects.forEach(replaceSelect);
   }
 
-  /* ─── Global click → tutup panel ────────────────────────── */
+  
   document.addEventListener('click', (e) => {
     if (!e.target.closest('.cs-wrap') && !e.target.closest('.cs-panel')) {
       closeAll(null);
     }
   });
 
-  /* ─── Scroll parent → reposition atau tutup ─────────────── */
+  
   document.addEventListener('scroll', () => {
     if (_openWrap && _openWrap._csPanel) {
       positionPanel(_openWrap, _openWrap._csPanel);
@@ -698,7 +678,7 @@
     }
   });
 
-  /* ─── Observer mainContent (navigasi antar halaman) ────────── */
+  
   function _observeAndReplace() {
     const mainContent = document.getElementById('mainContent');
     if (!mainContent || !window.MutationObserver) return;
@@ -709,12 +689,12 @@
     obs.observe(mainContent, { childList: true, subtree: true });
   }
 
-  /* ─── Init ───────────────────────────────────────────────── */
+  
   function init() {
     replaceAllInContainer(document);
     _observeAndReplace();
 
-    // Patch loadPage agar replace dijalankan setelah render
+    
     const _origLoadPage = window.loadPage;
     if (typeof _origLoadPage === 'function') {
       window.loadPage = function () {
@@ -724,7 +704,7 @@
       };
     }
 
-    // Ekspor API publik
+    
     window.CustomSelect = {
       replace: replaceSelect,
       replaceAll: replaceAllInContainer,
@@ -736,7 +716,7 @@
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {
-    // Tunggu sedikit agar semua JS lain selesai inject select mereka
+    
     setTimeout(init, 50);
   }
 

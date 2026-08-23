@@ -2,7 +2,7 @@ const { getPool, ok, err, cors } = require('./db');
 const { validateSession } = require('./middleware');
 
 exports.handler = async (event) => {
-  // Handle CORS
+  
   if (event.httpMethod === 'OPTIONS') {
     return {
       statusCode: 200,
@@ -29,7 +29,7 @@ exports.handler = async (event) => {
         return err('ID Usulan diperlukan');
       }
 
-      // Cek apakah tabel ada
+      
       const tableCheck = await pool.query(`
         SELECT EXISTS (
           SELECT FROM information_schema.tables 
@@ -38,7 +38,7 @@ exports.handler = async (event) => {
       `);
 
       if (!tableCheck.rows[0].exists) {
-        return ok([]); // Tabel belum ada, return empty array
+        return ok([]); 
       }
       
       let query = 'SELECT * FROM usulan_bukti WHERE id_usulan = $1';
@@ -65,26 +65,26 @@ exports.handler = async (event) => {
       })));
     }
 
-    // DELETE - hapus bukti
+    
     if (event.httpMethod === 'DELETE') {
       const { id } = JSON.parse(event.body || '{}');
       
       if (!id) return err('ID bukti diperlukan');
 
-      // Ambil info file sebelum dihapus dari DB
+      
       const fileRes = await pool.query('SELECT file_url, file_name FROM usulan_bukti WHERE id = $1', [id]);
       
-      // Hapus dari database
+      
       await pool.query('DELETE FROM usulan_bukti WHERE id = $1', [id]);
 
-      // FIX Bug #6: Hapus file dari Cloudinary agar storage tidak bocor.
-      // Panggil delete-file function via internal HTTP jika file_url tersedia.
+      
+      
       if (fileRes.rows.length > 0 && fileRes.rows[0].file_url) {
         const fileUrl = fileRes.rows[0].file_url;
-        // Fire-and-forget: jangan block response meski delete Cloudinary gagal
+        
         const https = require('https');
         const delUrl = new URL('https://api.cloudinary.com');
-        // Gunakan delete-file logic langsung (inline) agar tidak perlu HTTP internal call
+        
         const crypto = require('crypto');
         const cloudName  = process.env.CLOUDINARY_CLOUD_NAME  || '';
         const apiKey     = process.env.CLOUDINARY_API_KEY     || '';

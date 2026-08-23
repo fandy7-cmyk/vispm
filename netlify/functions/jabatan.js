@@ -1,22 +1,6 @@
 const { getPool, ok, err, conflict, cors } = require('./db');
 const { validateSession } = require('./middleware');
 
-/**
- * Handler: /api/jabatan
- *
- * GET    — Daftar jabatan Pengelola Program
- *           Response: [{ id, nama, aktif }]
- *
- * POST   — Tambah jabatan baru (body tanpa id) atau update (body dengan id)
- *           Body: { nama, aktif, id? }
- *           409 — Nama jabatan sudah ada
- *
- * PUT    — Update jabatan
- *           Body: { id, nama, aktif }
- *
- * DELETE — Hapus jabatan
- *           Query: ?id=... atau Body: { id }
- */
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors();
   const _authErr = await validateSession(event);
@@ -34,7 +18,7 @@ exports.handler = async (event) => {
     if (method === 'DELETE') {
       const id = params.id || JSON.parse(event.body || '{}').id;
       if (!id) return err('ID jabatan diperlukan');
-      // Ambil nama sebelum hapus untuk cascade remove dari users
+      
       const delRow = await pool.query('SELECT nama_jabatan FROM master_jabatan WHERE id=$1', [id]);
       const namaHapus = delRow.rows[0]?.nama_jabatan || '';
       await pool.query('DELETE FROM master_jabatan WHERE id=$1', [id]);
@@ -54,11 +38,11 @@ exports.handler = async (event) => {
       const { id, nama, aktif } = body;
       if (!nama || !nama.trim()) return err('Nama jabatan diperlukan');
       if (id) {
-        // Ambil nama lama sebelum update (untuk cascade rename ke users)
+        
         const oldRow = await pool.query('SELECT nama_jabatan FROM master_jabatan WHERE id=$1', [id]);
         const namaLama = oldRow.rows[0]?.nama_jabatan || '';
         await pool.query('UPDATE master_jabatan SET nama_jabatan=$1, aktif=$2 WHERE id=$3', [nama.trim(), aktif !== false, id]);
-        // Cascade: rename token di kolom jabatan semua user yang punya jabatan ini
+        
         if (namaLama && namaLama !== nama.trim()) {
           const usersWithJab = await pool.query(
             `SELECT email, jabatan FROM users WHERE jabatan LIKE $1`,
@@ -72,7 +56,7 @@ exports.handler = async (event) => {
         }
         return ok({ id, message: 'Jabatan berhasil diperbarui' });
       } else {
-        // Create - cek duplikat
+        
         const exists = await pool.query(
           'SELECT id, nama_jabatan FROM master_jabatan WHERE LOWER(TRIM(nama_jabatan))=LOWER(TRIM($1))',
           [nama.trim()]
@@ -107,7 +91,7 @@ exports.handler = async (event) => {
 
     return err('Method tidak diizinkan', 405);
   } catch(e) {
-    // Unique constraint violation — nama jabatan sudah ada
+    
     if (e.code === '23505' && e.constraint === 'master_jabatan_nama_jabatan_key') {
       return conflict('Nama jabatan sudah ada. Gunakan nama yang berbeda.');
     }

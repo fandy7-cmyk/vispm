@@ -1,6 +1,6 @@
-// ============== PAGINATION HELPER ==============
+
 const ITEMS_PER_PAGE = 10;
-const DASH_ITEMS_PER_PAGE = 5; // khusus tabel dashboard (PP, Kapus, Admin)
+const DASH_ITEMS_PER_PAGE = 5; 
 
 function paginateDash(rows, page) {
   const total = rows.length;
@@ -20,8 +20,6 @@ function paginateData(rows, page) {
   return { items, page: p, totalPages, total };
 }
 
-// Registry untuk menyimpan pagination callback — menghindari arrow function
-// dengan kurung kurawal {} di dalam HTML attribute onclick (menyebabkan parse error).
 if (!window.__pgCallbacks) window.__pgCallbacks = {};
 
 function __pgGo(key, p) {
@@ -36,8 +34,8 @@ function renderPagination(containerId, total, page, totalPages, onPageChange, it
   if (typeof onPageChange === 'function') {
     window.__pgCallbacks[cbKey] = onPageChange;
   } else if (typeof onPageChange === 'string') {
-    // String callback (legacy) — wrap jadi fungsi via Function constructor
-    // Ini aman karena hanya dipanggil dari kode internal, bukan input user
+    
+    
     window.__pgCallbacks[cbKey] = new Function('pg', onPageChange.replace(/^pg\s*=>\s*/, ''));
   }
 

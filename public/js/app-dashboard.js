@@ -1,7 +1,5 @@
-// ============== DASHBOARD ==============
 
-// Skeleton loading ditampilkan di #mainContent saat renderDashboard() masih fetch data,
-// menggantikan spinner global (loadPage sudah tidak pakai setLoading untuk page dashboard).
+
 function dashboardSkeleton() {
   const statCardSkel = `<div class="skel-statcard">
     <div style="display:flex;align-items:center;gap:7px">
@@ -94,13 +92,12 @@ async function renderDashboard() {
   }
 }
 
-// Render dropdown filter tahun di page-header dashboard
 async function _renderDashTahunDropdown(selectedTahun) {
   const list = await _loadDashTahunList();
-  // Pastikan CURRENT_YEAR selalu ada di list
+  
   const allTahun = [...new Set([...list, CURRENT_YEAR])].sort((a,b) => b - a);
   if (allTahun.length === 1) {
-    // Cuma 1 tahun tersedia — auto-select, tanpa opsi "Semua Tahun"
+    
     return `<select id="dashTahunFilter" class="form-control" onchange="renderDashboard()"
     style="border:1px solid var(--border,#e2e8f0);border-radius:7px;padding:5px 10px;font-size:12px;outline:none;font-family:inherit;background:var(--surface,white);color:var(--text);cursor:pointer">
     <option value="${allTahun[0]}" selected>${allTahun[0]}</option>
@@ -288,11 +285,9 @@ function renderAdminDashboard(el, d, tahunDipilih) {
     }
   }).catch(() => {});
 
-  // Load semua usulan terbaru (Admin)
+  
   loadAdminAllUsulan();
 }
-
-// ===== ADMIN: SEMUA USULAN =====
 
 async function loadAdminAllUsulan() {
   const el = document.getElementById('adminAllUsulanTable');
@@ -302,7 +297,7 @@ async function loadAdminAllUsulan() {
     const rows = await API.getUsulan({});
     _adminAllUsulanData = rows || [];
     renderAdminAllUsulanTable(_adminAllUsulanData);
-    // Populate filter puskesmas
+    
     const pkmSet = [...new Set(_adminAllUsulanData.map(u => u.namaPKM || u.kodePKM).filter(Boolean))].sort();
     const pkmSel = document.getElementById('adminAllFilterPKM');
     if (pkmSel) {
@@ -313,7 +308,7 @@ async function loadAdminAllUsulan() {
     const tahunSel = document.getElementById('adminAllFilterTahun');
     if (tahunSel) {
       if (tahunSet.length === 1) {
-        // Cuma 1 tahun tersedia — auto-select, tanpa opsi "Semua Tahun"
+        
         tahunSel.innerHTML = `<option value="${tahunSet[0]}" selected>${tahunSet[0]}</option>`;
       } else {
         tahunSel.innerHTML = `<option value="">Semua Tahun</option>` + tahunSet.map(t => `<option value="${t}">${t}</option>`).join('');
@@ -321,13 +316,13 @@ async function loadAdminAllUsulan() {
     }
     // Populate filter status — hanya tampilkan status yang benar-benar ada di data
     const statusOrder = ['Draft','Menunggu Kepala Puskesmas','Menunggu Pengelola Program','Menunggu Admin','Selesai','Ditolak','Ditolak Sebagian'];
-    // Opsi status "biasa" cuma muncul kalau ada usulan dgn status itu yang periodenya
-    // masih aktif — biar tidak dobel/ambigu dgn opsi "Periode Berakhir".
+    
+    
     const statusSet = new Set(_adminAllUsulanData.filter(u => !isPeriodeBerakhir(u)).map(u => u.statusGlobal).filter(Boolean));
     const statusSorted = statusOrder.filter(s => statusSet.has(s));
     statusSet.forEach(s => { if (!statusSorted.includes(s)) statusSorted.push(s); });
-    // "Periode Berakhir" adalah status turunan (belum final tapi periodeExpired true),
-    // tambahkan sebagai opsi filter terpisah kalau memang ada datanya.
+    
+    
     const adaBerakhir = _adminAllUsulanData.some(isPeriodeBerakhir);
     const statusSel = document.getElementById('adminAllFilterStatus');
     if (statusSel) {
@@ -385,12 +380,12 @@ function renderStatusSummary(d) {
   const selesai  = d.selesai || 0;
   const menunggu = d.menunggu || 0;
   const ditolak  = Math.max(0, total - selesai - menunggu);
-  // NOTE: baris "Periode Berakhir" belum bisa dihitung akurat di sini karena
-  // agregat awal dari backend (d) belum pisahkan expired vs aktif — butuh data
-  // per-baris dari API.getUsulan() yang baru datang belakangan (async).
-  // Tetap ditampilkan sebagai placeholder loading ("…") dari awal, biar struktur
-  // 4 baris sudah konsisten sejak render pertama & tidak "muncul belakangan"
-  // saat renderStatusSummaryFromRows() menggantikannya setelah fetch selesai.
+  
+  
+  
+  
+  
+  
   const items = [
     { label: 'Selesai',          val: selesai,  color: '#10b981', bg: _dk ? 'rgba(16,185,129,0.12)'  : '#ecfdf5' },
     { label: 'Dalam Proses',     val: menunggu, color: '#f59e0b', bg: _dk ? 'rgba(245,158,11,0.12)'  : '#fffbeb' },
@@ -411,9 +406,6 @@ function renderStatusSummaryItems(items) {
     </div>`;
 }
 
-// Ringkasan status Admin yang lebih akurat: pecah bucket "Dalam Proses" jadi
-// "Dalam Proses" (periode masih jalan) vs "Periode Berakhir" (habis waktu, belum final)
-// dihitung langsung dari data usulan (sudah bawa field periodeExpired dari backend).
 function renderStatusSummaryFromRows(rows) {
   const _dk = document.documentElement.getAttribute('data-theme') === 'dark';
   const list = rows || [];
@@ -430,7 +422,6 @@ function renderStatusSummaryFromRows(rows) {
   ];
   return renderStatusSummaryItems(items);
 }
-
 
 let _pkmProgressData = [];
 let _pkmProgressPage = 1;
@@ -497,7 +488,6 @@ function _renderPKMProgressPaged(pg) {
   + renderPagination('pkmProgressTable', total, p, totalPages, `pg => window._pkmProgressGoTo(pg)`, DASH_ITEMS_PER_PAGE);
 }
 
-
 function renderOperatorStatusSummary(rows) {
   const total   = rows.length;
   if (total === 0) return `<div class="empty-state" style="padding:16px"><span class="material-icons">inbox</span><p>Belum ada usulan</p></div>`;
@@ -507,7 +497,7 @@ function renderOperatorStatusSummary(rows) {
   const berakhir = prosesRows.filter(u => u.periodeExpired).length;
   const proses   = prosesRows.length - berakhir;
   const draft   = rows.filter(u => u.statusGlobal === 'Draft').length;
-  // Dual bar: selesai (hijau tua) + sudah diajukan/dalam proses (hijau muda)
+  
   const items = [
     { label: 'Selesai',         val: selesai,  color: '#10b981' },
     { label: 'Dalam Proses',    val: proses,   color: '#f59e0b' },
@@ -535,9 +525,9 @@ renderKapusStatusSummary(rows) {
   const berakhir = prosesRows.filter(u => u.periodeExpired).length;
   const proses   = prosesRows.length - berakhir;
   const ditolak = rows.filter(u => ['Ditolak','Ditolak Sebagian'].includes(u.statusGlobal)).length;
-  // FIX (b): Hitung dua segmen progress bar:
-  // - Selesai (hijau tua) = sudah final
-  // - Sudah melewati Kapus/lanjut ke PP atau Admin (hijau muda) = sudah diverifikasi Kapus
+  
+  
+  
   const items = [
   ];
   const _dk = document.documentElement.getAttribute('data-theme') === 'dark';
@@ -607,13 +597,13 @@ renderOperatorDashboard(el, d, tahunDipilih) {
       <div class="card-body" style="padding:0" id="recentTable"></div>
     </div>`;
 
-  // Populate dropdown tahun
+  
   _loadDashTahunList().then(list => {
     const sel = document.getElementById('dashTahunFilter');
     if (!sel) return;
     const allTahun = [...new Set([...list, CURRENT_YEAR])].sort((a,b) => b - a);
     if (allTahun.length === 1) {
-      // Cuma 1 tahun tersedia — auto-select, tanpa opsi "Semua Tahun"
+      
       sel.innerHTML = `<option value="${allTahun[0]}" selected>${allTahun[0]}</option>`;
     } else {
       sel.innerHTML = `<option value="">Semua Tahun</option>`
@@ -721,7 +711,7 @@ function renderPeriodeBanner(periodeList) {
           ? Math.floor(h/24) + 'h ' + String(h%24).padStart(2,'0') + ':' + mm + ':' + ss
           : String(h).padStart(2,'0') + ':' + mm + ':' + ss;
         el.style.background = diff < 3600000 ? 'rgba(239,68,68,0.4)' : 'rgba(0,0,0,0.2)';
-        // Sinkronkan statusText ("X hari lagi") & progress bar biar ikut live sama badge
+        
         _pTickTimelineRow(timerId, startMs, deadline.getTime());
       };
       let tid;
@@ -735,7 +725,7 @@ function renderPeriodeBanner(periodeList) {
 }
 
 function renderPeriodeVerifBanner(periodeList) {
-  // Cari periode yang punya data verifikasi
+  
   const list = (periodeList || []).filter(r => r.tanggal_mulai_verif || r.tanggalMulaiVerif);
   if (!list.length) return ''; // tidak ada periode verifikasi diset
 
@@ -882,13 +872,13 @@ function renderKepalasDashboard(el, d, tahunDipilih) {
       <div class="card-body" style="padding:0" id="kapusAllTable"></div>
     </div>`;
 
-  // Populate dropdown tahun
+  
   _loadDashTahunList().then(list => {
     const sel = document.getElementById('dashTahunFilter');
     if (!sel) return;
     const allTahun = [...new Set([...list, CURRENT_YEAR])].sort((a,b) => b - a);
     if (allTahun.length === 1) {
-      // Cuma 1 tahun tersedia — auto-select, tanpa opsi "Semua Tahun"
+      
       sel.innerHTML = `<option value="${allTahun[0]}" selected>${allTahun[0]}</option>`;
     } else {
       sel.innerHTML = `<option value="">Semua Tahun</option>`
@@ -917,14 +907,14 @@ function renderKepalasDashboard(el, d, tahunDipilih) {
     renderKapusPendingPaged(1);
   }).catch(() => {});
 
-  // Riwayat + summary — ikut filter tahun
+  
   const _kapusTahunParam = { kode_pkm: currentUser.kodePKM };
   if (tahunDipilih) _kapusTahunParam.tahun = tahunDipilih;
   API.getUsulan(_kapusTahunParam).then(rows => {
-    // Progress summary
+    
     const elSum = document.getElementById('kapusStatusSummary');
     if (elSum) elSum.innerHTML = renderKapusStatusSummary(rows);
-    // Riwayat semua — dengan pagination
+    
     const renderKapusAllPaged = (pg) => {
       const elAll = document.getElementById('kapusAllTable');
       if (!elAll) return;
@@ -939,9 +929,9 @@ function renderKepalasDashboard(el, d, tahunDipilih) {
 }
 
 function renderProgramDashboard(el, d, tahunDipilih) {
-  // Ringkasan indikator tanggung jawab PP
+  
   const aksesArr = (currentUser.indikatorAkses || []);
-  // Ambil nama indikator dari master jika tersedia (allIndList dari halaman master)
+  
   const _getIndNama = (no) => {
     if (window.allIndList && window.allIndList.length) {
       const found = window.allIndList.find(i => parseInt(i.no) === parseInt(no));
@@ -1036,7 +1026,7 @@ function renderProgramDashboard(el, d, tahunDipilih) {
             ${aksesArr2.map(no => {
               const nama = _getNama(no);
               const isRV = _reVerif.has(parseInt(no));
-              // Badge oranye + label "Re-verif" jika indikator ini perlu re-verifikasi
+              
               const bg     = isRV ? '#fff7ed' : '#e6fffa';
               const border = isRV ? '#fb923c' : 'var(--primary)';
               const color  = isRV ? '#c2410c' : 'var(--primary)';
@@ -1057,8 +1047,8 @@ function renderProgramDashboard(el, d, tahunDipilih) {
       ${infoHtml}`;
   };
 
-  // Fetch indikator dan usulan BERSAMAAN — render info card hanya SEKALI setelah keduanya selesai
-  // (menghilangkan race condition di mana early render tanpa reVerifNos menimpa final render)
+  
+  
   const _indFetch = window.allIndList && window.allIndList.length
     ? Promise.resolve(window.allIndList)
     : API.getIndikator().then(inds => { window.allIndList = inds; return inds; }).catch(() => []);
@@ -1070,19 +1060,19 @@ function renderProgramDashboard(el, d, tahunDipilih) {
     const pending = rows.filter(u => !u.sudahVerif);
     const done = rows.filter(u => u.sudahVerif);
 
-    // Hitung nomor indikator yang perlu re-verifikasi
+    
     const myAksesSet = new Set((currentUser.indikatorAkses || []).map(n => parseInt(n)));
     const myEmail = (currentUser.email || '').toLowerCase();
     const reVerifNos = new Set();
     // Iterasi semua rows — skenario 'Menunggu Re-verifikasi PP' bisa masuk done
-    // jika sudahVerif salah hitung, atau PP ini sudah respond tapi PP lain belum
+    
     rows.forEach(u => {
       if (!['Menunggu Pengelola Program','Menunggu Re-verifikasi PP','Ditolak Sebagian'].includes(u.statusGlobal)) return;
       (u.penolakanIndikator || [])
         .filter(p => {
           const aksiOk = !p.aksi || p.aksi === 'tolak' || p.aksi === 'kapus-ok' || p.aksi === 'kapus-verif' || p.aksi === 'reset';
           if (!aksiOk) return false;
-          // Untuk penolakan dari Admin: hanya baris email_program milik PP ini yang belum direspond
+          
           if ((p.dibuat_oleh || '') === 'Admin') {
             return (p.emailProgram || p.email_program || '').toLowerCase() === myEmail
               && !p.responded_at;
@@ -1118,7 +1108,7 @@ function renderProgramDashboard(el, d, tahunDipilih) {
       const { items, page: p, totalPages, total } = paginateDash(pending, pg);
       el.innerHTML = renderUsulanTable(items, 'program')
         + renderPagination('pendingTable', total, p, totalPages, 'pg => { ' + renderPendingPaged.toString().replace(/\n/g,' ') + '; }');
-      // Re-attach karena string tidak bisa capture closure — pakai global
+      
       el.innerHTML = renderUsulanTable(items, 'program')
         + renderPagination('pendingTable', total, p, totalPages, `pg => window._ppPendingGoTo(pg)`);
     };
@@ -1142,7 +1132,6 @@ function renderProgramDashboard(el, d, tahunDipilih) {
     renderDonePaged(1);
   }).catch(() => {});
 }
-
 
 function statCard(color, icon, label, value, sub = null) {
   const gradients = {
@@ -1170,18 +1159,18 @@ function statCard(color, icon, label, value, sub = null) {
 }
 
 function renderChart(data, chartMode) {
-  // chartMode: 'bulan' (tahun tertentu dipilih) atau 'tahun' (Semua Tahun)
+  
   const isBulanMode = !chartMode || chartMode === 'bulan';
   const ALL_MONTHS = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Ags','Sep','Okt','Nov','Des'];
 
   let full;
   if (isBulanMode) {
-    // Mode per bulan: isi semua 12 bulan, bulan tanpa data = 0
+    
     const dataMap = {};
     (data || []).forEach(d => { dataMap[d.label || d.bulan] = d.total || 0; });
     full = ALL_MONTHS.map(b => ({ label: b, total: dataMap[b] || 0 }));
   } else {
-    // Mode per tahun: gunakan data apa adanya dari backend, urutkan
+    
     full = (data || [])
       .map(d => ({ label: d.label || String(d.tahun || ''), total: d.total || 0 }))
       .sort((a, b) => a.label.localeCompare(b.label));
@@ -1243,7 +1232,7 @@ function renderDonutChart(selesai, proses, berakhir, ditolak) {
   });
   const pct = total > 0 ? Math.round((selesai / total) * 100) : 0;
   const uid = 'donut_' + Math.random().toString(36).slice(2,7);
-  // Render dengan stroke-dasharray = 0 dulu, animasikan setelah mount
+  
   const svgSegs = segments.map((s, i) =>
     `<circle id="${uid}_seg${i}" cx="${cx}" cy="${cy}" r="${r}"
       fill="none" stroke="${s.color}" stroke-width="13"
@@ -1282,21 +1271,18 @@ function renderDonutChart(selesai, proses, berakhir, ditolak) {
   </div>`;
 }
 
-// ============== USULAN TABLE HELPER ==============
-// Cek apakah periode verifikasi untuk usulan dengan tahun+bulan tertentu masih aktif.
-// Berbeda dengan _periodeVerifOpen (global), fungsi ini cek per-usulan.
 function _isPeriodeVerifOpenFor(tahun, bulan) {
   const list = window._periodeAktifList || [];
   if (!list.length) {
-    // Tidak ada data periode → fallback ke flag global jika tersedia, else open
+    
     return window._periodeVerifOpen !== false;
   }
-  // Cari periode yang cocok dengan tahun+bulan usulan ini
+  
   const p = list.find(x => parseInt(x.tahun) === parseInt(tahun) && parseInt(x.bulan) === parseInt(bulan));
-  if (!p) return false; // Periode tidak ditemukan → anggap tutup
+  if (!p) return false; 
   const tmv = p.tanggalMulaiVerif || p.tanggal_mulai_verif;
   const tsv = p.tanggalSelesaiVerif || p.tanggal_selesai_verif;
-  if (!tmv || !tsv) return false; // Periode verif belum diset → tutup
+  if (!tmv || !tsv) return false; 
   const jmv = (p.jamMulaiVerif || p.jam_mulai_verif || '00:00').slice(0, 5);
   const jsv = (p.jamSelesaiVerif || p.jam_selesai_verif || '23:59').slice(0, 5);
   const toDs = (v) => { const dt = new Date(new Date(v).getTime() + 8 * 3600000); return dt.toISOString().slice(0, 10); };
@@ -1323,16 +1309,16 @@ function renderUsulanTable(rows, role) {
         : `<button class="btn-icon" disabled title="${u.statusGlobal === 'Menunggu Pengelola Program' ? 'Menunggu respon Pengelola Program' : 'Tidak perlu perbaikan'}" style="background:transparent;border:none;color:#cbd5e1;opacity:0.3;cursor:not-allowed"><span class="material-icons" style="font-size:17px">restart_alt</span></button>`;
       return viewBtn + editBtn + perbaikiBtn + pdfBtnEarly + logBtnEarly;
     }
-    // PP dan Admin bisa verif sesuai status global
-    // Untuk PP di status 'Menunggu Kepala Puskesmas':
-    // PP masih bisa verif kalau:
-    //   1. Belum pernah verif sama sekali (myVerifStatus=null → VP-nya Menunggu), ATAU
-    //   2. Masih punya indikator miliknya yang belum direspond (aksi=null) di penolakanIndikator
+    
+    
+    
+    
+    
     const _ppBisaVerifSaatKapus = (() => {
       if (role !== 'program' || u.statusGlobal !== 'Menunggu Kepala Puskesmas') return false;
-      // Kasus 1: PP ini belum pernah verif sama sekali → harus bisa verif
+      
       if (!u.myVerifStatus || u.myVerifStatus === 'Menunggu') return true;
-      // Kasus 2: PP sudah pernah verif, cek apakah ada indikator miliknya yg belum direspond
+      
       const myAkses = currentUser.indikatorAkses || [];
       const penolakan = u.penolakanIndikator || [];
       const belumRespond = penolakan.filter(p => !p.aksi || p.aksi === '');
@@ -1349,7 +1335,7 @@ function renderUsulanTable(rows, role) {
       (role === 'program' && _ppBisaVerifSaatKapus) ||
       (role === 'admin'   && u.statusGlobal === 'Menunggu Admin');
 
-    // Sudah verifikasi
+    
     const sudahVerifKepala = role === 'kepala-puskesmas' && (u.statusKapus === 'Selesai' || u.statusKapus === 'Ditolak');
     const sudahVerifProgram = role === 'program' && u.sudahVerif === true;
     const sudahVerifAdmin = role === 'admin' && u.statusGlobal === 'Selesai';
@@ -1359,18 +1345,18 @@ function renderUsulanTable(rows, role) {
     if (sudahVerif) {
       verifBtn = `<button class="btn-icon" title="Anda sudah memverifikasi" style="background:transparent;border:none;color:#0d9488;cursor:default;opacity:0.7" disabled><span class="material-icons">check_circle</span></button>`;
     } else if (canVerif) {
-      // Periode tutup → tampilkan lock per-usulan (cek tahun+bulan usulan, bukan flag global)
+      
       if (!_isPeriodeVerifOpenFor(u.tahun, u.bulan)) {
         verifBtn = `<button class="btn-icon" title="Periode verifikasi sudah ditutup" style="background:transparent;border:none;opacity:0.55;cursor:not-allowed;color:#94a3b8" disabled><span class="material-icons">lock</span></button>`;
       } else {
         verifBtn = `<button class="btn-icon approve" onclick="openVerifikasi('${u.idUsulan}')" title="Verifikasi Sekarang" style="animation:pulse 1.5s infinite"><span class="material-icons">rate_review</span></button>`;
       }
     } else {
-      // canVerif=false: belum giliran role ini — tampilkan lock abu-abu
+      
       verifBtn = `<button class="btn-icon" title="Menunggu tahap sebelumnya" style="opacity:0.35;cursor:not-allowed" disabled><span class="material-icons">lock</span></button>`;
     }
 
-    // Tombol download PDF
+    
     const pdfBtn = getDownloadBtn(u, 20, role, currentUser.indikatorAkses);
     const logBtn = `<button class="btn-icon" onclick="openLogAktivitas('${u.idUsulan}')" title="Riwayat Aktivitas" style="background:transparent;border:none;color:#64748b"><span class="material-icons" style="font-size:18px">history</span></button>`;
 
@@ -1384,7 +1370,7 @@ function renderUsulanTable(rows, role) {
   };
 
   return `<div class="table-container"><table>
-    <thead><tr style="background:#0d9488"><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">ID Usulan</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Puskesmas</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Periode</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Indeks SPM</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:1%;min-width:140px;white-space:nowrap">Status</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Dibuat</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Aksi</th></tr></thead>
+    <thead><tr style="background:#0d9488"><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">ID Usulan</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Puskesmas</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Periode</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Indeks SPM</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:1%;min-width:140px;white-space:nowrap">Status</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Dibuat</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:1%;min-width:150px;white-space:nowrap">Aksi</th></tr></thead>
     <tbody>${rows.map(u => `<tr>
       <td><span style="font-weight:600;font-size:12px;">${u.idUsulan}</span></td>
       <td>${u.namaPKM || u.kodePKM}</td>
@@ -1409,9 +1395,9 @@ function renderUsulanTable(rows, role) {
         })()}
         ${(role === 'admin' && (u.ditolakOleh === 'Admin' || u.konteksPenolakan === 'Admin')) ? (() => {
           const sg = u.statusGlobal;
-          // FIX: filter lama pakai dari_kapus=true, tapi baris Admin punya dari_kapus=false
-          // (dari_kapus hanya true untuk baris Kapus yang aksi=NULL, bukan Admin yang aksi='tolak').
-          // Gunakan filter aksi='tolak' yang tepat untuk skenario Admin tolak indikator.
+          
+          
+          
           let _nosAdmin = [...new Set((u.penolakanIndikator || [])
   .filter(p => p.aksi === 'tolak')
   .map(p => parseInt(p.noIndikator)))];
@@ -1445,11 +1431,11 @@ const nos = _nosAdmin.sort((a,b)=>a-b).map(n => `<span style="background:#fecaca
           </div>` : ''}
         ${(role === 'program' && u.penolakanIndikator && u.penolakanIndikator.length && ['Menunggu Pengelola Program','Menunggu Re-verifikasi PP','Ditolak Sebagian'].includes(u.statusGlobal) && !u.sudahVerif) ? (() => {
           const myAkses = currentUser.indikatorAkses || [];
-          // Re-verif dari tolak PP biasa
+          
           const aktifTolak = u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak' || p.aksi === 'reset');
           const filteredTolak = myAkses.length > 0 ? aktifTolak.filter(p => myAkses.includes(parseInt(p.noIndikator))) : aktifTolak;
           const nosTolak = [...new Set(filteredTolak.map(p => parseInt(p.noIndikator)))].sort((a,b)=>a-b);
-          // Re-verif dari kapus sanggah (kapus-ok)
+          
           const aktifKapus = u.penolakanIndikator.filter(p => p.aksi === 'kapus-ok' || p.aksi === 'kapus-verif');
           const filteredKapus = myAkses.length > 0 ? aktifKapus.filter(p => myAkses.includes(parseInt(p.noIndikator))) : aktifKapus;
           const nosKapus = [...new Set(filteredKapus.map(p => parseInt(p.noIndikator)))].sort((a,b)=>a-b);
@@ -1469,8 +1455,8 @@ const nos = _nosAdmin.sort((a,b)=>a-b).map(n => `<span style="background:#fecaca
           </div>` : '');
         })() : ''}
         ${(role === 'operator' && ['Ditolak','Ditolak Sebagian'].includes(u.statusGlobal) && u.ditolakOleh) ? (() => {
-          // dari_kapus=TRUE (diset backend) = harus diperbaiki Operator
-          // kapus-ok/kapus-setuju = disanggah Kapus, PP yang re-verif — Operator tidak perlu perbaiki
+          
+          
           const semua = u.penolakanIndikator || [];
           const nosTolak = [...new Set(
             semua.filter(p => p.dari_kapus === true || p.dari_kapus === 'true')
@@ -1515,7 +1501,7 @@ const nos = _nosAdmin.sort((a,b)=>a-b).map(n => `<span style="background:#fecaca
             })()}
           </div>` : ''}
         ${(role === 'kepala-puskesmas' && u.statusGlobal === 'Menunggu Kepala Puskesmas' && u.ditolakOleh && u.penolakanIndikator && u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak').length) ? (() => {
-          // EXCLUDE aksi='sanggah': Kapus sudah setujui via sanggahan → diteruskan ke PP, bukan tanggung jawab Kapus lagi.
+          
           const aktif = u.penolakanIndikator.filter(p => !p.aksi || p.aksi === 'tolak');
           const bgColor = u.ditolakOleh === 'Admin' ? '#fff7ed' : '#fef2f2';
           const bdColor = u.ditolakOleh === 'Admin' ? '#fed7aa' : '#fca5a5';
@@ -1562,7 +1548,6 @@ const nos = _nosAdmin.sort((a,b)=>a-b).map(n => `<span style="background:#fecaca
     </tr>`).join('')}</tbody>
   </table></div>`;
 }
-
 
 // ============== PROTEKSI PERIODE: Banner periode tutup ==============
 function showPeriodeTutupBanner() {

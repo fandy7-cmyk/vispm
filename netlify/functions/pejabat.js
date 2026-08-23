@@ -20,7 +20,7 @@ exports.handler = async (event) => {
         updated_at TIMESTAMPTZ DEFAULT NOW()
       )
     `).catch(()=>{});
-    // Hapus data Kepala Dinas yang sudah tidak digunakan
+    
     await pool.query(
       `DELETE FROM pejabat_penandatangan WHERE jabatan = 'Kepala Dinas Kesehatan PPKB'`
     ).catch(()=>{});

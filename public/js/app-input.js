@@ -1,6 +1,6 @@
-// ============== INPUT USULAN (OPERATOR) ==============
+
 async function renderInput() {
-  // Guard: hanya Operator yang bisa input usulan
+  
   if (currentUser && currentUser.role === 'Kepala Puskesmas') {
     document.getElementById('mainContent').innerHTML = `<div class="empty-state"><span class="material-icons" style="font-size:48px;color:var(--text-xlight)">block</span><p>Kepala Puskesmas tidak memiliki akses untuk input usulan.</p></div>`;
     return;
@@ -11,11 +11,11 @@ async function renderInput() {
     try {
       const periodeRes = await API.get('periode');
       allPeriode = Array.isArray(periodeRes) ? periodeRes : [];
-      // Operator hanya bisa pilih periode yang benar-benar aktif hari ini atau masih dalam rentang
-      // isAktifToday = status Aktif DAN dalam rentang tanggal
+      
+      
       periodeOptions = allPeriode.filter(p => p.isAktifToday);
       periodeAktif = allPeriode.find(p => p.isAktifToday);
-    } catch(e2) { /* periode API mungkin gagal, tetap lanjut */ }
+    } catch(e2) {  }
   } catch (e) { toast(e.message, 'error'); }
 
   const isOp = currentUser.role === 'Operator';
@@ -23,8 +23,8 @@ async function renderInput() {
     ? `<select class="form-control" id="inputPKM" disabled><option value="${currentUser.kodePKM}">${currentUser.namaPKM || currentUser.kodePKM}</option></select>`
     : `<select class="form-control" id="inputPKM"><option value="">Pilih Puskesmas</option>${pkmList.map(p => `<option value="${p.kode}">${p.nama}</option>`).join('')}</select>`;
 
-  // Tahun yang bisa dipilih: ambil dari periode berstatus Aktif
-  // Jika tidak ada periode sama sekali, tampilkan tahun default
+  
+  
   const tahunAktif = [...new Set(periodeOptions.map(p => parseInt(p.tahun)))].sort();
   const defaultTahun = periodeAktif ? periodeAktif.tahun : (tahunAktif[0] || CURRENT_YEAR);
   const tahunSelectHtml = tahunAktif.length
@@ -103,7 +103,7 @@ async function renderInput() {
       <div class="card-body" style="padding:0" id="myUsulanTable"></div>
     </div>`;
 
-  // Timer countdown untuk periode di halaman Input Usulan
+  
   setTimeout(() => {
     window._periodeTimers = window._periodeTimers || [];
     window._periodeTimers.forEach(t => clearInterval(t));
@@ -150,9 +150,9 @@ async function renderInput() {
     });
   }, 0);
 
-  // Simpan semua periodeOptions (berstatus Aktif) untuk updateBulanOptions
+  
   window._periodeInputAktif = periodeOptions;
-  // Fetch usulan yang sudah ada untuk filter bulan
+  
   try {
     const existingUsulan = await API.getUsulan({ email_operator: currentUser.email }).catch(() => []);
     window._existingUsulanBulan = (existingUsulan || []).map(u => ({ tahun: u.tahun, bulan: u.bulan }));
@@ -170,7 +170,7 @@ function updateBulanOptions() {
     .filter(u => u.tahun == tahun)
     .map(u => parseInt(u.bulan));
   const bulanForTahun = periodeOptions.filter(p => p.tahun == tahun);
-  // Normalisasi field bulan: API bisa pakai 'bulan', 'no_bulan', atau 'noBulan'
+  
   const normBulanList = bulanForTahun.map(p => ({
     ...p,
     bulan: p.bulan ?? p.no_bulan ?? p.noBulan,
@@ -186,7 +186,7 @@ function updateBulanOptions() {
     sel.disabled = true;
     if (btnBuat) { btnBuat.disabled = true; btnBuat.style.opacity = '0.5'; btnBuat.style.cursor = 'not-allowed'; }
   } else if (available.length === 1) {
-    // Hanya 1 bulan aktif — langsung auto-select, tombol langsung enabled
+    
     sel.disabled = false;
     sel.innerHTML = available.map(p => `<option value="${p.bulan}" selected>${p.namaBulan}</option>`).join('');
     sel.value = String(available[0].bulan); // force select
@@ -280,7 +280,7 @@ async function loadMyUsulan() {
     const rows = await API.getUsulan({ email_operator: currentUser.email });
     const tbl = document.getElementById('myUsulanTable');
     if (!tbl) {
-      // User mungkin sedang di dashboard, refresh dashboard saja
+      
       if (currentUser.role === 'Operator') renderDashboard();
       return;
     }
@@ -297,7 +297,7 @@ async function createUsulan() {
   const namaBulanTxt = BULAN_NAMA[bulan] || 'bulan ini';
   if (!kodePKM) return toast('Pilih puskesmas terlebih dahulu', 'error');
 
-  // Cek apakah periode yang dipilih valid (berstatus Aktif)
+  
   const periodeOptions = window._periodeInputAktif || [];
   if (periodeOptions.length > 0) {
     const periodeValid = periodeOptions.find(p => parseInt(p.tahun) == tahun && parseInt(p.bulan) == bulan);
@@ -305,14 +305,14 @@ async function createUsulan() {
       toast(`Periode ${namaBulanTxt} ${tahun} tidak aktif. Pilih periode yang sudah dibuka oleh Admin.`, 'error');
       return;
     }
-    // Validasi tanggal dilakukan server (isAktifToday) — cukup cek flag itu
+    
     if (!periodeValid.isAktifToday) {
       toast(`Periode ${namaBulanTxt} ${tahun} sudah ditutup pada ${formatDate(periodeValid.tanggalSelesai)}. Hubungi Admin.`, 'warning');
       return;
     }
   }
 
-  // Cek duplikat di sisi client
+  
   const existingList = await API.getUsulan({ email_operator: currentUser.email }).catch(() => []);
   const duplikat = existingList.find(u => u.tahun == tahun && u.bulan == bulan && u.kodePKM === kodePKM);
   if (duplikat) {
@@ -324,7 +324,7 @@ async function createUsulan() {
   try {
     const result = await API.buatUsulan({ kodePKM, tahun, bulan, emailOperator: currentUser.email });
     toast(`Usulan ${result.idUsulan} berhasil dibuat! Silakan isi data indikator.`, 'success');
-    // Update cache bulan yang sudah ada, lalu refresh dropdown
+    
     window._existingUsulanBulan = [...(window._existingUsulanBulan || []), { tahun, bulan }];
     updateBulanOptions();
     loadMyUsulan();
@@ -348,24 +348,22 @@ async function deleteUsulan(idUsulan) {
   });
 }
 
-// ============== INDIKATOR INPUT MODAL ==============
 let currentIndikatorUsulan = null;
 let indikatorData = [];
 
-// Buka/buat folder Google Drive otomatis
 async function openGDriveFolder(kodePKM, tahun, bulan, namaBulan, idUsulan) {
   const btn = document.getElementById('btnOpenDrive');
   if (btn) { btn.innerHTML = '<div class="spm-spinner sm"><div class="sr1"></div><div class="sr2"></div><div class="sr3"></div></div> Membuat folder...'; btn.disabled = true; }
   try {
     const result = await API.get('drive', { kodePKM, tahun, bulan, namaBulan });
-    // Save folder URL to DB
+    
     if (idUsulan) {
       await API.put('usulan?action=drive-folder', { idUsulan, driveFolderId: result.folderId, driveFolderUrl: result.folderUrl })
         .catch(e => console.warn('[drive-folder] Gagal simpan folder URL:', e.message));
     }
     window.open(result.folderUrl, '_blank');
     if (btn) { btn.innerHTML = '<span class="material-icons" style="font-size:15px">folder_open</span> Buka Folder Drive'; btn.disabled = false; }
-    // Update link info
+    
     const linkEl = document.getElementById('driveFolderLink');
     if (linkEl) { linkEl.href = result.folderUrl; linkEl.style.display = 'inline-flex'; }
   } catch (e) {
@@ -375,17 +373,17 @@ async function openGDriveFolder(kodePKM, tahun, bulan, namaBulan, idUsulan) {
 }
 
 async function openIndikatorModal(idUsulan) {
-  // === PROTEKSI PERIODE: cek apakah periode masih aktif sebelum buka modal ===
-  // Hanya berlaku untuk Operator (yang input data), bukan verifikasi
+  
+  
   if (currentUser && currentUser.role === 'Operator') {
-    // Re-fetch periode untuk memastikan data terkini (bukan cache lama)
+    
     try {
       const freshPeriode = await API.get('periode');
       window._periodeAktifList = Array.isArray(freshPeriode) ? freshPeriode : [];
     } catch(e) {}
     const periodeAktif = (window._periodeAktifList || []).filter(p => p.isAktifToday);
     if (periodeAktif.length === 0) {
-      // Tutup paksa jika modal sudah terbuka, rebuild sidebar lalu tampilkan banner
+      
       closeModal('indikatorModal');
       buildSidebar();
       showPeriodeTutupBanner();
@@ -395,7 +393,7 @@ async function openIndikatorModal(idUsulan) {
   }
   currentIndikatorUsulan = idUsulan;
   document.getElementById('indModalId').textContent = idUsulan;
-  // Reset notifikasi dan tombol submit ke state awal
+  
   const _lockNotif = document.getElementById('indModalLockNotif');
   if (_lockNotif) { _lockNotif.style.display = 'none'; _lockNotif.innerHTML = ''; }
   const _submitBtn = document.getElementById('btnSubmitFromModal');
@@ -406,8 +404,8 @@ async function openIndikatorModal(idUsulan) {
   try {
     const [detail, inds] = await Promise.all([API.getDetailUsulan(idUsulan), API.getIndikatorUsulan(idUsulan)]);
     indikatorData = inds;
-    // Ditolak = bisa diedit ulang seperti Draft
-    // Draft & Ditolak = bisa diedit. Status lain = read-only
+    
+    
     const isLocked = detail.statusGlobal !== 'Draft' && !['Ditolak','Ditolak Sebagian'].includes(detail.statusGlobal);
     const namaBulan = BULAN_NAMA[detail.bulan] || detail.bulan;
 
@@ -417,12 +415,12 @@ async function openIndikatorModal(idUsulan) {
     const submitBtn = document.getElementById('btnSubmitFromModal');
     if (submitBtn) {
       submitBtn.style.display = canSubmit ? 'flex' : 'none';
-      // Ubah label tombol untuk ajukan ulang
+      
       submitBtn.innerHTML = isDitolak
         ? '<span class="material-icons">refresh</span> Ajukan Ulang'
         : '<span class="material-icons">send</span> Submit Usulan';
     }
-    // Tampilkan banner status (hanya saat read-only, bukan saat Ditolak)
+    
     const _ln = document.getElementById('indModalLockNotif');
     if (_ln) {
       if (isDitolak) {
@@ -454,30 +452,30 @@ async function openIndikatorModal(idUsulan) {
     const infoEl = document.getElementById('indModalInfo');
     if (infoEl) infoEl.style.display = 'none';
 
-    // Update SPM top display
+    
     const spmTopEl = document.getElementById('indModalSPMTop');
     if (spmTopEl) spmTopEl.textContent = parseFloat(detail.indeksSPM).toFixed(2);
 
-    // === FILTER: saat Ditolak, hanya tampilkan indikator bermasalah ===
+    
     let displayInds = inds;
     let bermasalahNos = [];
-    const alasanMap = {}; // no_indikator → alasan
+    const alasanMap = {}; 
 
     if (isDitolak) {
       const penolakanList = detail.penolakanIndikator || [];
 
       if (penolakanList.length > 0) {
-        // dari_kapus=true: indikator yang perlu diperbaiki Operator
-        // - Kapus tolak sendiri (dibuat_oleh=Kapus/NULL)
-        // - Kapus benarkan penolakan PP (dibuat_oleh=PP, aksi=tolak)
-        // - Kapus benarkan penolakan Admin (dibuat_oleh=Admin, aksi=tolak)
-        // dari_kapus=false: disanggah Kapus, stillwaiting PP/Admin, bukan urusan Operator
+        
+        
+        
+        
+        
         penolakanList.filter(p => p.dari_kapus === true || p.dari_kapus === 'true').forEach(p => {
           const no = parseInt(p.no_indikator || p.noIndikator);
           if (!bermasalahNos.includes(no)) bermasalahNos.push(no);
           alasanMap[no] = p.alasan || '-';
         });
-        // Fallback untuk data lama tanpa dari_kapus
+        
         if (bermasalahNos.length === 0) {
           penolakanList.filter(p => !p.aksi || p.aksi === 'reset' || p.aksi === 'tolak').forEach(p => {
             const no = parseInt(p.no_indikator || p.noIndikator);
@@ -486,7 +484,7 @@ async function openIndikatorModal(idUsulan) {
           });
         }
       } else {
-        // Tidak ada data penolakan di DB - parse dari kapus_catatan sebagai fallback
+        
         const catatan = detail.kapusCatatan || detail.alasanTolak || '';
         catatan.split('|').forEach(part => {
           const m = part.trim().match(/#(\d+):\s*(.+)/);
@@ -507,11 +505,11 @@ async function openIndikatorModal(idUsulan) {
       renderPenolakanBanner('indModalPenolakanBanner', detail.ditolakOleh || 'Verifikator',
         Object.entries(alasanMap).map(([no, alasan]) => ({ no: parseInt(no), alasan }))
       );
-      // Thread catatan riwayat
+      
       renderCatatanThread('indCatatanThread', idUsulan, 'Operator');
 
     } else {
-      // Tidak ditolak — sembunyikan banner dan thread
+      
       const _pb = document.getElementById('indModalPenolakanBanner');
       if (_pb) { _pb.style.display = 'none'; _pb.innerHTML = ''; }
       const _ct = document.getElementById('indCatatanThread');
@@ -573,7 +571,7 @@ async function openIndikatorModal(idUsulan) {
 
             if (isLocked) {
               if (!normLinks.length) return '<span style="color:#94a3b8;font-size:12px">-</span>';
-              // Set _buktiLinks untuk modal preview di locked state juga
+              
               window[`_buktiLinks_${ind.no}`] = { links: normLinks, idUsulan };
               return `<div style="display:flex;align-items:center;gap:2px">
                 <input type="hidden" id="indLinks-${ind.no}" value='${JSON.stringify(normLinks).replace(/'/g,"&#39;")}' data-idusulan="${idUsulan}">
@@ -581,7 +579,7 @@ async function openIndikatorModal(idUsulan) {
               </div>`;
             }
             const hasFiles = normLinks.length > 0;
-            // Kalau sudah ada file: tombol disabled (pointer-events:none), baru aktif lagi setelah file dihapus
+            
             const btnStyle = hasFiles
               ? 'display:inline-flex;align-items:center;gap:4px;padding:4px 12px;background:#16a34a;color:white;border-radius:6px;cursor:not-allowed;font-size:11.5px;font-weight:600;border:1.5px solid #16a34a;white-space:nowrap;pointer-events:none;opacity:0.85'
               : 'display:inline-flex;align-items:center;gap:4px;padding:4px 12px;background:#ef4444;color:white;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:600;border:1.5px solid #ef4444;white-space:nowrap';
@@ -638,7 +636,6 @@ async function openIndikatorModal(idUsulan) {
     toast(e.message, 'error');
   }
 }
-
 
 // ============== ICON CONSTANTS ==============
 const SVG_EYE = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>';
@@ -1006,7 +1003,7 @@ function _renderBuktiModal() {
   const fileIcons = { pdf:'&#128196;', doc:'&#128196;', docx:'&#128196;', xls:'&#128202;', xlsx:'&#128202;', ppt:'&#128190;', pptx:'&#128190;' };
   const fileIcon = fileIcons[ext] || '&#128196;';
 
-  // Inisialisasi zoom state
+  
   if (!window._buktiZoomState) window._buktiZoomState = {};
   if (window._buktiZoomState.fileIdx !== idx) {
     window._buktiZoomState = { scale: 1.0, fileIdx: idx };
@@ -1057,7 +1054,7 @@ function _renderBuktiModal() {
     </div>`;
   modal.classList.add('show');
 
-  // Pasang wheel zoom untuk gambar
+  
   if (isImage) {
     const previewEl = document.getElementById(previewId);
     if (previewEl) {
@@ -1069,15 +1066,15 @@ function _renderBuktiModal() {
     }
   }
 
-  // Untuk non-image: embed langsung pakai proxyUrl (sign-url set Content-Type yang benar)
+  
   if (!isImage) {
     (async () => {
       const el = document.getElementById(previewId);
       if (!el) return;
       try {
         if (isPDF) {
-          // Render PDF pakai PDF.js (pdfjs-dist CDN) — bebas dari IDM intercept
-          // karena tidak ada fetch/download ke URL eksternal, semua dirender via canvas
+          
+          
           el.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:12px;color:#94a3b8">
             ${spinnerHTML('lg')}
             <span style="font-size:13px">Memuat PDF...</span>
@@ -1085,10 +1082,10 @@ function _renderBuktiModal() {
           const _initZoom = (window._buktiZoomState && window._buktiZoomState.scale) ? window._buktiZoomState.scale : 1.0;
           await _renderPDFjs(el, proxyUrl, idx, _initZoom);
         } else if (isOffice) {
-          // Office: fetch file via proxy Netlify → ArrayBuffer → render lokal
-          // - docx/doc  : mammoth.js  → HTML preview
-          // - xlsx/xls  : SheetJS     → HTML table preview
-          // - pptx/ppt  : tidak bisa dirender lokal → tampilkan download
+          
+          
+          
+          
           el.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:12px;color:#94a3b8">
             ${spinnerHTML('lg')}
             <span style="font-size:13px">Memuat dokumen...</span>
@@ -1098,7 +1095,7 @@ function _renderBuktiModal() {
           const isExcel = ['xls','xlsx'].includes(ext);
 
           if (isWord) {
-            // ── WORD: mammoth.js ──────────────────────────────────────────
+            
             if (!window.mammoth) {
               await new Promise((res, rej) => {
                 const s = document.createElement('script');
@@ -1118,19 +1115,19 @@ function _renderBuktiModal() {
                           box-shadow:0 0 40px rgba(0,0,0,0.3);transform-origin:top center;transition:transform 0.2s ease">
                 ${result.value || '<p style="color:#94a3b8">Dokumen kosong atau tidak dapat dirender.</p>'}
               </div>`;
-            // Simpan referensi untuk zoom
+            
             el._docMode = 'word';
-            // Terapkan zoom awal jika sudah ada state
+            
             const _wInitZoom = (window._buktiZoomState && window._buktiZoomState.scale) ? window._buktiZoomState.scale : 1.0;
             if (_wInitZoom !== 1.0) _applyBuktiZoom(previewId, 'word', _wInitZoom);
-            // Wheel zoom
+            
             el.addEventListener('wheel', function(e) {
               e.preventDefault();
               _buktiZoom(e.deltaY < 0 ? 1 : -1, previewId, 'word');
             }, { passive: false });
 
           } else if (isExcel) {
-            // ── EXCEL: SheetJS ────────────────────────────────────────────
+            
             if (!window.XLSX) {
               await new Promise((res, rej) => {
                 const s = document.createElement('script');
@@ -1144,7 +1141,7 @@ function _renderBuktiModal() {
             const arrayBuf = await resp.arrayBuffer();
             const workbook = XLSX.read(arrayBuf, { type: 'array' });
 
-            // Render semua sheet sebagai tab
+            
             const sheetNames = workbook.SheetNames;
             let activeSheet  = 0;
             const renderSheet = (sheetIdx) => {
@@ -1217,7 +1214,6 @@ function _renderBuktiModal() {
     })();
   }
 }
-
 
 async function _renderPDFjs(container, url, idx, zoomScale) {
   const _zoom = (typeof zoomScale === 'number' && zoomScale > 0) ? zoomScale : 1.0;
@@ -1317,7 +1313,7 @@ async function _renderPDFjs(container, url, idx, zoomScale) {
       container._pdfLastZoom = userScale;
     };
 
-    // Render awal
+    
     await container._pdfRenderAtScale(_zoom);
 
   } catch(e) {
@@ -1360,18 +1356,16 @@ function _buktiGoto(idx) {
   _renderBuktiModal();
 }
 
-// ======= ZOOM CONTROLS untuk modal Data Dukung =======
-// Skala zoom: 0.5x – 4.0x (step 0.25)
 const _ZOOM_STEPS  = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 2.5, 3.0, 4.0];
 const _ZOOM_MIN    = 0.5;
 const _ZOOM_MAX    = 4.0;
 const _ZOOM_STEP   = 0.25;
 
 function _buktiZoom(dir, previewId, mode) {
-  // dir: +1 = zoom in, -1 = zoom out
+  
   if (!window._buktiZoomState) window._buktiZoomState = { scale: 1.0 };
   let s = window._buktiZoomState.scale || 1.0;
-  // Cari step berikutnya dari _ZOOM_STEPS
+  
   if (dir > 0) {
     const next = _ZOOM_STEPS.find(v => v > s + 0.001);
     s = next !== undefined ? next : _ZOOM_MAX;
@@ -1389,11 +1383,11 @@ function _buktiZoomReset(previewId, mode) {
 }
 
 function _applyBuktiZoom(previewId, mode, scale) {
-  // Update label
+  
   const label = document.getElementById('buktiZoomLabel');
   if (label) label.textContent = Math.round(scale * 100) + '%';
 
-  // Disable/enable tombol
+  
   const btnOut   = document.getElementById('buktiZoomOut');
   const btnIn    = document.getElementById('buktiZoomIn');
   const btnReset = document.getElementById('buktiZoomReset');
@@ -1406,11 +1400,11 @@ function _applyBuktiZoom(previewId, mode, scale) {
     if (img) {
       img.style.transform = scale === 1.0 ? '' : `scale(${scale})`;
       img.style.transformOrigin = 'center center';
-      // Kalau zoom > 1 ubah max-width/height agar bisa scroll
+      
       img.style.maxWidth  = scale > 1 ? 'none' : '100%';
       img.style.maxHeight = scale > 1 ? 'none' : '100%';
     }
-    // Pastikan container bisa scroll saat zoom > 1
+    
     const container = document.getElementById(previewId);
     if (container) {
       container.style.overflow = scale > 1 ? 'scroll' : 'auto';
@@ -1418,22 +1412,22 @@ function _applyBuktiZoom(previewId, mode, scale) {
       container.style.justifyContent = scale > 1 ? 'flex-start' : 'center';
     }
   } else if (mode === 'pdf') {
-    // Zoom PDF via re-render canvas — teks tetap tajam di semua zoom level
+    
     const container = document.getElementById(previewId);
     if (!container || !container._pdfRenderAtScale) return;
-    // Debounce: hindari multiple re-render saat user klik cepat
+    
     clearTimeout(container._pdfZoomTimer);
     container._pdfZoomTimer = setTimeout(async () => {
       const pdfPages = container._pdfPagesId ? document.getElementById(container._pdfPagesId) : null;
       if (pdfPages) {
-        // Tunjukkan spinner tipis di atas halaman saat re-render
+        
         pdfPages.style.opacity = '0.5';
       }
       await container._pdfRenderAtScale(scale);
       if (pdfPages) pdfPages.style.opacity = '';
     }, 80);
   } else if (mode === 'word') {
-    // Zoom Word via CSS transform pada #wordDocWrap
+    
     const container = document.getElementById(previewId);
     if (!container) return;
     const wrap = container.querySelector('#wordDocWrap');
@@ -1441,7 +1435,7 @@ function _applyBuktiZoom(previewId, mode, scale) {
       wrap.style.transform       = scale === 1.0 ? '' : `scale(${scale})`;
       wrap.style.transformOrigin = 'top center';
       wrap.style.transition      = 'transform 0.2s ease';
-      // Sesuaikan tinggi wrapper agar scroll area mengikuti
+      
       if (scale > 1.0) {
         const naturalH = wrap.scrollHeight / (parseFloat(wrap.dataset.lastScale) || 1);
         wrap.dataset.lastScale  = scale;
@@ -1453,20 +1447,20 @@ function _applyBuktiZoom(previewId, mode, scale) {
     }
     container.style.overflowX = scale > 1 ? 'auto' : 'hidden';
   } else if (mode === 'excel') {
-    // Zoom Excel: scale seluruh konten tabel
+    
     const container = document.getElementById(previewId);
     if (!container) return;
-    // Target: div wrapper utama (anak pertama el)
+    
     const inner = container.firstElementChild;
     if (inner) {
-      // Temukan div scroll area (anak kedua dari inner — setelah tabs jika ada)
+      
       const scrollDiv = inner.querySelector('div[style*="overflow:auto"]') || inner.lastElementChild;
       const tableEl   = inner.querySelector('#xlsxTable') || inner.querySelector('table');
       if (tableEl) {
         tableEl.style.transform       = scale === 1.0 ? '' : `scale(${scale})`;
         tableEl.style.transformOrigin = 'top left';
         tableEl.style.transition      = 'transform 0.2s ease';
-        // Sesuaikan lebar wrapper agar horizontal scroll muncul saat zoom
+        
         if (scale > 1.0) {
           const naturalW = tableEl.offsetWidth / (parseFloat(tableEl.dataset.lastScale) || 1);
           const naturalH = tableEl.offsetHeight / (parseFloat(tableEl.dataset.lastScale) || 1);
@@ -1507,20 +1501,16 @@ async function downloadBukti(idx) {
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
   } catch (e) {
-    // Fallback: buka via proxy di tab baru
+    
     window.open(downloadProxyUrl, '_blank');
   }
 }
-
-// ============== KOREKSI TARGET SISA (Indikator 7 - Lansia) ==============
-// Fungsi ini tidak lagi digunakan — Indikator 7 dikembalikan ke input manual.
-// INDIKATOR_TARGET_SISA dikosongkan di app-core.js.
 
 async function saveIndikator(noIndikator) {
   const target  = parseFloat(document.getElementById(`t-${noIndikator}`)?.value) || 0;
   const capaian = parseFloat(document.getElementById(`c-${noIndikator}`)?.value) || 0;
 
-  // Validasi: target bulan tidak boleh melebihi target tahunan (kecuali indikator #8 & #9)
+  
   if (!INDIKATOR_TARGET_KUNCI.includes(noIndikator)) {
     const sasaran = parseInt(document.getElementById(`sasaran-${noIndikator}`)?.value) || 0;
     if (sasaran > 0 && target > sasaran) {
@@ -1532,10 +1522,10 @@ async function saveIndikator(noIndikator) {
   }
 
   try {
-    // Kirim update — tanpa linkFile supaya link yg sudah ada tidak terhapus
+    
     const result = await API.put('usulan?action=indikator', { idUsulan: currentIndikatorUsulan, noIndikator, target, capaian });
 
-    // Update SPM display langsung dari response (tanpa extra API call)
+    
     if (result?.indeksSPM !== undefined) {
       const spmVal = parseFloat(result.indeksSPM).toFixed(2);
       const topEl = document.getElementById('indModalSPMTop');
@@ -1547,7 +1537,7 @@ async function saveIndikator(noIndikator) {
 }
 
 async function submitUsulanFromModal() {
-  // === PROTEKSI PERIODE: cek ulang saat submit agar tidak bisa submit jika periode sudah tutup ===
+  
   if (currentUser && currentUser.role === 'Operator') {
     try {
       const freshPeriode = await API.get('periode');
@@ -1562,10 +1552,10 @@ async function submitUsulanFromModal() {
       return;
     }
   }
-  // Cek apakah ini mode perbaiki (tombol sudah berubah jadi "Ajukan Ulang")
+  
   const submitBtn = document.getElementById('btnSubmitFromModal');
   const isResubmit = submitBtn && submitBtn.textContent.includes('Ajukan Ulang');
-  // Validasi catatan operator (wajib saat ditolak Kapus)
+  
   const _opCatatanWrap = document.getElementById('operatorCatatanWrap');
   if (_opCatatanWrap && _opCatatanWrap.style.display !== 'none') {
     const _opCatatan = document.getElementById('operatorCatatanInput');
@@ -1630,13 +1620,13 @@ async function doSubmitUsulan(forceSubmit) {
       return;
     }
 
-    // ok() wraps dalam { success: true, data: {...} }
-    // API.call sudah throw jika !success, jadi sampai sini = sukses
+    
+    
     const successMsg = raw?.message || raw?.data?.message || 'Usulan berhasil disubmit!';
     toast(' ' + successMsg, 'success');
     closeModal('indikatorModal');
 
-    // Update icon tombol di tabel jadi hijau
+    
     const rowBtn = document.querySelector(`button[onclick="openIndikatorModal('${currentIndikatorUsulan}')"]`);
     if (rowBtn) {
       rowBtn.style.background = '#d1fae5';
@@ -1655,20 +1645,19 @@ async function doSubmitUsulan(forceSubmit) {
   }
 }
 
-// Preview SPM saat oninput (kalkulasi di client tanpa hit server)
 function clampRealisasi(no) {
   const tEl = document.getElementById(`t-${no}`);
   const cEl = document.getElementById(`c-${no}`);
   if (!tEl || !cEl) return;
-  // Paksa integer — hapus desimal
+  
   if (cEl.value.includes('.')) cEl.value = Math.floor(parseFloat(cEl.value));
   const sasaranEl = document.getElementById(`sasaran-${no}`);
   const sasaran = sasaranEl ? (parseInt(sasaranEl.value) || 0) : 0;
   const isKunci = INDIKATOR_TARGET_KUNCI.includes(no);
   const isSisa = INDIKATOR_TARGET_SISA.includes(no);
-  // Untuk indikator kunci: batas maks realisasi = sasaran tahunan
-  // Untuk indikator sisa (no.7): tidak ada batas maks — backend yang naikkan target otomatis
-  // Untuk indikator biasa: batas maks realisasi = target bulan ini
+  
+  
+  
   const t = parseInt(tEl.value) || 0;
   const batasMaks = isKunci && sasaran > 0 ? sasaran : (isSisa ? 0 : t);
   let c = parseInt(cEl.value) || 0;
@@ -1705,10 +1694,10 @@ function updateSisaTarget(no) {
 }
 
 function previewSPM(changedNo) {
-  // Paksa integer pada target juga
+  
   const tEl2 = document.getElementById(`t-${changedNo}`);
   if (tEl2 && tEl2.value.includes('.')) tEl2.value = Math.floor(parseFloat(tEl2.value));
-  // Auto-koreksi Target Bulan Ini
+  
   if (tEl2) {
     const sasaranEl = document.getElementById(`sasaran-${changedNo}`);
     const sasaran = sasaranEl ? parseInt(sasaranEl.value) : 0;
@@ -1716,23 +1705,23 @@ function previewSPM(changedNo) {
     if (sasaran > 0) {
       let tVal = parseInt(tEl2.value) || 0;
       if (isKunci && tVal !== sasaran) {
-        // Indikator 8 & 9: target bulan HARUS = target tahunan, apapun yang diinput
+        
         tEl2.value = sasaran;
         toast(`Target Bulan Ini Indikator ${changedNo} otomatis disesuaikan ke Target Tahunan (${sasaran})`, 'warning');
-        // Clamp realisasi juga kalau melebihi sasaran tahunan
+        
         const cEl2 = document.getElementById(`c-${changedNo}`);
         if (cEl2 && (parseInt(cEl2.value) || 0) > sasaran) {
           cEl2.value = sasaran;
           toast(`Realisasi Indikator ${changedNo} disesuaikan ke target tahunan (${sasaran})`, 'warning');
         }
       } else if (!isKunci && tVal > sasaran) {
-        // Indikator biasa: tidak boleh melebihi target tahunan
+        
         tEl2.value = sasaran;
         toast(`Target Bulan Ini Indikator ${changedNo} disesuaikan ke Target Tahunan (${sasaran})`, 'warning');
       }
     }
   }
-  // Update capaian % display untuk baris yang berubah
+  
   const tEl = document.getElementById(`t-${changedNo}`);
   const cEl = document.getElementById(`c-${changedNo}`);
   const capEl = document.getElementById(`cap-${changedNo}`);
@@ -1741,9 +1730,9 @@ function previewSPM(changedNo) {
     const c = parseInt(cEl.value) || 0;
     capEl.textContent = fmtCapaianPct(c, t);
   }
-  // Hitung SPM preview — gabung data DOM (indikator yang tampil) + indikatorData (yang tersembunyi)
+  
   let totalNilai = 0, totalBobot = 0;
-  // Mulai dari semua indikator (termasuk yang tidak tampil)
+  
   (indikatorData || []).forEach(ind => {
     const tDom = document.getElementById(`t-${ind.no}`);
     const cDom = document.getElementById(`c-${ind.no}`);
@@ -1757,35 +1746,29 @@ function previewSPM(changedNo) {
   const round2 = n => Math.round((n + Number.EPSILON) * 100) / 100;
   const indeksKinerja = totalBobot > 0 ? totalNilai / totalBobot : 0;
   const indeksSPM = round2(indeksKinerja * 0.33);
-  // Update display dengan tanda bahwa ini preview (belum tersimpan)
+  
   const topEl = document.getElementById('indModalSPMTop');
   if (topEl) topEl.textContent = indeksSPM.toFixed(2);
 }
 
-// ============== DETAIL MODAL ==============
-// Cache nama user (email → nama) agar tidak fetch berulang kali
 if (!window._userNamaCache) window._userNamaCache = {};
 if (!window._userIndCache) window._userIndCache = {};
 
-// Helper: render badge indikator per-nomor dengan warna sesuai status (tolak=merah, setuju=hijau)
-// nomorMerah: Set nomor indikator yang perlu re-verif/ditolak (badge merah)
-// nomorHijau: Set nomor indikator yang sudah disetujui (badge hijau)
-// Jika keduanya null/undefined → fallback ke perilaku lama (isDitolakVP / isSelesai)
 function _renderIndikatorBadges(emailProgram, indikatorAkses, catatan, isDitolakVP, isSelesai, nomorMerah, nomorHijau) {
   const _indStr = (window._userIndCache[emailProgram] !== undefined && window._userIndCache[emailProgram] !== '')
     ? window._userIndCache[emailProgram]
     : (indikatorAkses || 'Semua');
-  // Sentinel: nomorHijau = Set({-1}) → _aksesArr kosong tapi PP sudah Selesai → semua disetujui
+  
   if (nomorHijau instanceof Set && nomorHijau.has(-1)) {
     return '<span style="display:inline-block;background:#d1fae5;color:#065f46;border:1px solid #6ee7b7;border-radius:4px;padding:0px 7px;font-size:10px;font-weight:700;margin:1px 0">Semua disetujui ✓</span>';
   }
   const _hasPerInd = (nomorMerah instanceof Set && nomorMerah.size > 0) || (nomorHijau instanceof Set && nomorHijau.size > 0);
-  // Selalu render badge per-nomor (abu = belum/menunggu, hijau = disetujui, merah = ditolak)
-  // Fallback ke teks biasa hanya jika _indStr tidak bisa di-parse sebagai daftar nomor
+  
+  
   if (!_hasPerInd && !isSelesai && !isDitolakVP) {
     const _nums = _indStr.split(/[,\s]+/).filter(Boolean).map(x => parseInt(x)).filter(n => !isNaN(n));
-    if (!_nums.length) return _indStr; // benar-benar tidak ada nomor → teks biasa
-    // Render semua badge abu (belum verifikasi)
+    if (!_nums.length) return _indStr; 
+    
     return _nums.map(function(n) {
       return '<span style="display:inline-block;background:#f1f5f9;color:#64748b;border:1px solid #cbd5e1;border-radius:4px;padding:0px 5px;font-size:10px;font-weight:700;margin:1px 1px 0 0">' + n + '</span>';
     }).join('');
@@ -1857,21 +1840,21 @@ async function viewDetail(idUsulan) {
       ? indsAll.filter(i => currentUser.indikatorAkses.includes(parseInt(i.no)))
       : indsAll;
 
-    // Filter tambahan: saat mode re-verifikasi PP, hanya tampilkan indikator yang ditolak/re-verif
+    
     const _isReVerifPP = currentUser.role === 'Pengelola Program' &&
       ['Menunggu Pengelola Program', 'Menunggu Re-verifikasi PP'].includes(detail.statusGlobal) &&
       detail.penolakanIndikator && detail.penolakanIndikator.length > 0;
 
     if (_isReVerifPP) {
       const myAkses = currentUser.indikatorAkses || [];
-      // Kumpulkan nomor indikator yang perlu di-re-verifikasi oleh PP ini
+      
       const reVerifNos = [...new Set(
         detail.penolakanIndikator
           .filter(p => {
             const no = parseInt(p.no_indikator || p.noIndikator);
-            // Hanya indikator yang menjadi tanggung jawab PP ini
+            
             if (myAkses.length && !myAkses.includes(no)) return false;
-            // Status aktif: tolak/reset (re-verif biasa) atau kapus-ok/kapus-verif (sanggahan kapus)
+            
             return !p.aksi || p.aksi === 'tolak' || p.aksi === 'reset' || p.aksi === 'kapus-ok' || p.aksi === 'kapus-verif';
           })
           .map(p => parseInt(p.no_indikator || p.noIndikator))
@@ -1880,11 +1863,11 @@ async function viewDetail(idUsulan) {
         inds = inds.filter(i => reVerifNos.includes(parseInt(i.no)));
       }
     }
-    // Resolve nama Kepala Puskesmas dari email jika belum ada namaKapus
+    
     if (!detail.namaKapus && detail.kapusApprovedBy) {
       detail.namaKapus = await _getNamaByEmail(detail.kapusApprovedBy);
     }
-    // Resolve nama Admin dari email jika belum ada namaAdmin
+    
     if (!detail.namaAdmin && detail.adminApprovedBy) {
       detail.namaAdmin = await _getNamaByEmail(detail.adminApprovedBy);
     }
@@ -1892,7 +1875,7 @@ async function viewDetail(idUsulan) {
     const _vpSelesai  = vp.filter(v=>v.status==='Selesai').length;
     const _vpTolak    = vp.filter(v=>v.status==='Ditolak').length;
     const _vpTunggu   = vp.filter(v=>v.status==='Menunggu').length;
-    // Selesai + Menolak = sudah melakukan verifikasi (keduanya dihitung sebagai progress)
+    
     const _vpSudahVerif = _vpSelesai + _vpTolak;
     const _vpPct      = vp.length ? Math.round((_vpSudahVerif / vp.length) * 100) : 0;
     const _svgGroups = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>';
@@ -2041,7 +2024,7 @@ ${isSelesai && v.catatan ? (() => {
   const pdfBtn = document.getElementById('btnDownloadPDF');
   if (pdfBtn) pdfBtn.style.display = detail.statusGlobal === 'Selesai' ? 'inline-flex' : 'none';
 
-  // Banner alasan penolakan — collapsible, tampil paling atas kalau ditolak
+  
   const rejectionBanner = ['Ditolak','Ditolak Sebagian'].includes(detail.statusGlobal) ? `
     <div style="background:var(--danger-light,#fef2f2);border:2px solid #fca5a5;border-radius:10px;margin-bottom:16px;overflow:hidden">
       <button onclick="(function(btn){var b=btn.nextElementSibling;var a=btn.querySelector('.ri-arrow');var open=b.style.display!=='none';b.style.display=open?'none':'block';a.style.transform=open?'rotate(0deg)':'rotate(180deg)';})(this)" style="width:100%;display:flex;gap:10px;align-items:center;padding:12px 16px;background:none;border:none;cursor:pointer;text-align:left">
@@ -2109,9 +2092,6 @@ function approvalBox(label, by, at, alasanTolak = '') {
   </div>`;
 }
 
-
-// ============== LAPORAN PDF ==============
-// ============== RIWAYAT AKTIVITAS (MODAL) ==============
 async function openLogAktivitas(idUsulan) {
   let modal = document.getElementById('logAktivitasModal');
   if (!modal) {
@@ -2145,7 +2125,7 @@ async function openLogAktivitas(idUsulan) {
   try {
     const data = await API.getLogAktivitas(idUsulan);
     const { logs, usulan } = data;
-    // SVG icon library untuk Riwayat Aktivitas
+    
     const _svgIconsLog = {
       send:         `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>`,
       restart_alt:  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.95"/></svg>`,
@@ -2219,16 +2199,16 @@ async function openLogAktivitas(idUsulan) {
     if (!logs.length) {
       gridHtml = `<div class="empty-state"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/><line x1="2" y1="2" x2="22" y2="22" stroke="#cbd5e1"/></svg><p>Belum ada aktivitas</p></div>`;
     } else {
-      // Expand logs: log yang punya 2 tindakan dipecah jadi 2 bubble terpisah
+      
       const expandedLogs = [];
       logs.forEach(log => {
-        // Kapus Membenarkan + sebagian disetujui → 2 bubble
+        
         if (log.aksi === 'Kapus Membenarkan' && log.detail && log.detail.includes('Indikator disetujui Kapus (→ PP):')) {
           const splitIdx = log.detail.indexOf('| Indikator disetujui Kapus (→ PP):');
           const tolakDetail = log.detail.substring(0, splitIdx).replace(/\s*\|\s*$/, '').trim();
           const setujuDetail = log.detail.substring(splitIdx).replace(/^\|\s*Indikator disetujui Kapus \(→ PP\):\s*/, '').trim();
           expandedLogs.push({ ...log, aksi: 'Kapus Membenarkan', detail: tolakDetail, _splitLabel: null });
-          // Format setujuDetail: "#1: alasan, #2: alasan" → lebih rapi
+          
           const setujuFormatted = setujuDetail.split(',').map(s => s.trim()).filter(Boolean)
             .map(s => {
               const m = s.match(/^#?(\d+)(?::\s*(.*))?$/);
@@ -2236,7 +2216,7 @@ async function openLogAktivitas(idUsulan) {
             }).join(' | ');
           expandedLogs.push({ ...log, aksi: '_KapusSetujuPP', detail: setujuFormatted || setujuDetail, _splitLabel: null });
         }
-        // Approve re-verifikasi dengan catatan → tampilkan catatan di bubble _KapusSetujuPP
+        
         else if (log.aksi === 'Approve' && log.detail && log.detail.includes('Catatan:')) {
           const catatanIdx = log.detail.indexOf('| Catatan:');
           const mainDetail = catatanIdx >= 0 ? log.detail.substring(0, catatanIdx).trim() : log.detail;
@@ -2246,13 +2226,13 @@ async function openLogAktivitas(idUsulan) {
             expandedLogs.push({ ...log, aksi: '_KapusSetujuPP', detail: catatanDetail, _splitLabel: null });
           }
         }
-        // PP Membenarkan + ada sanggah sebelumnya → sudah terpisah di DB (Sanggah Selesai + PP Membenarkan)
-        // Tapi jika PP Membenarkan punya info sanggah inline, pisahkan juga
+        
+        
         else {
           expandedLogs.push(log);
         }
       });
-      // Tambahkan entry aksiConfig untuk bubble synthetic
+      
       aksiConfig['_KapusSetujuPP'] = { color:'#15803d', bg:'#dcfce7', icon:'kapus_pp', label:'Kapus Setujui → PP' };
       const rows = [];
       for (let i = 0; i < expandedLogs.length; i += COLS) rows.push(expandedLogs.slice(i, i + COLS));
@@ -2334,14 +2314,10 @@ async function openLogAktivitas(idUsulan) {
   }
 }
 
-// ============================================================
-//  BUKA LAPORAN — fetch HTML dari server lalu buka print dialog
-//  mode: 'sementara' | 'final' | 'log'
-// ============================================================
 async function bukaLaporan(idUsulan, mode, aksesIndikator) {
   const modeLabel = { sementara:'Laporan Sementara', final:'Laporan Final', log:'Riwayat Aktivitas' };
 
-  // window.open HARUS dipanggil sync sebelum await — agar browser tidak blokir popup
+  
   const pw = window.open('', '_blank');
   if (!pw) { toast('Popup diblokir browser. Izinkan popup untuk situs ini.', 'error'); return; }
   const _modeSubtitle = { sementara:'Laporan Sementara', final:'Laporan Final', log:'Riwayat Aktivitas' };
@@ -2432,6 +2408,5 @@ async function bukaLaporan(idUsulan, mode, aksesIndikator) {
   }
 }
 
-// Alias untuk backward-compat dengan tombol yang sudah ada
 function downloadLaporanPDF(idUsulan)       { return bukaLaporan(idUsulan, 'final'); }
 function downloadLaporanSementara(idUsulan) { return bukaLaporan(idUsulan, 'sementara'); }

@@ -1,4 +1,4 @@
-// ============== THEME TOGGLE ==============
+
 function toggleTheme() {
   const html = document.documentElement;
   const isDark = html.getAttribute('data-theme') === 'dark';
@@ -9,7 +9,6 @@ function toggleTheme() {
   if (btn) btn.textContent = newTheme === 'dark' ? '☀️' : '🌙';
 }
 
-// Terapkan tema yang tersimpan saat load
 (function applyStoredTheme() {
   const saved = localStorage.getItem('spm_theme');
   if (saved) {

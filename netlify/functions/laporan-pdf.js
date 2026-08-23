@@ -4,26 +4,19 @@ const zlib = require('zlib');
 const { promisify } = require('util');
 const gzip = promisify(zlib.gzip);
 
-// ============================================================
-//  HELPER: Compress base64 image — resize ke max 200px wide
-//  via strip quality metadata agar tidak lewat 6MB Lambda limit
-// ============================================================
 function compressBase64Img(dataUrl, maxWidth = 200) {
-  // Jika bukan base64 data URL (misal URL biasa), kembalikan apa adanya
+  
   if (!dataUrl || !dataUrl.startsWith('data:image')) return dataUrl;
-  // Potong ke max ~150KB — tanda tangan tidak perlu resolusi tinggi di PDF
-  // Base64 150KB ≈ ~112KB binary image, cukup untuk TTD di ukuran 160x80px
-  const MAX_BASE64_CHARS = 500 * 1024; // 500KB
+  
+  
+  const MAX_BASE64_CHARS = 500 * 1024; 
   if (dataUrl.length <= MAX_BASE64_CHARS) return dataUrl;
-  // Jika terlalu besar, crop base64 string TIDAK bisa (rusak) → return placeholder
-  // Solusi: ganti dengan teks "TTD terlalu besar, simpan ulang"
+  
+  
   console.warn(`[laporan-pdf] tanda_tangan base64 terlalu besar: ${Math.round(dataUrl.length/1024)}KB, diganti placeholder`);
-  return null; // caller akan fallback ke approvedBadgeSVG
+  return null; 
 }
 
-// ============================================================
-//  HELPER: Approved Badge SVG
-// ============================================================
 function approvedBadgeSVG() {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 100 100">
     <defs><path id="circle" d="M 50,50 m -37,0 a 37,37 0 1,1 74,0 a 37,37 0 1,1 -74,0"/></defs>
@@ -42,10 +35,6 @@ function approvedBadgeSVG() {
   </svg>`;
 }
 
-// ============================================================
-//  HELPER: Format tanggal/waktu
-// ============================================================
-// Format persentase: 100 → "100", selain itu 1 desimal (58.49 → "58.5", 91.67 → "91.7")
 function fmtPct(val) {
   const n = parseFloat(val || 0);
   if (n >= 100) return '100';
@@ -61,9 +50,6 @@ function fmtDT(ts) {
   return `${tgl} | ${jam} WITA`;
 }
 
-// ============================================================
-//  KOP SURAT — dipakai semua mode
-// ============================================================
 function kopSurat(logoSrc = 'https://vispm.netlify.app/logobalut.png') {
   return `
     <div style="position:relative;padding-bottom:10px;margin-bottom:14px;border-bottom:2px solid #1e293b;min-height:80px">
@@ -78,9 +64,6 @@ function kopSurat(logoSrc = 'https://vispm.netlify.app/logobalut.png') {
     </div>`;
 }
 
-// ============================================================
-//  CSS GLOBAL — dipakai semua mode
-// ============================================================
 function globalCSS() {
   return `
     * { margin:0; padding:0; box-sizing:border-box; }
@@ -97,9 +80,6 @@ function globalCSS() {
     table { border-collapse: collapse; }`;
 }
 
-// ============================================================
-//  WRAPPER HTML — kop + judul + body + auto-print
-// ============================================================
 function wrapHtml(title, bodyContent) {
   return `<!DOCTYPE html>
 <html lang="id">
@@ -115,10 +95,6 @@ function wrapHtml(title, bodyContent) {
 </html>`;
 }
 
-// ============================================================
-//  MODE: sementara & final — laporan per indikator
-// ============================================================
-// Migrasi kolom — dijalankan sekali saat cold start, bukan setiap request
 let _migrationDone = false;
 async function runMigrations(pool) {
   if (_migrationDone) return;
@@ -134,7 +110,7 @@ async function runMigrations(pool) {
 async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter) {
   await runMigrations(pool);
 
-  // Query header
+  
   const hdrResult = await pool.query(
     `SELECT uh.*, p.nama_puskesmas, p.indeks_kesulitan_wilayah,
             ku.nama as kapus_nama, ku.nip as kapus_nip, ku.jabatan as kapus_jabatan,
@@ -147,14 +123,14 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
   if (!hdrResult.rows.length) throw new Error('Usulan tidak ditemukan');
   const h = hdrResult.rows[0];
 
-  // Pejabat penandatangan (hanya untuk mode final)
+  
   const pjResult = await pool.query(
     `SELECT jabatan, nama, nip, tanda_tangan FROM pejabat_penandatangan ORDER BY id`
   ).catch(() => ({ rows: [] }));
   const kasubag = pjResult.rows.find(p => p.jabatan === 'Kepala Sub Bagian Perencanaan') || {};
 
-  // Indikator + target tahunan + realisasi kumulatif semua bulan di tahun ini
-  // sisa_target = sasaran_tahunan - realisasi_kumulatif (akurat lintas bulan)
+  
+  
   const indResult = await pool.query(
     `SELECT ui.*,
             mi.nama_indikator, mi.catatan as catatan_indikator,
@@ -181,7 +157,7 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
     [idUsulan, h.kode_pkm, h.tahun]
   );
 
-  // Verifikasi program — JOIN users untuk ambil tanda_tangan & waktu verifikasi
+  
   const vpResult = await pool.query(
     `SELECT vp.*, u.tanda_tangan as tt_program, u.jabatan as jabatan_user,
             u.nama as nama_user, u.nip as nip_user,
@@ -191,15 +167,15 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
      WHERE vp.id_usulan = $1 ORDER BY vp.created_at`, [idUsulan]
   );
 
-  // Konfigurasi penandatangan dari DB — hanya ambil jabatan & urutan per indikator
-  // nama/NIP/TT diambil dari verifikasi_program+users (by email) di getVerifierSlots
+  
+  
   const penandatanganCfg = await pool.query(
     `SELECT no_indikator, jabatan, urutan
      FROM indikator_penandatangan
      ORDER BY no_indikator, urutan`
   ).catch(() => ({ rows: [] }));
 
-  // Kelompokkan per no_indikator → { 1: ['Jabatan A', 'Jabatan B'], 2: [...] }
+  
   const JABATAN_MAP_DB = {};
   for (const row of penandatanganCfg.rows) {
     if (!JABATAN_MAP_DB[row.no_indikator]) JABATAN_MAP_DB[row.no_indikator] = [];
@@ -213,7 +189,7 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
   const now = _nowDt.toLocaleDateString('id-ID', { ..._nowOpt, day:'2-digit', month:'long', year:'numeric' })
             + ' | ' + _nowDt.toLocaleTimeString('id-ID', { ..._nowOpt, hour:'2-digit', minute:'2-digit', hour12:false }).replace('.', ':') + ' WITA';
 
-  // Helper lowercase untuk string nullable
+  
   function LOWER(s) { return (s||'').toLowerCase(); }
 
   // Helper title case — hanya huruf pertama tiap kata kapital
@@ -380,17 +356,17 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
       const justify = chunk.length === 1 ? 'center' : 'space-between';
       extraRows += `<div style="display:flex;justify-content:${justify};align-items:flex-start;gap:20px;margin-top:8px;page-break-inside:avoid;break-inside:avoid">${chunk.map(s => signBlock(s)).join('')}</div>`;
     }
-    // Bungkus semua baris TTD jadi 1 unit — kalau memang tidak cukup ruang,
-    // seluruh grup pindah ke halaman berikutnya, bukan 1 TTD sendirian nyempil.
+    
+    
     return `<div style="page-break-inside:avoid;break-inside:avoid">${row1}${extraRows}</div>`;
   }
 
-  // Build pages
+  
   const _allInds = aksesFilter && aksesFilter.length
     ? indResult.rows.filter(ind => aksesFilter.includes(ind.no_indikator))
     : indResult.rows;
 
-  // ── LAPORAN SEMENTARA: semua 12 indikator dalam 1 halaman tabel ─────────────
+  
   let pagesHtml;
   if (isSementara) {
     const infoHeader = `
@@ -665,9 +641,6 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
   return { html: wrapHtml(titleDoc, pagesHtml + rekapPage), filename };
 }
 
-// ============================================================
-//  MODE: log — riwayat aktivitas
-// ============================================================
 async function generateLaporanLog(pool, idUsulan) {
   const [logResult, headerResult] = await Promise.all([
     pool.query(
@@ -695,35 +668,35 @@ async function generateLaporanLog(pool, idUsulan) {
                + ' | ' + nowDt.toLocaleTimeString('id-ID',{...nowOpt,hour:'2-digit',minute:'2-digit',hour12:false}) + ' WITA';
 
   const aksiColor = {
-    'Submit':                   '#0d9488',   // teal
-    'Ajukan Ulang':             '#0284c7',   // sky blue
-    'Approve':                  '#16a34a',   // green
-    'Approve Final':            '#15803d',   // dark green
-    'Selesai':                  '#059669',   // emerald
-    'Re-verifikasi':            '#06b6d4',   // cyan
-    'Respond Penolakan':        '#2563eb',   // blue
-    'Tolak':                    '#dc2626',   // red
-    'Tolak (sebagian)':         '#ea580c',   // orange
-    'Tolak Indikator':          '#be123c',   // rose
-    'Tolak Ke Operator':        '#b91c1c',   // dark red
-    'Tolak Global':             '#450a0a',   // darkest red
-    'Kembalikan':               '#7c3aed',   // violet
-    'Dikembalikan':             '#6d28d9',   // purple
-    'Kembalikan ke PP':         '#4f46e5',   // indigo
-    'Sanggah':                  '#9333ea',   // purple-600
-    'Sanggah Selesai':          '#a21caf',   // fuchsia
-    'Sanggah → Admin':          '#7e22ce',   // purple-800
-    'Sanggah → Kapus':          '#d97706',   // amber
-    'Kapus Sanggah':            '#db2777',   // pink
-    'Kapus Terima Penolakan':   '#f59e0b',   // yellow-amber
-    'Kapus Membenarkan':        '#b45309',   // amber-700
-    'Kapus Menyanggah':         '#c2410c',   // orange-700
-    'Konfirmasi Re-verif':      '#0369a1',   // sky-700
-    'PP Membenarkan':           '#0f766e',   // teal-700
-    'Benarkan Penolakan Admin': '#991b1b',   // red-800
-    'Terima Penolakan Admin':   '#7f1d1d',   // red-900
-    'Reset':                    '#64748b',   // slate
-    'Restore Verif':            '#6366f1',   // indigo-500
+    'Submit':                   '#0d9488',   
+    'Ajukan Ulang':             '#0284c7',   
+    'Approve':                  '#16a34a',   
+    'Approve Final':            '#15803d',   
+    'Selesai':                  '#059669',   
+    'Re-verifikasi':            '#06b6d4',   
+    'Respond Penolakan':        '#2563eb',   
+    'Tolak':                    '#dc2626',   
+    'Tolak (sebagian)':         '#ea580c',   
+    'Tolak Indikator':          '#be123c',   
+    'Tolak Ke Operator':        '#b91c1c',   
+    'Tolak Global':             '#450a0a',   
+    'Kembalikan':               '#7c3aed',   
+    'Dikembalikan':             '#6d28d9',   
+    'Kembalikan ke PP':         '#4f46e5',   
+    'Sanggah':                  '#9333ea',   
+    'Sanggah Selesai':          '#a21caf',   
+    'Sanggah → Admin':          '#7e22ce',   
+    'Sanggah → Kapus':          '#d97706',   
+    'Kapus Sanggah':            '#db2777',   
+    'Kapus Terima Penolakan':   '#f59e0b',   
+    'Kapus Membenarkan':        '#b45309',   
+    'Kapus Menyanggah':         '#c2410c',   
+    'Konfirmasi Re-verif':      '#0369a1',   
+    'PP Membenarkan':           '#0f766e',   
+    'Benarkan Penolakan Admin': '#991b1b',   
+    'Terima Penolakan Admin':   '#7f1d1d',   
+    'Reset':                    '#64748b',   
+    'Restore Verif':            '#6366f1',   
   };
   const aksiLabel = {
     'Submit':                   'Diajukan',
@@ -757,97 +730,96 @@ async function generateLaporanLog(pool, idUsulan) {
     'Restore Verif':            'Dipulihkan',
   };
 
-
-  // SVG inline icons — sinkron dengan Riwayat Aktivitas di app-input.js
+  
   function aksiSVG(aksi, color) {
     const s = (path) =>
       `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle;margin-right:3px;flex-shrink:0">${path}</svg>`;
     const icons = {
-      // Submit — paper-plane (send)
+      
       'Submit':
         s('<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>'),
-      // Ajukan Ulang — counter-clockwise refresh
+      
       'Ajukan Ulang':
         s('<polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.95"/>'),
-      // Approve — circle-check dengan ekor luar
+      
       'Approve':
         s('<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>'),
-      // Approve Final — circle dengan titik kompas (badge verified)
+      
       'Approve Final':
         s('<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2"/>'),
-      // Re-verifikasi — clockwise rotate
+      
       'Re-verifikasi':
         s('<polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.18-5"/>'),
-      // Tolak — X circle
+      
       'Tolak':
         s('<circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>'),
-      // Tolak sebagian — minus circle
+      
       'Tolak (sebagian)':
         s('<circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/>'),
-      // Tolak Indikator — lightning bolt
+      
       'Tolak Indikator':
         s('<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>'),
-      // Tolak Ke Operator — reply arrow
+      
       'Tolak Ke Operator':
         s('<polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/>'),
-      // Tolak Global — slash circle
+      
       'Tolak Global':
         s('<circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>'),
-      // Kembalikan — undo (counter-clockwise with arc)
+      
       'Kembalikan':
         s('<polyline points="3 7 3 3 7 3"/><path d="M3 3l5 5"/><path d="M21 13A9 9 0 0 1 3 13v-3"/>'),
-      // Dikembalikan — undo (sama dengan Kembalikan tapi warna berbeda)
+      
       'Dikembalikan':
         s('<polyline points="3 7 3 3 7 3"/><path d="M3 3l5 5"/><path d="M21 13A9 9 0 0 1 3 13v-3"/>'),
-      // Kembalikan ke PP — corner-down-left arrow
+      
       'Kembalikan ke PP':
         s('<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>'),
-      // Sanggah — gavel
+      
       'Sanggah':
         s('<path d="m14 13-8.5 8.5a2.12 2.12 0 0 1-3-3L11 10"/><path d="m16 16 6-6"/><path d="m8 8 6-6"/><path d="m9 7 8 8"/>'),
-      // Sanggah Selesai — gavel + filled dot
+      
       'Sanggah Selesai':
         s('<path d="m14 13-8.5 8.5a2.12 2.12 0 0 1-3-3L11 10"/><path d="m16 16 6-6"/><path d="m8 8 6-6"/><path d="m9 7 8 8"/><circle cx="20" cy="4" r="2" fill="currentColor" stroke="none"/>'),
-      // Sanggah → Admin — double reply arrows
+      
       'Sanggah → Admin':
         s('<polyline points="7 17 2 12 7 7"/><polyline points="12 17 7 12 12 7"/><path d="M22 18v-2a4 4 0 0 0-4-4H7"/>'),
-      // Sanggah → Kapus — double reply arrows + filled dot
+      
       'Sanggah → Kapus':
         s('<polyline points="7 17 2 12 7 7"/><polyline points="12 17 7 12 12 7"/><path d="M22 18v-2a4 4 0 0 0-4-4H7"/><circle cx="22" cy="8" r="2" fill="currentColor" stroke="none"/>'),
-      // Kapus Sanggah — gavel (sama bentuk)
+      
       'Kapus Sanggah':
         s('<path d="m14 13-8.5 8.5a2.12 2.12 0 0 1-3-3L11 10"/><path d="m16 16 6-6"/><path d="m8 8 6-6"/><path d="m9 7 8 8"/>'),
-      // Kapus Terima Penolakan — undo
+      
       'Kapus Terima Penolakan':
         s('<polyline points="3 7 3 3 7 3"/><path d="M3 3l5 5"/><path d="M21 13A9 9 0 0 1 3 13v-3"/>'),
-      // Respond Penolakan — chat bubble + plus
+      
       'Respond Penolakan':
         s('<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><line x1="9" y1="10" x2="15" y2="10"/><line x1="12" y1="7" x2="12" y2="13"/>'),
-      // Kapus Membenarkan — user-check
+      
       'Kapus Membenarkan':
         s('<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><polyline points="16 11 18 13 22 9"/>'),
-      // Kapus Menyanggah — gavel (sama tapi warna berbeda)
+      
       'Kapus Menyanggah':
         s('<path d="m14 13-8.5 8.5a2.12 2.12 0 0 1-3-3L11 10"/><path d="m16 16 6-6"/><path d="m8 8 6-6"/><path d="m9 7 8 8"/>'),
-      // Konfirmasi Re-verif — user-check
+      
       'Konfirmasi Re-verif':
         s('<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="m16 11 2 2 4-4"/>'),
-      // PP Membenarkan — clipboard check
+      
       'PP Membenarkan':
         s('<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>'),
-      // Benarkan Penolakan Admin — clipboard check
+      
       'Benarkan Penolakan Admin':
         s('<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>'),
-      // Terima Penolakan Admin — rect check
+      
       'Terima Penolakan Admin':
         s('<rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/>'),
-      // Selesai — filled circle check
+      
       'Selesai':
         s('<path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/>'),
-      // Reset — counter-clockwise double arrow
+      
       'Reset':
         s('<path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>'),
-      // Restore Verif — history dengan titik peringatan
+      
       'Restore Verif':
         s('<path d="M3.06 13a9 9 0 1 0 .49-4.95"/><polyline points="3 3 3 9 9 9"/><line x1="12" y1="7" x2="12" y2="12"/><circle cx="12" cy="15" r="1" fill="currentColor" stroke="none"/>'),
     };
@@ -927,18 +899,13 @@ async function generateLaporanLog(pool, idUsulan) {
   return { html: wrapHtml(titleDoc, bodyHtml), filename };
 }
 
-// ============================================================
-//  MODE: rekap — tabel rekap semua usulan sesuai filter
-//  Dipanggil dari handler dengan ?mode=rekap&ids=id1,id2,...
-//  Opsional: &tahun=2026&bulan=Januari&pkm=NUSANTARA&status=Selesai
-// ============================================================
 async function generateLaporanRekap(pool, ids, filterLabel) {
   if (!ids || !ids.length) throw new Error('Tidak ada data untuk direkap');
 
   const bulanNama = ['','Januari','Februari','Maret','April','Mei','Juni',
     'Juli','Agustus','September','Oktober','November','Desember'];
 
-  // Fetch semua header sekaligus
+  
   const placeholders = ids.map((_, i) => `$${i + 1}`).join(',');
   const result = await pool.query(
     `SELECT uh.*, p.nama_puskesmas
@@ -955,7 +922,7 @@ async function generateLaporanRekap(pool, ids, filterLabel) {
   const nowStr = _nowRekap.toLocaleDateString('id-ID', { ..._nowOpt, day: '2-digit', month: 'long', year: 'numeric' })
     + ' | ' + _nowRekap.toLocaleTimeString('id-ID', { ..._nowOpt, hour: '2-digit', minute: '2-digit', hour12: false }).replace('.', ':') + ' WITA';
 
-  // Hitung summary
+  
   const total    = rows.length;
   const selesai  = rows.filter(r => r.status_global === 'Selesai').length;
   const pending  = rows.filter(r => !['Selesai','Ditolak'].includes(r.status_global)).length;
@@ -1022,12 +989,9 @@ async function generateLaporanRekap(pool, ids, filterLabel) {
   return { html: wrapHtml('Rekap Laporan SPM', bodyHtml), filename };
 }
 
-// ============================================================
-//  ENTRY POINT — generateLaporanHtml (dipanggil dari handler)
-// ============================================================
 async function generateLaporanHtml(idUsulan, mode, aksesFilter) {
   const pool = getPool();
-  // mode: 'sementara' | 'final' | 'log'
+  
   if (mode === 'log') return generateLaporanLog(pool, idUsulan);
   const isSementara = mode === 'sementara';
   return generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter);
@@ -1035,16 +999,13 @@ async function generateLaporanHtml(idUsulan, mode, aksesFilter) {
 
 exports.generateLaporanHtml = generateLaporanHtml;
 
-// ============================================================
-//  NETLIFY HANDLER
-// ============================================================
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors();
   const _authErr = await validateSession(event);
   if (_authErr) return _authErr;
   const params = event.queryStringParameters || {};
   const idUsulan = params.id;
-  const mode = params.mode || 'final'; // 'sementara' | 'final' | 'log' | 'rekap'
+  const mode = params.mode || 'final'; 
   const aksesParam = params.akses || '';
   const aksesFilter = aksesParam ? aksesParam.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n) && n > 0) : [];
 
@@ -1076,11 +1037,11 @@ exports.handler = async (event) => {
   try {
     const { html, filename } = await generateLaporanHtml(idUsulan, mode, aksesFilter);
 
-    // Cek ukuran — Lambda limit 6MB (base64 ~4.5MB raw)
+    
     const rawBytes = Buffer.byteLength(html, 'utf8');
     console.log(`[laporan-pdf] HTML size: ${Math.round(rawBytes / 1024)}KB`);
 
-    // Gunakan gzip jika > 3MB untuk tetap di bawah limit 6MB
+    
     if (rawBytes > 3 * 1024 * 1024) {
       const compressed = await gzip(html);
       const b64 = compressed.toString('base64');

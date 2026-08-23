@@ -36,14 +36,14 @@ exports.handler = async (event) => {
       query += ' ORDER BY tahun, bulan';
       const result = await pool.query(query, qParams);
 
-      // Gunakan waktu WITA (UTC+8) untuk perbandingan tanggal DAN jam
-      // Netlify server berjalan di UTC — tanpa konversi ini, hari bisa off-by-one
+      
+      
       const nowWita = new Date(Date.now() + 8 * 3600000);
-      const todayStr = nowWita.toISOString().slice(0, 10); // "YYYY-MM-DD" dalam WITA
-      // Format jam sekarang sebagai "HH:MM" dalam WITA
-      const nowTimeStr = nowWita.toISOString().slice(11, 16); // "HH:MM"
+      const todayStr = nowWita.toISOString().slice(0, 10); 
+      
+      const nowTimeStr = nowWita.toISOString().slice(11, 16); 
 
-      // Helper: ambil tanggal dari nilai DB sebagai string WITA "YYYY-MM-DD"
+      
       const toDateStr = (val) => {
         if (!val) return '';
         const d = new Date(val);
@@ -59,15 +59,15 @@ exports.handler = async (event) => {
         const jm = jamMulai  || '00:00';
         const js = jamSelesai || '23:59';
         if (!mulaiStr || !selesaiStr) return false;
-        // Cek apakah sekarang >= mulai (tanggal+jam) DAN sekarang <= selesai (tanggal+jam)
+        
         const nowDT  = todayStr + 'T' + nowTimeStr;
         const mulaiDT  = mulaiStr  + 'T' + jm;
         const selesaiDT = selesaiStr + 'T' + js;
         return nowDT >= mulaiDT && nowDT <= selesaiDT;
       };
 
-      // Auto-update expired periods to Tidak Aktif
-      // Expired = status Aktif DAN waktu sekarang sudah melewati tanggal+jam selesai
+      
+      
       for (const r of result.rows) {
         if (r.status === 'Aktif') {
           const selesaiStr = toDateStr(r.tanggal_selesai);
@@ -82,10 +82,10 @@ exports.handler = async (event) => {
       }
 
       return ok(result.rows.map(r => {
-        // isAktifToday: status Aktif DAN sekarang dalam rentang tanggal+jam input
+        
         const isAktifToday = r.status === 'Aktif'
           && isNowInRange(r.tanggal_mulai, r.jam_mulai, r.tanggal_selesai, r.jam_selesai);
-        // isVerifToday: status Aktif DAN sekarang dalam rentang tanggal+jam verifikasi
+        
         const isVerifToday = r.status === 'Aktif'
           && !!r.tanggal_mulai_verif && !!r.tanggal_selesai_verif
           && isNowInRange(r.tanggal_mulai_verif, r.jam_mulai_verif, r.tanggal_selesai_verif, r.jam_selesai_verif);
@@ -138,7 +138,7 @@ exports.handler = async (event) => {
     if (method === 'DELETE') {
       const { tahun, bulan } = params;
       if (!tahun || !bulan) return err('Tahun dan bulan diperlukan');
-      // Cek apakah periode sedang aktif hari ini — tidak boleh dihapus
+      
       const r = await pool.query('SELECT id, status, tanggal_mulai, tanggal_selesai FROM periode_input WHERE tahun=$1 AND bulan=$2', [parseInt(tahun), parseInt(bulan)]);
       if (!r.rows.length) return err('Periode tidak ditemukan');
       const p = r.rows[0];

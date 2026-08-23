@@ -56,7 +56,7 @@ async function adminStats(pool, tahun) {
   const s = usulanResult.rows[0];
   const bulanNama = ['','Jan','Feb','Mar','Apr','Mei','Jun','Jul','Ags','Sep','Okt','Nov','Des'];
 
-  // Format chart sesuai mode: per bulan atau per tahun
+  
   const chart = tahun
     ? chartResult.rows.map(r => ({ label: bulanNama[r.bulan] || r.bulan, total: parseInt(r.total), isBulan: true }))
     : chartResult.rows.map(r => ({ label: String(r.tahun), total: parseInt(r.total), isBulan: false }));
@@ -92,7 +92,7 @@ async function operatorStats(pool, email, tahun) {
      FROM periode_input WHERE status='Aktif' ORDER BY tahun, bulan`
   );
 
-  // Helper WITA (UTC+8) — cek jam juga, bukan hanya tanggal
+  
   const _nowWita = new Date(Date.now() + 8 * 3600000);
   const _todayStr = _nowWita.toISOString().slice(0, 10);
   const _nowTime  = _nowWita.toISOString().slice(11, 16);
@@ -163,8 +163,8 @@ async function kapusStats(pool, kodePKM, tahun) {
     terverifikasi: parseInt(s.terverifikasi) || 0,
     total: parseInt(s.total) || 0,
     tahunFilter: tahun || null,
-    // Tampilkan semua periode Aktif (jangan dibatasi ke usulan yang sudah ada,
-    // deadline verifikasi berlaku global untuk PKM ini)
+    
+    
     periodeAktifList: periodeResult.rows
       .map(r => ({
         ...r,
@@ -286,13 +286,13 @@ async function programStats(pool, email, tahun) {
     const nowDT = _todayStr2 + 'T' + _nowTime2;
     return nowDT >= ms + 'T' + (jM || '00:00') && nowDT <= ss + 'T' + (jS || '23:59');
   };
-  // Cari periode yang isAktifToday (input aktif sekarang) — ambil pertama
+  
   const pvAktif = pvResult.rows.find(r => _inRange2(r.tanggal_mulai, r.jam_mulai, r.tanggal_selesai, r.jam_selesai)) || {};
   const pv = pvAktif;
   const isVerifToday = !!pv.tanggal_mulai_verif && !!pv.tanggal_selesai_verif
     && _inRange2(pv.tanggal_mulai_verif, pv.jam_mulai_verif, pv.tanggal_selesai_verif, pv.jam_selesai_verif);
-  // periodeAktifList untuk banner verif — tampilkan semua periode Aktif
-  // (jangan dibatasi ke usulan yang sudah ditugaskan, deadline verifikasi berlaku global)
+  
+  
   const periodeAktifList = pvResult.rows
     .map(r => ({
     ...r,

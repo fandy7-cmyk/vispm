@@ -1,26 +1,6 @@
 const { getPool, ok, err, cors } = require('./db');
 const { validateSession } = require('./middleware');
 
-/**
- * Handler: /api/laporan
- *
- * GET — Daftar laporan usulan dengan summary statistik
- *       Query params:
- *         tahun         — filter tahun (number)
- *         bulan         — filter bulan 1-12, atau 'semua'
- *         kode_pkm      — filter puskesmas, atau 'semua'
- *         status        — filter status global, atau 'semua'
- *         email_operator— filter berdasarkan operator pembuat
- *         limit         — jumlah baris per halaman (default: 1000, max: 5000)
- *         page          — halaman (default: 1)
- *
- *       Response: {
- *         data: [{ no, idUsulan, kodePKM, namaPKM, tahun, bulan, namaBulan,
- *                  totalIndikator, indeksSPM, statusGlobal, createdBy, createdAt,
- *                  finalApprovedBy, finalApprovedAt }],
- *         summary: { total, selesai, pending, rataSPM }
- *       }
- */
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors();
   const _authErr = await validateSession(event);

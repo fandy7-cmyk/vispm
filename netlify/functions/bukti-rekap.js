@@ -1,27 +1,6 @@
 const { getPool, ok, err, cors } = require('./db');
 const { validateSession } = require('./middleware');
 
-/**
- * Handler: /api/bukti-rekap
- *
- * GET — Kumpulkan semua data dukung (file bukti) untuk 1 indikator,
- *       dari BANYAK usulan sekaligus (lintas puskesmas & rentang bulan).
- *       Dipakai oleh tombol "Download Data Dukung per Indikator" di halaman Laporan,
- *       supaya tidak perlu buka satu-satu usulan.
- *
- *       Query params:
- *         noIndikator — nomor indikator (wajib)
- *         tahun       — tahun (wajib)
- *         bulanFrom   — bulan awal 1-12 (default 1)
- *         bulanTo     — bulan akhir 1-12 (default 12)
- *         kodePkm     — daftar kode puskesmas dipisah koma, opsional (kosong = semua)
- *
- *       Response: {
- *         totalFile, totalUsulan,
- *         files: [{ idUsulan, kodePkm, namaPkm, tahun, bulan, namaBulan,
- *                    fileName, fileUrl }]
- *       }
- */
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors();
   const _authErr = await validateSession(event);
@@ -68,8 +47,8 @@ exports.handler = async (event) => {
     for (const r of result.rows) {
       if (!r.link_file) continue;
 
-      // Parse link_file — sama seperti logic di frontend (app-input.js):
-      // bisa string URL tunggal, JSON array of string, atau JSON array of {id,url,name}
+      
+      
       let links = [];
       try {
         const parsed = JSON.parse(r.link_file);

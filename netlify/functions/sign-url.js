@@ -58,9 +58,9 @@ exports.handler = async (event) => {
     return { statusCode: 500, headers: cors, body: JSON.stringify({ error: 'Cloudinary env vars tidak di-set' }) };
   }
 
-  // FIX Bug #3: Generate signed URL sebagai fallback untuk file raw/private.
-  // Cloudinary Basic Auth tidak valid untuk delivery URL, hanya untuk API management.
-  // Solusi: signed delivery URL yang valid 1 jam.
+  
+  
+  
   function buildSignedUrl(rawUrl) {
     try {
       const urlObj = new URL(rawUrl);
@@ -73,7 +73,7 @@ exports.handler = async (event) => {
       const publicId = pidWithExt.replace(/\.[^.]+$/, '');
       const resourceType = urlObj.pathname.includes('/raw/') ? 'raw' : 'image';
       const expiresAt = Math.floor(Date.now() / 1000) + 3600;
-      // Signature: urut abjad, tanpa resource_type (sesuai Cloudinary spec)
+      
       const crypto = require('crypto');
       const toSign = `public_id=${publicId}&timestamp=${expiresAt}${apiSecret}`;
       const signature = crypto.createHash('sha1').update(toSign).digest('hex');
@@ -85,12 +85,12 @@ exports.handler = async (event) => {
   try {
     let result = null;
 
-    // Strategy 1: URL asli langsung (berhasil untuk file public/access_mode=public)
+    
     result = await httpsGet(url, {});
     console.log('[sign-url] S1 direct:', result.status);
 
-    // Strategy 2: Signed URL (untuk file raw yang tidak di-set access_mode=public)
-    // Basic Auth tidak valid untuk delivery URL Cloudinary — gunakan signed URL saja.
+    
+    
     if (result.status !== 200) {
       const signedUrl = buildSignedUrl(url);
       if (signedUrl) {
@@ -130,7 +130,7 @@ exports.handler = async (event) => {
       };
     }
 
-    // mode=download (default)
+    
     return {
       statusCode: 200,
       headers: {

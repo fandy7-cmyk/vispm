@@ -52,7 +52,7 @@ exports.handler = async (event) => {
     // Helper: sanitasi nama untuk Cloudinary folder (hapus karakter tidak aman)
     const sanitize = (str) => (str || '').replace(/[^a-zA-Z0-9\s\-_.]/g, '').replace(/\s+/g, '_').substring(0, 50).trim();
 
-    // Folder: VISPM / KodePKM_NamaPKM / Tahun / BulanFolder / IndFolder
+    
     const pkmFolder   = kodePKM
       ? (namaPKM ? `${kodePKM}_${sanitize(namaPKM)}` : kodePKM)
       : 'PKM';

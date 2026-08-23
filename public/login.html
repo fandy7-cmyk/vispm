@@ -13,11 +13,10 @@
 <meta name="apple-mobile-web-app-title" content="VISPM">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-<link rel="stylesheet" href="/css/app.css?v=1.1.4">
-<link rel="stylesheet" href="/css/responsive.css?v=1.1.4">
+<link rel="stylesheet" href="/css/app.css?v=1.1.5">
+<link rel="stylesheet" href="/css/responsive.css?v=1.1.5">
 <script>
-// Cek paling awal, sebelum body sempet di-render: kalau sesi masih ada,
-// langsung lempar ke app tanpa nge-flash form login dulu.
+
 (function() {
   try {
     var user = sessionStorage.getItem('spm_user');
@@ -32,12 +31,11 @@
 </head>
 <body>
 
-<!-- AUTH SCREEN -->
 <div id="authScreen">
   <div class="auth-modal">
-    <!-- Kiri: Info aplikasi -->
+    
     <div class="auth-left">
-      <!-- Logo Kemenkes + Balut di tengah -->
+      
       <div class="auth-left-logos">
         <div class="auth-left-logo-item">
           <img src="/logokemenkes.png" alt="Kemenkes">
@@ -47,12 +45,12 @@
           <img src="/logobalut.png" alt="Kab. Banggai Laut">
         </div>
       </div>
-      <!-- Judul -->
+      
       <div class="auth-left-title">
         <h1>VI<span>SPM</span></h1>
         <p>Verifikasi Indeks<br>Standar Pelayanan Minimal</p>
       </div>
-      <!-- Fitur -->
+      
       <div class="auth-left-features">
         <div class="auth-left-features-inner">
         <div class="auth-left-feature">
@@ -69,12 +67,12 @@
         </div>
         </div>
       </div>
-      <!-- Copyright -->
+      
       <div class="auth-left-footer">
         <p><strong>Dinas Kesehatan, Pengendalian Penduduk dan Keluarga Berencana</strong><br>Kabupaten Banggai Laut &copy; 2026</p>
       </div>
     </div>
-    <!-- Kanan: Form login -->
+    
     <div class="auth-right">
       <div class="auth-right-logo">
         <img src="/favicon.png" alt="VISPM" onerror="this.outerHTML='<span class=\'material-icons\' style=\'font-size:24px;color:white\'>verified</span>'">
@@ -114,8 +112,7 @@
   </div>
 </div>
 
-
-<script src="/js/api.js?v=1.1.4"></script>
+<script src="/js/api.js?v=1.1.5"></script>
 <script>
 function _labelWilayah(raw, label, fullWord) {
   if (!raw) return null;
@@ -151,9 +148,6 @@ function _formatAlamatNominatim(addr) {
   return parts.length ? parts.join(', ') : null;
 }
 
-// Coba TomTom dulu (via backend, API key disimpan aman di env var) — datanya
-// proprietary (bukan OSM), jadi coverage kecamatan di daerah terpencil bisa
-// lebih lengkap drpd Nominatim. Kalau gagal/kosong, fallback ke Nominatim.
 async function _getLokasiTomTom(latitude, longitude) {
   try {
     const r = await fetch('/api/reverse-geocode', {
@@ -199,7 +193,6 @@ async function _getBrowserLokasi() {
   }
 }
 
-// ============== AUTH ==============
 async function doLogin() {
   const email = document.getElementById('authEmail').value.trim();
   if (!email) return setAuthStatus('Masukkan email Anda', 'error');
@@ -214,15 +207,15 @@ async function doLogin() {
   try {
     const user = await API.login(email, password);
     sessionStorage.setItem('spm_user', JSON.stringify(user));
-    // Catat log login — minta lokasi GPS browser dulu (non-blocking thd UX,
-    // timeout 3-7 detik total), baru kirim ke audit trail. Kalau gagal/ditolak,
-    // backend otomatis fallback ke IP-based lookup.
+    
+    
+    
     _getBrowserLokasi().then(lokasi => {
       API.logAudit({ module: 'auth', action: 'LOGIN', userEmail: user.email, userNama: user.nama, userRole: user.role, detail: 'Login berhasil', lokasi });
     });
-    // login.html udah gak nyimpen markup appLayout/modal lagi - full
-    // navigation ke index.html, biar boot sequence (restore session ->
-    // startApp, lihat app-master.js) yang ngurus sisanya.
+    
+    
+    
     window.location.href = '/';
   } catch (e) {
     setAuthStatus(e.message, 'error');
@@ -231,7 +224,6 @@ async function doLogin() {
     setTimeout(() => setAuthStatus('', ''), 2000);
   }
 }
-
 
 function toggleAuthPw() {
   const inp = document.getElementById('authPassword');

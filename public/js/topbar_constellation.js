@@ -1,9 +1,3 @@
-/* ═══════════════════════════════════════════════════════════════════════════
-   Topbar Constellation Drift
-   Partikel teal melayang bebas di ruang antara logo & profil topbar,
-   sesekali kekoneksi garis tipis saat saling berdekatan ("jaringan hidup").
-   Warna disamakan dengan partikel orbit logo (.sbpp) di sidebar-header.
-   ═══════════════════════════════════════════════════════════════════════════ */
 (function () {
   const container = document.getElementById('topbarConstellation');
   const canvas = document.getElementById('topbarConstellationCanvas');
@@ -13,8 +7,8 @@
   const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   const PALETTE = ['#2dd4bf', '#5eead4', '#14b8a6', '#0d9488', '#ffffff'];
-  const LINK_DIST = 85;       // jarak maksimum buat garis penghubung antar partikel
-  const PARTICLE_GAP = 42;    // makin lebar area, makin banyak partikel
+  const LINK_DIST = 85;       
+  const PARTICLE_GAP = 42;    
   const MIN_PARTICLES = 6;
   const MAX_PARTICLES = 24;
 
@@ -64,10 +58,10 @@
       return;
     }
 
-    // Skala ulang posisi partikel yang SUDAH ADA biar polanya tetap nyambung —
-    // jangan di-random ulang total, itu penyebab konstelasi "loncat"/reset
-    // tiap pindah menu (lebar topbar sering geser dikit gara-gara scrollbar
-    // muncul/ilang saat konten halaman ganti).
+    
+    
+    
+    
     if (prevW > 0 && prevH > 0 && (prevW !== w || prevH !== h)) {
       const sx = w / prevW, sy = h / prevH;
       for (const p of particles) {
@@ -76,8 +70,8 @@
       }
     }
 
-    // Jumlah partikel cuma disesuaikan seperlunya (nambah/kurang dikit),
-    // bukan rebuild total array.
+    
+    
     const targetCount = Math.max(MIN_PARTICLES, Math.min(MAX_PARTICLES, Math.round(w / PARTICLE_GAP)));
     while (particles.length < targetCount) particles.push(makeParticle());
     if (particles.length > targetCount) particles.length = targetCount;
@@ -175,7 +169,7 @@
     else if (!prefersReducedMotion) start();
   });
 
-  // init
+  
   resize();
   if (prefersReducedMotion) {
     drawStaticFrame();
@@ -183,11 +177,11 @@
     start();
   }
 
-  // Container tersembunyi (display:none) saat halaman pertama dimuat (masih di
-  // layar login), jadi resize() di atas dapat w/h = 0 dan animasi belum start.
-  // Expose hook ini biar app-core.js bisa langsung "nyalain ulang" persis saat
-  // appLayout ditampilkan (bukan nunggu ResizeObserver, yang suka telat kena
-  // antre di belakang kerjaan render dashboard yang berat).
+  
+  
+  
+  
+  
   window.__topbarConstellationKick = function () {
     resize();
     if (prefersReducedMotion) drawStaticFrame(); else start();

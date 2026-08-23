@@ -1,10 +1,10 @@
-// API client for SPM Verifikasi app
+
 const API = {
   BASE: '/api',
 
   async call(endpoint, options = {}) {
     try {
-      // Ambil session token dari sessionStorage
+      
       const _user = (() => { try { return JSON.parse(sessionStorage.getItem('spm_user') || '{}'); } catch(e) { return {}; } })();
       const _token = _user.sessionToken || '';
       const _authHeader = _token ? { 'Authorization': 'Bearer ' + _token } : {};
@@ -18,7 +18,7 @@ const API = {
         },
       });
 
-      // 401 — session tidak valid / digantikan device lain
+      
       if (res.status === 401) {
         const data = await res.json().catch(() => ({}));
         const msg = data.message || 'Sesi berakhir. Silakan login kembali.';
@@ -27,12 +27,12 @@ const API = {
         throw new Error(msg);
       }
 
-      // Server error (5xx) — mungkin return HTML bukan JSON, tangkap duluan
+      
       if (res.status >= 500) {
         throw new Error(`Server error (${res.status}). Coba beberapa saat lagi.`);
       }
 
-      // Rate limit / lockout
+      
       if (res.status === 429) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.message || 'Terlalu banyak percobaan. Coba lagi nanti.');
@@ -40,10 +40,10 @@ const API = {
 
       const data = await res.json();
 
-      // 202 = needConfirm (submit dengan bukti belum lengkap), teruskan apa adanya ke caller
+      
       if (res.status === 202) return data;
 
-      // 409 = conflict (duplikat data)
+      
       if (res.status === 409) {
         throw new Error(data.message || 'Data sudah ada (konflik).');
       }
@@ -73,10 +73,10 @@ const API = {
     return this.call(endpoint, { method: 'DELETE', body: JSON.stringify(body) });
   },
 
-  // Auth
+  
   login: (email, password) => API.post('auth', { email, password }),
-  // keepalive:true — request tetap dikirim browser walau tab pindah/di-background
-  // sebelum fetch selesai (penting utk log LOGIN yg nunggu GPS di background)
+  
+  
   logAudit: (data) => API.call('audit-trail', { method: 'POST', body: JSON.stringify(data), keepalive: true }),
   logout: () => {
     const _user = (() => { try { return JSON.parse(sessionStorage.getItem('spm_user') || '{}'); } catch(e) { return {}; } })();
@@ -85,40 +85,36 @@ const API = {
     sessionStorage.removeItem('spm_user');
   },
 
-  // Dashboard
+  
   dashboard: (params) => API.get('dashboard', params),
 
-  // Users
+  
   getUsers:    ()     => API.get('users'),
   createUser:  (data) => API.post('users', data),
   updateUser:  (data) => API.put('users', data),
   deleteUser:  (email)=> API.del('users', { email }),
-  /** @deprecated gunakan createUser() */
-  saveUser:    (data) => API.post('users', data),
+    saveUser:    (data) => API.post('users', data),
 
-  // Puskesmas
+  
   getPKM:    (aktif) => API.get('puskesmas', aktif ? { aktif: 'true' } : {}),
   createPKM: (data)  => API.post('puskesmas', data),
   updatePKM: (data)  => API.put('puskesmas', data),
   deletePKM: (kode)  => API.del('puskesmas', { kode }),
-  /** @deprecated gunakan createPKM() */
-  savePKM:   (data)  => API.post('puskesmas', data),
+    savePKM:   (data)  => API.post('puskesmas', data),
 
-  // Indikator
+  
   getIndikator:    ()     => API.get('indikator'),
   createIndikator: (data) => API.post('indikator', data),
   updateIndikator: (data) => API.put('indikator', data),
   deleteIndikator: (no)   => API.del('indikator', { no }),
-  /** @deprecated gunakan createIndikator() */
-  saveIndikator: (data)   => API.post('indikator', data),
+    saveIndikator: (data)   => API.post('indikator', data),
 
-  // Periode
+  
   getPeriode:    (tahun) => API.get('periode', { tahun }),
   createPeriode: (data)  => API.post('periode', data),
-  /** @deprecated gunakan createPeriode() */
-  savePeriode:   (data)  => API.post('periode', data),
+    savePeriode:   (data)  => API.post('periode', data),
 
-  // Usulan
+  
   getUsulan:           (params) => API.get('usulan', params),
   getDetailUsulan:     (id)     => API.get('usulan', { action: 'detail', id }),
   getIndikatorUsulan:  (id)     => API.get('usulan', { action: 'indikator', id }),
@@ -132,39 +128,34 @@ const API = {
   getLogAktivitas:     (id)     => API.get('usulan', { action: 'log', id }),
   getPenolakanIndikator:(idUsulan) => API.get('usulan', { action: 'penolakan', idUsulan }),
   respondPenolakan:    (data)   => API.post('usulan?action=respond-penolakan', data),
-  /** @deprecated gunakan createUsulan() */
-  buatUsulan:   (data) => API.post('usulan?action=buat', data),
-  /** @deprecated gunakan verifyKapus() */
-  verifKapus:   (data) => API.post('usulan?action=verif-kapus', data),
-  /** @deprecated gunakan verifyProgram() */
-  verifProgram: (data) => API.post('usulan?action=verif-program', data),
-  /** @deprecated gunakan verifyAdmin() */
-  verifAdmin:   (data) => API.post('usulan?action=verif-admin', data),
+    buatUsulan:   (data) => API.post('usulan?action=buat', data),
+    verifKapus:   (data) => API.post('usulan?action=verif-kapus', data),
+    verifProgram: (data) => API.post('usulan?action=verif-program', data),
+    verifAdmin:   (data) => API.post('usulan?action=verif-admin', data),
 
-  // Laporan
+  
   getLaporan: (params) => API.get('laporan', params),
 
-  // Bukti Rekap (download data dukung per indikator, lintas usulan/puskesmas)
+  
   getBuktiRekap: (params) => API.get('bukti-rekap', params),
 
-  // Jabatan
+  
   getJabatan:    ()     => API.get('jabatan'),
   createJabatan: (data) => API.post('jabatan', data),
-  updateJabatan: (data) => API.post('jabatan', data),  // backend pakai POST + id untuk update
+  updateJabatan: (data) => API.post('jabatan', data),  
   deleteJabatan: (id)   => API.del('jabatan', { id }),
-  /** @deprecated gunakan createJabatan() */
-  saveJabatan: (data)   => API.post('jabatan', data),
+    saveJabatan: (data)   => API.post('jabatan', data),
 
-  // Audit Trail
+  
   getAuditTrail: (params) => API.get('audit-trail', params),
 
-  // Konfigurasi Penandatangan Per Indikator
+  
   getPenandatangan:    ()            => API.get('indikator-penandatangan'),
   savePenandatangan:   (data)        => API.post('indikator-penandatangan', data),
   deletePenandatangan: (noIndikator) => API.del('indikator-penandatangan', { noIndikator }),
 
-  // Pengumuman Sistem (Admin kelola, tampil saat login)
-  // getPengumuman: return [] jika endpoint belum ada (404) — silent fail
+  
+  
   getPengumuman: async (params) => {
     try {
       const qs = new URLSearchParams(params || {}).toString();
@@ -175,7 +166,7 @@ const API = {
         method: 'GET',
         headers: { 'Content-Type': 'application/json', ...(_token ? { 'Authorization': 'Bearer ' + _token } : {}) }
       });
-      // 404 = endpoint belum dibuat di backend — silent, kembalikan array kosong
+      
       if (res.status === 404) return [];
       if (!res.ok) return [];
       const data = await res.json();
@@ -187,11 +178,9 @@ const API = {
   deletePengumuman: (id)     => API.del('pengumuman', { id })
 };
 
-// Utils
 const BULAN_NAMA = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
   'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 
-// ============== DOWNLOAD BUTTON HELPERS ==============
 function btnDownloadFinal(idUsulan, size=20) {
   return `<button class="btn-icon" onclick="downloadLaporanPDF('${idUsulan}')" title="Download Laporan Final" style="background:transparent;border:none;color:#10b981">
     <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10"/><path d="m8 9 4 4 4-4"/><path d="M4 17c0 2.2 1.8 4 4 4h8c2.2 0 4-1.8 4-4"/></svg>
@@ -224,13 +213,12 @@ function getDownloadBtn(u, size=20, role, akses) {
     if (u.statusKapus === 'Selesai') return btnDownloadSementara(u.idUsulan, size) + btnDownloadDisabled(size);
     return btnDownloadDisabled(size);
   }
-  // fallback (kepala-puskesmas, dll)
+  
   if (u.statusGlobal === 'Selesai') return btnDownloadFinal(u.idUsulan, size);
   if (u.statusKapus === 'Selesai') return btnDownloadSementara(u.idUsulan, size);
   return btnDownloadDisabled(size);
 }
 
-// ============== STATUS BAR ==============
 function renderStatusBar(u) {
   const vp = u.vpProgress;
   const steps = [
@@ -242,22 +230,24 @@ function renderStatusBar(u) {
     { label: 'Admin', icon: 'admin_panel_settings', done: u.statusGlobal === 'Selesai', active: u.statusGlobal === 'Menunggu Admin', rejected: false },
   ];
   const isDitolak = ['Ditolak', 'Ditolak Sebagian'].includes(u.statusGlobal);
-  return `<div style="display:flex;align-items:center;gap:0;padding:4px 0">${steps.map((s, i) => {
+  return `<div class="vp-stepper" style="display:flex;align-items:flex-start;gap:0;padding:4px 0;width:100%">${steps.map((s, i) => {
     let color = '#cbd5e1', textColor = '#94a3b8', bg = 'white';
     let icon = s.icon;
     if (s.done) { color='#0d9488'; textColor='#0d9488'; bg='#e6fffa'; icon='check_circle'; }
     else if (s.partial) { color='#06b6d4'; textColor='#0891b2'; bg='#ecfeff'; icon='hourglass_top'; }
     else if (isDitolak && s.rejected) { color='#ef4444'; textColor='#ef4444'; bg='#fef2f2'; icon='cancel'; }
     else if (s.active) { color='#f59e0b'; textColor='#d97706'; bg='#fffbeb'; icon='hourglass_top'; }
-    return '<div style="display:flex;align-items:center;flex:1">' +
-      '<div style="display:flex;flex-direction:column;align-items:center;gap:1px;flex:1">' +
-        '<div style="width:28px;height:28px;border-radius:50%;background:' + bg + ';border:2px solid ' + color + ';display:flex;align-items:center;justify-content:center">' +
+    // Kolom step & connector pakai min-width:0 supaya flex:1 benar2 membagi rata,
+    // tidak melebar mengikuti panjang teks label (mis. "Kepala Puskesmas").
+    return '<div class="vp-step" style="display:flex;align-items:flex-start;flex:1;min-width:0">' +
+      '<div class="vp-step-col" style="display:flex;flex-direction:column;align-items:center;gap:1px;flex:1;min-width:0">' +
+        '<div class="vp-step-circle" style="width:28px;height:28px;border-radius:50%;background:' + bg + ';border:2px solid ' + color + ';display:flex;align-items:center;justify-content:center;flex-shrink:0">' +
           '<span class="material-icons" style="font-size:15px;color:' + color + '">' + icon + '</span>' +
         '</div>' +
-        '<span style="font-size:10px;font-weight:700;color:' + textColor + ';white-space:nowrap">' + s.label + '</span>' +
+        '<span class="vp-step-label" style="font-size:10px;font-weight:700;color:' + textColor + ';white-space:normal;word-break:break-word;text-align:center;line-height:1.2;max-width:100%">' + s.label + '</span>' +
         (s.vpText && !s.done ? '<span style="font-size:9px;color:#0891b2">' + s.vpText + '</span>' : '') +
       '</div>' +
-      (i < steps.length-1 ? '<div style="flex:1;height:2px;background:' + (s.done ? '#0d9488' : s.partial ? '#06b6d4' : '#e2e8f0') + ';margin-bottom:18px;min-width:8px"></div>' : '') +
+      (i < steps.length-1 ? '<div class="vp-step-connector" style="flex:0.6;height:2px;background:' + (s.done ? '#0d9488' : s.partial ? '#06b6d4' : '#e2e8f0') + ';margin-top:13px;min-width:6px"></div>' : '') +
     '</div>';
   }).join('')}</div>`;
 }
@@ -283,23 +273,12 @@ function formatDateTime(d) {
   } catch { return '-'; }
 }
 
-// Status yang dianggap "final" — sudah tidak mungkin lagi kena label Periode Berakhir
 const STATUS_FINAL_LIST = ['Selesai', 'Ditolak', 'Ditolak Sebagian'];
 
-// True kalau usulan sedang tampil sebagai badge "Periode Berakhir" (belum final +
-// periodenya sudah lewat batas waktu). Dipakai bareng dgn statusBadge() supaya
-// filter status di seluruh sistem konsisten dgn apa yg ditampilkan di badge.
 function isPeriodeBerakhir(u) {
   return !!(u && u.periodeExpired && !STATUS_FINAL_LIST.includes(u.statusGlobal));
 }
 
-// Cocokkan satu usulan terhadap satu pilihan filter status, termasuk pilihan
-// turunan "__periode_berakhir__". Status non-final (mis. "Menunggu Pengelola Program")
-// hanya dianggap cocok kalau periodenya MASIH AKTIF — begitu periode berakhir (dan belum
-// dibuka/diproses lagi sampai jadi final), usulan itu pindah ke bucket "Periode Berakhir"
-// saja, tidak dobel muncul di status asalnya. Kalau periode dibuka lagi / statusnya
-// berubah, periodeExpired otomatis balik false dari backend sehingga otomatis kembali
-// fleksibel masuk status aslinya.
 function matchStatusFilter(u, statusVal) {
   if (!statusVal) return true;
   if (statusVal === '__periode_berakhir__') return isPeriodeBerakhir(u);
@@ -307,9 +286,9 @@ function matchStatusFilter(u, statusVal) {
 }
 
 function statusBadge(status, usulan) {
-  // Jika usulan diberikan dan statusnya belum final, tapi periode (input/verifikasi)-nya
-  // sudah lewat batas waktu (dihitung di backend, field periodeExpired) → tampilkan
-  // "Periode Berakhir" agar tidak ambigu dengan status "dalam proses" yang periodenya masih jalan.
+  
+  
+  
   if (isPeriodeBerakhir(usulan)) {
     const batasTxt = usulan.periodeBatasWaktu ? ' pada ' + formatDateTime(usulan.periodeBatasWaktu) : '';
     return `<span class="badge badge-expired" style="text-align:left" title="Status masih '${status || '-'}', tapi periode sudah habis waktu${batasTxt}">Periode Berakhir</span>`;
@@ -353,8 +332,6 @@ function closeToast() {
   document.getElementById('toastNotification').style.display = 'none';
 }
 
-// showModal dan closeModal didefinisikan di app.js
-
 function showConfirm({ title, message, onConfirm, type = 'danger' }) {
   window._confirmCallback = onConfirm;
   const el = document.getElementById('confirmModal');
@@ -385,16 +362,12 @@ function executeConfirm() {
   if (window._confirmCallback) window._confirmCallback();
 }
 
-// setLoading didefinisikan di app.js
-
-// Current year for select defaults
 const CURRENT_YEAR = new Date().getFullYear();
 const CURRENT_BULAN = new Date().getMonth() + 1;
 
-// ============== SESSION EXPIRED OVERLAY ==============
 function _showSessionExpired(msg) {
   if (document.getElementById('_sessionExpiredOverlay')) return;
-  // Sembunyikan toast yang sedang tampil & blok toast baru
+  
   clearTimeout(window._toastTimer);
   const _toastEl = document.getElementById('toastNotification');
   if (_toastEl) _toastEl.style.display = 'none';

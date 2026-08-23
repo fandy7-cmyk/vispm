@@ -1,22 +1,5 @@
 const { getPool, err, cors } = require('./db');
 
-/**
- * Helper: Validasi session token dari request header
- *
- * Cara pakai di handler lain:
- *   const { getPool, ok, err, cors } = require('./db');
- *   const { validateSession } = require('./middleware');
- *
- *   exports.handler = async (event) => {
- *     if (event.httpMethod === 'OPTIONS') return cors();
- *     const authErr = await validateSession(event);
- *     if (authErr) return authErr;
- *     // ... logic handler ...
- *   };
- *
- * Frontend harus kirim header:
- *   Authorization: Bearer <sessionToken>
- */
 async function validateSession(event) {
   const authHeader = event.headers?.authorization || event.headers?.Authorization || '';
   const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
@@ -58,7 +41,7 @@ async function validateSession(event) {
       return err('Sesi telah berakhir karena akun login di perangkat lain.', 401);
     }
 
-    // Session valid — tidak return apapun (null = lanjut)
+    
     return null;
 
   } catch (e) {
@@ -67,21 +50,13 @@ async function validateSession(event) {
   }
 }
 
-/**
- * Handler: /api/auth-validate
- * Endpoint ringan untuk cek apakah token masih valid
- * Dipanggil frontend saat app pertama kali dibuka (page refresh)
- *
- * GET — Header: Authorization: Bearer <token>
- * Response: { success:true, data:{ email, nama, role } } atau 401
- */
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors();
 
   const authErr = await validateSession(event);
   if (authErr) return authErr;
 
-  // Ambil info user dari token
+  
   const authHeader = event.headers?.authorization || event.headers?.Authorization || '';
   const token = authHeader.slice(7).trim();
 

@@ -1,27 +1,8 @@
-/**
- * VISPM — CUSTOM TOOLTIP COMPONENT
- * Menggantikan tooltip native browser (attribute [title]) dengan bubble
- * custom yang konsisten di semua platform (desktop, Android, iOS).
- *
- * Cara pakai:
- *   1. Tambahkan <script src="/js/custom-tooltip.js"></script> di index.html
- *      SETELAH semua JS lain (boleh sebelum/sesudah custom-select.js, tidak saling bergantung)
- *   2. Semua elemen dengan attribute [title="..."] otomatis dikonversi saat
- *      halaman load DAN setiap kali konten <body> berubah (navigasi, modal, re-render tabel)
- *
- * API:
- *   - Cukup pakai title="..." seperti biasa di HTML, sisanya otomatis
- *   - title dipindah ke data-tooltip (aria-label ditambahkan otomatis utk aksesibilitas
- *     jika belum ada), sehingga tooltip native browser tidak pernah muncul
- *   - Mendukung disabled button, dark mode via CSS var, keyboard focus (Tab)
- *   - Auto-flip posisi (atas/bawah) & auto-clamp horizontal agar tidak terpotong viewport
- */
 
 (function () {
   'use strict';
 
-  /* ─── Inject CSS ─────────────────────────────────────────── */
-  const STYLE_ID = '__vispm_tt_style';
+    const STYLE_ID = '__vispm_tt_style';
   if (!document.getElementById(STYLE_ID)) {
     const style = document.createElement('style');
     style.id = STYLE_ID;
@@ -63,12 +44,10 @@
     document.head.appendChild(style);
   }
 
-  /* ─── State ────────────────────────────────────────────── */
-  let bubble = null, textEl = null, arrow = null;
+    let bubble = null, textEl = null, arrow = null;
   let currentEl = null, showTimer = null, hideTimer = null;
 
-  /* ─── Build bubble (sekali saja, reused) ─────────────────── */
-  function ensureBubble() {
+    function ensureBubble() {
     if (bubble) return;
     bubble = document.createElement('div');
     bubble.className = 'tt-bubble';
@@ -82,8 +61,7 @@
     document.body.appendChild(bubble);
   }
 
-  /* ─── Posisi bubble relatif ke elemen target ─────────────── */
-  function position(el) {
+    function position(el) {
     const rect = el.getBoundingClientRect();
     const bRect = bubble.getBoundingClientRect();
     const vw = window.innerWidth, vh = window.innerHeight;
@@ -126,8 +104,7 @@
     currentEl = null;
   }
 
-  /* ─── Konversi title → data-tooltip ──────────────────────── */
-  function convert(el) {
+    function convert(el) {
     if (el._ttConverted) return;
     const t = el.getAttribute('title');
     if (!t || !t.trim()) return;
@@ -141,8 +118,7 @@
     (container || document).querySelectorAll('[title]').forEach(convert);
   }
 
-  /* ─── Event delegation (hover + keyboard focus) ──────────── */
-  document.addEventListener('mouseover', e => {
+    document.addEventListener('mouseover', e => {
     const el = e.target.closest('[data-tooltip]');
     if (!el || el === currentEl) return;
     clearTimeout(hideTimer); clearTimeout(showTimer);
@@ -166,8 +142,7 @@
   document.addEventListener('scroll', () => { if (currentEl) position(currentEl); }, true);
   window.addEventListener('resize', () => { if (currentEl) position(currentEl); });
 
-  /* ─── Observer seluruh <body> (mencakup mainContent + modal) ─ */
-  function _observeAndConvert() {
+    function _observeAndConvert() {
     if (!window.MutationObserver) return;
     let pending = false;
     const obs = new MutationObserver(() => {
@@ -178,12 +153,11 @@
     obs.observe(document.body, { childList: true, subtree: true, attributeFilter: ['title'], attributes: true });
   }
 
-  /* ─── Init ───────────────────────────────────────────────── */
-  function init() {
+    function init() {
     convertAll(document);
     _observeAndConvert();
 
-    // Patch loadPage agar konversi dijalankan lagi setelah render halaman
+    
     const _origLoadPage = window.loadPage;
     if (typeof _origLoadPage === 'function') {
       window.loadPage = function () {

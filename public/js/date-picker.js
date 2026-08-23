@@ -1,17 +1,8 @@
-/**
- * VISPM — CUSTOM DATE PICKER v3
- * Popup di-render langsung ke document.body (teleport) sehingga tidak
- * terpotong oleh overflow:hidden / overflow-y:auto pada .modal-body.
- *
- * Letakkan di index.html SETELAH app-master.js:
- *   <script src="/js/date-picker.js"></script>
- */
 
 (function (global) {
   'use strict';
 
-  /* ────────── CSS ────────── */
-  function injectCSS() {
+    function injectCSS() {
     if (document.getElementById('vdp-style')) return;
     const s = document.createElement('style');
     s.id = 'vdp-style';
@@ -97,8 +88,7 @@
     document.head.appendChild(s);
   }
 
-  /* ────────── Helpers ────────── */
-  const p2 = n => String(n).padStart(2, '0');
+    const p2 = n => String(n).padStart(2, '0');
   const MONTHS = ['Januari','Februari','Maret','April','Mei','Juni',
                   'Juli','Agustus','September','Oktober','November','Desember'];
   const DAYS   = ['Min','Sen','Sel','Rab','Kam','Jum','Sab'];
@@ -119,12 +109,10 @@
   function toISO(y, m, d) { return `${y}-${p2(m+1)}-${p2(d)}`; }
   function fmtDisp(y, m, d) { return `${p2(d)} ${MSHORT[m]} ${y}`; }
 
-  /* ────────── State ────────── */
-  const STATE   = {};   // inputId → { y, m, d, navY, navM }
+    const STATE   = {};   
   let activeId  = null;
 
-  /* ────────── Portal (popup di body) ────────── */
-  function getPortal() {
+    function getPortal() {
     let p = document.getElementById('vdp-portal');
     if (!p) {
       p = document.createElement('div');
@@ -139,10 +127,10 @@
     const rect   = btnEl.getBoundingClientRect();
     const vw     = window.innerWidth;
     const vh     = window.innerHeight;
-    const pw     = 268; // popup width
-    const ph     = 320; // popup approx height
+    const pw     = 268; 
+    const ph     = 320; 
 
-    // Buka ke bawah jika cukup ruang, kalau tidak ke atas
+    
     let top  = rect.bottom + 5;
     let left = rect.left;
     if (top + ph > vh) top = rect.top - ph - 5;
@@ -159,23 +147,20 @@
     if (p) p.style.display = 'none';
   }
 
-  /* ────────── Tutup ────────── */
-  function closeAll() {
+    function closeAll() {
     hidePortal();
     document.querySelectorAll('.vdp-btn.vdp-open').forEach(el => el.classList.remove('vdp-open'));
     activeId = null;
   }
 
-  /* ────────── Commit ke hidden input ────────── */
-  function commitValue(inputId, isoVal) {
+    function commitValue(inputId, isoVal) {
     const el = document.getElementById(inputId);
     if (!el) return;
     el.value = isoVal;
     el.dispatchEvent(new Event('change', { bubbles: true }));
   }
 
-  /* ────────── Update tampilan tombol ────────── */
-  function updateBtn(inputId) {
+    function updateBtn(inputId) {
     const st  = STATE[inputId];
     const btn = document.getElementById('vdp-btn-' + inputId);
     if (!btn) return;
@@ -190,8 +175,7 @@
     }
   }
 
-  /* ────────── Render isi kalender ke portal ────────── */
-  function renderCalendar(inputId, btnEl) {
+    function renderCalendar(inputId, btnEl) {
     const st     = STATE[inputId];
     const portal = getPortal();
     const t      = todayWITA();
@@ -232,7 +216,7 @@
 
     positionPortal(btnEl);
 
-    // Navigasi bulan
+    
     portal.querySelectorAll('[data-dir]').forEach(btn => {
       btn.addEventListener('click', e => {
         e.stopPropagation();
@@ -243,7 +227,7 @@
       });
     });
 
-    // Pilih hari
+    
     portal.querySelectorAll('.vdp-d:not(.vdp-oth)').forEach(el => {
       el.addEventListener('click', e => {
         e.stopPropagation();
@@ -255,7 +239,7 @@
       });
     });
 
-    // Hapus tanggal
+    
     portal.querySelector('.vdp-fclear').addEventListener('click', e => {
       e.stopPropagation();
       st.d = 0;
@@ -275,30 +259,29 @@
     });
   }
 
-  /* ────────── Init satu picker ────────── */
-  function initPicker(inputId) {
+    function initPicker(inputId) {
     injectCSS();
 
     const hidden = document.getElementById(inputId);
     if (!hidden) return;
 
-    // Sembunyikan native input
+    
     hidden.style.display = 'none';
 
-    // Baca nilai dari hidden input
+    
     const cur = parseISO(hidden.value);
     const t   = todayWITA();
     STATE[inputId] = cur
       ? { y: cur.y, m: cur.m, d: cur.d, navY: cur.y, navM: cur.m }
       : { y: 0, m: 0, d: 0, navY: t.y, navM: t.m };
 
-    // Jika sudah punya tombol → update tampilan saja
+    
     if (document.getElementById('vdp-btn-' + inputId)) {
       updateBtn(inputId);
       return;
     }
 
-    // Buat tombol
+    
     const btn = document.createElement('div');
     btn.className = 'vdp-btn';
     btn.id = 'vdp-btn-' + inputId;
@@ -329,13 +312,12 @@
       if (e.key === 'Escape') closeAll();
     });
 
-    // Sisipkan tepat setelah hidden input
+    
     hidden.parentNode.insertBefore(btn, hidden.nextSibling);
     updateBtn(inputId);
   }
 
-  /* ────────── Hook ke _initAllPeriodePickers ────────── */
-  function hookInit() {
+    function hookInit() {
     const orig = window._initAllPeriodePickers;
     if (typeof orig !== 'function') {
       setTimeout(hookInit, 150);
@@ -343,9 +325,9 @@
     }
 
     window._initAllPeriodePickers = function (jm, js, jmv, jsv) {
-      // Time picker asli dulu
+      
       orig.call(this, jm, js, jmv, jsv);
-      // Date picker — hidden inputs sudah terisi saat ini
+      
       initPicker('pMulai');
       initPicker('pSelesai');
       initPicker('pMulaiVerif');
@@ -353,23 +335,21 @@
     };
   }
 
-  /* ────────── Tutup saat klik di luar ────────── */
-  document.addEventListener('click', e => {
+    document.addEventListener('click', e => {
     if (!activeId) return;
     const portal = document.getElementById('vdp-portal');
     const btn    = document.getElementById('vdp-btn-' + activeId);
-    // Jika klik di dalam portal atau di tombol, biarkan
+    
     if (portal && portal.contains(e.target)) return;
     if (btn    && btn.contains(e.target))    return;
     closeAll();
   });
 
-  // Repositon on scroll/resize
+  
   window.addEventListener('scroll', () => { if (activeId) closeAll(); }, true);
   window.addEventListener('resize', () => { if (activeId) closeAll(); });
 
-  /* ────────── Expose global ────────── */
-  global.VDP = {
+    global.VDP = {
     init: initPicker,
     setValue: function (inputId, isoVal) {
       const cur = parseISO(isoVal);
@@ -382,8 +362,7 @@
     }
   };
 
-  /* ────────── Start ────────── */
-  if (document.readyState === 'loading') {
+    if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', hookInit);
   } else {
     hookInit();

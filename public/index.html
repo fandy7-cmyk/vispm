@@ -13,17 +13,13 @@
 <meta name="apple-mobile-web-app-title" content="VISPM">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-<link rel="stylesheet" href="/css/app.css?v=1.1.4">
-<link rel="stylesheet" href="/css/responsive.css?v=1.1.4">
+<link rel="stylesheet" href="/css/app.css?v=1.1.5">
+<link rel="stylesheet" href="/css/responsive.css?v=1.1.5">
 </head>
 <body>
 
 <script>
-// Guard: index.html cuma boleh diakses kalau ada sesi login. Dicek
-// sedini mungkin (sebelum appLayout/modal dirender / sebelum app-core.js
-// dkk ke-load) biar yang belum login gak perlu download seluruh app-shell.
-// Boot penuh (restore session -> startApp) tetap dilakukan app-master.js
-// di bagian bawah - guard ini cuma nyegat yang jelas2 gak punya sesi.
+
 (function() {
   try {
     var user = sessionStorage.getItem('spm_user');
@@ -36,11 +32,10 @@
 })();
 </script>
 
-<!-- MAIN APP -->
 <div id="appLayout" style="display:none;">
   <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
 
-  <!-- SIDEBAR -->
+  
   <div class="sidebar" id="sidebar">
     <div class="sidebar-header">
       <div class="sidebar-logo">
@@ -62,11 +57,11 @@
         </div>
       </div>
     </div>
-    <div class="sidebar-nav" id="sidebarNav"><!-- dynamic --></div>
+    <div class="sidebar-nav" id="sidebarNav"></div>
     <div class="sidebar-footer" style="padding:8px"></div>
   </div>
 
-  <!-- MAIN -->
+  
   <div class="main">
     <div class="topbar">
       <div style="display:flex;align-items:center;gap:10px;">
@@ -77,10 +72,10 @@
       <div class="topbar-constellation" id="topbarConstellation" aria-hidden="true">
         <canvas id="topbarConstellationCanvas"></canvas>
       </div>
-      <script src="js/topbar_constellation.js?v=1.1.4"></script>
+      <script src="js/topbar_constellation.js?v=1.1.5"></script>
 
       <div class="topbar-right">
-        <!-- NOTIF BUTTON -->
+        
     <div id="notifBtnWrap" style="position:relative">
       <button id="notifBtn" title="Notifikasi" aria-label="Notifikasi"
         onclick="toggleNotifPanel()"
@@ -110,11 +105,10 @@
         </div>
       </div>
     </div>
-    <div class="content" id="mainContent"><!-- dynamic --></div>
+    <div class="content" id="mainContent"></div>
   </div>
 </div>
 
-<!-- RESET PASSWORD MODAL -->
 <div class="modal" id="resetPasswordModal" style="z-index:3000">
   <div class="modal-card" style="max-width:400px;width:100%">
     <div class="modal-header">
@@ -156,7 +150,6 @@
   </div>
 </div>
 
-<!-- CHANGE PASSWORD MODAL -->
 <div class="modal" id="changePasswordModal" style="z-index:3000">
   <div class="modal-card" style="max-width:400px;width:100%">
     <div class="modal-header">
@@ -188,7 +181,6 @@
   </div>
 </div>
 
-<!-- CONFIRM MODAL -->
 <div class="confirm-modal" id="confirmModal">
   <div class="confirm-card">
     <div class="confirm-header danger" id="confirmHeader">
@@ -204,7 +196,6 @@
   </div>
 </div>
 
-<!-- TOAST -->
 <div class="toast" id="toastNotification">
   <span class="material-icons" id="toastIcon">check_circle</span>
   <div class="toast-content">
@@ -214,7 +205,6 @@
   <span class="material-icons toast-close" onclick="closeToast()">close</span>
 </div>
 
-<!-- LOADER -->
 <div class="loader" id="globalLoader">
   <div style="position:relative;width:40px;height:40px">
     <div style="position:absolute;inset:0;border-radius:50%;border:3px solid transparent;border-top-color:#0d9488;animation:spin 1.1s linear infinite"></div>
@@ -223,7 +213,6 @@
   </div>
 </div>
 
-<!-- INPUT USULAN MODAL -->
 <div class="modal fullscreen" id="indikatorModal">
   <div class="modal-card">
     <div class="modal-header">
@@ -232,7 +221,7 @@
       <button class="btn-icon" onclick="closeModal('indikatorModal')"><span class="material-icons">close</span></button>
     </div>
     <div class="modal-body flex-col">
-      <!-- SPM di atas -->
+      
       <div style="flex-shrink:0">
       <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:linear-gradient(135deg,#0d9488,#06b6d4);border-radius:10px;margin-bottom:12px;color:white">
         <div>
@@ -241,7 +230,7 @@
         </div>
         <span class="material-icons" style="font-size:40px;opacity:0.3">assessment</span>
       </div>
-      <!-- Info upload -->
+      
       <div class="info-card info" id="indModalInfo" style="margin-bottom:10px">
         <span class="material-icons">info</span>
         <div class="info-card-text">Isi target dan realisasi, lalu klik Upload untuk setiap indikator.</div>
@@ -279,7 +268,6 @@
   </div>
 </div>
 
-<!-- DETAIL USULAN MODAL -->
 <div class="modal fullscreen" id="detailModal">
   <div class="modal-card">
     <div class="modal-header">
@@ -287,12 +275,11 @@
       <h3>Detail Usulan - <span id="detailModalId"></span></h3>
       <button class="btn-icon" onclick="closeModal('detailModal')"><span class="material-icons">close</span></button>
     </div>
-    <div class="modal-body" id="detailModalBody"><!-- dynamic --></div>
+    <div class="modal-body" id="detailModalBody"></div>
 
   </div>
 </div>
 
-<!-- VERIFIKASI MODAL -->
 <div class="modal fullscreen" id="verifikasiModal">
   <div class="modal-card">
     <div class="modal-header">
@@ -334,7 +321,7 @@
         </table>
       </div>
       <div style="margin-top:16px;">
-        <!-- Pilih Indikator Bermasalah — hanya tampil untuk Admin saat klik Tolak -->
+        
         <div id="adminRejectPanel" style="display:none;margin-bottom:14px;background:#fef2f2;border:1.5px solid #fca5a5;border-radius:10px;padding:14px">
           <div style="font-weight:700;font-size:13px;color:#dc2626;margin-bottom:8px;display:flex;align-items:center;gap:6px">
             <span class="material-icons" style="font-size:16px">error_outline</span>
@@ -362,21 +349,21 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script src="/js/api.js?v=1.1.4"></script>
-<script src="/js/app-core.js?v=1.1.4"></script>
-<script src="/js/app-pagination.js?v=1.1.4"></script>
-<script src="/js/app-theme.js?v=1.1.4"></script>
-<script src="/js/app-notif.js?v=1.1.4"></script>
-<script src="/js/app-dashboard.js?v=1.1.4"></script>
-<script src="/js/app-input.js?v=1.1.4"></script>
-<script src="/js/app-verifikasi.js?v=1.1.4"></script>
-<script src="/js/app-profil.js?v=1.1.4"></script>
-<script src="/js/app-master.js?v=1.1.4"></script>
-<script src="/js/app-laporan-ranking.js?v=1.1.4"></script>
-<script src="/js/app-pengumuman.js?v=1.1.4"></script>
-<script src="/js/date-picker.js?v=1.1.4"></script> 
+<script src="/js/api.js?v=1.1.5"></script>
+<script src="/js/app-core.js?v=1.1.5"></script>
+<script src="/js/app-pagination.js?v=1.1.5"></script>
+<script src="/js/app-theme.js?v=1.1.5"></script>
+<script src="/js/app-notif.js?v=1.1.5"></script>
+<script src="/js/app-dashboard.js?v=1.1.5"></script>
+<script src="/js/app-input.js?v=1.1.5"></script>
+<script src="/js/app-verifikasi.js?v=1.1.5"></script>
+<script src="/js/app-profil.js?v=1.1.5"></script>
+<script src="/js/app-master.js?v=1.1.5"></script>
+<script src="/js/app-laporan-ranking.js?v=1.1.5"></script>
+<script src="/js/app-pengumuman.js?v=1.1.5"></script>
+<script src="/js/date-picker.js?v=1.1.5"></script> 
 <script>
-// Disable browser native validation styling pada semua input number
+
 document.addEventListener('DOMContentLoaded', function() {
   document.addEventListener('invalid', function(e) {
     e.preventDefault();
@@ -386,12 +373,6 @@ document.addEventListener('DOMContentLoaded', function() {
   }, true);
 });
 
-// ============================================================
-//  HELPER GLOBAL: spinnerHTML(size, label)
-//  size: 'sm'(16px) | 'md'(24px) | 'lg'(36px) | 'xl'(48px)
-//  Menghasilkan HTML spinner triple-ring teal seragam.
-//  Gunakan di mana saja sebagai pengganti spinner ad-hoc.
-// ============================================================
 function spinnerHTML(size = 'lg', label = '') {
   const spinner = `<div class="spm-spinner ${size}"><div class="sr1"></div><div class="sr2"></div><div class="sr3"></div></div>`;
   if (!label) return spinner;
@@ -409,7 +390,6 @@ function loadingInline(label = 'Memuat...') {
   return `<div class="loading-state inline">${spinnerHTML('sm')}<span>${label}</span></div>`;
 }
 
-// Lupa password: tampilkan info di authStatus
 function showForgotPasswordInfo() {
   const box = document.getElementById('forgotInfoBox');
   if (!box) return;
@@ -418,9 +398,9 @@ function showForgotPasswordInfo() {
   box._hideTimer = setTimeout(() => { box.style.display = 'none'; }, 4000);
 }
 </script>
- <script src="/js/responsive-patch.js?v=1.1.4"></script>
- <script src="/js/custom-select.js?v=1.1.4"></script>
- <script src="/js/custom-tooltip.js?v=1.1.4"></script>
+ <script src="/js/responsive-patch.js?v=1.1.5"></script>
+ <script src="/js/custom-select.js?v=1.1.5"></script>
+ <script src="/js/custom-tooltip.js?v=1.1.5"></script>
 
 </body>
 </html>

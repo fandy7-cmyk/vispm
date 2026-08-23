@@ -21,7 +21,7 @@ exports.handler = async (event) => {
   }
 
   try {
-    // Parse URL untuk ambil public_id dan resource_type
+    
     const urlObj = new URL(url);
     const pathParts = urlObj.pathname.split('/');
     const uploadIdx = pathParts.indexOf('upload');
@@ -33,15 +33,15 @@ exports.handler = async (event) => {
     const publicId = pidWithExt.replace(/\.[^.]+$/, '');
     const resourceType = urlObj.pathname.includes('/raw/') ? 'raw' : 'image';
 
-    // Generate signed URL valid 1 jam
+    
     const expiresAt = Math.floor(Date.now() / 1000) + 3600;
-    // FIX Bug #1: Cloudinary delivery signature TIDAK menyertakan resource_type.
-    // String yang di-sign harus urut abjad: public_id, timestamp (tanpa resource_type).
+    
+    
     const toSign = `public_id=${publicId}&timestamp=${expiresAt}${apiSecret}`;
     const signature = crypto.createHash('sha1').update(toSign).digest('hex');
 
-    // Build signed delivery URL
-    // Format: /upload/s--{signature}--/v{timestamp}/{public_id}
+    
+    
     const signedUrl = `https://res.cloudinary.com/${cloudName}/${resourceType}/upload/s--${signature}--/v${expiresAt}/${publicId}`;
 
     console.log('[get-signed-url] publicId:', publicId, 'signedUrl:', signedUrl);

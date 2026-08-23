@@ -3,22 +3,6 @@ const { validateSession } = require('./middleware');
 
 let _migrated = false;
 
-/**
- * Handler: /api/indikator
- *
- * GET    — Daftar semua indikator
- *           Response: [{ no, nama, bobot, aktif, catatan }]
- *
- * POST   — Tambah indikator baru
- *           Body: { no, nama, bobot, aktif, catatan }
- *           409 — Nomor indikator sudah ada
- *
- * PUT    — Update indikator
- *           Body: { no, nama, bobot, aktif, catatan }
- *
- * DELETE — Hapus indikator
- *           Body: { no }
- */
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors();
   const _authErr = await validateSession(event);

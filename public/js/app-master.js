@@ -1,5 +1,5 @@
-// ============== LAPORAN ==============
-// Per-tab page size overrides (tidak mengubah ITEMS_PER_PAGE global)
+
+
 const _PAGE_SIZE_JAB = 12;
 const _PAGE_SIZE_PKM = 12;
 const _PAGE_SIZE_IND = 12;
@@ -11,7 +11,6 @@ function _paginateCustom(rows, page, size) {
   return { items: rows.slice(start, start + size), page: p, totalPages, total };
 }
 
-// Semua data laporan mentah (sebelum filter bulan/status/pkm)
 window._lapAllData = window._lapAllData || [];
 let _lapAllData = window._lapAllData;
 
@@ -46,9 +45,8 @@ async function renderLaporan() {
           </select>
         </div>
       </div>
-    </div>
-    ${role === 'Admin' ? `` : ``}
-    <div class=\"card\" id=\"lapTabelCard\" style=\"\">\n      <div class=\"card-body\" style=\"padding:0\" id=\"lapTable\">${loadingBlock('Memuat...')}</div>\n    </div>`;
+      <div style="padding:0" id="lapTable">${loadingBlock('Memuat...')}</div>
+    </div>`;
 
   await loadLaporan();
 }
@@ -103,12 +101,12 @@ function _lapRebuildFilters(rows, selTahun, selBulan, selStatus, selPKM) {
   if (statusSel) {
     const statusOrder = ['Draft','Menunggu Kepala Puskesmas','Menunggu Pengelola Program','Menunggu Admin','Selesai','Ditolak'];
     // Opsi status "biasa" cuma muncul kalau ada usulan dgn status itu YANG PERIODENYA
-    // MASIH AKTIF (belum expired) — biar tidak dobel/ambigu dgn opsi "Periode Berakhir".
+    
     const statusSet = new Set(rowsByTahun.filter(r => !isPeriodeBerakhir(r)).map(r => r.statusGlobal).filter(Boolean));
     const statusSorted = statusOrder.filter(s => statusSet.has(s));
     statusSet.forEach(s => { if (!statusSorted.includes(s)) statusSorted.push(s); });
-    // "Periode Berakhir" bukan statusGlobal asli — ini status turunan (belum final tapi
-    // periodeExpired true). Tampilkan sebagai opsi filter terpisah kalau memang ada datanya.
+    
+    
     const adaBerakhir = rowsByTahun.some(isPeriodeBerakhir);
     statusSel.innerHTML = '<option value="">Semua Status</option>'
       + statusSorted.map(s => `<option value="${s}" ${selStatus === s ? 'selected':''}>${s}</option>`).join('')
@@ -128,7 +126,7 @@ function _lapApplyFilter() {
   const status   = document.getElementById('lapStatus')?.value;
   const pkm      = document.getElementById('lapPKM')?.value;
 
-  // Rebuild semua filter untuk tahun yang dipilih (termasuk PKM & bulan)
+  
   _lapRebuildFilters(_lapAllData, tahun, bulan, status, pkm);
 
   const filtered = _lapAllData.filter(r => {
@@ -143,7 +141,7 @@ function _lapApplyFilter() {
 }
 
 async function loadLaporan() {
-  // Fetch SEMUA data (tanpa filter tahun/bulan/status) agar filter bisa dibangun dari data nyata
+  
   const params = {};
   if (currentUser.role === 'Operator')        params.email_operator = currentUser.email;
   if (currentUser.role === 'Kepala Puskesmas') params.kode_pkm       = currentUser.kodePKM;
@@ -155,7 +153,6 @@ async function loadLaporan() {
     _lapAllData = rawData;
     window._lapAllData = rawData;
 
-
     const prevTahun  = document.getElementById('lapTahun')?.value  ?? '';
     const prevBulan  = document.getElementById('lapBulan')?.value  || '';
     const prevStatus = document.getElementById('lapStatus')?.value || '';
@@ -165,7 +162,7 @@ async function loadLaporan() {
     _lapApplyFilter();
   } catch (e) {
     if (!window._verifSilentReload) toast(e.message, 'error');
-    // Fallback: isi dropdown tahun agar tidak stuck "Memuat..."
+    
     const tahunSel = document.getElementById('lapTahun');
     if (tahunSel && !tahunSel.options.length) {
       tahunSel.innerHTML = '<option value="">Semua Tahun</option>';
@@ -174,15 +171,15 @@ async function loadLaporan() {
 }
 
 function _lapRenderTable(data) {
-  // Hitung summary dari data yang sudah difilter
+  
   const total   = data.length;
   const selesai = data.filter(r => r.statusGlobal === 'Selesai').length;
   const belumFinal = data.filter(r => !['Selesai','Ditolak'].includes(r.statusGlobal));
   const berakhir = belumFinal.filter(isPeriodeBerakhir).length;
-  // Samakan dgn definisi Dashboard Admin: cuma status_global='Menunggu Admin'
-  // yang dihitung "Menunggu Verifikasi" (bukan semua status non-final —
-  // status lain seperti "Menunggu Kepala Puskesmas"/"Menunggu Pengelola Program"
-  // bukan giliran Admin, jadi jangan ikut kehitung di sini).
+  
+  
+  
+  
   const pending  = data.filter(r => r.statusGlobal === 'Menunggu Admin' && !isPeriodeBerakhir(r)).length;
   const indeks  = data.filter(r => parseFloat(r.indeksSPM) > 0).map(r => parseFloat(r.indeksSPM));
   const rataSPM = indeks.length ? (indeks.reduce((a,b)=>a+b,0)/indeks.length).toFixed(2) : '0';
@@ -210,7 +207,7 @@ function _lapRenderPage(page) {
   const { items, page: p, totalPages, total } = paginateData(data, page);
   window._lapPage = p;
 
-  // Hitung offset nomor urut berdasarkan halaman
+  
   const offset = (p - 1) * 10;
 
   document.getElementById('lapTable').innerHTML = `
@@ -253,12 +250,11 @@ function exportLaporan() {
   toast('Export Excel berhasil! Filter: ' + filterInfo, 'success');
 }
 
-// Download PDF Rekap sesuai filter aktif — 1 PDF tabel rekap dengan kop surat
 async function downloadRekapLaporan() {
   const data = window._laporanData;
   if (!data || !data.length) return toast('Tidak ada data untuk didownload', 'warning');
 
-  // Susun label filter untuk ditampilkan di PDF
+  
   const tahun  = document.getElementById('lapTahun')?.value || '';
   const bulanEl = document.getElementById('lapBulan');
   const bulan  = bulanEl?.options[bulanEl.selectedIndex]?.text || '';
@@ -345,7 +341,6 @@ async function downloadRekapLaporan() {
   }
 }
 
-// ============== DOWNLOAD DATA DUKUNG PER INDIKATOR (ZIP, lintas usulan) ==============
 async function openBuktiRekapModal() {
   let modal = document.getElementById('buktiRekapModal');
   if (!modal) {
@@ -359,8 +354,8 @@ async function openBuktiRekapModal() {
   let indikatorList = [];
   try { indikatorList = (await API.getIndikator()).filter(i => i.aktif !== false); } catch(e) {}
 
-  // Pengelola Program hanya boleh lihat & download data dukung indikator yang
-  // jadi tanggung jawabnya (sama seperti pembatasan di tombol Download Laporan Final PP)
+  
+  
   const isPP = currentUser.role === 'Pengelola Program';
   if (isPP) {
     const aksesArr = Array.isArray(currentUser.indikatorAkses)
@@ -625,14 +620,13 @@ async function _brStartDownload() {
   }
 }
 
-// ============== MASTER DATA (TAB) ==============
 let _masterActiveTab = 'users';
 
 async function renderMasterData(tab) {
   if (tab) _masterActiveTab = tab;
   const activeTab = _masterActiveTab;
 
-  // Selalu build shell dulu jika belum ada
+  
   if (!document.getElementById('masterTabContent')) {
     _buildMasterShell();
   }
@@ -659,11 +653,11 @@ async function renderMasterData(tab) {
       const fn = fnMap[activeTab];
       if (fn) await _renderIntoTab(fn);
     }
-  } finally { /* loadingBlock di atas sudah cukup, tidak perlu overlay tambahan */ }
+  } finally {  }
 }
 
 async function renderSettingsTab(el) {
-  // Jika dipanggil dari _renderToTab (el = masterTabContent), atau dari first load
+  
   const target = el || document.getElementById('masterTabContent');
   if (!target) return;
   target.innerHTML = `
@@ -696,7 +690,7 @@ async function renderSettingsTab(el) {
       document.getElementById('settingTahunAwal').value = res.tahun_awal;
       document.getElementById('settingTahunAkhir').value = res.tahun_akhir;
     }
-  } catch(e) { /* silent */ }
+  } catch(e) {  }
 }
 
 async function renderPejabatTab(el) {
@@ -790,16 +784,16 @@ async function savePejabat(jabatan) {
     await API.post('pejabat', { jabatan, nama, nip, tandaTangan: tanda_tangan });
     toast('Data '+jabatan+' berhasil disimpan!', 'success');
     renderPejabatTab(document.getElementById('masterTabContent'));
-    // Auto-refresh tombol verifikasi jika modal verifikasi terbuka (Admin)
+    
     const verifModal = document.getElementById('verifikasiModal');
     if (verifModal && verifModal.classList.contains('show')) {
-      // Re-cek status TT pejabat dari data terbaru
+      
       try {
         const pjList = await API.get('pejabat').catch(() => []);
         const kasubag = pjList.find(p => p.jabatan === 'Kepala Sub Bagian Perencanaan');
         const ttOk = !!(kasubag?.tanda_tangan);
         _updateVerifTTBanner(ttOk, 'Admin');
-        // Reload modal verifikasi sekali (bukan rekursif) setelah TT Admin tersimpan
+        
         if (ttOk && window.verifCurrentUsulan) {
           window._verifSilentReload = true;
           openVerifikasi(window.verifCurrentUsulan).catch(() => {}).finally(() => { window._verifSilentReload = false; });
@@ -809,7 +803,6 @@ async function savePejabat(jabatan) {
   } catch(e) { toast(e.message, 'error'); }
   finally { setMasterLoading(false); }
 }
-
 
 async function saveSettings() {
   const awal = parseInt(document.getElementById('settingTahunAwal').value);
@@ -821,21 +814,21 @@ async function saveSettings() {
   try {
     await API.post('settings', { tahun_awal: awal, tahun_akhir: akhir });
 
-    // Update global tahun range
+    
     window._appTahunAwal = awal;
     window._appTahunAkhir = akhir;
 
-    // Refresh dropdown filterTahunPeriode dengan rentang tahun baru
+    
     const filterEl = document.getElementById('filterTahunPeriode');
     if (filterEl) {
       const currentVal = parseInt(filterEl.value);
-      // Pilih tahun yang sebelumnya dipilih jika masih dalam rentang, jika tidak gunakan tahun awal
+      
       const newSelected = (currentVal >= awal && currentVal <= akhir) ? currentVal : awal;
       filterEl.innerHTML = yearOptions(newSelected);
       loadPeriodeGrid();
     }
 
-    // Refresh dropdown pTahun di modal tambah periode (jika modal sedang terbuka)
+    
     const pTahunEl = document.getElementById('pTahun');
     if (pTahunEl) {
       const pVal = parseInt(pTahunEl.value);
@@ -848,7 +841,6 @@ async function saveSettings() {
   } catch(e) { status.textContent = e.message; }
   finally { setMasterLoading(false); }
 }
-
 
 // ============== ADMIN - USERS ==============
 let allUsers = [], allPKMList = [], allIndList = [];
@@ -949,10 +941,10 @@ async function renderUsers(el) {
       </div>
     </div>`;
 
-  // Load data
+  
   try {
-    // Paksa kosongkan search box — beberapa browser (Chrome/Edge) suka
-    // auto-isi ulang dari histori autofill meskipun autocomplete="off"
+    
+    
     const _su = document.getElementById('filterTeksKelola');
     if (_su) _su.value = '';
 
@@ -962,14 +954,14 @@ async function renderUsers(el) {
     window.allIndList = allIndList;
     renderUsersTable(allUsers);
 
-    // Fill PKM dropdown (modal tambah user)
+    
     const pkmSel = document.getElementById('uPKM');
     allPKMList.forEach(p => pkmSel.innerHTML += `<option value="${p.kode}">${p.nama}</option>`);
 
-    // Fill PKM filter dropdown (filter tabel user)
+    
     const filterPKMSel = document.getElementById('filterPKM');
     if (filterPKMSel) {
-      // Hanya tampilkan PKM yang ada di daftar user (bukan semua master PKM)
+      
       const pkmDipakai = new Map();
       allUsers.forEach(u => { if (u.kodePKM && u.namaPKM) pkmDipakai.set(u.kodePKM, u.namaPKM); });
       const pkmSorted = [...pkmDipakai.entries()].sort((a,b) => a[1].localeCompare(b[1]));
@@ -979,7 +971,7 @@ async function renderUsers(el) {
   } catch (e) { if (!window._verifSilentReload) toast(e.message, 'error'); }
 }
 
-let _currentFilteredUsers = null; // menyimpan hasil filter aktif untuk pagination
+let _currentFilteredUsers = null; 
 
 function filterUsers() {
   const q = document.getElementById('filterTeksKelola').value.toLowerCase();
@@ -1001,7 +993,7 @@ function renderUsersTable(users, page) {
   const el = document.getElementById('usersTable');
   if (!el) return;
   if (page) _usersPage = page;
-  // Simpan ke state filter jika dipanggil langsung (bukan dari pagination)
+  
   if (users !== undefined) _currentFilteredUsers = users;
   const filteredUsers = (_currentFilteredUsers || users || allUsers).filter(u => u.role !== 'Super Admin' && u.role !== 'Admin' && u.email !== 'admin@vispm.com');
   const { items, page: p, totalPages, total } = paginateData(filteredUsers, _usersPage);
@@ -1026,8 +1018,6 @@ function renderUsersTable(users, page) {
     + renderPagination('usersTable', total, p, totalPages, pg => { _usersPage = pg; renderUsersTable(); });
 }
 
-
-// ============== PREVIEW TANDA TANGAN USER ==============
 function previewTandaTanganUser(email, nama, role) {
   const user = (allUsers || []).find(u => u.email === email);
   const tt = user?.tandaTangan;
@@ -1042,7 +1032,7 @@ function previewTandaTanganUser(email, nama, role) {
   }
   const hastt = !!(tt && (tt.startsWith('data:image') || tt.startsWith('http')));
 
-  // Build bagian tanda tangan tanpa nested template literal
+  
   let ttBodyHtml;
   if (hastt) {
     ttBodyHtml = '<div style="border:1.5px solid #e2e8f0;border-radius:10px;background:#f8fafc;padding:16px;text-align:center;min-height:80px">'
@@ -1186,7 +1176,7 @@ function checkUserRole() {
   const role = document.getElementById('uRole').value;
   const isProgram = role === 'Pengelola Program';
 
-  // Toggle fullscreen: Pengelola Program → fullscreen, lainnya → modal biasa
+  
   const userModal = document.getElementById('userModal');
   if (userModal) {
     const isOpen = userModal.classList.contains('show');
@@ -1196,11 +1186,11 @@ function checkUserRole() {
 
   document.getElementById('pkmContainer').style.display = (role === 'Operator' || role === 'Kepala Puskesmas') ? 'block' : 'none';
 
-  // Toggle grid: 1 kolom (default) atau 2 kolom (PP)
+  
   const grid = document.getElementById('userModalGrid');
   if (grid) grid.style.gridTemplateColumns = isProgram ? '320px 1fr' : '1fr';
 
-  // Tampilkan/sembunyikan kolom kanan (jabatan + indikator) sekaligus
+  
   const rightCol = document.getElementById('ppRightCol');
   if (rightCol) rightCol.style.display = isProgram ? 'flex' : 'none';
 
@@ -1242,14 +1232,14 @@ function parseIndikatorAksesString(str) {
 
 function openUserModal(editEmail = null) {
   document.getElementById('userModalTitle').textContent = editEmail ? 'Edit User' : 'Tambah User';
-  // Reset SEMUA field form terlebih dahulu
+  
   document.getElementById('uEmail').value = '';
   document.getElementById('uEmail').readOnly = !!editEmail;
   document.getElementById('uNama').value = '';
   document.getElementById('uRole').value = 'Operator';
   document.getElementById('uPKM').value = '';
   document.getElementById('uAktif').value = 'true';
-  // Reset NIP
+  
   const nipResetEl = document.getElementById('uNIP');
   if (nipResetEl) nipResetEl.value = '';
   // Reset jabatan checkboxes — hapus semua centang
@@ -1257,7 +1247,7 @@ function openUserModal(editEmail = null) {
   if (jabatanBox) {
     jabatanBox.querySelectorAll('input[type=checkbox]').forEach(cb => cb.checked = false);
   }
-  // Reset indikator checkboxes
+  
   const indBox = document.getElementById('indCheckboxList');
   if (indBox) {
     indBox.querySelectorAll('input[type=checkbox]').forEach(cb => cb.checked = false);
@@ -1273,7 +1263,7 @@ function openUserModal(editEmail = null) {
       document.getElementById('uPKM').value = user.kodePKM || '';
       document.getElementById('uAktif').value = user.aktif ? 'true' : 'false';
       checkUserRole();
-      // Isi NIP
+      
       const nipEl = document.getElementById('uNIP');
       if (nipEl) nipEl.value = user.nip || '';
       if (user.role === 'Pengelola Program') {
@@ -1330,15 +1320,12 @@ async function deleteUser(email) {
         await API.deleteUser(email);
         toast('User berhasil dihapus');
         allUsers = (await API.getUsers()).filter(u => u.role !== 'Admin' && u.role !== 'Super Admin');
-        filterUsers(); // re-apply filter yang aktif, bukan render semua
+        filterUsers(); 
       } catch (e) { toast(e.message, 'error'); }
     }
   });
 }
 
-
-
-// ============== KELOLA JABATAN ==============
 let _jabatanAllList = [];
 
 async function renderJabatan(el) {
@@ -1465,7 +1452,7 @@ async function saveJabatan() {
     toast(`Jabatan "${nama}" berhasil ${_editJabatanId ? 'diperbarui' : 'ditambahkan'}`, 'success');
     closeModal('jabatanModal');
     await loadJabatanTable();
-    // Refresh dropdown jabatan kalau sedang buka form user
+    
     if (document.getElementById('jabatanCheckboxList')) {
       const cur = getSelectedJabatan();
       await loadJabatanDropdown(cur);
@@ -1488,7 +1475,6 @@ async function deleteJabatan(id, nama) {
   });
 }
 
-// ============== ADMIN - PKM ==============
 let allPKM = [];
 
 async function renderPKM(el) {
@@ -1624,7 +1610,6 @@ async function deletePKM(kode) {
   });
 }
 
-// ============== ADMIN - TARGET TAHUNAN ==============
 let _ttPKM = [], _ttIndikator = [], _ttCurrentKode = null, _ttCurrentTahun = null;
 
 async function renderTargetTahunan(el) {
@@ -1731,7 +1716,6 @@ async function saveTargetTahunan() {
   finally { setMasterLoading(false); }
 }
 
-// ============== ADMIN - INDIKATOR ==============
 let allIndikator = [];
 
 async function renderIndikator(el) {
@@ -1865,7 +1849,6 @@ async function deleteInd(no) {
   });
 }
 
-// ============== ADMIN - PERIODE ==============
 let _editPeriodeTahun = null, _editPeriodeBulan = null;
 
 async function renderPeriode(el) {
@@ -1873,7 +1856,7 @@ async function renderPeriode(el) {
   const target = el || document.getElementById('mainContent');
   if (!target) return;
 
-  // Load settings untuk tahun range
+  
   let tahunAwal = window._appTahunAwal || currentTahun;
   let tahunAkhir = window._appTahunAkhir || (currentTahun + 3);
   try {
@@ -2045,7 +2028,6 @@ async function renderPeriode(el) {
   loadPeriodeGrid();
 }
 
-// ── Helper: hitung progress & status waktu berjalan untuk timeline periode ──
 function _pWDate(dateStr, timeStr) {
   if (!dateStr) return null;
   const [y, mo, d] = String(dateStr).slice(0, 10).split('-').map(Number);
@@ -2057,8 +2039,7 @@ function _pNowWita() {
   const s = new Date(Date.now() + 8 * 3600000);
   return Date.UTC(s.getUTCFullYear(), s.getUTCMonth(), s.getUTCDate(), s.getUTCHours(), s.getUTCMinutes());
 }
-// Konversi tanggal (dari DB, boleh UTC midnight) + jam WITA -> epoch ms yang benar (real UTC instant).
-// Dipakai bareng sama badge timer (tick) supaya statusText/progress bar ikut live, bukan cuma badge-nya doang.
+
 function _pEpochWITA(dateStr, timeStr) {
   if (!dateStr) return null;
   const d = new Date(dateStr);
@@ -2071,7 +2052,7 @@ function _pEpochWITA(dateStr, timeStr) {
     + String(witaDate.getUTCDate()).padStart(2, '0');
   return new Date(tglWITA + 'T' + String(hh || 0).padStart(2, '0') + ':' + String(mm || 0).padStart(2, '0') + ':00+08:00').getTime();
 }
-// Format sisa waktu jadi "D hari HH:MM:SS" (atau "HH:MM:SS" doang kalau udah di bawah 1 hari)
+
 function _pFormatCountdown(ms) {
   const totalSec = Math.max(0, Math.floor(ms / 1000));
   const d = Math.floor(totalSec / 86400);
@@ -2081,8 +2062,7 @@ function _pFormatCountdown(ms) {
   const hh = String(h).padStart(2, '0'), mm = String(m).padStart(2, '0'), ss = String(s).padStart(2, '0');
   return d > 0 ? `${d} hari ${hh}:${mm}:${ss}` : `${hh}:${mm}:${ss}`;
 }
-// Update statusText + progress bar sebuah _pTimelineRow secara live, dipanggil dari dalam tick() badge timer
-// biar sisa waktu ikut sinkron detik demi detik, bukan nyangkut di nilai render awal.
+
 function _pTickTimelineRow(rowId, startMs, endMs, nowMs) {
   const elStatus = document.getElementById(rowId + '_status');
   const elBar = document.getElementById(rowId + '_barfill');
@@ -2244,11 +2224,11 @@ async function openPeriodeModal() {
   document.getElementById('pSelesaiVerif').value = '';
   document.getElementById('pJamMulaiVerif').value = '08:00';
   document.getElementById('pJamSelesaiVerif').value = '17:00';
-  // Reset toggle sinkronisasi: default tidak sync
+  
   const syncCb = document.getElementById('pSyncVerif');
   if (syncCb) { syncCb.checked = false; _onSyncVerifToggle(); }
   showModal('periodeModal');
-  // Init 24h pickers SETELAH modal tampil agar elemen div.time-picker-24 sudah ada di DOM
+  
   setTimeout(() => _initAllPeriodePickers('08:00', '17:00', '08:00', '17:00'), 80);
 }
 
@@ -2281,13 +2261,13 @@ async function editPeriode(tahun, bulan) {
     document.getElementById('pSelesaiVerif').value  = tSelesaiVerif;
     document.getElementById('pJamMulaiVerif').value  = jMulaiVerif;
     document.getElementById('pJamSelesaiVerif').value = jSelesaiVerif;
-    // Deteksi apakah periode verif sama persis dengan input → aktifkan toggle sync
+    
     const isSync = tMulaiVerif === tMulai && tSelesaiVerif === tSelesai
       && jMulaiVerif === jMulai && jSelesaiVerif === jSelesai;
     const syncCb = document.getElementById('pSyncVerif');
     if (syncCb) { syncCb.checked = isSync; _onSyncVerifToggle(); }
     showModal('periodeModal');
-    // Init 24h pickers SETELAH modal tampil agar elemen div.time-picker-24 sudah ada di DOM
+    
     const _jm = jMulai, _js = jSelesai, _jmv = jMulaiVerif, _jsv = jSelesaiVerif;
     setTimeout(() => _initAllPeriodePickers(_jm, _js, _jmv, _jsv), 80);
   } catch (e) { openPeriodeModal(); }
@@ -2320,7 +2300,7 @@ async function savePeriode() {
   const jamMulai = document.getElementById('pJamMulai').value || '08:00';
   const jamSelesai = document.getElementById('pJamSelesai').value || '17:00';
   const status = document.getElementById('pStatus').value;
-  // Jika mode sync aktif, gunakan nilai dari periode input
+  
   const isSync = document.getElementById('pSyncVerif')?.checked;
   const tanggalMulaiVerif  = isSync ? (tanggalMulai || null)  : (document.getElementById('pMulaiVerif').value || null);
   const tanggalSelesaiVerif = isSync ? (tanggalSelesai || null) : (document.getElementById('pSelesaiVerif').value || null);
@@ -2339,7 +2319,6 @@ async function savePeriode() {
   finally { setMasterLoading(false); }
 }
 
-// ── Periode modal helper: toggle sinkronisasi waktu verifikasi ──
 function _onSyncVerifToggle() {
   const isSync = document.getElementById('pSyncVerif')?.checked;
   const fields  = document.getElementById('pVerifFields');
@@ -2351,7 +2330,7 @@ function _onSyncVerifToggle() {
     fields.style.pointerEvents = 'none';
     if (info) info.style.display = 'block';
     if (hint) hint.style.display = 'none';
-    _doSyncVerif(); // langsung sync saat toggle ON
+    _doSyncVerif(); 
   } else {
     fields.style.opacity = '1';
     fields.style.pointerEvents = '';
@@ -2360,13 +2339,11 @@ function _onSyncVerifToggle() {
   }
 }
 
-// Salin nilai tanggal input → verifikasi
 function _syncVerifDate() {
   if (!document.getElementById('pSyncVerif')?.checked) return;
   _doSyncVerif();
 }
 
-// Salin nilai jam input → verifikasi
 function _syncVerifTime() {
   if (!document.getElementById('pSyncVerif')?.checked) return;
   _doSyncVerif();
@@ -2377,17 +2354,14 @@ function _doSyncVerif() {
   const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
   set('pMulaiVerif',   get('pMulai'));
   set('pSelesaiVerif',  get('pSelesai'));
-  // Sync picker (hidden input sudah di-update oleh picker sendiri, tapi kita juga
-  // perlu update picker verif agar tampilan select berubah)
+  
+  
   _setTimePicker24('pJamMulaiVerifPicker',  get('pJamMulai'));
   _setTimePicker24('pJamSelesaiVerifPicker', get('pJamSelesai'));
   set('pJamMulaiVerif',  get('pJamMulai'));
   set('pJamSelesaiVerif', get('pJamSelesai'));
 }
 
-// ── Custom 24-hour time picker (ganti input[type=time] agar tidak ada AM/PM) ──
-// Render dua <select> jam (00-23) dan menit (00,05,...,55) ke dalam div.time-picker-24.
-// Nilai tersinkron ke hidden <input type="time"> via data-target.
 function _initTimePicker24(pickerId, initialValue) {
   const wrap = document.getElementById(pickerId);
   if (!wrap) return;
@@ -2395,12 +2369,12 @@ function _initTimePicker24(pickerId, initialValue) {
   const syncFn   = wrap.dataset.sync;
   const [initH, initM] = (initialValue || '08:00').split(':').map(Number);
 
-  // Jika sudah di-render sebagai stepper, update via _tpSet
+  
   if (wrap._tpSet) {
     wrap._tpSet(initH, initM);
     return;
   }
-  // Fallback: jika ada span display lama, update teks
+  
   const existH = document.getElementById(pickerId + '_h');
   const existM = document.getElementById(pickerId + '_m');
   if (existH && existM && existH.tagName === 'SPAN') {
@@ -2411,7 +2385,7 @@ function _initTimePicker24(pickerId, initialValue) {
     return;
   }
 
-  // Stepper helper: update hidden input & trigger sync
+  
   const _commit = (h, m) => {
     const val = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
     const target = document.getElementById(targetId);
@@ -2455,7 +2429,7 @@ function _initTimePicker24(pickerId, initialValue) {
 
     </div>`;
 
-  // Focus ring on wrap
+  
   const wrapEl = document.getElementById(`${pickerId}_wrap`);
   if (wrapEl) {
     wrapEl.addEventListener('focusin', () => { wrapEl.style.borderColor='#0d9488'; wrapEl.style.boxShadow='0 0 0 3px rgba(13,148,136,0.12)'; });
@@ -2496,7 +2470,7 @@ function _initTimePicker24(pickerId, initialValue) {
     _commit(_h, _m);
   });
 
-  // Simpan state ke elemen untuk dibaca _setTimePicker24
+  
   wrap._tpH = () => _h;
   wrap._tpM = () => _m;
   wrap._tpSet = (h, m) => {
@@ -2508,7 +2482,6 @@ function _initTimePicker24(pickerId, initialValue) {
   };
 }
 
-// Set nilai picker dari string "HH:MM"
 function _setTimePicker24(pickerId, value) {
   if (!value) return;
   const [hStr, mStr] = value.split(':');
@@ -2516,12 +2489,12 @@ function _setTimePicker24(pickerId, value) {
   const m = parseInt(mStr) || 0;
   const wrap = document.getElementById(pickerId);
   if (!wrap) return;
-  // Stepper mode — gunakan _tpSet yang disimpan saat init
+  
   if (typeof wrap._tpSet === 'function') {
     wrap._tpSet(h, m);
     return;
   }
-  // Fallback: span display
+  
   const spanH = document.getElementById(`${pickerId}_h`);
   const spanM = document.getElementById(`${pickerId}_m`);
   if (spanH) spanH.textContent = String(h).padStart(2, '0');
@@ -2532,7 +2505,6 @@ function _setTimePicker24(pickerId, value) {
   }
 }
 
-// Inisialisasi semua 4 picker di modal periode
 function _initAllPeriodePickers(jm, js, jmv, jsv) {
   _initTimePicker24('pJamMulaiPicker',    jm  || '08:00');
   _initTimePicker24('pJamSelesaiPicker',   js  || '17:00');
@@ -2540,11 +2512,10 @@ function _initAllPeriodePickers(jm, js, jmv, jsv) {
   _initTimePicker24('pJamSelesaiVerifPicker',jsv || '17:00');
 }
 
-// ============== GLOBAL HELPERS ==============
 function showModal(id) { document.getElementById(id)?.classList.add('show'); }
 function closeModal(id) {
   if (id === 'verifikasiModal') {
-    window._verifTTOk        = true;  // reset saat tutup
+    window._verifTTOk        = true;  
     window._verifDitolakOleh = '';
     window._verifIsPPReVerif = false;
     verifCurrentUsulan       = null;
@@ -2554,12 +2525,9 @@ function closeModal(id) {
 }
 function setLoading(show) { document.getElementById('globalLoader').classList.toggle('show', show); }
 
-// Versi lokal setLoading khusus Master Data — overlay hanya menutupi area
-// konten tab (#masterTabContent), bukan seluruh layar (sidebar/topbar tetap
-// bisa dipakai, tidak ikut ke-blur seperti spinner global).
 function setMasterLoading(show) {
   const tc = document.getElementById('masterTabContent');
-  if (!tc) { setLoading(show); return; } // fallback jaga-jaga kalau shell belum ada
+  if (!tc) { setLoading(show); return; } 
   if (!tc.style.position || tc.style.position === 'static') tc.style.position = 'relative';
   let ov = document.getElementById('masterLocalLoader');
   if (show) {
@@ -2577,17 +2545,14 @@ function setMasterLoading(show) {
   }
 }
 
-// Close modal on backdrop click
 document.addEventListener('click', (e) => {
   if (e.target.classList.contains('modal')) {
     closeModal(e.target.id);
   }
 });
 
-// Enter key on auth
-// ============== IDLE AUTO LOGOUT ==============
-const IDLE_TIMEOUT      =  5 * 60 * 1000; // 5 menit idle → logout
-const IDLE_WARN_BEFORE  = 30 * 1000; // tampilkan warning 30 detik sebelum logout
+const IDLE_TIMEOUT      =  5 * 60 * 1000; 
+const IDLE_WARN_BEFORE  = 30 * 1000; 
 let _idleTimer     = null;
 let _idleWarnTimer = null;
 let _idleCountdown = null;
@@ -2645,12 +2610,12 @@ function resetIdleTimer() {
   _hideIdleWarning();
   if (!currentUser) return;
 
-  // Warning 2 menit sebelum timeout
+  
   _idleWarnTimer = setTimeout(() => {
     if (currentUser) _showIdleWarning();
   }, IDLE_TIMEOUT - IDLE_WARN_BEFORE);
 
-  // Logout setelah timeout penuh
+  
   _idleTimer = setTimeout(() => {
     if (currentUser) {
       _hideIdleWarning();
@@ -2671,20 +2636,20 @@ function startIdleWatcher() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  // Enter-key handler buat form login udah dipindah ke login.html
-  // (index.html gak punya #authEmail lagi sejak app-shell dipisah dari
-  // halaman login).
+  
+  
+  
 
-  // Restore session dari localStorage
+  
   try {
     const saved = sessionStorage.getItem('spm_user');
     if (saved) {
       currentUser = JSON.parse(saved);
-      // Normalisasi role lama → nama baru
+      
       const roleMap = { 'Kapus': 'Kepala Puskesmas', 'kapus': 'Kepala Puskesmas', 'Program': 'Pengelola Program' };
       if (roleMap[currentUser.role]) {
         currentUser.role = roleMap[currentUser.role];
-        sessionStorage.setItem('spm_user', JSON.stringify(currentUser)); // update sessionStorage
+        sessionStorage.setItem('spm_user', JSON.stringify(currentUser)); 
       }
       startApp();
       startIdleWatcher();
@@ -2694,7 +2659,6 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
-// ============ KELOLA SEMUA USULAN (SUPER ADMIN) ============
 async function renderKelolaUsulan() {
   document.getElementById('mainContent').innerHTML = `
     <div class="page-header">
@@ -2717,22 +2681,20 @@ async function renderKelolaUsulan() {
   loadKelolaUsulan();
 }
 
-// Data mentah SEMUA usulan (semua tahun, sebelum filter)
 let _kuAllRows = [];
 let _kuPage = 1, _kuRows = [];
 
-// Rebuild semua filter (tahun, bulan, status) dari data yang ada
 function _kuRebuildFilters(rows, selTahun, selBulan, selStatus) {
-  // --- Tahun ---
+  
   const tahunSel = document.getElementById('kuTahun');
   if (tahunSel) {
     const years = [...new Set(rows.map(u => parseInt(u.tahun)).filter(Boolean))].sort((a,b) => b - a);
     const finalYears = years.length > 0 ? years : [CURRENT_YEAR];
     if (finalYears.length === 1) {
-      // Cuma 1 tahun tersedia — auto-select, tanpa opsi "Semua Tahun"
+      
       tahunSel.innerHTML = `<option value="${finalYears[0]}" selected>${finalYears[0]}</option>`;
     } else {
-      // selTahun === '' berarti "Semua Tahun", undefined/null berarti default ke tahun terbaru
+      
       const picked = (selTahun !== undefined && selTahun !== null) ? selTahun : finalYears[0];
       tahunSel.innerHTML =
         `<option value="" ${picked === '' ? 'selected' : ''}>Semua Tahun</option>` +
@@ -2760,13 +2722,13 @@ function _kuRebuildFilters(rows, selTahun, selBulan, selStatus) {
   if (statusSel) {
     const rowsTahunIni = rows.filter(u => !tahunPilih || parseInt(u.tahun) === tahunPilih);
     const statusOrder = ['Draft','Menunggu Kepala Puskesmas','Menunggu Pengelola Program','Menunggu Admin','Selesai','Ditolak'];
-    // Opsi status "biasa" cuma muncul kalau ada usulan dgn status itu yang periodenya
-    // masih aktif — biar tidak dobel/ambigu dgn opsi "Periode Berakhir".
+    
+    
     const statusSet = new Set(rowsTahunIni.filter(u => !isPeriodeBerakhir(u)).map(u => u.statusGlobal).filter(Boolean));
     const statusSorted = statusOrder.filter(s => statusSet.has(s));
     statusSet.forEach(s => { if (!statusSorted.includes(s)) statusSorted.push(s); });
-    // "Periode Berakhir" adalah status turunan (belum final tapi periodeExpired true),
-    // tambahkan sebagai opsi filter terpisah kalau memang ada datanya.
+    
+    
     const adaBerakhir = rowsTahunIni.some(isPeriodeBerakhir);
     statusSel.innerHTML = '<option value="">Semua Status</option>'
       + statusSorted.map(s => `<option value="${s}" ${selStatus === s ? 'selected':''}>${s}</option>`).join('')
@@ -2787,13 +2749,13 @@ function _kuSyncCustomSelects() {
     if (!sel) return;
     const wrap = sel.closest('.cs-wrap');
     if (!wrap) {
-      // Belum di-replace CustomSelect — coba replace sekarang
+      
       if (window.CustomSelect && typeof window.CustomSelect.replace === 'function') {
         window.CustomSelect.replace(sel);
       }
       return;
     }
-    // Update teks trigger sesuai nilai yang terpilih saat ini
+    
     const triggerText = wrap.querySelector('.cs-trigger-text');
     if (!triggerText) return;
     const selectedOpt = sel.options[sel.selectedIndex];
@@ -2804,7 +2766,6 @@ function _kuSyncCustomSelects() {
   });
 }
 
-// Dipanggil saat tahun berubah: rebuild bulan & status untuk tahun baru, lalu apply filter
 function _kuOnTahunChange() {
   _kuRebuildFilters(_kuAllRows, document.getElementById('kuTahun')?.value, '', '');
   _kuSyncCustomSelects();
@@ -2830,7 +2791,7 @@ function _kuApplyFilter(page) {
 async function loadKelolaUsulan(page) {
   if (page) { _kuPage = page; _kuApplyFilter(page); return; }
 
-  // Baca filter aktif sebelum DOM di-replace oleh loading
+  
   const prevBulan  = document.getElementById('kuBulan')?.value  || '';
   const prevStatus = document.getElementById('kuStatus')?.value || '';
   // Baca tahun dari DOM — '' = Semua Tahun (default saat pertama kali buka)
@@ -2842,11 +2803,11 @@ async function loadKelolaUsulan(page) {
   setMasterLoading(true);
 
   try {
-    // Fetch SEMUA usulan tanpa filter tahun agar dropdown tahun bisa dibangun dari data nyata
+    
     _kuAllRows = await API.getUsulan({});
     _kuPage = 1;
 
-    // Resolve nama operator dari email (pakai cache _userNamaCache)
+    
     try {
       if (!window._userNamaCache) window._userNamaCache = {};
       const uniqueEmails = [...new Set(_kuAllRows.map(u => u.createdBy).filter(Boolean))];
@@ -2861,7 +2822,7 @@ async function loadKelolaUsulan(page) {
       }));
     } catch(e) {}
 
-    // '' = Semua Tahun; jika ada nilai tahun tertentu tapi tidak ada di data → fallback ke ''
+    
     const availYears = [...new Set(_kuAllRows.map(u => String(u.tahun)).filter(Boolean))];
     const resolvedTahun = prevTahun === '' ? '' : (availYears.includes(prevTahun) ? prevTahun : '');
 
@@ -2955,8 +2916,6 @@ async function restoreVerifAdmin(idUsulan) {
   });
 }
 
-
-// ============== MASTER DATA TAB WRAPPERS ==============
 const _masterTabs = [
   { id: 'users',           icon: 'group',          label: 'User' },
   { id: 'jabatan',         icon: 'badge',           label: 'Jabatan' },
@@ -2970,9 +2929,6 @@ const _masterTabs = [
   { id: 'audit-trail',     icon: 'manage_search',   label: 'Audit Trail' },
 ];
 
-
-// ============== AUDIT TRAIL ==============
-// Label tampilan untuk modul dan aksi
 const _AT_MODULE_LABELS = {
   auth: 'Login / Auth', usulan: 'Usulan', users: 'User',
   puskesmas: 'Puskesmas', indikator: 'Indikator', periode: 'Periode', settings: 'Pengaturan'
@@ -2982,7 +2938,7 @@ const _AT_ACTION_LABELS = {
   SUBMIT: 'Submit', APPROVE: 'Approve', REJECT: 'Tolak',
   RESET: 'Reset', RESTORE: 'Restore', VERIFY: 'Verifikasi'
 };
-// Fallback: Title Case jika aksi tidak ada di mapping
+
 function _atActionLabel(raw) {
   const key = (raw || '').toUpperCase();
   if (_AT_ACTION_LABELS[key]) return _AT_ACTION_LABELS[key];
@@ -3036,30 +2992,27 @@ async function renderAuditTrail(el) {
           </button>
         </div>
       </div>
-    </div>
-    <div class="card">
-      <div class="card-body" style="padding:0" id="auditTrailTable"></div>
+      <div style="padding:0" id="auditTrailTable"></div>
     </div>`;
 
-  // Custom date picker (VDP) — samakan dengan filter tanggal lain di seluruh sistem,
-  // ganti kalender bawaan browser pada input Tanggal Mulai/Akhir
+  
+  
   if (window.VDP) {
     VDP.init('atDateFrom');
     VDP.init('atDateTo');
   }
 
-  // Isi dropdown modul & aksi dari data nyata (tanpa filter tanggal, limit besar)
-  // Keduanya di-await agar spinner global tidak mati sebelum data selesai dimuat
+  
+  
   await Promise.all([
     _populateAuditFilterOptions(),
     loadAuditTrail()
   ]);
 }
 
-// Ambil semua data tanpa filter → bangun opsi modul & aksi yang benar-benar ada di DB
 async function _populateAuditFilterOptions() {
   try {
-    // Ambil sample besar tanpa filter tanggal agar modul/aksi lengkap terdeteksi
+    
     const all = await API.get('audit-trail', { limit: 5000 });
     if (!all || !all.length) return;
 
@@ -3067,7 +3020,7 @@ async function _populateAuditFilterOptions() {
     const actionSel = document.getElementById('atAction');
     if (!moduleSel || !actionSel) return;
 
-    // Kumpulkan nilai unik yang benar-benar ada
+    
     const modules = [...new Set(all.map(r => r.module).filter(Boolean))].sort();
     const actions = [...new Set(all.map(r => (r.action||'').toUpperCase()).filter(Boolean))].sort();
 
@@ -3160,9 +3113,9 @@ function _atRenderTable() {
         <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:12%">Waktu</th>
         <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:8%">Modul</th>
         <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:8%">Aksi</th>
-        <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:14%">User</th>
+        <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:20%">User</th>
         <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:9%">Role</th>
-        <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:15%">Detail</th>
+        <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:9%">Detail</th>
         <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:11%">IP Address</th>
         <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:23%">Lokasi</th>
       </tr></thead>
@@ -3174,12 +3127,12 @@ function _atRenderTable() {
           <td style="font-size:11.5px;color:#64748b;white-space:nowrap">${formatDateTime(r.created_at)}</td>
           <td><span style="font-size:11px;font-weight:700;background:#f1f5f9;color:#475569;padding:2px 8px;border-radius:20px">${r.module||'-'}</span></td>
           <td><span style="font-size:11px;font-weight:700;background:${bg};color:${col};padding:2px 8px;border-radius:20px;border:1px solid ${col}33">${ac||'-'}</span></td>
-          <td style="font-size:12px"><div style="font-weight:600">${r.user_nama||'-'}</div><div style="font-size:11px;color:#94a3b8">${r.user_email||''}</div></td>
+          <td style="font-size:12px;overflow:hidden"><div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${r.user_nama||'-'}">${r.user_nama||'-'}</div><div style="font-size:11px;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${r.user_email||''}">${r.user_email||''}</div></td>
           <td style="font-size:12px;color:#64748b">${r.user_role||'-'}</td>
           <td style="font-size:12px;word-break:break-word">${r.detail||'-'}</td>
-          <td style="font-size:11px;color:#94a3b8">${r.ip_address||'-'}</td>
-          <td style="font-size:11px;color:#64748b">${r.lokasi
-            ? `<span style="display:flex;align-items:center;gap:4px">${_atLokasiIcon(_atLokasiIsAkurat(r.lokasi))}${r.lokasi}</span>`
+          <td style="font-size:11px;color:#94a3b8;word-break:break-all;overflow-wrap:break-word">${r.ip_address||'-'}</td>
+          <td style="font-size:11px;color:#64748b;overflow-wrap:break-word">${r.lokasi
+            ? `<span style="display:flex;align-items:flex-start;gap:4px"><span style="flex-shrink:0;margin-top:1px">${_atLokasiIcon(_atLokasiIsAkurat(r.lokasi))}</span><span>${r.lokasi}</span></span>`
             : '<span style="color:#cbd5e1">—</span>'}</td>
         </tr>`;
       }).join('')}
@@ -3199,7 +3152,6 @@ function exportAuditTrail() {
   ]);
   _downloadExcel('Audit_Trail', headers, rows);
 }
-
 
 // ============== EXCEL EXPORT HELPER (SpreadsheetML, no external lib) ==============
 function _downloadExcel(filename, headers, rows) {
@@ -3242,7 +3194,6 @@ function _downloadExcel(filename, headers, rows) {
   URL.revokeObjectURL(url);
   toast('File Excel berhasil diunduh', 'success');
 }
-
 
 // ============== PENCARIAN GLOBAL ==============
 let _searchTimeout = null;
@@ -3414,8 +3365,6 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') closeGlobalSearch();
 });
 
-
-
 function _buildMasterShell() {
   const tabsHtml = _masterTabs.map(t => `
     <button id="masterTab_${t.id}" onclick="renderMasterData('${t.id}')"
@@ -3447,20 +3396,11 @@ function _highlightMasterTab(activeId) {
   });
 }
 
-// _renderIntoTab: panggil renderFn(el) dengan el = masterTabContent
-// renderFn menerima el opsional; jika tidak, pakai mainContent sebagai fallback
 async function _renderIntoTab(renderFn) {
   const tc = document.getElementById('masterTabContent');
   if (!tc) return;
   await renderFn(tc);
-}// ============== TAB: KONFIGURASI PENANDATANGAN PER INDIKATOR ==============
-// Tambahkan tab ini ke _masterTabs di app-master.js:
-// { id: 'penandatangan', icon: 'assignment_ind', label: 'Penandatangan' }
-//
-// Tambahkan case ini di renderMasterData():
-// } else if (activeTab === 'penandatangan') {
-//   await renderPenandatanganTab(tc);
-// }
+}
 
 async function renderPenandatanganTab(el) {
   const target = el || document.getElementById('masterTabContent');
@@ -3469,7 +3409,7 @@ async function renderPenandatanganTab(el) {
   target.innerHTML = loadingBlock('Memuat...');
 
   try {
-    // Load semua data sekaligus
+    
     const [indikatorList, jabatanList, savedConfig] = await Promise.all([
       API.get('indikator'),
       API.get('jabatan'),
@@ -3477,7 +3417,7 @@ async function renderPenandatanganTab(el) {
     ]);
 
     const inds = (indikatorList || []).filter(i => i.aktif);
-    // Daftar jabatan PP dari master jabatan
+    
     const jabatanOptions = (jabatanList || []).filter(j => j.aktif).sort((a,b) => a.nama.localeCompare(b.nama)).map(j => j.nama);
 
     target.innerHTML = `
@@ -3499,7 +3439,7 @@ async function renderPenandatanganTab(el) {
 
     const listEl = document.getElementById('penandatanganList');
 
-    // Reset state, isi dari saved config
+    
     window._penandatanganState = {};
     listEl.innerHTML = inds.map(ind => {
       const current = savedConfig[ind.no] || [];
@@ -3685,8 +3625,7 @@ async function renderRanking() {
     }
   }
 
-
-  // Gunakan fungsi dari app-laporan-ranking.js
+  
   if (typeof window._rankPopulateFilters === 'function') {
     window._rankPopulateFilters();
   }

@@ -28,29 +28,6 @@ async function runMigrations(pool) {
   _migrated = true;
 }
 
-/**
- * Handler: /api/audit-trail
- *
- * GET — Query log aktivitas global
- *       Query params:
- *         date_from — tanggal mulai (YYYY-MM-DD)
- *         date_to   — tanggal akhir (YYYY-MM-DD)
- *         module    — filter modul (auth, usulan, users, puskesmas, dll)
- *         action    — filter aksi (LOGIN, CREATE, UPDATE, DELETE, SUBMIT, APPROVE, REJECT)
- *         user      — filter email atau nama user (LIKE search)
- *         limit     — baris per halaman (default: 1000, max: 5000)
- *         page      — halaman (default: 1)
- *       Response: [{ id, created_at, module, action, user_email, user_nama,
- *                    user_role, detail, ip_address, lokasi }]
- *
- * POST — Tulis log aktivitas baru
- *        Body: { module, action, userEmail, userNama, userRole, detail, meta?, lokasi? }
- *        IP address diambil otomatis dari header request.
- *        lokasi: opsional, dikirim frontend dari GPS browser (via reverse-geocode,
- *        lihat _getBrowserLokasi() di app-core.js) — jauh lebih akurat (level
- *        kecamatan) drpd IP lookup. Kalau kosong dan action=LOGIN, fallback
- *        otomatis ke ip-api.com (cuma level kota).
- */
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors();
 
@@ -60,7 +37,7 @@ exports.handler = async (event) => {
   await runMigrations(pool);
 
   try {
-    // ===== GET: query log =====
+    
     if (event.httpMethod === 'GET') {
       const p = event.queryStringParameters || {};
 
@@ -118,11 +95,11 @@ exports.handler = async (event) => {
         || event.headers?.['x-real-ip']
         || '-';
 
-      // Prioritas: lokasi presisi dari browser (GPS/WiFi via Geolocation API,
-      // dikirim client via reverse-geocode) — jauh lebih akurat drpd IP
-      // geolocation, apalagi di daerah yg ISP-nya routing lewat kota lain.
-      // Fallback ke IP-based lookup (level kota saja) kalau user tidak
-      // mengizinkan/browser tidak mendukung, dan hanya untuk action LOGIN.
+      
+      
+      
+      
+      
       let lokasi = lokasiClient || null;
       if (!lokasi && action.toUpperCase() === 'LOGIN' && ip && ip !== '-' && ip !== '::1' && !ip.startsWith('127.') && !ip.startsWith('192.168.') && !ip.startsWith('10.')) {
         try {
@@ -132,7 +109,7 @@ exports.handler = async (event) => {
             lokasi = [geo.city, geo.regionName, geo.country].filter(Boolean).join(', ');
           }
         } catch (_) {
-          // Gagal lookup → biarkan null, jangan gagalkan log
+          
         }
       }
 

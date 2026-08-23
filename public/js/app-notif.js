@@ -1,4 +1,4 @@
-// ============== NOTIFIKASI IN-APP ==============
+
 window._notifInterval = null;
 let _notifCount = 0;
 
@@ -8,7 +8,7 @@ async function fetchNotifCount() {
     const role = currentUser.role;
     let count = 0;
     if (role === 'Operator') {
-      // Usulan yang ditolak dan perlu diperbaiki
+      
       const myUsulan = await API.getUsulan({ email_operator: currentUser.email }).catch(() => []);
       count = (myUsulan || []).filter(u => ['Ditolak','Ditolak Sebagian'].includes(u.statusGlobal)).length;
     } else if (role === 'Kepala Puskesmas') {
@@ -28,7 +28,7 @@ async function fetchNotifCount() {
 }
 
 function updateNotifBadge(count) {
-  // Update badge di topbar
+  
   let badge = document.getElementById('notifBadge');
   const btn = document.getElementById('notifBtn');
   if (!btn) return;
@@ -47,7 +47,7 @@ function updateNotifBadge(count) {
     if (badge) badge.style.display = 'none';
   }
 
-  // Update title halaman
+  
   const base = 'VISPM | Verifikasi Indeks SPM';
   document.title = count > 0 ? `(${count}) ${base}` : base;
 }
@@ -77,7 +77,7 @@ function toggleNotifPanel() {
 
   loadNotifPanel();
 
-  // Tutup saat klik di luar
+  
   setTimeout(() => {
     document.addEventListener('click', function handler(e) {
       const p = document.getElementById('notifPanel');
@@ -161,5 +161,5 @@ async function loadNotifPanel() {
 function startNotifPoller() {
   fetchNotifCount();
   clearInterval(window._notifInterval);
-  window._notifInterval = setInterval(fetchNotifCount, 60000); // cek tiap 1 menit
+  window._notifInterval = setInterval(fetchNotifCount, 60000); 
 }

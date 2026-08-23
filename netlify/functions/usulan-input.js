@@ -1,9 +1,6 @@
 const { getPool, ok, err, confirm, cors } = require('./db');
 const { isValidText, parseIndikatorAkses, logAktivitas, mapHeader } = require('./usulan-helpers');
 
-// ─── Helper: cek apakah sekarang (WITA) masih dalam periode input yang aktif ───
-// Kembalikan objek error jika di luar periode, atau null jika masih valid.
-// Dipakai oleh updateIndikator dan submitUsulan agar konsisten dengan buatUsulan.
 async function cekPeriodeInput(pool, tahun, bulan) {
   const periodeCheck = await pool.query(
     `SELECT tanggal_mulai, tanggal_selesai, jam_mulai, jam_selesai
@@ -11,13 +8,13 @@ async function cekPeriodeInput(pool, tahun, bulan) {
     [tahun, bulan]
   ).catch(() => ({ rows: [] }));
 
-  if (!periodeCheck.rows.length) return null; // tidak ada periode aktif → biarkan logika lain yang handle
+  if (!periodeCheck.rows.length) return null; 
 
   const p = periodeCheck.rows[0];
-  if (!p.tanggal_mulai || !p.tanggal_selesai) return null; // tanggal belum diset → skip
+  if (!p.tanggal_mulai || !p.tanggal_selesai) return null; 
 
   const nowWita  = new Date(Date.now() + 8 * 3600000);
-  const nowStr   = nowWita.toISOString().slice(0, 16); // "YYYY-MM-DDTHH:MM"
+  const nowStr   = nowWita.toISOString().slice(0, 16); 
   const toWitaStr = (tgl, jam) => {
     const d = new Date(new Date(tgl).getTime() + 8 * 3600000);
     return d.toISOString().slice(0, 10) + 'T' + (jam || '00:00');
@@ -30,12 +27,12 @@ async function cekPeriodeInput(pool, tahun, bulan) {
   if (nowStr > selesaiStr)
     return err(`Periode input sudah ditutup pada ${new Date(p.tanggal_selesai).toLocaleDateString('id-ID')} pukul ${p.jam_selesai || '23:59'} WITA.`);
 
-  return null; // periode valid
+  return null; 
 }
 
 async function buatUsulan(pool, body) {
   const { kodePKM, tahun, bulan, emailOperator } = body;
-  // Selalu gunakan waktu server (UTC) agar konsisten dan tidak bergantung jam PC user
+  
   if (!kodePKM || !tahun || !bulan || !emailOperator) return err('Data tidak lengkap');
   const periodeCheck = await pool.query(
     `SELECT id, tanggal_mulai, tanggal_selesai, jam_mulai, jam_selesai FROM periode_input
@@ -43,12 +40,12 @@ async function buatUsulan(pool, body) {
     [tahun, bulan]
   );
   if (periodeCheck.rows.length === 0) return err('Periode input untuk bulan/tahun ini belum diaktifkan. Hubungi Admin.');
-  // Cek rentang tanggal DAN jam jika ada
+  
   const p = periodeCheck.rows[0];
   if (p.tanggal_mulai && p.tanggal_selesai) {
-    // Gunakan WITA (UTC+8) konsisten dengan frontend dan backend verifikasi
+    
     const nowWita = new Date(Date.now() + 8 * 3600000);
-    const nowStr  = nowWita.toISOString().slice(0, 16); // "YYYY-MM-DDTHH:MM"
+    const nowStr  = nowWita.toISOString().slice(0, 16); 
     const toWitaStr = (tgl, jam) => {
       const d = new Date(new Date(tgl).getTime() + 8 * 3600000);
       return d.toISOString().slice(0, 10) + 'T' + (jam || '00:00');
@@ -75,7 +72,7 @@ async function buatUsulan(pool, body) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    // Bersihkan data penolakan_indikator lama jika ada (sisa dari usulan yg pernah dihapus)
+    
     await client.query('DELETE FROM penolakan_indikator WHERE id_usulan=$1', [idUsulan]).catch(()=>{});
     await client.query(
       `INSERT INTO usulan_header (id_usulan,tahun,bulan,periode_key,kode_pkm,total_nilai,total_bobot,indeks_kinerja_spm,indeks_beban_kerja,indeks_spm,status_kapus,status_program,status_final,status_global,is_locked,created_by,created_at)
@@ -101,7 +98,6 @@ async function buatUsulan(pool, body) {
   } catch (e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }
 }
 
-// Nomor indikator yang target bulannya selalu = target tahunan (Hipertensi & DM)
 const INDIKATOR_TARGET_KUNCI = [8, 9];
 
 async function updateIndikator(pool, body) {
@@ -110,19 +106,19 @@ async function updateIndikator(pool, body) {
   const lockCheck = await pool.query('SELECT is_locked, status_global, kode_pkm, tahun, bulan FROM usulan_header WHERE id_usulan=$1', [idUsulan]);
   if (lockCheck.rows.length === 0) return err('Usulan tidak ditemukan');
   const { is_locked, status_global, kode_pkm, tahun, bulan } = lockCheck.rows[0];
-  // Boleh edit kalau: tidak terkunci, ATAU status Ditolak (operator perbaiki)
+  
   if (is_locked && status_global !== 'Ditolak' && status_global !== 'Ditolak Sebagian') return err('Usulan sudah terkunci dan tidak dapat diedit');
 
-  // Cek periode input masih terbuka (termasuk jam)
-  // Hanya berlaku untuk status Draft — saat Ditolak/Ditolak Sebagian,
-  // Operator diizinkan memperbaiki di luar periode input agar tidak tertahan
+  
+  
+  
   if (status_global === 'Draft') {
     const periodeErr = await cekPeriodeInput(pool, tahun, bulan);
     if (periodeErr) return periodeErr;
   }
 
-  // Poin 4: Guard — saat Ditolak/Ditolak Sebagian, hanya boleh edit indikator yang bermasalah
-  // Indikator yang tidak ada di penolakan_indikator (dari_kapus=true) tidak boleh diubah
+  
+  
   if (status_global === 'Ditolak' || status_global === 'Ditolak Sebagian') {
     const penolakanRes = await pool.query(
       `SELECT DISTINCT no_indikator FROM penolakan_indikator
@@ -136,7 +132,7 @@ async function updateIndikator(pool, body) {
       [idUsulan]
     ).catch(() => ({ rows: [] }));
     const bermasalahNos = penolakanRes.rows.map(r => parseInt(r.no_indikator));
-    // Hanya blokir jika ada data penolakan (data baru). Data lama tanpa penolakan tetap bisa diedit.
+    
     if (bermasalahNos.length > 0 && !bermasalahNos.includes(parseInt(noIndikator))) {
       return err(`Indikator #${noIndikator} sudah disetujui dan tidak perlu diperbaiki. Hanya indikator yang ditolak yang dapat diedit.`);
     }
@@ -145,7 +141,7 @@ async function updateIndikator(pool, body) {
   let t = parseFloat(target) || 0;
   let c = parseFloat(capaian) || 0;
 
-  // Untuk indikator kunci (8 & 9): target bulan selalu = sasaran tahunan
+  
   if (INDIKATOR_TARGET_KUNCI.includes(parseInt(noIndikator))) {
     const ttRes = await pool.query(
       'SELECT sasaran FROM target_tahunan WHERE kode_pkm=$1 AND no_indikator=$2 AND tahun=$3 LIMIT 1',
@@ -154,26 +150,26 @@ async function updateIndikator(pool, body) {
     const sasaranTahunan = ttRes.rows.length > 0 ? (parseInt(ttRes.rows[0].sasaran) || 0) : 0;
     if (sasaranTahunan > 0) {
       t = sasaranTahunan;
-      // Clamp realisasi agar tidak melebihi sasaran tahunan
+      
       if (c > sasaranTahunan) c = sasaranTahunan;
     }
   }
 
-  // Rumus rasio: capaian / target, maks 1.00, 2 angka di belakang koma
+  
   let rasio = 0;
   if (t > 0) rasio = Math.min(c / t, 1);
 
-  // Ambil bobot indikator ini
+  
   const bobotRes = await pool.query(
     'SELECT bobot FROM usulan_indikator WHERE id_usulan=$1 AND no_indikator=$2',
     [idUsulan, noIndikator]
   );
   const bobot = bobotRes.rows.length > 0 ? parseInt(bobotRes.rows[0].bobot) || 0 : 0;
 
-  // nilai = bobot * rasio
+  
   const nilaiTerbobot = Math.round(bobot * rasio * 100) / 100;
 
-  // Update — link_file diupdate kalau linkFile dikirim (termasuk string kosong untuk hapus semua)
+  
   if (linkFile !== undefined && linkFile !== null) {
     await pool.query(
       'UPDATE usulan_indikator SET target=$1, capaian=$2, realisasi_rasio=$3, nilai_terbobot=$4, catatan=$5, link_file=$6 WHERE id_usulan=$7 AND no_indikator=$8',
@@ -192,7 +188,7 @@ async function updateIndikator(pool, body) {
 
 async function hitungSPM(pool, idUsulan) {
   const KONSTANTA = 0.33;
-  // Fungsi pembulatan 2 desimal sesuai aturan matematika standar
+  
   const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
 
   const r = await pool.query(
@@ -204,15 +200,15 @@ async function hitungSPM(pool, idUsulan) {
   for (const row of r.rows) {
     const bobot = parseInt(row.bobot) || 0;
     const rasio = parseFloat(row.realisasi_rasio) || 0;
-    // nilai = bobot * rasio — akumulasi dengan presisi penuh dulu
+    
     totalNilai += bobot * rasio;
     totalBobot += bobot;
   }
 
-  // Rumus: indeks_kinerja = total_nilai / total_bobot (pembulatan 2 desimal)
+  
   const indeksKinerja = totalBobot > 0 ? totalNilai / totalBobot : 0;
 
-  // Rumus: indeks_spm = indeks_kinerja * 0.33 (pembulatan 2 desimal)
+  
   const indeksSPM = round2(indeksKinerja * KONSTANTA);
 
   await pool.query(
@@ -236,26 +232,26 @@ async function submitUsulan(pool, body) {
   if (statusSaatIni !== 'Draft' && statusSaatIni !== 'Ditolak' && statusSaatIni !== 'Ditolak Sebagian')
     return err('Usulan tidak dapat disubmit pada status ini');
 
-  // Cek periode input masih terbuka (termasuk jam) untuk submit pertama (Draft).
-  // Untuk re-submit (Ditolak/Ditolak Sebagian), Operator tetap diizinkan
-  // mengajukan ulang di luar periode agar proses perbaikan tidak tertahan.
+  
+  
+  
   if (statusSaatIni === 'Draft') {
     const periodeSubmitErr = await cekPeriodeInput(pool, tahun, bulan);
     if (periodeSubmitErr) return periodeSubmitErr;
   }
 
-  // Cek indikator yang belum ada bukti DULU sebelum reset apapun
+  
   const indResult = await pool.query(
     'SELECT no_indikator, link_file FROM usulan_indikator WHERE id_usulan=$1', [idUsulan]
   );
-  // Saat mode perbaiki (Ditolak), hanya cek bukti untuk indikator yang bermasalah saja
+  
   let indToCheck = indResult.rows;
   const isDitolakMode = ['Ditolak','Ditolak Sebagian'].includes(statusSaatIni);
   if (isDitolakMode) {
-    // Indikator yang perlu dicek buktinya = yang harus diperbaiki Operator
-    // Yaitu: dari_kapus=true (Kapus tolak sendiri, atau Kapus benarkan PP/Admin)
-    // aksi='tolak' dari PP/Admin yang sudah dibenarkan Kapus masuk ke sini
-    // PENTING: aksi=NULL dari Kapus tidak cocok dengan NOT IN — harus handle NULL secara eksplisit
+    
+    
+    
+    
     const penolakanResult = await pool.query(
       `SELECT DISTINCT no_indikator FROM penolakan_indikator
        WHERE id_usulan=$1
@@ -285,7 +281,7 @@ async function submitUsulan(pool, body) {
   // Tentukan target dan lakukan reset berdasarkan kondisi penolakan
   const wasKapusDitolak = ditolakOleh === 'Kepala Puskesmas';
   const wasProgramDitolak = ditolakOleh === 'Pengelola Program';
-  // 'KapusTolakAdmin': Kapus benarkan penolakan Admin → Operator perbaiki → kirim ke Kapus dulu
+  
   const wasKapusTolakAdmin = ditolakOleh === 'Admin' && konteks_penolakan === 'KapusTolakAdmin';
   const wasAdminDitolak = ditolakOleh === 'Admin' && !wasKapusTolakAdmin;
 
@@ -293,7 +289,7 @@ async function submitUsulan(pool, body) {
 
   if (['Ditolak','Ditolak Sebagian'].includes(statusSaatIni)) {
     if (wasKapusDitolak || wasKapusTolakAdmin) {
-      // Kepala Puskesmas menolak (baik langsung maupun benarkan Admin) → reset semua stage header
+      
       targetStatus = 'Menunggu Kepala Puskesmas';
 
       const sisaAdminCheck = await pool.query(
@@ -314,8 +310,8 @@ await pool.query(
    WHERE id_usulan=$1`, [idUsulan, catatanOperator || null, masihAdaAdmin]
 );
       
-      // Ambil email Kapus yang mencatat persetujuan
-      // aksi='kapus-setuju' = data lama, aksi='kapus-ok' = data baru (Kapus sanggah PP)
+      
+      
       const kapusSetujuRows = await pool.query(
         `SELECT DISTINCT no_indikator, email_admin FROM penolakan_indikator WHERE id_usulan=$1 AND aksi IN ('kapus-setuju','kapus-ok')`,
         [idUsulan]
@@ -323,9 +319,9 @@ await pool.query(
       const kapusSetujuNos = kapusSetujuRows.rows.map(r => parseInt(r.no_indikator));
       const emailKapusSetuju = kapusSetujuRows.rows[0]?.email_admin || email;
 
-      // FIX BUG 4: Hapus SEMUA baris penolakan untuk indikator yang Kapus setujui
+      
       if (kapusSetujuNos.length > 0) {
-        // Hapus baris PP lama (aksi=NULL/tolak/reset) untuk indikator yang Kapus setujui
+        
         await pool.query(
           `DELETE FROM penolakan_indikator
            WHERE id_usulan=$1
@@ -334,7 +330,7 @@ await pool.query(
           [idUsulan, kapusSetujuNos]
         ).catch(() => {});
         
-        // Hapus juga baris Admin untuk indikator yang sama (jika ada)
+        
         await pool.query(
           `DELETE FROM penolakan_indikator
            WHERE id_usulan=$1
@@ -343,7 +339,7 @@ await pool.query(
           [idUsulan, kapusSetujuNos]
         ).catch(() => {});
         
-        // Hapus baris kapus-setuju / kapus-ok lama
+        
         await pool.query(
           `DELETE FROM penolakan_indikator
            WHERE id_usulan=$1
@@ -352,7 +348,7 @@ await pool.query(
           [idUsulan, kapusSetujuNos]
         ).catch(() => {});
         
-        // Insert ulang baris untuk re-verifikasi PP
+        
         for (const no of kapusSetujuNos) {
           await pool.query(
             `INSERT INTO penolakan_indikator (id_usulan, no_indikator, alasan, email_admin, email_program, aksi, dibuat_oleh)
@@ -363,7 +359,7 @@ await pool.query(
           ).catch(() => {});
         }
 
-        // Reset VP yang pegang indikator kapus-setuju (termasuk yang sudah Selesai)
+        
         const allVPKapus = await pool.query(
           `SELECT email_program, indikator_akses FROM verifikasi_program WHERE id_usulan=$1`, [idUsulan]
         );
@@ -463,7 +459,7 @@ await pool.query(
         );
       }
     } else if (wasAdminDitolak) {
-      // Admin menolak → kembali ke Pengelola Program
+      
       targetStatus = 'Menunggu Pengelola Program';
       await pool.query(
         `UPDATE usulan_header SET
@@ -475,7 +471,7 @@ await pool.query(
          WHERE id_usulan=$1`, [idUsulan]
       );
       
-      // Reset VP yang terkena indikator bermasalah
+      
       const bermasalahAdminRows = await pool.query(
         `SELECT DISTINCT no_indikator FROM penolakan_indikator
          WHERE id_usulan=$1 AND dibuat_oleh='Admin'`,

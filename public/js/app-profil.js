@@ -1,9 +1,9 @@
-// ============== TOPBAR DROPDOWN ==============
+
 function toggleTopbarDropdown() {
   const dd = document.getElementById('topbarDropdown');
   if (!dd) return;
   const isOpen = dd.classList.contains('open');
-  // Tutup dulu semua, lalu toggle
+  
   document.querySelectorAll('.topbar-dropdown.open').forEach(el => el.classList.remove('open'));
   if (!isOpen) dd.classList.add('open');
 }
@@ -13,17 +13,14 @@ function closeTopbarDropdown() {
   if (dd) dd.classList.remove('open');
 }
 
-// Tutup dropdown kalau klik di luar
 document.addEventListener('click', (e) => {
   if (!e.target.closest('#topbarAvatarWrap')) {
     closeTopbarDropdown();
   }
 });
 
-
-// ============== EDIT PROFIL ==============
 function openEditProfil() {
-  // Buat modal kalau belum ada
+  
   let modal = document.getElementById('editProfilModal');
   if (!modal) {
     modal = document.createElement('div');
@@ -65,7 +62,7 @@ function openEditProfil() {
       </div>`;
     document.body.appendChild(modal);
   }
-  // Inject section tanda tangan setelah modal ada — cek role saat ini
+  
   const epTTSection = document.getElementById('epTTSection');
   if (epTTSection) {
     const rolesBolehTT = ['Kepala Puskesmas', 'Pengelola Program'];
@@ -112,7 +109,7 @@ function openEditProfil() {
     namaEl.disabled = true; namaEl.style.background = '#f8fafc'; namaEl.style.color = 'var(--text-light)';
     nipEl.disabled = true; nipEl.style.background = '#f8fafc'; nipEl.style.color = 'var(--text-light)';
   }
-  // Tampilkan tanda tangan jika ada
+  
   const ttPreview = document.getElementById('epTTPreview');
   const ttPlaceholder = document.getElementById('epTTPlaceholder');
   const ttHapus = document.getElementById('epTTHapus');
@@ -127,18 +124,13 @@ function openEditProfil() {
   setTimeout(() => document.getElementById('epNama').focus(), 100);
 }
 
-
-// ============================================================
-//  HELPER: Resize gambar tanda tangan sebelum disimpan ke DB
-//  Max 400x200px, output JPEG quality 0.82 → maks ~50-80KB base64
-// ============================================================
 function resizeImageToBase64(file, maxW, maxH, quality, callback) {
   const reader = new FileReader();
   reader.onload = ev => {
     const img = new Image();
     img.onload = () => {
       let w = img.width, h = img.height;
-      // Hitung rasio agar proporsional
+      
       if (w > maxW || h > maxH) {
         const ratio = Math.min(maxW / w, maxH / h);
         w = Math.round(w * ratio);
@@ -147,7 +139,7 @@ function resizeImageToBase64(file, maxW, maxH, quality, callback) {
       const canvas = document.createElement('canvas');
       canvas.width = w; canvas.height = h;
       const ctx = canvas.getContext('2d');
-      // Background putih (agar PNG transparan tidak jadi hitam saat JPEG)
+      
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, w, h);
       ctx.drawImage(img, 0, 0, w, h);
@@ -181,7 +173,6 @@ function hapusTandaTangan() {
   inp.value = ''; inp._newTT = null;
 }
 
-
 async function saveEditProfil() {
   const statusEl = document.getElementById('epStatus');
   const isAdmin = currentUser.role === 'Admin';
@@ -210,7 +201,7 @@ async function saveEditProfil() {
     currentUser.nip = nip;
     if (tandaTangan !== undefined) currentUser.tandaTangan = tandaTangan;
     sessionStorage.setItem('spm_user', JSON.stringify(currentUser));
-    // Update tampilan
+    
     document.getElementById('sidebarName').textContent = nama;
     document.getElementById('sidebarAvatar').textContent = nama[0].toUpperCase();
     const _topbarAv2 = document.getElementById('topbarAvatar');
@@ -219,7 +210,7 @@ async function saveEditProfil() {
     if (dropNameEl) dropNameEl.textContent = nama;
     toast('Profil berhasil diperbarui!', 'success');
     closeModal('editProfilModal');
-    // Auto-refresh tombol verifikasi jika dibuka dari modal verifikasi
+    
     const verifModal = document.getElementById('verifikasiModal');
     const fromVerif = window._openProfilFromVerif;
     window._openProfilFromVerif = false;
@@ -236,7 +227,6 @@ async function saveEditProfil() {
     statusEl.textContent = e.message;
   } finally { setLoading(false); }
 }
-
 
 function showChangePassword() {
   document.getElementById('cpOld').value = '';

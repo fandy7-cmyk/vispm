@@ -41,7 +41,7 @@ exports.handler = async (event) => {
         [kode_pkm, parseInt(tahun)]
       );
 
-      // Gabungkan dengan semua indikator aktif (yang belum di-set tetap 0)
+      
       const allInd = await pool.query(
         `SELECT no_indikator, nama_indikator FROM master_indikator WHERE aktif=true ORDER BY no_indikator`
       );
@@ -55,8 +55,8 @@ exports.handler = async (event) => {
       })));
     }
 
-    // POST: upsert satu atau banyak target sekaligus
-    // body: { kodePKM, tahun, targets: [{noIndikator, sasaran}, ...] }
+    
+    
     if (method === 'POST') {
       const { kodePKM, tahun, targets } = JSON.parse(event.body || '{}');
       if (!kodePKM || !tahun || !Array.isArray(targets)) return err('kodePKM, tahun, dan targets diperlukan');

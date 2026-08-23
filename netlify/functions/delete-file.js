@@ -63,7 +63,7 @@ exports.handler = async (event) => {
     const apiKey    = process.env.CLOUDINARY_API_KEY;
     const apiSecret = process.env.CLOUDINARY_API_SECRET;
 
-    // Coba hapus sebagai image dulu, kalau tidak ada coba raw
+    
     const imageExts = ['jpg','jpeg','png','gif','webp','bmp','svg'];
     const ext = publicId.split('.').pop()?.toLowerCase() || '';
     const resourceType = imageExts.includes(ext) ? 'image' : 'raw';
@@ -74,7 +74,7 @@ exports.handler = async (event) => {
       return { statusCode: 200, headers, body: JSON.stringify({ success: true }) };
     }
 
-    // Kalau tidak ditemukan di resourceType pertama, coba yang lain
+    
     if (result.body?.result === 'not found') {
       const fallback = resourceType === 'image' ? 'raw' : 'image';
       const result2 = await cloudinaryDelete(publicId, fallback, apiKey, apiSecret, cloudName);
@@ -83,7 +83,7 @@ exports.handler = async (event) => {
       }
     }
 
-    return { statusCode: 200, headers, body: JSON.stringify({ success: true }) }; // tetap sukses agar tidak block UI
+    return { statusCode: 200, headers, body: JSON.stringify({ success: true }) }; 
   } catch (e) {
     console.error('Delete file error:', e);
     return { statusCode: 500, headers, body: JSON.stringify({ success: false, error: e.message }) };

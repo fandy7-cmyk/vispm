@@ -1,18 +1,13 @@
-// Indikator yang target bulannya selalu = sasaran tahunan penuh (dikunci)
-// No. 8: Hipertensi, No. 9: Diabetes Melitus
+
+
 const INDIKATOR_TARGET_KUNCI = [8, 9];
 
-// Indikator 7 (Lansia): dikembalikan ke input manual seperti indikator 1-6
-// (tidak ada lagi perhitungan otomatis sisa target / sisa bulan)
 const INDIKATOR_TARGET_SISA = [];
 
-// Validasi teks: harus mengandung minimal 1 huruf atau angka (bukan hanya simbol/spasi)
 function isValidText(str) {
   return str && /[a-zA-Z0-9\u00C0-\u024F\u4e00-\u9fff]/.test(str.trim());
 }
 
-// ============== CATATAN THREAD HELPER ==============
-// Render riwayat catatan sebagai zigzag timeline (5 per baris), collapse by default
 async function renderCatatanThread(elId, idUsulan, currentRole) {
   const el = document.getElementById(elId);
   if (!el) return;
@@ -39,7 +34,7 @@ async function renderCatatanThread(elId, idUsulan, currentRole) {
     'Pengelola Program': { color:'#7c3aed', bg:'#f5f3ff', border:'#c4b5fd' },
     'Admin':             { color:'#dc2626', bg:'#fef2f2', border:'#fca5a5' },
   };
-  // SVG icon library — setiap aksi unik
+  
   const _svgIcons = {
     send: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>`,
     replay: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.95"/></svg>`,
@@ -112,26 +107,25 @@ async function renderCatatanThread(elId, idUsulan, currentRole) {
     return tgl + ' ' + jam + ' WITA';
   }
 
-  // unique prefix per elemen supaya tidak collision jika 2 thread di halaman sama
+  
   const pfx = elId + '_ct';
 
-  // === GRID MODE: 4 kolom, compact, klik expand detail ===
+  
   const COLS = 10;
   let html = '<div style="display:grid;grid-template-columns:repeat(10,1fr);gap:6px">';
-
 
   function _renderDetailLog(log) {
     const _aksiD = (log.aksi || '').trim();
     // ── Kapus Terima Penolakan: parse bagian tolak vs sanggah ──
     if (_aksiD === 'Kapus Terima Penolakan' && log.detail) {
-      // Format: "Konteks | Indikator dikembalikan ke Operator: #4: alasan | #6: alasan | Indikator disanggah Kapus (→ PP re-verif): #1, #3"
+      
       const detail = log.detail;
-      // Pisahkan konteks (sebelum " | Indikator dikembalikan")
+      
       const idxKembalikan = detail.indexOf(' | Indikator dikembalikan ke Operator:');
       const idxDisanggah  = detail.indexOf(' | Indikator disanggah Kapus');
       const konteks = idxKembalikan >= 0 ? detail.substring(0, idxKembalikan) : (idxDisanggah >= 0 ? detail.substring(0, idxDisanggah) : detail);
 
-      // Bagian tolak: antara "Indikator dikembalikan ke Operator:" dan "Indikator disanggah Kapus"
+      
       let tolakStr = '';
       if (idxKembalikan >= 0) {
         const startTolak = idxKembalikan + ' | Indikator dikembalikan ke Operator:'.length;
@@ -231,7 +225,7 @@ async function renderCatatanThread(elId, idUsulan, currentRole) {
     return html;
   }
 
-  // Registry untuk toggle callbacks — hindari SVG bersarang di dalam onclick string
+  
   if (!window.__ctToggle) window.__ctToggle = {};
 
   logs.forEach((log, idx) => {
@@ -240,44 +234,44 @@ async function renderCatatanThread(elId, idUsulan, currentRole) {
     const icon = aksiIcon[_aksi] || 'chat';
     const nama = log.user_nama || log.user_email;
     const cardId = pfx + '_' + idx;
-    // Warna badge aksi — ambil dari aksiConfig, fallback ke role color
+    
     const _aksiColorMap = {
-      'Submit':                   { c:'#0d9488', b:'#f0fdf9' },   // teal
-      'Ajukan Ulang':             { c:'#0284c7', b:'#e0f2fe' },   // sky blue
-      'Approve':                  { c:'#16a34a', b:'#f0fdf4' },   // green
-      'Approve Final':            { c:'#15803d', b:'#dcfce7' },   // dark green
-      'Re-verifikasi':            { c:'#06b6d4', b:'#ecfeff' },   // cyan
-      'Tolak':                    { c:'#dc2626', b:'#fef2f2' },   // red
-      'Tolak (sebagian)':         { c:'#ea580c', b:'#fff7ed' },   // orange
-      'Tolak Indikator':          { c:'#be123c', b:'#fff1f2' },   // rose
-      'Tolak Ke Operator':        { c:'#b91c1c', b:'#fef2f2' },   // dark red
-      'Kembalikan':               { c:'#7c3aed', b:'#f5f3ff' },   // violet
-      'Dikembalikan':             { c:'#6d28d9', b:'#ede9fe' },   // purple
-      'Sanggah':                  { c:'#9333ea', b:'#faf5ff' },   // purple-600
-      'Sanggah Selesai':          { c:'#a21caf', b:'#fdf4ff' },   // fuchsia
-      'PP Membenarkan':           { c:'#0f766e', b:'#f0fdfa' },   // teal-700
-      'Kapus Membenarkan':        { c:'#b45309', b:'#fefce8' },   // amber-700
-      'Kapus Menyanggah':         { c:'#c2410c', b:'#fff7ed' },   // orange-700
-      'Respond Penolakan':        { c:'#2563eb', b:'#eff6ff' },   // blue
-      'Sanggah → Admin':          { c:'#7e22ce', b:'#f3e8ff' },   // purple-800
-      'Sanggah → Kapus':          { c:'#d97706', b:'#fffbeb' },   // amber
-      'Kembalikan ke PP':         { c:'#4f46e5', b:'#eef2ff' },   // indigo
-      'Kapus Sanggah':            { c:'#db2777', b:'#fdf2f8' },   // pink
-      'Kapus Terima Penolakan':   { c:'#f59e0b', b:'#fffbeb' },   // yellow-amber
-      'Benarkan Penolakan Admin': { c:'#991b1b', b:'#fef2f2' },   // red-800
-      'Reset':                    { c:'#64748b', b:'#f8fafc' },   // slate
-      'Restore Verif':            { c:'#6366f1', b:'#eef2ff' },   // indigo-500
-      'Selesai':                  { c:'#059669', b:'#ecfdf5' },   // emerald
-      'Konfirmasi Re-verif':      { c:'#0369a1', b:'#e0f2fe' },   // sky-700
-      'Terima Penolakan Admin':   { c:'#7f1d1d', b:'#fef2f2' },   // red-900
-      'Tolak Global':             { c:'#450a0a', b:'#fff1f2' },   // darkest red
+      'Submit':                   { c:'#0d9488', b:'#f0fdf9' },   
+      'Ajukan Ulang':             { c:'#0284c7', b:'#e0f2fe' },   
+      'Approve':                  { c:'#16a34a', b:'#f0fdf4' },   
+      'Approve Final':            { c:'#15803d', b:'#dcfce7' },   
+      'Re-verifikasi':            { c:'#06b6d4', b:'#ecfeff' },   
+      'Tolak':                    { c:'#dc2626', b:'#fef2f2' },   
+      'Tolak (sebagian)':         { c:'#ea580c', b:'#fff7ed' },   
+      'Tolak Indikator':          { c:'#be123c', b:'#fff1f2' },   
+      'Tolak Ke Operator':        { c:'#b91c1c', b:'#fef2f2' },   
+      'Kembalikan':               { c:'#7c3aed', b:'#f5f3ff' },   
+      'Dikembalikan':             { c:'#6d28d9', b:'#ede9fe' },   
+      'Sanggah':                  { c:'#9333ea', b:'#faf5ff' },   
+      'Sanggah Selesai':          { c:'#a21caf', b:'#fdf4ff' },   
+      'PP Membenarkan':           { c:'#0f766e', b:'#f0fdfa' },   
+      'Kapus Membenarkan':        { c:'#b45309', b:'#fefce8' },   
+      'Kapus Menyanggah':         { c:'#c2410c', b:'#fff7ed' },   
+      'Respond Penolakan':        { c:'#2563eb', b:'#eff6ff' },   
+      'Sanggah → Admin':          { c:'#7e22ce', b:'#f3e8ff' },   
+      'Sanggah → Kapus':          { c:'#d97706', b:'#fffbeb' },   
+      'Kembalikan ke PP':         { c:'#4f46e5', b:'#eef2ff' },   
+      'Kapus Sanggah':            { c:'#db2777', b:'#fdf2f8' },   
+      'Kapus Terima Penolakan':   { c:'#f59e0b', b:'#fffbeb' },   
+      'Benarkan Penolakan Admin': { c:'#991b1b', b:'#fef2f2' },   
+      'Reset':                    { c:'#64748b', b:'#f8fafc' },   
+      'Restore Verif':            { c:'#6366f1', b:'#eef2ff' },   
+      'Selesai':                  { c:'#059669', b:'#ecfdf5' },   
+      'Konfirmasi Re-verif':      { c:'#0369a1', b:'#e0f2fe' },   
+      'Terima Penolakan Admin':   { c:'#7f1d1d', b:'#fef2f2' },   
+      'Tolak Global':             { c:'#450a0a', b:'#fff1f2' },   
     };
     const aksiClr = _aksiColorMap[_aksi] || { c:cfg.color, b:cfg.bg };
 
     const _svgChevronDown = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="${aksiClr.c}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>`;
     const _svgChevronUp   = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="${aksiClr.c}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>`;
 
-    // Simpan SVG ke registry agar tidak perlu inject ke dalam onclick string
+    
     window.__ctToggle[cardId] = { up: _svgChevronUp, down: _svgChevronDown };
 
     html += `<div style="border:1.5px solid ${aksiClr.c}55;border-radius:8px;background:${aksiClr.b};overflow:hidden">
@@ -325,7 +319,6 @@ async function renderCatatanThread(elId, idUsulan, currentRole) {
   el.style.display = 'block';
 }
 
-// Toggle helper untuk catatan thread — dipanggil via onclick="__ctToggleFn('id')"
 function __ctToggleFn(cardId) {
   const d   = document.getElementById(cardId);
   const arr = document.getElementById(cardId + '_arr');
@@ -336,11 +329,6 @@ function __ctToggleFn(cardId) {
   if (svgs) arr.innerHTML = isHidden ? svgs.up : svgs.down;
 }
 
-// ============== APP STATE ==============
-
-// ============== PENOLAKAN BANNER HELPER ==============
-// Tampilkan banner alasan penolakan per indikator dari verifikator level atas
-// elId: id elemen div target | ditolakOleh: label nama role | alasanArr: [{no, alasan}]
 function renderPenolakanBanner(elId, ditolakOleh, alasanArr) {
   const el = document.getElementById(elId);
   if (!el) return;
@@ -381,10 +369,8 @@ function formatTS(ts) {
   return `${tgl} | ${jam} WITA`;
 }
 
-// ============== HEADER INFO STRIP ==============
-// Render info header modal jadi 1 baris horizontal kompak
 function renderHeaderInfo(detail) {
-  // flex kolom: Puskesmas dan Dibuat Oleh lebih lebar, Status cukup untuk teks panjang
+  
   const items = [
     { label: 'Puskesmas', value: `<span style="font-size:13.5px;font-weight:600;color:var(--text-dark)">${detail.namaPKM}</span>`, flex: '1.5' },
     { label: 'Periode', value: `<span style="font-size:13.5px;font-weight:600;color:var(--text-dark)">${detail.namaBulan} ${detail.tahun}</span>`, flex: '1' },
@@ -397,7 +383,7 @@ function renderHeaderInfo(detail) {
   return `<div class="header-info-grid" style="background:white;border:1px solid #e2e8f0;border-radius:10px;padding:8px 0;display:flex;align-items:center;flex-wrap:wrap;gap:0;width:100%;margin-bottom:14px">
     ${items.map((item, i) => `
       <div class="header-info-item" style="padding:6px 14px;flex:${item.flex};min-width:120px;${i<items.length-1?'border-right:1px solid #e2e8f0;':''}">
-        <div style="font-size:10px;color:var(--text-light);font-weight:600;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${item.label}</div>
+        <div style="font-size:10px;color:var(--text-light);font-weight:600;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;word-break:keep-all;overflow-wrap:normal">${item.label}</div>
         <div style="min-width:0">${item.value}</div>
       </div>`).join('')}
   </div>`;
@@ -412,7 +398,6 @@ let verifCurrentUsulan = null; // for verifikasi modal
 // Google Drive: menggunakan Service Account (backend)
 window.GDRIVE_FOLDER_ID = "1HywRrWup2JgX3Zig2FND8K5Zc6HWtu-A";
 
-
 // Format date only: DD MMMM YYYY
 function formatDate(ts) {
   if (!ts) return '-';
@@ -424,17 +409,14 @@ function formatDate(ts) {
   });
 }
 
-// Format datetime: DD MMMM YYYY, HH:mm  
 function formatDateTime(ts) { return formatTS(ts); }
 
-// Sanitasi jam ke format 24-jam "HH:MM"
-// Menangani data lama yang mungkin tersimpan sebagai "08:00 AM", "05:00 PM", dll.
 function fmt24(jamStr) {
   if (!jamStr) return '';
   const s = jamStr.trim();
   // Jika sudah format HH:MM tanpa AM/PM → langsung kembalikan
   if (/^\d{1,2}:\d{2}$/.test(s)) return s.padStart(5, '0').slice(0, 5);
-  // Coba parse format "HH:MM AM/PM" atau "H:MM AM/PM"
+  
   const m = s.match(/^(\d{1,2}):(\d{2})\s*(AM|PM|am|pm)$/i);
   if (m) {
     let h = parseInt(m[1]);
@@ -444,29 +426,19 @@ function fmt24(jamStr) {
     if (period === 'PM' && h !== 12) h += 12;
     return String(h).padStart(2, '0') + ':' + min;
   }
-  return s; // fallback kembalikan apa adanya
+  return s; 
 }
 
-// Format Capaian (%) — dipakai di seluruh sistem
 function fmtCapaianPct(capaian, target) {
   if (!target || target <= 0) return '0%';
   const pct = Math.min((parseFloat(capaian) / parseFloat(target)) * 100, 100);
   if (pct === 100) return '100%';
   if (pct === 0) return '0%';
-  // Tampilkan 1 desimal jika ada, buang trailing zero
+  
   const fixed = pct.toFixed(1);
   return (fixed.endsWith('.0') ? pct.toFixed(0) : fixed) + '%';
 }
-// ============== LOKASI LOGIN (GPS presisi → reverse-geocode) ==============
-// Ambil lokasi presisi dari browser (GPS/WiFi via Geolocation API), lalu reverse-geocode
-// jadi alamat administratif (kecamatan, kabupaten/kota, provinsi).
-// Kalau user menolak izin lokasi / browser tidak mendukung / timeout → return null,
-// backend akan fallback otomatis ke IP-based lookup (cuma level kota).
-// Diporting dari SAPA — logic identik, dipakai bareng biar konsisten antar sistem.
 
-// Tambahkan label (mis. "Kec.") di depan nama wilayah, kecuali nama itu
-// sendiri sudah mengandung kata itu (mis. sumber data kadang sudah kasih
-// "Kecamatan Luwuk" langsung).
 function _labelWilayah(raw, label, fullWord) {
   if (!raw) return null;
   const lower = raw.toLowerCase();
@@ -501,9 +473,6 @@ function _formatAlamatNominatim(addr) {
   return parts.length ? parts.join(', ') : null;
 }
 
-// Coba TomTom dulu (via backend, API key disimpan aman di env var) — datanya
-// proprietary (bukan OSM), jadi coverage kecamatan di daerah terpencil bisa
-// lebih lengkap drpd Nominatim. Kalau gagal/kosong, fallback ke Nominatim.
 async function _getLokasiTomTom(latitude, longitude) {
   try {
     const r = await fetch('/api/reverse-geocode', {
@@ -549,7 +518,6 @@ async function _getBrowserLokasi() {
   }
 }
 
-// ============== AUTH ==============
 async function doLogin() {
   const email = document.getElementById('authEmail').value.trim();
   if (!email) return setAuthStatus('Masukkan email Anda', 'error');
@@ -565,16 +533,16 @@ async function doLogin() {
     const user = await API.login(email, password);
     currentUser = user;
     sessionStorage.setItem('spm_user', JSON.stringify(user));
-    // Catat log login. Sebelumnya: nunggu GPS dulu (bisa sampai ~10 detik
-    // berantai: GPS 3dtk → TomTom 4dtk → Nominatim 3.5dtk) baru kirim log,
-    // fire-and-forget tanpa keepalive & error ditelan diam-diam — kalau user
-    // keburu pindah tab/halaman sebelum rantai itu kelar, log LOGIN hilang
-    // tanpa jejak sama sekali (sesi login-nya sendiri tetap valid & tidak
-    // terganggu, makanya user tetap bisa lanjut kerja seperti biasa).
-    // FIX: batasi waktu tunggu lokasi maks 2.5 detik (kalau lebih lama,
-    // kirim log duluan tanpa lokasi drpd tidak terkirim sama sekali),
-    // request pakai keepalive (lihat api.js), dan retry sekali + console.warn
-    // kalau tetap gagal supaya tidak lagi silent-fail.
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     (async () => {
       let lokasi = null;
       try {
@@ -582,14 +550,14 @@ async function doLogin() {
           _getBrowserLokasi(),
           new Promise(resolve => setTimeout(() => resolve(null), 2500)),
         ]);
-      } catch (_) { /* biarkan null, jangan gagalkan pengiriman log */ }
+      } catch (_) {  }
 
       const logPayload = { module: 'auth', action: 'LOGIN', userEmail: user.email, userNama: user.nama, userRole: user.role, detail: 'Login berhasil', lokasi };
       try {
         await API.logAudit(logPayload);
       } catch (e1) {
-        // Retry sekali setelah jeda singkat — jaringan mobile sering flaky
-        // tepat di detik-detik awal setelah login
+        
+        
         setTimeout(() => {
           API.logAudit(logPayload).catch(e2 => {
             console.warn('[audit] Gagal mencatat log LOGIN setelah retry:', e2?.message || e2);
@@ -629,26 +597,25 @@ function doLogout() {
   });
 }
 
-// ============== APP INIT ==============
 function startApp() {
-  // authScreen udah pindah total ke login.html (gak dirender lagi di
-  // sini), jadi gak perlu di-hide lagi disini - null-check biar aman.
+  
+  
   const _authScreen = document.getElementById('authScreen');
   if (_authScreen) _authScreen.style.display = 'none';
   document.getElementById('appLayout').style.display = 'flex';
-  // Langsung nyalain animasi konstelasi topbar sekarang (container baru saja
-  // punya ukuran nyata), jangan nunggu ResizeObserver yang bisa telat kena
-  // antre di belakang render dashboard di bawah.
+  
+  
+  
   if (window.__topbarConstellationKick) window.__topbarConstellationKick();
 
-  // Normalisasi indikatorAkses: pastikan selalu berupa array integer
-  // (dari DB/localStorage bisa berupa string "1,3,5-8" atau array)
+  
+  
   const _aksesRaw = currentUser.indikatorAkses;
   if (typeof _aksesRaw === 'string') {
-    currentUser.indikatorAksesString = _aksesRaw; // simpan string asli untuk display
+    currentUser.indikatorAksesString = _aksesRaw; 
     currentUser.indikatorAkses = parseIndikatorAksesString(_aksesRaw);
   } else if (Array.isArray(_aksesRaw)) {
-    // Sudah array (misal dari localStorage JSON) — normalisasi ulang ke integer dan rebuild string
+    
     currentUser.indikatorAkses = _aksesRaw.map(n => parseInt(n)).filter(n => !isNaN(n) && n > 0);
     currentUser.indikatorAksesString = currentUser.indikatorAkses.join(',');
   } else {
@@ -687,20 +654,20 @@ function startApp() {
       window._appTahunAkhir = parseInt(s.tahun_akhir);
     }
   }).catch((err) => {
-    // Endpoint /api/settings gagal (500/network error) — app tetap berjalan dengan nilai default.
-    // Periksa log server untuk memperbaiki endpoint ini.
+    
+    
     console.warn('[VISPM] /api/settings gagal:', err.message || err);
   });
-  // Fetch periode aktif untuk proteksi sidebar Input Usulan
+  
   API.get('periode').then(allPeriode => {
     window._periodeAktifList = Array.isArray(allPeriode) ? allPeriode : [];
-    buildSidebar(); // rebuild sidebar setelah tahu status periode
+    buildSidebar(); 
   }).catch(() => {
     window._periodeAktifList = [];
   });
   buildSidebar();
 
-  // Inject tombol Search & Notifikasi ke topbar
+  
   const topbarRight = document.querySelector('.topbar-right');
   if (topbarRight && !document.getElementById('notifBtnWrap')) {
     const searchBtn = document.createElement('button');
@@ -734,13 +701,13 @@ function startApp() {
   }
   startNotifPoller();
 
-  // Restore halaman terakhir sebelum refresh (jika ada), fallback ke dashboard
-  // Restore halaman terakhir, tapi validasi dulu apakah role saat ini boleh akses
+  
+  
   let lastPage = 'dashboard';
   try {
     const saved = sessionStorage.getItem('spm_last_page');
     if (saved && saved !== 'dashboard') {
-      // Kumpulkan halaman yang boleh diakses role ini dari menuMap
+      
       const roleMenus = {
         'Admin':            ['dashboard','verifikasi','laporan','ranking','master-data','kelola-usulan'],
         'Operator':         ['dashboard','input','laporan'],
@@ -750,29 +717,27 @@ function startApp() {
       };
       const allowed = roleMenus[currentUser.role] || ['dashboard'];
       if (allowed.includes(saved)) lastPage = saved;
-      // Kalau halaman tidak diizinkan (misal 'input' untuk Kapus), fallback ke dashboard
+      
     }
   } catch(e) {}
   loadPage(lastPage);
 
-  // Tampilkan menu Tanda Tangan hanya untuk Kepala Puskesmas dan Pengelola Program
+  
   const btnEPTT = document.getElementById('btnEditProfilTT');
   if (btnEPTT) {
     const rolesBolehTT = ['Kepala Puskesmas','Pengelola Program'];
     btnEPTT.style.display = rolesBolehTT.includes(currentUser.role) ? '' : 'none';
   }
 
-  // Popup notifikasi tanda tangan untuk Kepala Puskesmas, Pengelola Program, dan Admin
+  
   const rolesBolehTT2 = ['Kepala Puskesmas', 'Pengelola Program', 'Admin'];
   if (rolesBolehTT2.includes(currentUser.role)) {
     setTimeout(() => showTandaTanganLoginPopup(), 1000);
   }
 
-  // Popup pengumuman sistem (semua role) — tampil setelah popup TT jika ada
+  
   setTimeout(() => showPengumumanLoginPopup(), 1800);
 }
-
-
 
 async function showTandaTanganLoginPopup() {
   try {
@@ -786,13 +751,13 @@ async function showTandaTanganLoginPopup() {
     } else if (role === 'Admin') {
       try {
         const pjList = await API.get('pejabat');
-        // Cek semua pejabat yang terdaftar — jika ada yang belum punya tanda tangan, tampilkan popup
-        // Tidak lagi hardcode jabatan tertentu agar fleksibel saat pejabat dihapus/ditambah
+        
+        
         ttMissing = pjList.length === 0 || pjList.some(p => !p.tanda_tangan);
       } catch(e) { ttMissing = true; }
     }
 
-    if (!ttMissing) return; // Tanda tangan sudah lengkap, tidak perlu popup
+    if (!ttMissing) return; 
 
     const SVG_PEN_I  = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>';
     const SVG_PEN2_I = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>';
@@ -845,13 +810,13 @@ async function showTandaTanganLoginPopup() {
       </div>`;
     popup.addEventListener('click', e => { if (e.target === popup) popup.remove(); });
     document.body.appendChild(popup);
-  } catch(e) { /* silent fail */ }
+  } catch(e) {  }
 }
 
 function buildSidebar() {
   const role = currentUser.role;
   const nav = document.getElementById('sidebarNav');
-  // SVG icons sidebar — identik dengan PAGE_ICONS di topbar
+  
   const SIDEBAR_SVG = {
     dashboard:       `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>`,
     verifikasi:      `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`,
@@ -920,7 +885,7 @@ function buildSidebar() {
       }
     }
   }
-  // Tombol Buku Panduan — tampil untuk semua role di bagian bawah sidebar
+  
   html += `
     <div style="margin-top:auto;border-top:1px solid rgba(255,255,255,0.15);padding-top:6px;">
       <div class="menu-item" onclick="openBukuPanduan()" title="Lihat Buku Panduan VISPM">
@@ -934,13 +899,13 @@ function buildSidebar() {
 function openBukuPanduan() {
   const PDF_URL = '/Buku_Panduan_VISPM.pdf';
 
-  // Buat modal jika belum ada
+  
   if (!document.getElementById('bukuPanduanModal')) {
     const el = document.createElement('div');
     el.id = 'bukuPanduanModal';
     el.className = 'modal fullscreen';
 el.style.cssText = 'top:0;left:0;right:0;bottom:0;z-index:2500;justify-content:flex-start;background:transparent;pointer-events:none;';
-    // Responsif: mobile full-screen, desktop offset sidebar
+    
     const _isMobilePanduan = () => window.innerWidth <= 768;
     const _getCardStylePanduan = () => _isMobilePanduan()
       ? 'display:flex;flex-direction:column;height:100dvh;height:100vh;margin-top:0;margin-left:0;border-radius:0;width:100%;max-width:100%;pointer-events:all;border-left:none;'
@@ -972,7 +937,7 @@ el.innerHTML = `
       </div>`;
     document.body.appendChild(el);
     el.addEventListener('click', e => { if (e.target === el) closeModal('bukuPanduanModal'); });
-    // Resize handler — update card style saat orientasi berubah
+    
     window.addEventListener('resize', () => {
       const card = document.getElementById('bukuPanduanCard');
       if (card) card.style.cssText = _getCardStylePanduan();
@@ -992,14 +957,12 @@ function downloadBukuPanduan() {
   toast('Mengunduh Buku Panduan VISPM...', 'success');
 }
 
-
 function setActiveNav(page) {
   document.querySelectorAll('.menu-item').forEach(m => m.classList.remove('active'));
   const el = document.getElementById('nav-' + page);
   if (el) el.classList.add('active');
 }
 
-// ============== ROUTING ==============
 const PAGE_ICONS = {
   dashboard:       `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>`,
   verifikasi:      `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`,
@@ -1023,7 +986,7 @@ const PAGE_TITLES = {
 };
 
 function loadPage(page) {
-  // === PROTEKSI PERIODE: Cegah akses halaman Input Usulan jika tidak ada periode aktif ===
+  
   if (page === 'input' && currentUser && currentUser.role === 'Operator') {
     const periodeAktif = (window._periodeAktifList || []).filter(p => p.isAktifToday);
     if (periodeAktif.length === 0) {
@@ -1032,7 +995,7 @@ function loadPage(page) {
     }
   }
   currentPage = page;
-  // Simpan halaman terakhir agar bisa di-restore saat refresh
+  
   try { sessionStorage.setItem('spm_last_page', page); } catch(e) {}
   closeSidebar();
   setActiveNav(page);
@@ -1060,16 +1023,16 @@ function loadPage(page) {
 
   const fn = renders[page];
   if (fn) {
-    // 'master-data', 'ranking' & 'laporan' mengelola loading state sendiri (spinner lokal
-    // di dalam area kontennya), sehingga tidak perlu spinner global dari loadPage.
-    // 'dashboard' pakai skeleton loading (lebih cocok utk layout stat card/chart/tabel)
-    // dibanding spinner global yang nge-blur seluruh halaman.
+    
+    
+    
+    
     if (page === 'dashboard') {
       document.getElementById('mainContent').innerHTML = dashboardSkeleton();
       setLoading(false);
       Promise.resolve(fn());
     } else if (page === 'master-data' || page === 'ranking' || page === 'laporan') {
-      setLoading(false); // batalkan setLoading(true) di atas, serahkan ke render fn masing-masing
+      setLoading(false); 
       Promise.resolve(fn());
     } else {
       Promise.resolve(fn()).finally(() => setLoading(false));
@@ -1080,9 +1043,6 @@ function loadPage(page) {
   }
 }
 
-// ============== SIDEBAR MOBILE ==============
-// Didefinisikan sebagai window.* (bukan function declaration) agar bisa
-// di-override oleh responsive-patch.js tanpa konflik hoisting.
 window.toggleSidebar = function toggleSidebar() {
   document.getElementById('sidebar').classList.toggle('open');
   document.getElementById('sidebarOverlay').classList.toggle('show');
@@ -1092,7 +1052,6 @@ window.closeSidebar = function closeSidebar() {
   document.getElementById('sidebarOverlay').classList.remove('show');
 };
 
-// ============== HELPER: YEAR SELECT ==============
 function yearOptions(selected, maxYear) {
   const max = maxYear || window._appTahunAkhir || window._maxPeriodeTahun || Math.max(CURRENT_YEAR + 3, 2030);
   const min = window._appTahunAwal || Math.min(2024, CURRENT_YEAR);

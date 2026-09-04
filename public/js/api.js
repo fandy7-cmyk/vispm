@@ -116,6 +116,7 @@ const API = {
 
   
   getUsulan:           (params) => API.get('usulan', params),
+  getNotifCount:       (params) => API.get('usulan', { action: 'notif-count', ...params }),
   getDetailUsulan:     (id)     => API.get('usulan', { action: 'detail', id }),
   getIndikatorUsulan:  (id)     => API.get('usulan', { action: 'indikator', id }),
   createUsulan:        (data)   => API.post('usulan?action=buat', data),

@@ -6,21 +6,12 @@ async function fetchNotifCount() {
   if (!currentUser) return;
   try {
     const role = currentUser.role;
-    let count = 0;
-    if (role === 'Operator') {
-      
-      const myUsulan = await API.getUsulan({ email_operator: currentUser.email }).catch(() => []);
-      count = (myUsulan || []).filter(u => ['Ditolak','Ditolak Sebagian'].includes(u.statusGlobal)).length;
-    } else if (role === 'Kepala Puskesmas') {
-      const list = await API.getUsulan({ kode_pkm: currentUser.kodePKM }).catch(() => []);
-      count = (list || []).filter(u => ['Menunggu Kepala Puskesmas','Menunggu Re-verifikasi Kepala Puskesmas'].includes(u.statusGlobal) && !u.periodeExpired).length;
-    } else if (role === 'Pengelola Program') {
-      const ppList = await API.getUsulan({ email_program: currentUser.email }).catch(() => []);
-      count = (ppList || []).filter(u => ['Menunggu Pengelola Program','Menunggu Re-verifikasi PP'].includes(u.statusGlobal) && !u.periodeExpired).length;
-    } else if (role === 'Admin') {
-      const allUsulan = await API.getUsulan({}).catch(() => []);
-      count = (allUsulan || []).filter(u => u.statusGlobal === 'Menunggu Admin' && !u.periodeExpired).length;
-    }
+    let params = { role };
+    if (role === 'Operator' || role === 'Pengelola Program') params.email = currentUser.email;
+    else if (role === 'Kepala Puskesmas') params.kode_pkm = currentUser.kodePKM;
+    else if (role !== 'Admin') { _notifCount = 0; updateNotifBadge(0); return; } // role tanpa notif (mis. Super Admin)
+
+    const count = await API.getNotifCount(params).catch(() => 0);
 
     _notifCount = count;
     updateNotifBadge(count);

@@ -818,15 +818,21 @@ async function verifAdmin(pool, body) {
   const adaTolak = indikatorList.some(i => i.aksi === 'tolak');
 
   if (!adaTolak) {
-    
+    // Snapshot pejabat penandatangan saat ini, biar laporan final periode ini
+    // tetap nunjukin pejabat yang benar walau pejabat_penandatangan diganti belakangan.
+    const pjSnapshot = await pool.query(
+      `SELECT jabatan, nama, nip, tanda_tangan FROM pejabat_penandatangan ORDER BY id`
+    ).catch(() => ({ rows: [] }));
+
     await pool.query(
       `UPDATE usulan_header SET status_global='Selesai', status_final='Selesai',
        admin_approved_by=$1, admin_approved_at=NOW(),
        waktu_selesai=NOW(),
        ditolak_oleh=NULL, konteks_penolakan=NULL,
-       reverif_count=0
+       reverif_count=0,
+       penandatangan_snapshot=$3
        WHERE id_usulan=$2`,
-      [email, idUsulan]
+      [email, idUsulan, JSON.stringify(pjSnapshot.rows)]
     );
     
     await pool.query(`DELETE FROM penolakan_indikator WHERE id_usulan=$1`, [idUsulan]).catch(() => {});

@@ -405,7 +405,7 @@ body {
 .mobile-menu-btn:active { background: rgba(255,255,255,0.15); }
 .mobile-menu-btn .material-icons { font-size: var(--sp-lg); }    
 
-.content { flex: 1; overflow-y: auto; padding: var(--content-p); }  
+.content { flex: 1; overflow-y: auto; padding: var(--content-p); min-width: 0; }  
 
 .card {
   background: var(--surface); border-radius: var(--radius-lg);

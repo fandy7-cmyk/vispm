@@ -284,6 +284,54 @@ async function getUsulanList(pool, params) {
   }));
 }
 
+// Query ringan khusus badge notifikasi: cuma COUNT, tanpa join berat / query paralel tambahan.
+async function getNotifCount(pool, params) {
+  const role = params.role || '';
+  const periodeExpiredExpr = `(
+    COALESCE(pi.tanggal_selesai_verif, pi.tanggal_selesai) IS NOT NULL
+    AND (NOW() AT TIME ZONE 'Asia/Makassar') >
+      (COALESCE(pi.tanggal_selesai_verif, pi.tanggal_selesai)::date
+       + COALESCE(pi.jam_selesai_verif, pi.jam_selesai, '23:59')::time)
+  )`;
+
+  let sql, vals;
+  if (role === 'Operator') {
+    if (!params.email) return ok(0);
+    sql = `SELECT COUNT(*) cnt FROM usulan_header uh
+           WHERE uh.created_by=$1 AND uh.status_global IN ('Ditolak','Ditolak Sebagian')`;
+    vals = [params.email];
+  } else if (role === 'Kepala Puskesmas') {
+    if (!params.kode_pkm) return ok(0);
+    sql = `SELECT COUNT(*) cnt FROM usulan_header uh
+           LEFT JOIN periode_input pi ON pi.tahun=uh.tahun AND pi.bulan=uh.bulan
+           WHERE uh.kode_pkm=$1
+             AND uh.status_global IN ('Menunggu Kepala Puskesmas','Menunggu Re-verifikasi Kepala Puskesmas')
+             AND NOT ${periodeExpiredExpr}`;
+    vals = [params.kode_pkm];
+  } else if (role === 'Pengelola Program') {
+    if (!params.email) return ok(0);
+    sql = `SELECT COUNT(*) cnt FROM usulan_header uh
+           LEFT JOIN periode_input pi ON pi.tahun=uh.tahun AND pi.bulan=uh.bulan
+           WHERE uh.status_global IN ('Menunggu Pengelola Program','Menunggu Re-verifikasi PP')
+             AND NOT ${periodeExpiredExpr}
+             AND EXISTS (
+               SELECT 1 FROM verifikasi_program vp
+               WHERE vp.id_usulan = uh.id_usulan AND LOWER(vp.email_program)=LOWER($1)
+             )`;
+    vals = [params.email];
+  } else if (role === 'Admin') {
+    sql = `SELECT COUNT(*) cnt FROM usulan_header uh
+           LEFT JOIN periode_input pi ON pi.tahun=uh.tahun AND pi.bulan=uh.bulan
+           WHERE uh.status_global = 'Menunggu Admin' AND NOT ${periodeExpiredExpr}`;
+    vals = [];
+  } else {
+    return ok(0);
+  }
+
+  const result = await pool.query(sql, vals);
+  return ok(parseInt(result.rows[0].cnt, 10) || 0);
+}
+
 async function getUsulanDetail(pool, idUsulan) {
   if (!idUsulan) return err('ID usulan diperlukan');
   const result = await pool.query(
@@ -409,4 +457,4 @@ async function saveDriveFolder(pool, body) {
   return ok({ message: 'Folder Drive disimpan' });
 }
 
-module.exports = { getUsulanList, getUsulanDetail, getIndikatorUsulan, getProgramVerifStatus, saveDriveFolder };
+module.exports = { getUsulanList, getNotifCount, getUsulanDetail, getIndikatorUsulan, getProgramVerifStatus, saveDriveFolder };

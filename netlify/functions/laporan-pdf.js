@@ -124,9 +124,20 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
   const h = hdrResult.rows[0];
 
   
-  const pjResult = await pool.query(
-    `SELECT jabatan, nama, nip, tanda_tangan FROM pejabat_penandatangan ORDER BY id`
-  ).catch(() => ({ rows: [] }));
+  // Pejabat penandatangan: kalau usulan ini sudah final dan sudah punya snapshot,
+  // pakai snapshot itu (biar laporan tetap konsisten walau pejabat diganti belakangan).
+  // Kalau belum ada snapshot (usulan lama sebelum fitur ini, atau laporan sementara/belum final),
+  // fallback ke data pejabat_penandatangan yang aktif sekarang.
+  let pjResult;
+  if (h.penandatangan_snapshot) {
+    const snap = typeof h.penandatangan_snapshot === 'string'
+      ? JSON.parse(h.penandatangan_snapshot) : h.penandatangan_snapshot;
+    pjResult = { rows: Array.isArray(snap) ? snap : [] };
+  } else {
+    pjResult = await pool.query(
+      `SELECT jabatan, nama, nip, tanda_tangan FROM pejabat_penandatangan ORDER BY id`
+    ).catch(() => ({ rows: [] }));
+  }
   const kasubag = pjResult.rows.find(p => p.jabatan === 'Kepala Sub Bagian Perencanaan') || {};
 
   
@@ -261,15 +272,15 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
 
     let signImg;
     if (!approved) {
-      signImg = `<div style="width:68px;height:68px;border:2px dashed #cbd5e1;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:#94a3b8;font-size:10px;margin-bottom:4px">Belum</div>
+      signImg = `<div style="width:80px;height:80px;border:2px dashed #cbd5e1;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:#94a3b8;font-size:10px;margin-bottom:6px">Belum</div>
                  <div style="font-size:9px;color:#94a3b8;margin-bottom:2px">Menunggu persetujuan</div>`;
     } else if (ttValid) {
-      signImg = `<div style="height:68px;display:flex;align-items:center;justify-content:center;margin-bottom:2px">
-                   <img src="${tt}" style="max-height:60px;max-width:150px;object-fit:contain;display:block;margin:0 auto">
+      signImg = `<div style="height:80px;display:flex;align-items:center;justify-content:center;margin-bottom:4px">
+                   <img src="${tt}" style="max-height:70px;max-width:160px;object-fit:contain;display:block;margin:0 auto">
                  </div>
                  <div style="font-size:9px;color:#2d7a47;font-weight:700;margin-bottom:2px;display:flex;align-items:center;justify-content:center;gap:4px"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"11\" height=\"11\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#2d7a47\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M22 11.08V12a10 10 0 1 1-5.93-9.14\"/><polyline points=\"22 4 12 14.01 9 11.01\"/></svg>Diverifikasi: ${fmtDT(verifiedAt)}</div>`;
     } else {
-      signImg = `<div style="display:inline-block;margin-bottom:4px;transform:scale(0.85)">${approvedBadgeSVG()}</div>
+      signImg = `<div style="display:inline-block;margin-bottom:6px">${approvedBadgeSVG()}</div>
                  <div style="font-size:9px;color:#2d7a47;font-weight:700;margin-bottom:2px;display:flex;align-items:center;justify-content:center;gap:4px"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"11\" height=\"11\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#2d7a47\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M22 11.08V12a10 10 0 1 1-5.93-9.14\"/><polyline points=\"22 4 12 14.01 9 11.01\"/></svg>Diverifikasi: ${fmtDT(verifiedAt)}</div>`;
     }
     return `<div style="text-align:center;flex:1;page-break-inside:avoid;break-inside:avoid">

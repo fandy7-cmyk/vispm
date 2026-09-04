@@ -1,6 +1,6 @@
 const { getPool, ok, err, cors } = require('./db');
 const { validateSession } = require('./middleware');
-const { getUsulanList, getUsulanDetail, getIndikatorUsulan, getProgramVerifStatus, saveDriveFolder } = require('./usulan-query');
+const { getUsulanList, getNotifCount, getUsulanDetail, getIndikatorUsulan, getProgramVerifStatus, saveDriveFolder } = require('./usulan-query');
 const { buatUsulan, updateIndikator, submitUsulan } = require('./usulan-input');
 const { verifKapus, verifProgram, verifAdmin, rejectUsulan, getPenolakanIndikator, respondPenolakan } = require('./usulan-verifikasi');
 const { parseIndikatorAkses, logAktivitas, mapHeader, adminResetUsulan, restoreVerifStatus, getLogAktivitas } = require('./usulan-helpers');
@@ -30,6 +30,7 @@ async function runMigrations(pool) {
     
     pool.query(`ALTER TABLE usulan_header ADD COLUMN IF NOT EXISTS reverif_count INT DEFAULT 0`).catch(()=>{}),
     pool.query(`ALTER TABLE usulan_header ADD COLUMN IF NOT EXISTS waktu_selesai TIMESTAMPTZ`).catch(()=>{}),
+    pool.query(`ALTER TABLE usulan_header ADD COLUMN IF NOT EXISTS penandatangan_snapshot JSONB`).catch(()=>{}),
     pool.query(`CREATE TABLE IF NOT EXISTS penolakan_indikator (
       id SERIAL PRIMARY KEY,
       id_usulan VARCHAR(50) NOT NULL,
@@ -99,6 +100,21 @@ async function runMigrations(pool) {
     `UPDATE penolakan_indikator SET dibuat_oleh='Kapus' WHERE dibuat_oleh IS NULL`
   ).catch(()=>{});
 
+  // Backfill satu kali: usulan lama yang sudah Selesai tapi belum punya snapshot
+  // pejabat penandatangan (dibuat sebelum fitur ini ada) dibekukan pakai data
+  // pejabat_penandatangan yang AKTIF SEKARANG — supaya kalau nanti pejabatnya
+  // diganti, laporan lama ini tidak ikut berubah lagi.
+  await pool.query(`
+    UPDATE usulan_header
+    SET penandatangan_snapshot = (
+      SELECT COALESCE(jsonb_agg(jsonb_build_object(
+        'jabatan', jabatan, 'nama', nama, 'nip', nip, 'tanda_tangan', tanda_tangan
+      )), '[]'::jsonb)
+      FROM pejabat_penandatangan
+    )
+    WHERE status_global = 'Selesai' AND penandatangan_snapshot IS NULL
+  `).catch(()=>{});
+
 }
 
 exports.handler = async (event) => {
@@ -110,6 +126,14 @@ exports.handler = async (event) => {
   const method = event.httpMethod;
   const params = event.queryStringParameters || {};
   const path = params.action || '';
+
+  // Notif count = query ringan buat badge, tidak butuh kolom hasil migrasi apapun.
+  // Ditaruh sebelum runMigrations biar tidak ikut nunggu ~20 query ALTER/UPDATE saat cold start.
+  if (method === 'GET' && path === 'notif-count') {
+    try { return await getNotifCount(pool, params); }
+    catch (e) { console.error('Notif count error:', e); return err('Error: ' + e.message, 500); }
+  }
+
   try {
     await runMigrations(pool);
     if (method === 'GET' && !path) return await getUsulanList(pool, params);

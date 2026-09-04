@@ -107,6 +107,13 @@
   -webkit-overflow-scrolling: touch;
 }
 
+.table-container::-webkit-scrollbar { height: 6px; }
+.table-container::-webkit-scrollbar-track { background: #f1f5f9; }
+.table-container::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+.table-container::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+[data-theme="dark"] .table-container::-webkit-scrollbar-track { background: #0f172a; }
+[data-theme="dark"] .table-container::-webkit-scrollbar-thumb { background: #334155; }
+
 .modal.fullscreen .table-container {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
@@ -1223,7 +1230,7 @@ body { overflow-x: hidden; }
 
 @media (max-width: 600px) {
   
-  #mainContent table td:last-child {
+  #mainContent table td:last-child:not(:has(.btn-icon)) {
     min-width: 80px;
     max-width: 110px;
     word-break: break-word;
@@ -1272,7 +1279,18 @@ body { overflow-x: hidden; }
 #pendingTable  .table-container,
 #ppDoneTable   .table-container,
 #kapusAllTable .table-container,
-#recentTable   .table-container {
+#recentTable   .table-container,
+#rankTable     .table-container,
+#adminAllUsulanTable .table-container,
+#adminPendingTable   .table-container,
+#indTable      .table-container,
+#jabatanTable  .table-container,
+#kuTable       .table-container,
+#myUsulanTable .table-container,
+#pkmProgressTable .table-container,
+#pkmTable      .table-container,
+#usersTable    .table-container,
+#verifTable    .table-container {
   overflow-x: auto !important;
   -webkit-overflow-scrolling: touch;
   
@@ -1281,7 +1299,18 @@ body { overflow-x: hidden; }
 #pendingTable  .table-container table,
 #ppDoneTable   .table-container table,
 #kapusAllTable .table-container table,
-#recentTable   .table-container table {
+#recentTable   .table-container table,
+#rankTable     .table-container table,
+#adminAllUsulanTable .table-container table,
+#adminPendingTable   .table-container table,
+#indTable      .table-container table,
+#jabatanTable  .table-container table,
+#kuTable       .table-container table,
+#myUsulanTable .table-container table,
+#pkmProgressTable .table-container table,
+#pkmTable      .table-container table,
+#usersTable    .table-container table,
+#verifTable    .table-container table {
   min-width: 560px;
   width: 100%;
 }
@@ -1289,7 +1318,18 @@ body { overflow-x: hidden; }
 #pendingTable,
 #ppDoneTable,
 #kapusAllTable,
-#recentTable {
+#recentTable,
+#rankTable,
+#adminAllUsulanTable,
+#adminPendingTable,
+#indTable,
+#jabatanTable,
+#kuTable,
+#myUsulanTable,
+#pkmProgressTable,
+#pkmTable,
+#usersTable,
+#verifTable {
   min-width: 0;
   
   overflow: hidden;

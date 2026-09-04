@@ -46,6 +46,7 @@
 
     let bubble = null, textEl = null, arrow = null;
   let currentEl = null, showTimer = null, hideTimer = null;
+  let _suppressUntilMove = false;
 
     function ensureBubble() {
     if (bubble) return;
@@ -119,6 +120,7 @@
   }
 
     document.addEventListener('mouseover', e => {
+    if (_suppressUntilMove) return; // abaikan mouseover "palsu" akibat tab baru saja refocus
     const el = e.target.closest('[data-tooltip]');
     if (!el || el === currentEl) return;
     clearTimeout(hideTimer); clearTimeout(showTimer);
@@ -130,6 +132,14 @@
     clearTimeout(showTimer);
     hideTimer = setTimeout(hide, 80);
   });
+  // Setelah tab ini kehilangan fokus (mis. window.open buat download laporan),
+  // browser suka nge-trigger ulang mouseover palsu ke elemen yang masih ketiban
+  // kursor begitu tab ini fokus lagi — walau mouse-nya sendiri diam. Tooltip jadi
+  // nongol lagi dan nyangkut karena gak ada mouseout beneran yang nyusul.
+  // Fix: begitu blur, sembunyikan & tahan tooltip sampai ada gerakan mouse asli.
+  window.addEventListener('blur', () => { hide(); _suppressUntilMove = true; });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) { hide(); _suppressUntilMove = true; } });
+  document.addEventListener('mousemove', () => { _suppressUntilMove = false; }, true);
   document.addEventListener('focusin', e => {
     const el = e.target.closest('[data-tooltip]');
     if (el) { clearTimeout(showTimer); show(el); }

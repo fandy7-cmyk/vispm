@@ -2399,9 +2399,9 @@ async function bukaLaporan(idUsulan, mode, aksesIndikator) {
     const res = await fetch(_laporanUrl, { headers: _token ? { 'Authorization': 'Bearer ' + _token } : {} });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const html = await res.text();
-    pw.document.open();
-    pw.document.write(html);
-    pw.document.close();
+    const _blobUrl = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+    pw.location.href = _blobUrl;
+    setTimeout(() => URL.revokeObjectURL(_blobUrl), 60000);
   } catch(e) {
     pw.document.write('<html><body style="font-family:Arial;padding:40px;color:#ef4444"><p>Gagal memuat laporan: ' + e.message + '</p></body></html>');
     toast('Gagal membuka laporan: ' + e.message, 'error');

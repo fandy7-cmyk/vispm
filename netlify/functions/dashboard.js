@@ -84,12 +84,14 @@ async function operatorStats(pool, email, tahun) {
   );
   const s = result.rows[0];
 
-  // Ambil semua periode berstatus Aktif — filter jam dilakukan di JS (bukan di SQL)
-  // karena SQL CURRENT_DATE tidak tahu jam_mulai/jam_selesai
+  // Ambil periode Aktif DAN Tidak Aktif — yang Tidak Aktif dibutuhkan biar dashboard operator
+  // masih bisa nunjukin badge "Periode Berikutnya" (oranye) buat periode yang di-disable manual
+  // tapi tanggal mulainya masih di masa depan. Filter jam tetap di JS (bukan di SQL)
+  // karena SQL CURRENT_DATE tidak tahu jam_mulai/jam_selesai.
   const periodeResult = await pool.query(
-    `SELECT tahun, bulan, nama_bulan, tanggal_mulai, tanggal_selesai, jam_mulai, jam_selesai,
+    `SELECT tahun, bulan, nama_bulan, status, tanggal_mulai, tanggal_selesai, jam_mulai, jam_selesai,
             tanggal_mulai_verif, tanggal_selesai_verif, jam_mulai_verif, jam_selesai_verif
-     FROM periode_input WHERE status='Aktif' ORDER BY tahun, bulan`
+     FROM periode_input WHERE status IN ('Aktif','Tidak Aktif') ORDER BY tahun, bulan`
   );
 
   
@@ -115,8 +117,10 @@ async function operatorStats(pool, email, tahun) {
     tanggalSelesaiVerif: r.tanggal_selesai_verif || null,
     jamMulaiVerif: r.jam_mulai_verif || '08:00',
     jamSelesaiVerif: r.jam_selesai_verif || '17:00',
-    isAktifToday: _inRange(r.tanggal_mulai, r.jam_mulai, r.tanggal_selesai, r.jam_selesai),
-    isVerifToday: !!r.tanggal_mulai_verif && !!r.tanggal_selesai_verif
+    // isAktifToday sengaja ikut syarat status='Aktif' — periode Tidak Aktif gak boleh kehitung
+    // "aktif hari ini" walau tanggalnya kebetulan lagi dalam rentang.
+    isAktifToday: r.status === 'Aktif' && _inRange(r.tanggal_mulai, r.jam_mulai, r.tanggal_selesai, r.jam_selesai),
+    isVerifToday: r.status === 'Aktif' && !!r.tanggal_mulai_verif && !!r.tanggal_selesai_verif
       && _inRange(r.tanggal_mulai_verif, r.jam_mulai_verif, r.tanggal_selesai_verif, r.jam_selesai_verif),
   }));
   const periodeAktif = periodeAktifList.find(p => p.isAktifToday) || null;
@@ -143,8 +147,8 @@ async function kapusStats(pool, kodePKM, tahun) {
       [kodePKM]
     ),
     pool.query(
-      `SELECT tahun, bulan, nama_bulan, tanggal_mulai, tanggal_selesai, jam_mulai, jam_selesai, tanggal_mulai_verif, tanggal_selesai_verif, jam_mulai_verif, jam_selesai_verif
-       FROM periode_input WHERE status='Aktif' ORDER BY tahun, bulan`
+      `SELECT tahun, bulan, nama_bulan, status, tanggal_mulai, tanggal_selesai, jam_mulai, jam_selesai, tanggal_mulai_verif, tanggal_selesai_verif, jam_mulai_verif, jam_selesai_verif
+       FROM periode_input WHERE status IN ('Aktif','Tidak Aktif') ORDER BY tahun, bulan`
     )
   ]);
   const s = result.rows[0];
@@ -177,8 +181,8 @@ async function kapusStats(pool, kodePKM, tahun) {
         tanggalSelesaiVerif: r.tanggal_selesai_verif || null,
         jamMulaiVerif: r.jam_mulai_verif || '08:00',
         jamSelesaiVerif: r.jam_selesai_verif || '17:00',
-        isAktifToday: _inRange(r.tanggal_mulai, r.jam_mulai, r.tanggal_selesai, r.jam_selesai),
-        isVerifToday: !!r.tanggal_mulai_verif && !!r.tanggal_selesai_verif
+        isAktifToday: r.status === 'Aktif' && _inRange(r.tanggal_mulai, r.jam_mulai, r.tanggal_selesai, r.jam_selesai),
+        isVerifToday: r.status === 'Aktif' && !!r.tanggal_mulai_verif && !!r.tanggal_selesai_verif
           && _inRange(r.tanggal_mulai_verif, r.jam_mulai_verif, r.tanggal_selesai_verif, r.jam_selesai_verif),
       }))
   });
@@ -272,9 +276,9 @@ async function programStats(pool, email, tahun) {
 
   // Ambil semua periode aktif — filter jam di JS
   const pvResult = await pool.query(
-    `SELECT tahun, bulan, nama_bulan, tanggal_mulai, tanggal_selesai, jam_mulai, jam_selesai,
+    `SELECT tahun, bulan, nama_bulan, status, tanggal_mulai, tanggal_selesai, jam_mulai, jam_selesai,
             tanggal_mulai_verif, tanggal_selesai_verif, jam_mulai_verif, jam_selesai_verif
-     FROM periode_input WHERE status='Aktif' ORDER BY tahun, bulan`
+     FROM periode_input WHERE status IN ('Aktif','Tidak Aktif') ORDER BY tahun, bulan`
   ).catch(() => ({ rows: [] }));
   const _nowWita2 = new Date(Date.now() + 8 * 3600000);
   const _todayStr2 = _nowWita2.toISOString().slice(0, 10);
@@ -287,7 +291,7 @@ async function programStats(pool, email, tahun) {
     return nowDT >= ms + 'T' + (jM || '00:00') && nowDT <= ss + 'T' + (jS || '23:59');
   };
   
-  const pvAktif = pvResult.rows.find(r => _inRange2(r.tanggal_mulai, r.jam_mulai, r.tanggal_selesai, r.jam_selesai)) || {};
+  const pvAktif = pvResult.rows.find(r => r.status === 'Aktif' && _inRange2(r.tanggal_mulai, r.jam_mulai, r.tanggal_selesai, r.jam_selesai)) || {};
   const pv = pvAktif;
   const isVerifToday = !!pv.tanggal_mulai_verif && !!pv.tanggal_selesai_verif
     && _inRange2(pv.tanggal_mulai_verif, pv.jam_mulai_verif, pv.tanggal_selesai_verif, pv.jam_selesai_verif);
@@ -305,8 +309,8 @@ async function programStats(pool, email, tahun) {
     tanggalSelesaiVerif: r.tanggal_selesai_verif || null,
     jamMulaiVerif: r.jam_mulai_verif || '08:00',
     jamSelesaiVerif: r.jam_selesai_verif || '17:00',
-    isAktifToday: _inRange2(r.tanggal_mulai, r.jam_mulai, r.tanggal_selesai, r.jam_selesai),
-    isVerifToday: !!r.tanggal_mulai_verif && !!r.tanggal_selesai_verif
+    isAktifToday: r.status === 'Aktif' && _inRange2(r.tanggal_mulai, r.jam_mulai, r.tanggal_selesai, r.jam_selesai),
+    isVerifToday: r.status === 'Aktif' && !!r.tanggal_mulai_verif && !!r.tanggal_selesai_verif
       && _inRange2(r.tanggal_mulai_verif, r.jam_mulai_verif, r.tanggal_selesai_verif, r.jam_selesai_verif),
   }));
 

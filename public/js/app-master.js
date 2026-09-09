@@ -347,7 +347,7 @@ async function openBuktiRekapModal() {
     modal = document.createElement('div');
     modal.id = 'buktiRekapModal';
     modal.className = 'modal';
-    modal.addEventListener('click', e => { if (e.target === modal) closeModal('buktiRekapModal'); });
+    // Klik di luar modal tidak lagi menutup modal (harus via tombol Tutup)
     document.body.appendChild(modal);
   }
 
@@ -1027,7 +1027,7 @@ function previewTandaTanganUser(email, nama, role) {
     modal.id = 'ttPreviewModal';
     modal.className = 'modal';
     modal.style.zIndex = '3500';
-    modal.addEventListener('click', function(e) { if (e.target === modal) closeModal('ttPreviewModal'); });
+    // Klik di luar modal tidak lagi menutup modal (harus via tombol Tutup)
     document.body.appendChild(modal);
   }
   const hastt = !!(tt && (tt.startsWith('data:image') || tt.startsWith('http')));
@@ -2073,8 +2073,8 @@ function _pTickTimelineRow(rowId, startMs, endMs, nowMs) {
   if (elBar) elBar.style.width = (100 - pct) + '%';
   if (elStatus) {
     let statusText;
-    if (now < startMs) statusText = 'Belum dimulai';
-    else if (now > endMs) statusText = 'Berakhir';
+    if (now < startMs) statusText = 'Dibuka dalam ' + _pFormatCountdown(startMs - now);
+    else if (now > endMs) statusText = 'Ditutup';
     else statusText = _pFormatCountdown(endMs - now) + ' lagi';
     elStatus.textContent = statusText;
   }
@@ -2110,12 +2110,12 @@ function _pTimelineRow(label, icon, color, colorLight, mulaiTgl, mulaiJam, seles
   // jadi duplikat & rawan keliatan gak sinkron (gara-gara pembulatan ceil), jadi cukup progress bar aja.
   const statusSpan = hideStatus ? '' : `<span${statusId} style="font-size:11px;font-weight:600;color:var(--text-light,#64748b)">${statusText}</span>`;
   return `<div style="padding:10px 16px">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-      <div style="display:flex;align-items:center;gap:6px">
-        <span style="color:${lblColor};display:flex">${icon}</span>
+    <div style="margin-bottom:6px">
+      <span style="display:inline-flex;align-items:center;gap:6px;vertical-align:middle">
+        <span style="color:${lblColor};display:inline-flex">${icon}</span>
         <span style="font-size:11px;font-weight:700;color:${lblColor};text-transform:uppercase;letter-spacing:0.4px">${label}</span>
-      </div>
-      ${statusSpan}
+      </span>
+      ${statusSpan ? ` <span style="margin-left:6px">${statusSpan}</span>` : ''}
     </div>
     <div style="position:relative;height:6px;border-radius:3px;overflow:hidden;background:${barTrack}">${barFill}</div>
     <div style="display:flex;justify-content:space-between;margin-top:5px;font-size:11px;color:${dateColor};font-weight:600">
@@ -2163,34 +2163,41 @@ async function loadPeriodeGrid() {
 
       // Tampilkan abu-abu (disabled) jika: status Tidak Aktif ATAU status Aktif tapi di luar rentang waktu (isAktifToday=false)
       const isDisabled = isTidakAktif || (!isActive && p.status === 'Aktif');
-      const borderColor = isDisabled ? '#e2e8f0' : '#a7d8d3';
-      const bg = isDisabled ? '#f8fafc' : 'var(--surface)';
-      const badgeHtml = isTidakAktif
-        ? '<span class="badge badge-default" style="color:#94a3b8">Tidak Aktif</span>'
-        : isDisabled
-          ? '<span class="badge badge-default" style="color:#94a3b8">Di Luar Rentang</span>'
-          : '<span class="badge badge-info">Aktif</span>';
       const jm2  = fmt24(p.jamMulai)  || '08:00';
       const js2  = fmt24(p.jamSelesai) || '17:00';
       const jmv2 = fmt24(p.jamMulaiVerif) || '08:00';
       const jsv2 = fmt24(p.jamSelesaiVerif) || '17:00';
-      return `<div style="border:1.5px solid ${borderColor};border-radius:10px;overflow:hidden;background:${bg};cursor:pointer;opacity:${isDisabled?'0.75':'1'}" onclick="editPeriode(${p.tahun},${p.bulan})">
+      // Beda tampilan buat periode yang BELUM dibuka (masih akan datang) vs yang UDAH ditutup/nonaktif —
+      // biar gak kelihatan sama-sama "mati" padahal maknanya beda (yang satu masih akan jalan).
+      const _startMs = _pWDate(p.tanggalMulai, jm2);
+      const _nowMs = _pNowWita();
+      const isUpcoming = _startMs != null && _nowMs < _startMs;
+      // Semua upcoming (Aktif maupun Tidak Aktif) sekarang oranye, gak dibedain lagi.
+      const borderColor = isUpcoming ? '#fbbf24' : (isDisabled ? '#e2e8f0' : '#a7d8d3');
+      const bg = isUpcoming ? '#fef3c7' : (isDisabled ? '#f8fafc' : 'var(--surface)');
+      const rowIdSubmit2 = `periodeGridSubmit_${p.tahun}_${p.bulan}`;
+      const rowIdVerif2 = `periodeGridVerif_${p.tahun}_${p.bulan}`;
+      // Badge di header card menampilkan status statis dulu (fallback), lalu langsung
+      // ditimpa countdown live oleh _tickGrid (id ...Submit_..._status, sama kayak baris Submit).
+      const badgeHtml = isUpcoming
+        ? `<span id="${rowIdSubmit2}_status" class="badge" style="color:#92400e;background:#fef3c7;border:1px solid #fcd34d">Di Luar Rentang</span>`
+        : `<span id="${rowIdSubmit2}_status" class="badge badge-default" style="color:#94a3b8">${isTidakAktif ? 'Tidak Aktif' : 'Di Luar Rentang'}</span>`;
+      return `<div style="border:${isUpcoming ? '2px' : '1.5px'} solid ${borderColor};border-radius:10px;overflow:hidden;background:${bg};cursor:pointer;opacity:${isUpcoming?'1':(isDisabled?'0.75':'1')}" onclick="editPeriode(${p.tahun},${p.bulan})">
         <div style="padding:12px 16px 0;display:flex;justify-content:space-between;align-items:center">
           <span style="font-weight:700;font-size:14px;color:var(--text,#1e293b)">${p.namaBulan} ${p.tahun}</span>
           ${badgeHtml}
         </div>
-        ${_pTimelineRow('Submit / Re-submit', _svgClock, '#0d9488', '#d1fae5', p.tanggalMulai, jm2, p.tanggalSelesai, js2, isDisabled)}
-        ${p.tanggalMulaiVerif ? `<div style="border-top:1px dashed var(--border,#e2e8f0)"></div>${_pTimelineRow('Verifikasi / Re-verifikasi', _svgShield, '#0d9488', '#d1fae5', p.tanggalMulaiVerif, jmv2, p.tanggalSelesaiVerif, jsv2, isDisabled)}` : ''}
+        ${_pTimelineRow('Submit / Re-submit', _svgClock, '#0d9488', '#d1fae5', p.tanggalMulai, jm2, p.tanggalSelesai, js2, isDisabled, rowIdSubmit2, true)}
+        ${p.tanggalMulaiVerif ? `<div style="border-top:1px dashed var(--border,#e2e8f0)"></div>${_pTimelineRow('Verifikasi / Re-verifikasi', _svgShield, '#0d9488', '#d1fae5', p.tanggalMulaiVerif, jmv2, p.tanggalSelesaiVerif, jsv2, isDisabled, rowIdVerif2, true)}` : ''}
       </div>`;
     }).join('');
 
     // Countdown detail (hari:jam:menit:detik) → refresh tiap detik, dan langsung jalanin sekali
     // biar gak nunggu 1 detik dulu buat nampilin nilai awalnya.
     clearInterval(window._periodeGridTick);
-    const activeRows = rows.filter(p => p.isAktifToday);
-    if (activeRows.length) {
+    if (rows.length) {
       const _tickGrid = () => {
-        activeRows.forEach(p => {
+        rows.forEach(p => {
           const jm  = fmt24(p.jamMulai)  || '08:00';
           const js  = fmt24(p.jamSelesai) || '17:00';
           const jmv = fmt24(p.jamMulaiVerif) || '08:00';
@@ -2545,11 +2552,8 @@ function setMasterLoading(show) {
   }
 }
 
-document.addEventListener('click', (e) => {
-  if (e.target.classList.contains('modal')) {
-    closeModal(e.target.id);
-  }
-});
+// Klik di luar modal (pada area backdrop) tidak lagi menutup modal secara global.
+// Modal hanya ditutup lewat tombol Tutup/Batal/Simpan atau tombol close eksplisit.
 
 const IDLE_TIMEOUT      =  5 * 60 * 1000; 
 const IDLE_WARN_BEFORE  = 30 * 1000; 
@@ -3227,7 +3231,7 @@ function openGlobalSearch() {
           ESC untuk tutup &nbsp;·&nbsp; Enter untuk pilih hasil pertama
         </div>
       </div>`;
-    modal.addEventListener('click', e => { if (e.target === modal) closeGlobalSearch(); });
+    // Klik di luar box pencarian tidak lagi menutup pencarian global (harus via tombol Tutup/ESC)
     document.body.appendChild(modal);
   }
   modal.style.display = 'flex';

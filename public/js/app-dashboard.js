@@ -258,7 +258,7 @@ function renderAdminDashboard(el, d, tahunDipilih) {
     // Perbarui statcard "Periode Berakhir" dgn hitungan real dari data per-baris
     const berakhirCount = (rows || []).filter(isPeriodeBerakhir).length;
     const berakhirEl = document.getElementById('dashStatBerakhir');
-    if (berakhirEl) berakhirEl.innerHTML = statCard('red','error','Periode Berakhir', berakhirCount, berakhirCount > 0 ? 'Perlu tindakan' : 'Tidak ada');
+    if (berakhirEl) berakhirEl.innerHTML = statCard('red','error','Periode Berakhir', berakhirCount);
     // Perbarui statcard "Menunggu Verifikasi" — HARUS match persis dgn filter
     // yg dipakai list "Menunggu Verifikasi Admin" di atas (awaiting_admin=true
     // → status_global='Menunggu Admin', lihat usulan-query.js), supaya angka di
@@ -550,7 +550,8 @@ renderKapusStatusSummary(rows) {
 
 function
 renderOperatorDashboard(el, d, tahunDipilih) {
-  const periodeList = (d.periodeAktifList || (d.periodeAktif ? [d.periodeAktif] : [])).filter(p => p.isAktifToday);
+  const periodeListRaw = d.periodeAktifList || (d.periodeAktif ? [d.periodeAktif] : []);
+  const periodeList = periodeListRaw.filter(p => p.isAktifToday);
   const periodeLabel = periodeList.length > 0 ? periodeList.length : '-';
 
   el.innerHTML = `
@@ -567,10 +568,11 @@ renderOperatorDashboard(el, d, tahunDipilih) {
     <div class="stats-grid">
       ${statCard("blue","assignment","Total Usulan Saya", d.totalUsulan)}
       ${statCard("green","check_circle","Selesai/Disetujui", d.disetujui)}
-      ${statCard("orange","pending","Dalam Proses", d.menunggu)}
+      <div id="dashStatProsesOp" style="display:contents">${statCard("orange","pending","Dalam Proses", d.menunggu)}</div>
       ${statCard('cyan','event_available','Periode Aktif', periodeLabel)}
+      <div id="dashStatBerakhirOp" style="display:contents">${statCard('red','error','Periode Berakhir', '…', 'Memuat...')}</div>
     </div>
-    ${renderPeriodeBanner(periodeList)}
+    ${renderPeriodeBanner(periodeListRaw)}
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;align-items:stretch;margin-bottom:14px">
       <div class="card" style="margin:0;display:flex;flex-direction:column">
         <div class="card-header-bar">
@@ -578,7 +580,7 @@ renderOperatorDashboard(el, d, tahunDipilih) {
         </div>
         <div class="card-body" style="display:flex;flex-direction:column;gap:10px;flex:1;justify-content:center">
           <div style="display:flex;gap:10px;flex-wrap:wrap">
-            <button class="btn btn-primary" onclick="loadPage('input')"><span class="material-icons">add</span>Buat Usulan Baru</button>
+            <button class="btn btn-primary" onclick="loadPage('input')" ${periodeList.length === 0 ? 'style="opacity:0.5;cursor:not-allowed"' : ''} title="${periodeList.length === 0 ? 'Tidak ada periode input aktif' : ''}"><span class="material-icons">add</span>Buat Usulan Baru</button>
             <button class="btn btn-secondary" onclick="loadPage('laporan')"><span class="material-icons">bar_chart</span>Lihat Laporan</button>
           </div>
         </div>
@@ -619,6 +621,13 @@ renderOperatorDashboard(el, d, tahunDipilih) {
     document.getElementById("recentTable").innerHTML = renderUsulanTable(rows.slice(0, 5), "operator");
     const el2 = document.getElementById("operatorStatusSummary");
     if (el2) el2.innerHTML = renderOperatorStatusSummary(rows);
+    const prosesRowsOp = rows.filter(u => !['Selesai','Ditolak','Ditolak Sebagian','Draft'].includes(u.statusGlobal));
+    const berakhirCountOp = prosesRowsOp.filter(u => u.periodeExpired).length;
+    const prosesCountOp = prosesRowsOp.length - berakhirCountOp;
+    const elBerakhirOp = document.getElementById("dashStatBerakhirOp");
+    if (elBerakhirOp) elBerakhirOp.innerHTML = statCard('red','error','Periode Berakhir', berakhirCountOp);
+    const elProsesOp = document.getElementById("dashStatProsesOp");
+    if (elProsesOp) elProsesOp.innerHTML = statCard("orange","pending","Dalam Proses", prosesCountOp);
   }).catch(() => {
     const el2 = document.getElementById("recentTable");
     if (el2) el2.innerHTML = `<div class="empty-state" style="padding:32px"><span class="material-icons">inbox</span><p>Belum ada data usulan</p></div>`;
@@ -632,25 +641,89 @@ async function downloadLaporanDashboardOperator() {
     await downloadLaporanPDF(rows[0].idUsulan);
   } catch(e) { toast(e.message, "error"); }
 }
-function renderPeriodeBanner(periodeList) {
-  if (!periodeList || !periodeList.length) {
-    return `
-      <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-bottom:14px">
-        <div style="background:var(--warning-light,linear-gradient(135deg,#fffbeb,#fef3c7));border:1.5px solid var(--border,#fcd34d);border-radius:12px;padding:16px 18px;display:flex;align-items:center;gap:14px;box-shadow:0 2px 8px rgba(245,158,11,0.10)">
-          <div style="width:42px;height:42px;border-radius:10px;background:var(--warning-light,#fef9c3);border:1.5px solid var(--border,#fde68a);display:flex;align-items:center;justify-content:center;flex-shrink:0">
-            <span class="material-icons" style="font-size:22px;color:#d97706">event_busy</span>
-          </div>
-          <div>
-            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#92400e;margin-bottom:2px">Periode Input</div>
-            <div style="font-size:13px;font-weight:700;color:#78350f">Tidak Ada Periode Aktif</div>
-            <div style="font-size:11px;color:#b45309;margin-top:2px">Hubungi Admin untuk membuka periode.</div>
-          </div>
-        </div>
-      </div>`;
-  }
+function renderPeriodeBanner(periodeListRaw) {
   const svgCal = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>';
   const svgSend = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>';
   const svgNotif = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>';
+
+  const periodeList = (periodeListRaw || []).filter(p => p.isAktifToday);
+
+  if (!periodeList.length) {
+    // Belum ada yang aktif hari ini — cek apakah ada periode Aktif yang tanggal mulainya masih di masa depan,
+    // biar operator liat countdown "Dibuka dalam..." juga, bukan cuma "Tidak Ada Periode Aktif" polos.
+    const _nowMs = _pNowWita();
+    const upcoming = (periodeListRaw || []).filter(p => {
+      const jm = fmt24(p.jamMulai || p.jam_mulai) || '08:00';
+      const startMs = _pWDate(p.tanggalMulai || p.tanggal_mulai, jm);
+      return startMs != null && _nowMs < startMs;
+    }).sort((a, b) => {
+      const jmA = fmt24(a.jamMulai || a.jam_mulai) || '08:00';
+      const jmB = fmt24(b.jamMulai || b.jam_mulai) || '08:00';
+      return _pWDate(a.tanggalMulai || a.tanggal_mulai, jmA) - _pWDate(b.tanggalMulai || b.tanggal_mulai, jmB);
+    });
+
+    if (!upcoming.length) {
+      return `
+        <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-bottom:14px">
+          <div style="background:var(--warning-light,linear-gradient(135deg,#fffbeb,#fef3c7));border:1.5px solid var(--border,#fcd34d);border-radius:12px;padding:16px 18px;display:flex;align-items:center;gap:14px;box-shadow:0 2px 8px rgba(245,158,11,0.10)">
+            <div style="width:42px;height:42px;border-radius:10px;background:var(--warning-light,#fef9c3);border:1.5px solid var(--border,#fde68a);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+              <span class="material-icons" style="font-size:22px;color:#d97706">event_busy</span>
+            </div>
+            <div>
+              <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#92400e;margin-bottom:2px">Periode Input</div>
+              <div style="font-size:13px;font-weight:700;color:#78350f">Tidak Ada Periode Aktif</div>
+              <div style="font-size:11px;color:#b45309;margin-top:2px">Hubungi Admin untuk membuka periode.</div>
+            </div>
+          </div>
+        </div>`;
+    }
+
+    const upItems = upcoming.map((p, idx) => {
+      const nm = p.namaBulan || p.nama_bulan || '';
+      const thn = p.tahun || '';
+      const tglMulai = p.tanggalMulai || p.tanggal_mulai;
+      const tglSelesai = p.tanggalSelesai || p.tanggal_selesai;
+      const jm = fmt24(p.jamMulai || p.jam_mulai) || '08:00';
+      const js = fmt24(p.jamSelesai || p.jam_selesai) || '17:00';
+      const timerId = `periodeUpcomingTimer_${idx}`;
+      const isTidakAktif = p.status === 'Tidak Aktif';
+      const borderColor = '#fbbf24';
+      const bg = '#fef3c7';
+      const headerBg = 'linear-gradient(135deg,#d97706,#f59e0b)';
+      const rowColor = '#92400e';
+      const label = isTidakAktif ? '(Nonaktif) ' : '';
+      return `<div style="border:2px solid ${borderColor};border-radius:10px;overflow:hidden;background:${bg};box-shadow:0 1px 4px rgba(37,99,235,0.10)">
+        <div style="background:${headerBg};padding:8px 14px;color:white;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:space-between;gap:7px">
+          <span style="display:flex;align-items:center;gap:7px"><span style="opacity:0.9;display:flex">${svgCal}</span> ${label}${nm} ${thn}</span>
+          <span id="${timerId}_status" style="font-size:11px;font-weight:700;background:rgba(0,0,0,0.2);padding:3px 8px;border-radius:20px;letter-spacing:0.3px;white-space:nowrap">--:--:--</span>
+        </div>
+        ${_pTimelineRow('Submit / Re-submit', svgSend, rowColor, bg, tglMulai, jm, tglSelesai, js, false, timerId, true)}
+        ${isTidakAktif ? `<div style="display:flex;align-items:flex-start;gap:8px;padding:8px 14px;background:var(--warning-light,#fffbeb);border-top:1px solid var(--border,#fcd34d)"><span style="color:#d97706;display:flex;flex-shrink:0;margin-top:1px">${svgNotif}</span><div style="font-size:12px;color:#0f172a;line-height:1.5">Periode ini masih dinonaktifkan manual — gak bakal otomatis kebuka meski tanggalnya udah masuk.</div></div>` : ''}
+      </div>`;
+    }).join('');
+
+    const upHtml = `<div style="margin-bottom:14px"><div class="card" style="margin:0"><div class="card-header-bar"><span class="card-title" style="display:flex;align-items:center;gap:7px"><span style="color:#d97706;display:flex">${svgCal}</span> Periode Berikutnya</span></div><div class="card-body"><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px">${upItems}</div></div></div></div>`;
+
+    setTimeout(() => {
+      window._periodeUpTimers = window._periodeUpTimers || [];
+      window._periodeUpTimers.forEach(t => clearInterval(t));
+      window._periodeUpTimers = [];
+      upcoming.forEach((p, idx) => {
+        const jm = fmt24(p.jamMulai || p.jam_mulai) || '08:00';
+        const js = fmt24(p.jamSelesai || p.jam_selesai) || '17:00';
+        const startMs = _pEpochWITA(p.tanggalMulai || p.tanggal_mulai, jm);
+        const endMs = _pEpochWITA(p.tanggalSelesai || p.tanggal_selesai, js);
+        const timerId = `periodeUpcomingTimer_${idx}`;
+        const tick = () => _pTickTimelineRow(timerId, startMs, endMs);
+        const tid = setInterval(tick, 1000);
+        tick();
+        window._periodeUpTimers.push(tid);
+      });
+    }, 0);
+
+    return upHtml;
+  }
+
   const items = periodeList.map((p, idx) => {
     const nm = p.namaBulan || p.nama_bulan || '';
     const thn = p.tahun || '';
@@ -731,6 +804,7 @@ function renderPeriodeVerifBanner(periodeList) {
 
   const svgCal = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>';
   const svgShield = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>';
+  const svgNotifV = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>';
 
   const items = list.map((p, idx) => {
     const mulai = p.tanggal_mulai_verif || p.tanggalMulaiVerif;
@@ -738,30 +812,40 @@ function renderPeriodeVerifBanner(periodeList) {
     const jmv = fmt24(p.jamMulaiVerif || p.jam_mulai_verif) || '08:00';
     const jsv = fmt24(p.jamSelesaiVerif || p.jam_selesai_verif) || '17:00';
     const isAktif = p.isVerifToday;
+    const isTidakAktif = p.status === 'Tidak Aktif';
     const nm = p.namaBulan || p.nama_bulan || '';
     const thn = p.tahun || '';
     const timerId = `periodeVerifTimer_${idx}`;
 
-    // Header warna: hijau kalau aktif, merah kalau closed, kuning kalau belum mulai
+    // Header warna: hijau kalau aktif, merah kalau closed, biru/oranye kalau belum mulai
+    // (biru = Aktif bakal ke-trigger otomatis, oranye = Tidak Aktif manual-disabled)
     const now = new Date(Date.now() + 8*3600000).toISOString().slice(0,10);
     const mulaiDs = mulai ? new Date(new Date(mulai).getTime()+8*3600000).toISOString().slice(0,10) : '9999';
     const selesaiDs = selesai ? new Date(new Date(selesai).getTime()+8*3600000).toISOString().slice(0,10) : '0000';
     const belumMulai = now < mulaiDs;
     const sudahTutup = now > selesaiDs;
 
-    let headerBg, borderColor, statusLabel;
+    let headerBg, borderColor, statusLabel, liveCountdown = false, note = '';
     if (isAktif) {
       headerBg = 'linear-gradient(135deg,#0d9488,#06b6d4)';
       borderColor = '#a7f3d0';
       statusLabel = 'Aktif';
     } else if (belumMulai) {
       headerBg = 'linear-gradient(135deg,#d97706,#f59e0b)';
-      borderColor = '#fcd34d';
+      borderColor = '#fbbf24';
       statusLabel = 'Belum Dibuka';
-    } else {
+      liveCountdown = true;
+      if (isTidakAktif) note = 'Periode ini masih dinonaktifkan manual — gak bakal otomatis kebuka meski tanggalnya udah masuk.';
+    } else if (sudahTutup) {
       headerBg = 'linear-gradient(135deg,#dc2626,#ef4444)';
       borderColor = '#fca5a5';
       statusLabel = 'Sudah Ditutup';
+    } else {
+      // dalam rentang tanggal tapi Tidak Aktif (manual-disabled)
+      headerBg = 'linear-gradient(135deg,#94a3b8,#cbd5e1)';
+      borderColor = '#e2e8f0';
+      statusLabel = 'Tidak Aktif';
+      note = 'Periode ini dinonaktifkan manual oleh Admin.';
     }
 
     const judulHeader = nm && thn ? `${nm} ${thn}` : 'Periode Verifikasi';
@@ -769,60 +853,82 @@ function renderPeriodeVerifBanner(periodeList) {
     return `<div style="border:1.5px solid ${borderColor};border-radius:10px;overflow:hidden;background:var(--surface,white);box-shadow:0 1px 4px rgba(13,148,136,0.08)">
       <div style="background:${headerBg};padding:8px 14px;color:white;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:space-between;gap:7px">
         <span style="display:flex;align-items:center;gap:7px"><span style="opacity:0.9;display:flex">${svgCal}</span> ${judulHeader}</span>
-        <span id="${timerId}" style="font-size:11px;font-weight:700;background:rgba(0,0,0,0.2);padding:3px 8px;border-radius:20px;letter-spacing:0.3px;white-space:nowrap">${isAktif ? '--:--:--' : statusLabel}</span>
+        <span id="${timerId}" style="font-size:11px;font-weight:700;background:rgba(0,0,0,0.2);padding:3px 8px;border-radius:20px;letter-spacing:0.3px;white-space:nowrap">${isAktif || liveCountdown ? '--:--:--' : statusLabel}</span>
       </div>
       ${_pTimelineRow('Verifikasi / Re-verifikasi', svgShield, '#0d9488', '#d1fae5', mulai, jmv, selesai, jsv, false, timerId, true)}
+      ${note ? `<div style="display:flex;align-items:flex-start;gap:8px;padding:8px 14px;background:var(--warning-light,#fffbeb);border-top:1px solid var(--border,#fcd34d)"><span style="color:#d97706;display:flex;flex-shrink:0;margin-top:1px">${svgNotifV}</span><div style="font-size:12px;color:#0f172a;line-height:1.5">${note}</div></div>` : ''}
     </div>`;
   }).join('');
 
   const html = `<div style="margin-bottom:14px"><div class="card" style="margin:0"><div class="card-header-bar"><span class="card-title" style="display:flex;align-items:center;gap:7px"><span style="color:#7c3aed;display:flex">${svgCal}</span> Periode Aktif</span></div><div class="card-body"><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px">${items}</div></div></div></div>`;
 
-  // Timer countdown untuk periode verif yang aktif
+  // Timer countdown untuk periode verif yang aktif (nutup) maupun yang belum mulai (buka)
   setTimeout(() => {
     window._periodeVerifTimers = window._periodeVerifTimers || [];
     window._periodeVerifTimers.forEach(t => clearInterval(t));
     window._periodeVerifTimers = [];
     list.forEach((p, idx) => {
-      if (!p.isVerifToday) return;
       const jmv = fmt24(p.jamMulaiVerif || p.jam_mulai_verif) || '08:00';
       const jsv = fmt24(p.jamSelesaiVerif || p.jam_selesai_verif) || '17:00';
       const _tglMulaiRaw = p.tanggal_mulai_verif || p.tanggalMulaiVerif || '';
       const _tglRaw = p.tanggal_selesai_verif || p.tanggalSelesaiVerif || '';
-      const _tglDate = _tglRaw ? new Date(_tglRaw) : null;
-      if (!_tglDate || isNaN(_tglDate)) return;
-      const [jsvH, jsvM] = jsv.split(':').map(Number);
-      const _witaMs = _tglDate.getTime() + 8 * 3600000;
-      const _witaDate = new Date(_witaMs);
-      const _tglWITA = _witaDate.getUTCFullYear() + '-'
-        + String(_witaDate.getUTCMonth()+1).padStart(2,'0') + '-'
-        + String(_witaDate.getUTCDate()).padStart(2,'0');
-      const deadline = new Date(_tglWITA + 'T' + String(jsvH).padStart(2,'0') + ':' + String(jsvM).padStart(2,'0') + ':00+08:00');
-      const startMs = _pEpochWITA(_tglMulaiRaw, jmv);
       const timerId = 'periodeVerifTimer_' + idx;
-      const getEl = () => document.getElementById(timerId);
-      const tick = () => {
-        const el = getEl();
-        if (!el) { clearInterval(tid); return; }
-        const diff = deadline - Date.now();
-        if (diff <= 0) {
-          el.textContent = 'Ditutup'; el.style.background = 'rgba(239,68,68,0.35)';
+      const startMs = _pEpochWITA(_tglMulaiRaw, jmv);
+
+      if (p.isVerifToday) {
+        const _tglDate = _tglRaw ? new Date(_tglRaw) : null;
+        if (!_tglDate || isNaN(_tglDate)) return;
+        const [jsvH, jsvM] = jsv.split(':').map(Number);
+        const _witaMs = _tglDate.getTime() + 8 * 3600000;
+        const _witaDate = new Date(_witaMs);
+        const _tglWITA = _witaDate.getUTCFullYear() + '-'
+          + String(_witaDate.getUTCMonth()+1).padStart(2,'0') + '-'
+          + String(_witaDate.getUTCDate()).padStart(2,'0');
+        const deadline = new Date(_tglWITA + 'T' + String(jsvH).padStart(2,'0') + ':' + String(jsvM).padStart(2,'0') + ':00+08:00');
+        const getEl = () => document.getElementById(timerId);
+        const tick = () => {
+          const el = getEl();
+          if (!el) { clearInterval(tid); return; }
+          const diff = deadline - Date.now();
+          if (diff <= 0) {
+            el.textContent = 'Ditutup'; el.style.background = 'rgba(239,68,68,0.35)';
+            _pTickTimelineRow(timerId, startMs, deadline.getTime());
+            clearInterval(tid); return;
+          }
+          const h = Math.floor(diff / 3600000);
+          const m = Math.floor((diff % 3600000) / 60000);
+          const s = Math.floor((diff % 60000) / 1000);
+          const mm = String(m).padStart(2,'0'), ss = String(s).padStart(2,'0');
+          el.textContent = h >= 24
+            ? Math.floor(h/24) + 'h ' + String(h%24).padStart(2,'0') + ':' + mm + ':' + ss
+            : String(h).padStart(2,'0') + ':' + mm + ':' + ss;
+          el.style.background = diff < 3600000 ? 'rgba(239,68,68,0.4)' : 'rgba(0,0,0,0.2)';
           _pTickTimelineRow(timerId, startMs, deadline.getTime());
-          clearInterval(tid); return;
-        }
-        const h = Math.floor(diff / 3600000);
-        const m = Math.floor((diff % 3600000) / 60000);
-        const s = Math.floor((diff % 60000) / 1000);
-        const mm = String(m).padStart(2,'0'), ss = String(s).padStart(2,'0');
-        el.textContent = h >= 24
-          ? Math.floor(h/24) + 'h ' + String(h%24).padStart(2,'0') + ':' + mm + ':' + ss
-          : String(h).padStart(2,'0') + ':' + mm + ':' + ss;
-        el.style.background = diff < 3600000 ? 'rgba(239,68,68,0.4)' : 'rgba(0,0,0,0.2)';
-        _pTickTimelineRow(timerId, startMs, deadline.getTime());
-      };
-      let tid;
-      tid = setInterval(tick, 1000);
-      tick();
-      window._periodeVerifTimers.push(tid);
+        };
+        let tid;
+        tid = setInterval(tick, 1000);
+        tick();
+        window._periodeVerifTimers.push(tid);
+        return;
+      }
+
+      // Belum mulai (biru = Aktif, oranye = Tidak Aktif) — live countdown "Dibuka dalam..."
+      if (startMs != null && Date.now() < startMs) {
+        const endMs = _pEpochWITA(_tglRaw, jsv);
+        const getEl = () => document.getElementById(timerId);
+        const tick = () => {
+          const el = getEl();
+          if (!el) { clearInterval(tid); return; }
+          const diff = startMs - Date.now();
+          if (diff <= 0) { clearInterval(tid); return; }
+          el.textContent = 'Dibuka dalam ' + _pFormatCountdown(diff);
+          _pTickTimelineRow(timerId, startMs, endMs);
+        };
+        let tid;
+        tid = setInterval(tick, 1000);
+        tick();
+        window._periodeVerifTimers.push(tid);
+      }
     });
   }, 0);
 
@@ -1143,17 +1249,17 @@ function statCard(color, icon, label, value, sub = null) {
     red:    'linear-gradient(135deg,#dc2626,#f87171)',
   };
   const grad = gradients[color] || gradients.blue;
-  return `<div class="stat-card stat-card-v2" style="background:${grad};border:none;padding:10px 14px;overflow:hidden;display:flex;flex-direction:column;justify-content:space-between;cursor:default;position:relative">
+  return `<div class="stat-card stat-card-v2" style="background:${grad};border:none;padding:10px 14px;overflow:hidden;display:flex;flex-direction:column;justify-content:center;gap:4px;cursor:default;position:relative;height:84px;box-sizing:border-box">
     <span class="material-icons" style="position:absolute;right:-4px;bottom:-4px;font-size:50px;color:rgba(255,255,255,0.12);pointer-events:none;user-select:none">${icon}</span>
-    <div style="display:flex;align-items:center;gap:7px;margin-bottom:5px">
+    <div style="display:flex;align-items:center;gap:7px">
       <div style="width:24px;height:24px;border-radius:6px;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;flex-shrink:0">
         <span class="material-icons" style="font-size:13px;color:#fff">${icon}</span>
       </div>
       <div style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.85)">${label}</div>
     </div>
-    <div>
+    <div style="display:flex;align-items:baseline;gap:6px">
       <div style="font-size:22px;font-weight:900;color:#fff;line-height:1;letter-spacing:-1px">${value ?? 0}</div>
-      ${sub !== null ? `<div style="font-size:10px;color:rgba(255,255,255,0.6);margin-top:2px;font-weight:500">${sub}</div>` : ''}
+      ${sub !== null ? `<div style="font-size:10px;color:rgba(255,255,255,0.6);font-weight:500">${sub}</div>` : ''}
     </div>
   </div>`;
 }

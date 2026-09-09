@@ -364,7 +364,7 @@ async function openFormPengumuman(id, containerId) {
     modal.id = 'pgmFormModal';
     modal.className = 'modal';
     modal.style.zIndex = '3100';
-    modal.addEventListener('click', e => { if (e.target === modal) closeModal('pgmFormModal'); });
+    // Klik di luar modal tidak lagi menutup modal (harus via tombol Tutup)
     document.body.appendChild(modal);
   }
 

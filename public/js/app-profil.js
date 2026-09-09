@@ -27,7 +27,7 @@ function openEditProfil() {
     modal.id = 'editProfilModal';
     modal.className = 'modal';
     modal.style.zIndex = '3000';
-    modal.addEventListener('click', e => { if (e.target === modal) closeModal('editProfilModal'); });
+    // Klik di luar modal tidak lagi menutup modal (harus via tombol Tutup)
     modal.innerHTML = `
       <div class="modal-card" style="max-width:420px;width:100%">
         <div class="modal-header">

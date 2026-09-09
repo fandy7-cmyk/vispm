@@ -936,7 +936,7 @@ el.innerHTML = `
         </div>
       </div>`;
     document.body.appendChild(el);
-    el.addEventListener('click', e => { if (e.target === el) closeModal('bukuPanduanModal'); });
+    // Klik di luar modal tidak lagi menutup modal (harus via tombol Tutup)
     
     window.addEventListener('resize', () => {
       const card = document.getElementById('bukuPanduanCard');

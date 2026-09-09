@@ -991,7 +991,7 @@ function _renderBuktiModal() {
     modal.id = 'previewBuktiModal';
     modal.className = 'modal fullscreen';
     document.body.appendChild(modal);
-    modal.addEventListener('click', e => { if (e.target === modal) modal.classList.remove('show'); });
+    // Klik di luar modal tidak lagi menutup modal (harus via tombol Tutup)
   }
 
   const svgDownload = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
@@ -2099,7 +2099,7 @@ async function openLogAktivitas(idUsulan) {
     modal.id = 'logAktivitasModal';
     modal.className = 'modal fullscreen';
     modal.style.zIndex = '3500';
-    modal.addEventListener('click', e => { if (e.target === modal) closeModal('logAktivitasModal'); });
+    // Klik di luar modal tidak lagi menutup modal (harus via tombol Tutup)
     document.body.appendChild(modal);
   }
   modal.innerHTML = `

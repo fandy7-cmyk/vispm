@@ -799,12 +799,33 @@ function renderPeriodeBanner(periodeListRaw) {
 
 function renderPeriodeVerifBanner(periodeList) {
   
-  const list = (periodeList || []).filter(r => r.tanggal_mulai_verif || r.tanggalMulaiVerif);
-  if (!list.length) return ''; // tidak ada periode verifikasi diset
+  const listAll = (periodeList || []).filter(r => r.tanggal_mulai_verif || r.tanggalMulaiVerif);
+  if (!listAll.length) return ''; // tidak ada periode verifikasi diset
 
   const svgCal = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>';
   const svgShield = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>';
   const svgNotifV = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>';
+
+  // Samain kayak renderPeriodeBanner (Operator): kalau ada yang lagi aktif verif hari ini, tampilin itu aja.
+  // Kalau nggak ada yang aktif, cuma tampilin periode berikutnya (belum mulai) — bukan yang udah tutup/nonaktif.
+  const activeToday = listAll.filter(p => p.isVerifToday);
+  let list, judulSection = 'Periode Verifikasi Aktif';
+  if (activeToday.length) {
+    list = activeToday;
+  } else {
+    const _nowMs = _pNowWita();
+    list = listAll.filter(p => {
+      const jmv = fmt24(p.jamMulaiVerif || p.jam_mulai_verif) || '08:00';
+      const startMs = _pWDate(p.tanggal_mulai_verif || p.tanggalMulaiVerif, jmv);
+      return startMs != null && _nowMs < startMs;
+    }).sort((a, b) => {
+      const jmvA = fmt24(a.jamMulaiVerif || a.jam_mulai_verif) || '08:00';
+      const jmvB = fmt24(b.jamMulaiVerif || b.jam_mulai_verif) || '08:00';
+      return _pWDate(a.tanggal_mulai_verif || a.tanggalMulaiVerif, jmvA) - _pWDate(b.tanggal_mulai_verif || b.tanggalMulaiVerif, jmvB);
+    });
+    judulSection = 'Periode Verifikasi Berikutnya';
+  }
+  if (!list.length) return ''; // nggak ada yang aktif atau bakal dibuka — nggak usah tampilin apa-apa
 
   const items = list.map((p, idx) => {
     const mulai = p.tanggal_mulai_verif || p.tanggalMulaiVerif;
@@ -860,7 +881,7 @@ function renderPeriodeVerifBanner(periodeList) {
     </div>`;
   }).join('');
 
-  const html = `<div style="margin-bottom:14px"><div class="card" style="margin:0"><div class="card-header-bar"><span class="card-title" style="display:flex;align-items:center;gap:7px"><span style="color:#7c3aed;display:flex">${svgCal}</span> Periode Aktif</span></div><div class="card-body"><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px">${items}</div></div></div></div>`;
+  const html = `<div style="margin-bottom:14px"><div class="card" style="margin:0"><div class="card-header-bar"><span class="card-title" style="display:flex;align-items:center;gap:7px"><span style="color:#7c3aed;display:flex">${svgCal}</span> ${judulSection}</span></div><div class="card-body"><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px">${items}</div></div></div></div>`;
 
   // Timer countdown untuk periode verif yang aktif (nutup) maupun yang belum mulai (buka)
   setTimeout(() => {
@@ -951,6 +972,7 @@ function renderKepalasDashboard(el, d, tahunDipilih) {
       ${statCard('orange','pending','Menunggu Verifikasi', d.menunggu)}
       ${statCard('green','check_circle','Sudah Diverifikasi', d.terverifikasi)}
       ${statCard('blue','assignment','Total Usulan PKM Saya', d.total)}
+      <div id="dashStatBerakhirKapus" style="display:contents">${statCard('red','error','Periode Berakhir', '…', 'Memuat...')}</div>
     </div>
     ${renderPeriodeVerifBanner(d.periodeAktifList || [])}
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;align-items:stretch;margin-bottom:14px">
@@ -1020,7 +1042,12 @@ function renderKepalasDashboard(el, d, tahunDipilih) {
     
     const elSum = document.getElementById('kapusStatusSummary');
     if (elSum) elSum.innerHTML = renderKapusStatusSummary(rows);
-    
+
+    const prosesRowsKapus = rows.filter(u => !['Selesai','Ditolak','Ditolak Sebagian','Draft'].includes(u.statusGlobal));
+    const berakhirCountKapus = prosesRowsKapus.filter(u => u.periodeExpired).length;
+    const elBerakhirKapus = document.getElementById('dashStatBerakhirKapus');
+    if (elBerakhirKapus) elBerakhirKapus.innerHTML = statCard('red','error','Periode Berakhir', berakhirCountKapus);
+
     const renderKapusAllPaged = (pg) => {
       const elAll = document.getElementById('kapusAllTable');
       if (!elAll) return;
@@ -1081,6 +1108,12 @@ function renderProgramDashboard(el, d, tahunDipilih) {
         <span class="material-icons" style="color:var(--primary);font-size:18px">info</span>
         <div class="loading-state inline"><div class="spm-spinner sm"><div class="sr1"></div><div class="sr2"></div><div class="sr3"></div></div><span style="font-size:12px;color:var(--text-light)">Memuat indikator...</span></div>
       </div>
+    </div>
+    <div class="card" style="margin-bottom:14px;display:none" id="pendingExpiredCard">
+      <div class="card-header-bar" style="background:#fef2f2;border-bottom:1px solid #fecaca">
+        <span class="card-title" style="color:#991b1b"><span class="material-icons" style="color:#991b1b">error</span>Periode Berakhir</span>
+      </div>
+      <div class="card-body" style="padding:0" id="pendingExpiredTable"></div>
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;align-items:stretch;margin-bottom:14px">
       <div class="card" style="margin:0;display:flex;flex-direction:column">
@@ -1203,18 +1236,27 @@ function renderProgramDashboard(el, d, tahunDipilih) {
     let _ppPendingPage = 1;
     let _ppDonePage = 1;
 
+    const pendingExpired = pending.filter(u => u.periodeExpired);
+    const pendingActive = pending.filter(u => !u.periodeExpired);
+
+    const expiredCard = document.getElementById('pendingExpiredCard');
+    const expiredTableEl = document.getElementById('pendingExpiredTable');
+    if (pendingExpired.length) {
+      if (expiredCard) expiredCard.style.display = '';
+      if (expiredTableEl) expiredTableEl.innerHTML = renderUsulanTable(pendingExpired, 'program');
+    } else if (expiredCard) {
+      expiredCard.style.display = 'none';
+    }
+
     const renderPendingPaged = (pg) => {
       _ppPendingPage = pg;
       const el = document.getElementById('pendingTable');
       if (!el) return;
-      if (!pending.length) {
+      if (!pendingActive.length) {
         el.innerHTML = `<div class="empty-state" style="padding:32px"><span class="material-icons">inbox</span><p>Belum ada data usulan</p></div>`;
         return;
       }
-      const { items, page: p, totalPages, total } = paginateDash(pending, pg);
-      el.innerHTML = renderUsulanTable(items, 'program')
-        + renderPagination('pendingTable', total, p, totalPages, 'pg => { ' + renderPendingPaged.toString().replace(/\n/g,' ') + '; }');
-      
+      const { items, page: p, totalPages, total } = paginateDash(pendingActive, pg);
       el.innerHTML = renderUsulanTable(items, 'program')
         + renderPagination('pendingTable', total, p, totalPages, `pg => window._ppPendingGoTo(pg)`);
     };

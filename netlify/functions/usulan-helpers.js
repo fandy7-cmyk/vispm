@@ -1,4 +1,5 @@
 const { getPool, ok, err, cors } = require('./db');
+const { logAudit } = require('./_audit.js');
 
 function isValidText(str) {
   return str && /[a-zA-Z0-9\u00C0-\u024F\u4e00-\u9fff]/.test(str.trim());
@@ -18,10 +19,20 @@ function parseIndikatorAkses(str) {
   return [...new Set(result)];
 }
 
-async function logAktivitas(pool, email, role, aksi, idUsulan, detail) {
+async function logAktivitas(pool, email, role, aksi, idUsulan, detail, event) {
   // Gunakan NOW() dari PostgreSQL agar waktu selalu akurat (UTC) regardless timezone server
   try { await pool.query(`INSERT INTO log_aktivitas (timestamp,user_email,role,aksi,id_usulan,detail) VALUES (NOW(),$1,$2,$3,$4,$5)`, [email,role,aksi,idUsulan,detail]); }
   catch(e) { console.error('Log error:', e); }
+
+  // Selain riwayat per-usulan di atas, catat juga ke audit_trail GLOBAL (Master
+  // Data → Audit Trail) supaya aksi usulan (submit/verifikasi/tolak/dst) ikut
+  // kelihatan di sana, sama seperti update Surat di SAPA — bukan cuma di
+  // riwayat masing-masing usulan.
+  await logAudit(pool, event, {
+    module: 'usulan', action: aksi,
+    userEmail: email, userRole: role,
+    detail, meta: { idUsulan },
+  });
 }
 
 function mapHeader(r) {
@@ -79,7 +90,7 @@ function mapHeader(r) {
   };
 }
 
-async function adminResetUsulan(pool, body) {
+async function adminResetUsulan(pool, body, event) {
   const { idUsulan, email } = body;
   if (!idUsulan) return err('idUsulan diperlukan');
   await pool.query(
@@ -89,11 +100,11 @@ async function adminResetUsulan(pool, body) {
      kapus_approved_by=NULL, admin_approved_by=NULL WHERE id_usulan=$1`, [idUsulan]
   );
   await pool.query(`UPDATE verifikasi_program SET status='Menunggu', verified_at=NULL, last_verified_at=NULL WHERE id_usulan=$1`, [idUsulan]);
-  await logAktivitas(pool, email, 'Admin', 'Reset', idUsulan, 'Direset oleh Admin');
+  await logAktivitas(pool, email, 'Admin', 'Reset', idUsulan, 'Direset oleh Admin', event);
   return ok({ message: 'Usulan berhasil direset ke Draft' });
 }
 
-async function restoreVerifStatus(pool, body) {
+async function restoreVerifStatus(pool, body, event) {
   const { idUsulan, emailAdmin, kapusBy, kapusAt } = body;
   if (!idUsulan) return err('idUsulan diperlukan');
   const adminCheck = await pool.query(`SELECT role FROM users WHERE LOWER(email)=LOWER($1)`, [emailAdmin]);
@@ -107,7 +118,7 @@ async function restoreVerifStatus(pool, body) {
     `UPDATE verifikasi_program SET status='Selesai', verified_at=NOW(), last_verified_at=NOW(),
      catatan=COALESCE(catatan,'Dipulihkan oleh Admin') WHERE id_usulan=$1 AND status='Menunggu'`, [idUsulan]
   );
-  await logAktivitas(pool, emailAdmin, 'Admin', 'Restore Verif', idUsulan, 'Status verifikasi dipulihkan');
+  await logAktivitas(pool, emailAdmin, 'Admin', 'Restore Verif', idUsulan, 'Status verifikasi dipulihkan', event);
   return ok({ message: 'Status verifikasi berhasil dipulihkan' });
 }
 

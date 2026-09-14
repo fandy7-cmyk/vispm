@@ -1,5 +1,6 @@
 const { getPool, ok, err, cors } = require('./db');
 const { validateSession } = require('./middleware');
+const { logAudit, getSessionUser } = require('./_audit.js');
 
 let _migrated = false;
 
@@ -77,6 +78,8 @@ exports.handler = async (event) => {
           dibuat_oleh || null,
         ]
       );
+      const actorAdd = await getSessionUser(pool, event);
+      await logAudit(pool, event, { module: 'pengumuman', action: 'CREATE', userEmail: actorAdd?.email, userNama: actorAdd?.nama, userRole: actorAdd?.role, detail: `Menambahkan pengumuman "${judul.trim()}"` });
       return ok(_fmt(result.rows[0]));
     }
 
@@ -110,6 +113,8 @@ exports.handler = async (event) => {
         ]
       );
       if (!result.rows.length) return err('Pengumuman tidak ditemukan', 404);
+      const actorUpd = await getSessionUser(pool, event);
+      await logAudit(pool, event, { module: 'pengumuman', action: 'UPDATE', userEmail: actorUpd?.email, userNama: actorUpd?.nama, userRole: actorUpd?.role, detail: `Mengubah pengumuman "${judul.trim()}"` });
       return ok(_fmt(result.rows[0]));
     }
 
@@ -124,6 +129,8 @@ exports.handler = async (event) => {
         [id]
       );
       if (!result.rows.length) return err('Pengumuman tidak ditemukan', 404);
+      const actorDel = await getSessionUser(pool, event);
+      await logAudit(pool, event, { module: 'pengumuman', action: 'DELETE', userEmail: actorDel?.email, userNama: actorDel?.nama, userRole: actorDel?.role, detail: `Menghapus pengumuman id ${id}` });
       return ok({ deleted: true, id });
     }
 

@@ -30,7 +30,7 @@ async function cekPeriodeInput(pool, tahun, bulan) {
   return null; 
 }
 
-async function buatUsulan(pool, body) {
+async function buatUsulan(pool, body, event) {
   const { kodePKM, tahun, bulan, emailOperator } = body;
   
   if (!kodePKM || !tahun || !bulan || !emailOperator) return err('Data tidak lengkap');
@@ -94,6 +94,7 @@ async function buatUsulan(pool, body) {
       );
     }
     await client.query('COMMIT');
+    await logAktivitas(pool, emailOperator, 'Operator', 'Buat Usulan', idUsulan, `Usulan dibuat untuk PKM ${kodePKM} periode ${bulan}/${tahun}`, event);
     return ok({ idUsulan, message: 'Usulan berhasil dibuat' });
   } catch (e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }
 }
@@ -219,7 +220,7 @@ async function hitungSPM(pool, idUsulan) {
   return { indeksKinerja, indeksBeban: KONSTANTA, indeksSPM, totalNilai: round2(totalNilai), totalBobot };
 }
 
-async function submitUsulan(pool, body) {
+async function submitUsulan(pool, body, event) {
   const { idUsulan, email, forceSubmit, catatanOperator } = body;
 
   const result = await pool.query(
@@ -510,7 +511,7 @@ await pool.query(
   const logDetailOperator = isResubmit
     ? `Diajukan ulang → ${targetStatus}${catatanOperator ? ' | Catatan: ' + catatanOperator : ''}`
     : 'Disubmit ke Kepala Puskesmas';
-  await logAktivitas(pool, email, 'Operator', isResubmit ? 'Ajukan Ulang' : 'Submit', idUsulan, logDetailOperator);
+  await logAktivitas(pool, email, 'Operator', isResubmit ? 'Ajukan Ulang' : 'Submit', idUsulan, logDetailOperator, event);
   
   return ok({ message: isResubmit
     ? `Usulan berhasil diajukan ulang! Diteruskan ke ${targetStatus}.`

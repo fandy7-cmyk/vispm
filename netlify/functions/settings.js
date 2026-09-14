@@ -1,5 +1,6 @@
 const { getPool, ok, err, cors } = require('./db');
 const { validateSession } = require('./middleware');
+const { logAudit, getSessionUser } = require('./_audit.js');
 
 const CURRENT_YEAR = new Date().getFullYear();
 
@@ -51,6 +52,8 @@ exports.handler = async (event) => {
         `INSERT INTO app_settings (key, value, updated_at) VALUES ('tahun_akhir',$1,NOW())
          ON CONFLICT (key) DO UPDATE SET value=$1, updated_at=NOW()`, [String(tahun_akhir)]
       );
+      const actorSave = await getSessionUser(pool, event);
+      await logAudit(pool, event, { module: 'settings', action: 'UPDATE', userEmail: actorSave?.email, userNama: actorSave?.nama, userRole: actorSave?.role, detail: `Mengubah rentang tahun aplikasi: ${tahun_awal}–${tahun_akhir}` });
       return ok({ message: 'Pengaturan berhasil disimpan', tahun_awal, tahun_akhir });
     }
 

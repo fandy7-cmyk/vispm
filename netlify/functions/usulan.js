@@ -141,19 +141,19 @@ exports.handler = async (event) => {
     if (method === 'GET' && path === 'indikator') return await getIndikatorUsulan(pool, params.id);
     if (method === 'GET' && path === 'program-status') return await getProgramVerifStatus(pool, params.id);
     const body = JSON.parse(event.body || '{}');
-    if (method === 'POST' && path === 'buat') return await buatUsulan(pool, body);
+    if (method === 'POST' && path === 'buat') return await buatUsulan(pool, body, event);
     if (method === 'PUT' && path === 'indikator') return await updateIndikator(pool, body);
-    if (method === 'POST' && path === 'submit') return await submitUsulan(pool, body);
-    if (method === 'POST' && path === 'verif-kapus')   return await verifKapus(pool, body);
-    if (method === 'POST' && path === 'verif-program') return await verifProgram(pool, body);
-    if (method === 'POST' && path === 'verif-admin')   return await verifAdmin(pool, body);
-    if (method === 'POST' && path === 'reject') return await rejectUsulan(pool, body);
+    if (method === 'POST' && path === 'submit') return await submitUsulan(pool, body, event);
+    if (method === 'POST' && path === 'verif-kapus')   return await verifKapus(pool, body, event);
+    if (method === 'POST' && path === 'verif-program') return await verifProgram(pool, body, event);
+    if (method === 'POST' && path === 'verif-admin')   return await verifAdmin(pool, body, event);
+    if (method === 'POST' && path === 'reject') return await rejectUsulan(pool, body, event);
     if (method === 'GET'  && path === 'log') return await getLogAktivitas(pool, params.id);
     if (method === 'GET'  && path === 'penolakan') return await getPenolakanIndikator(pool, params);
-    if (method === 'POST' && path === 'respond-penolakan') return await respondPenolakan(pool, body);
+    if (method === 'POST' && path === 'respond-penolakan') return await respondPenolakan(pool, body, event);
     if (method === 'PUT' && path === 'drive-folder') return await saveDriveFolder(pool, body);
-    if (method === 'POST' && path === 'admin-reset') return await adminResetUsulan(pool, body);
-    if (method === 'POST' && path === 'restore-verif') return await restoreVerifStatus(pool, body);
+    if (method === 'POST' && path === 'admin-reset') return await adminResetUsulan(pool, body, event);
+    if (method === 'POST' && path === 'restore-verif') return await restoreVerifStatus(pool, body, event);
     if (method === 'DELETE') {
       const { idUsulan } = body; 
       if (!idUsulan) return err('idUsulan diperlukan');

@@ -1,5 +1,6 @@
 const { getPool, ok, err, conflict, cors } = require('./db');
 const { validateSession } = require('./middleware');
+const { logAudit, getSessionUser } = require('./_audit.js');
 const bcrypt = require('bcryptjs');
 
 let _migrated = false;
@@ -45,6 +46,8 @@ exports.handler = async (event) => {
          VALUES ($1,$2,$3,$4,$5,$6,$7,true,$8)`,
         [email.trim().toLowerCase(), nama, nip||null, role, kodePKM||null, indikatorAkses||null, jabatan||null, hashedPassword]
       );
+      const actorAdd = await getSessionUser(pool, event);
+      await logAudit(pool, event, { module: 'users', action: 'CREATE', userEmail: actorAdd?.email, userNama: actorAdd?.nama, userRole: actorAdd?.role, detail: `Menambahkan user "${nama}" (${email}) — role ${role}` });
       return ok({ message: 'User berhasil ditambahkan. Password default: ' + DEFAULT_PASSWORD });
     }
     if (method === 'PUT') {
@@ -63,12 +66,16 @@ exports.handler = async (event) => {
           [nama, nip||null, role, kodePKM||null, indikatorAkses||null, jabatan||null, aktif!==false, email]
         );
       }
+      const actorUpd = await getSessionUser(pool, event);
+      await logAudit(pool, event, { module: 'users', action: 'UPDATE', userEmail: actorUpd?.email, userNama: actorUpd?.nama, userRole: actorUpd?.role, detail: `Mengubah user "${nama}" (${email})` });
       return ok({ message: 'User berhasil diupdate' });
     }
     if (method === 'DELETE') {
       const { email } = body;
       if (!email) return err('Email diperlukan');
       await pool.query('DELETE FROM users WHERE LOWER(email)=LOWER($1)', [email]);
+      const actorDel = await getSessionUser(pool, event);
+      await logAudit(pool, event, { module: 'users', action: 'DELETE', userEmail: actorDel?.email, userNama: actorDel?.nama, userRole: actorDel?.role, detail: `Menghapus user (${email})` });
       return ok({ message: 'User berhasil dihapus' });
     }
     return err('Method tidak diizinkan', 405);

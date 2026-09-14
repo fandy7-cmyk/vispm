@@ -1,5 +1,6 @@
 const { getPool, ok, err, cors } = require('./db');
 const { validateSession } = require('./middleware');
+const { logAudit, getSessionUser } = require('./_audit.js');
 
 let _migrated = false;
 
@@ -70,6 +71,8 @@ exports.handler = async (event) => {
           [kodePKM, parseInt(t.noIndikator), parseInt(tahun), parseInt(t.sasaran) || 0]
         );
       }
+      const actorSave = await getSessionUser(pool, event);
+      await logAudit(pool, event, { module: 'target-tahunan', action: 'UPDATE', userEmail: actorSave?.email, userNama: actorSave?.nama, userRole: actorSave?.role, detail: `Menyimpan target tahunan ${tahun} untuk PKM ${kodePKM} (${targets.length} indikator)` });
       return ok({ message: `Target tahunan berhasil disimpan untuk ${targets.length} indikator` });
     }
 

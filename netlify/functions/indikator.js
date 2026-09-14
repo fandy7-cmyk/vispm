@@ -1,5 +1,6 @@
 const { getPool, ok, err, conflict, cors } = require('./db');
 const { validateSession } = require('./middleware');
+const { logAudit, getSessionUser } = require('./_audit.js');
 
 let _migrated = false;
 
@@ -38,6 +39,8 @@ exports.handler = async (event) => {
         'INSERT INTO master_indikator (no_indikator, nama_indikator, bobot, aktif, catatan) VALUES ($1,$2,$3,$4,$5)',
         [parseInt(no), nama, parseInt(bobot)||0, aktif !== false, catatan||null]
       );
+      const actorAdd = await getSessionUser(pool, event);
+      await logAudit(pool, event, { module: 'indikator', action: 'CREATE', userEmail: actorAdd?.email, userNama: actorAdd?.nama, userRole: actorAdd?.role, detail: `Menambahkan indikator #${no} "${nama}"` });
       return ok({ message: 'Indikator berhasil ditambahkan' });
     }
 
@@ -48,6 +51,8 @@ exports.handler = async (event) => {
         'UPDATE master_indikator SET nama_indikator=$1, bobot=$2, aktif=$3, catatan=$4 WHERE no_indikator=$5',
         [nama, parseInt(bobot)||0, aktif !== false, catatan||null, parseInt(no)]
       );
+      const actorUpd = await getSessionUser(pool, event);
+      await logAudit(pool, event, { module: 'indikator', action: 'UPDATE', userEmail: actorUpd?.email, userNama: actorUpd?.nama, userRole: actorUpd?.role, detail: `Mengubah indikator #${no} "${nama}"` });
       return ok({ message: 'Indikator berhasil diupdate' });
     }
 
@@ -55,6 +60,8 @@ exports.handler = async (event) => {
       const { no } = body;
       if (!no) return err('Nomor indikator diperlukan');
       await pool.query('DELETE FROM master_indikator WHERE no_indikator=$1', [parseInt(no)]);
+      const actorDel = await getSessionUser(pool, event);
+      await logAudit(pool, event, { module: 'indikator', action: 'DELETE', userEmail: actorDel?.email, userNama: actorDel?.nama, userRole: actorDel?.role, detail: `Menghapus indikator #${no}` });
       return ok({ message: 'Indikator berhasil dihapus' });
     }
 

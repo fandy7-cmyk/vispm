@@ -1,5 +1,6 @@
 const { getPool, ok, err, cors } = require('./db');
 const { validateSession } = require('./middleware');
+const { logAudit, getSessionUser } = require('./_audit.js');
 
 let _migrated = false;
 
@@ -49,6 +50,8 @@ exports.handler = async (event) => {
           updated_at = NOW()
       `, [jabatan, nama, nip || null, tandaTangan || null]);
 
+      const actorSave = await getSessionUser(pool, event);
+      await logAudit(pool, event, { module: 'pejabat', action: event.httpMethod === 'POST' ? 'CREATE' : 'UPDATE', userEmail: actorSave?.email, userNama: actorSave?.nama, userRole: actorSave?.role, detail: `Menyimpan pejabat "${nama}" (${jabatan})` });
       return ok({ message: 'Pejabat berhasil disimpan' });
     }
 
@@ -56,6 +59,8 @@ exports.handler = async (event) => {
       const { id } = body;
       if (!id) return err('ID diperlukan');
       await pool.query(`DELETE FROM pejabat_penandatangan WHERE id = $1`, [id]);
+      const actorDel = await getSessionUser(pool, event);
+      await logAudit(pool, event, { module: 'pejabat', action: 'DELETE', userEmail: actorDel?.email, userNama: actorDel?.nama, userRole: actorDel?.role, detail: `Menghapus pejabat id ${id}` });
       return ok({ message: 'Pejabat berhasil dihapus' });
     }
 

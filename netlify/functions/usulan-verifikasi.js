@@ -1,7 +1,7 @@
 const { ok, err } = require('./db');
 const { isValidText, parseIndikatorAkses, logAktivitas } = require('./usulan-helpers');
 
-async function verifProgram(pool, body) {
+async function verifProgram(pool, body, event) {
   const { idUsulan, email, indikatorList, catatanProgram } = body;
   if (!idUsulan || !email) return err('Data tidak lengkap');
   if (!indikatorList || !indikatorList.length) return err('Keputusan per indikator wajib diisi');
@@ -124,7 +124,7 @@ async function verifProgram(pool, body) {
   const detailLog = adaTolak
     ? alasanGabungan + (catatanProgram ? ` | Catatan PP: ${catatanProgram}` : '')
     : (isReVerifAdmin && catatanProgram ? `Semua indikator disanggah — catatan: ${catatanProgram}` : logLabel);
-  await logAktivitas(pool, email, 'Pengelola Program', aksiLog, idUsulan, detailLog);
+  await logAktivitas(pool, email, 'Pengelola Program', aksiLog, idUsulan, detailLog, event);
 
   
   const allVP = await pool.query('SELECT status FROM verifikasi_program WHERE id_usulan=$1', [idUsulan]);
@@ -313,12 +313,12 @@ async function verifProgram(pool, body) {
   if (nomorBermasalah.length) {
     const alasanLog = nomorBermasalah.map(n => `#${n}: ${alasanMap[n] || 'Ditolak'}`).join(' | ');
     await logAktivitas(pool, email, 'Pengelola Program', 'Kembalikan', idUsulan,
-      'Indikator bermasalah ' + alasanLog + ' — dikembalikan ke Kepala Puskesmas');
+      'Indikator bermasalah ' + alasanLog + ' — dikembalikan ke Kepala Puskesmas', event);
   }
   return ok({ message: 'Indikator bermasalah dikembalikan ke Kepala Puskesmas untuk re-verifikasi.', allDone: true });
 }
 
-async function verifKapus(pool, body) {
+async function verifKapus(pool, body, event) {
   const { idUsulan, email, indikatorList, catatanKapus } = body;
   if (!idUsulan || !email) return err('Data tidak lengkap');
   if (!indikatorList || !indikatorList.length) return err('Keputusan per indikator wajib diisi');
@@ -398,7 +398,7 @@ async function verifKapus(pool, body) {
         [email, catatanKapus || 'Dikonfirmasi Kepala Puskesmas — dikembalikan ke Operator', idUsulan]
       );
       await logAktivitas(pool, email, 'Kepala Puskesmas', 'Konfirmasi Tolak Admin', idUsulan,
-        `Mengkonfirmasi penolakan Admin yang dibenarkan PP — usulan dikembalikan ke Operator untuk perbaikan${catatanKapus ? ' | Catatan: ' + catatanKapus : ''}`);
+        `Mengkonfirmasi penolakan Admin yang dibenarkan PP — usulan dikembalikan ke Operator untuk perbaikan${catatanKapus ? ' | Catatan: ' + catatanKapus : ''}`, event);
       return ok({ message: 'Dikonfirmasi — usulan dikembalikan ke Operator untuk diperbaiki.' });
     }
 
@@ -486,7 +486,7 @@ const adaSisaPP = parseInt(piPPCheck.rows[0]?.ct) > 0;
         [email, catatanKapus || 'Dikonfirmasi Kepala Puskesmas', idUsulan]
       );
       await logAktivitas(pool, email, 'Kepala Puskesmas', 'Konfirmasi Re-verif', idUsulan,
-        `Mengkonfirmasi hasil re-verifikasi PP — diteruskan ke Admin untuk keputusan final${catatanKapus ? ' | Catatan: ' + catatanKapus : ''}`);
+        `Mengkonfirmasi hasil re-verifikasi PP — diteruskan ke Admin untuk keputusan final${catatanKapus ? ' | Catatan: ' + catatanKapus : ''}`, event);
       return ok({ message: 'Dikonfirmasi — usulan diteruskan ke Admin untuk keputusan final.' });
     }
 
@@ -614,7 +614,7 @@ const adaSisaPP = parseInt(piPPCheck.rows[0]?.ct) > 0;
       logAksiKapus  = 'Approve';
       logDetailKapus = catatanKapus && catatanKapus !== 'Semua indikator disetujui' ? `Semua indikator disetujui | Catatan: ${catatanKapus}` : 'Semua indikator disetujui';
     }
-    await logAktivitas(pool, email, 'Kepala Puskesmas', logAksiKapus, idUsulan, logDetailKapus);
+    await logAktivitas(pool, email, 'Kepala Puskesmas', logAksiKapus, idUsulan, logDetailKapus, event);
     return ok({ message: 'Semua indikator disetujui — diteruskan ke Pengelola Program.' });
   }
 
@@ -774,12 +774,12 @@ const adaSisaPP = parseInt(piPPCheck.rows[0]?.ct) > 0;
     ? `Sebagian indikator dikembalikan ke Operator, sebagian lagi diteruskan ke PP untuk re-verifikasi.`
     : `Indikator bermasalah dikembalikan ke Operator untuk diperbaiki.`;
   await logAktivitas(pool, email, 'Kepala Puskesmas', logAksiTolak, idUsulan,
-    konteksLog + ' | Indikator dikembalikan ke Operator: ' + alasanGabungan + setujuInfo);
+    konteksLog + ' | Indikator dikembalikan ke Operator: ' + alasanGabungan + setujuInfo, event);
   return ok({ message: msgKapus, nomorTolak: nomorTolakKapus });
 }
 
 // ============== VERIFIKASI ADMIN ==============
-async function verifAdmin(pool, body) {
+async function verifAdmin(pool, body, event) {
   const { idUsulan, email, indikatorList } = body;
   if (!idUsulan || !email) return err('Data tidak lengkap');
   if (!indikatorList || !indikatorList.length) return err('Keputusan per indikator wajib diisi');
@@ -836,7 +836,7 @@ async function verifAdmin(pool, body) {
     );
     
     await pool.query(`DELETE FROM penolakan_indikator WHERE id_usulan=$1`, [idUsulan]).catch(() => {});
-    await logAktivitas(pool, email, 'Admin', 'Selesai', idUsulan, 'Semua indikator disetujui — usulan selesai');
+    await logAktivitas(pool, email, 'Admin', 'Selesai', idUsulan, 'Semua indikator disetujui — usulan selesai', event);
     return ok({ message: 'Usulan telah disetujui dan dinyatakan Selesai.' });
   }
 
@@ -940,11 +940,11 @@ async function verifAdmin(pool, body) {
     : '';
 
   await logAktivitas(pool, email, 'Admin', 'Kembalikan ke PP', idUsulan,
-    'Indikator bermasalah dikembalikan ke Pengelola Program | ' + alasanGabungan);
+    'Indikator bermasalah dikembalikan ke Pengelola Program | ' + alasanGabungan, event);
   return ok({ message: 'Indikator bermasalah dikembalikan ke Pengelola Program untuk re-verifikasi.' + warningMsg, isOverLimit });
 }
 
-async function rejectUsulan(pool, body) {
+async function rejectUsulan(pool, body, event) {
   const { idUsulan, email, alasan } = body;
   if (!idUsulan || !email) return err('Data tidak lengkap');
   if (!isValidText(alasan)) return err('Alasan penolakan harus diisi dengan teks yang bermakna');
@@ -967,7 +967,7 @@ async function rejectUsulan(pool, body) {
     [alasan, idUsulan]
   );
 
-  await logAktivitas(pool, email, 'Admin', 'Tolak Global', idUsulan, `Ditolak oleh Admin: ${alasan}`);
+  await logAktivitas(pool, email, 'Admin', 'Tolak Global', idUsulan, `Ditolak oleh Admin: ${alasan}`, event);
   return ok({ message: 'Usulan telah ditolak.' });
 }
 
@@ -986,7 +986,7 @@ async function getPenolakanIndikator(pool, params) {
   return ok(result.rows);
 }
 
-async function respondPenolakan(pool, body) {
+async function respondPenolakan(pool, body, event) {
   const { idUsulan, email, responList } = body;
   if (!idUsulan || !email) return err('Data tidak lengkap');
   if (!responList || !responList.length) return err('Respons per indikator wajib diisi');
@@ -1070,7 +1070,7 @@ async function respondPenolakan(pool, body) {
   );
   if (parseInt(pending.rows[0]?.ct) > 0) {
     await logAktivitas(pool, email, 'Pengelola Program', 'Respond Penolakan', idUsulan,
-      logDetail.join(' | ') + ' [sebagian]');
+      logDetail.join(' | ') + ' [sebagian]', event);
     return ok({ message: 'Respons disimpan. Menunggu respons pengelola program lain.', allDone: false });
   }
 
@@ -1146,7 +1146,7 @@ async function respondPenolakan(pool, body) {
        ditolak_oleh='Admin', konteks_penolakan='Admin' WHERE id_usulan=$1`, [idUsulan]
     );
     await logAktivitas(pool, email, 'Pengelola Program', 'Sanggah → Admin', idUsulan,
-      'Semua PP menyanggah penolakan Admin — diteruskan ke Admin untuk re-verifikasi | ' + logDetail.join(' | '));
+      'Semua PP menyanggah penolakan Admin — diteruskan ke Admin untuk re-verifikasi | ' + logDetail.join(' | '), event);
     return ok({ message: 'Semua pengelola program menyanggah — diteruskan ke Admin untuk re-verifikasi.', allDone: true });
   }
 
@@ -1232,7 +1232,7 @@ for (const no of nomorAkuiArr) {
       + ` | Indikator diakui (→ Operator): ${nomorAkuiArr.map(n => '#'+n).join(', ')}`
       + ` | Indikator disanggah (→ Admin): ${nomorSanggahArr.map(n => '#'+n).join(', ')}`
       + ` | ` + logDetail.join(' | ');
-    await logAktivitas(pool, email, 'Pengelola Program', 'Sanggah → Kapus', idUsulan, logMixed);
+    await logAktivitas(pool, email, 'Pengelola Program', 'Sanggah → Kapus', idUsulan, logMixed, event);
     return ok({
       message: 'Sebagian indikator disanggah (akan ke Admin) dan sebagian diakui (ke Kepala Puskesmas untuk konfirmasi).',
       allDone: true
@@ -1322,7 +1322,7 @@ for (const no of nomorAkuiArr) {
        ditolak_oleh='Admin', konteks_penolakan='AdminTerimaKapus' WHERE id_usulan=$1`, [idUsulan]
     );
     await logAktivitas(pool, email, 'Pengelola Program', 'Terima Penolakan Admin → Kapus', idUsulan,
-      'PP menerima penolakan Admin — diteruskan ke Kepala Puskesmas untuk konfirmasi | ' + logDetail.join(' | '));
+      'PP menerima penolakan Admin — diteruskan ke Kepala Puskesmas untuk konfirmasi | ' + logDetail.join(' | '), event);
     return ok({ message: 'Penolakan Admin dibenarkan. Diteruskan ke Kepala Puskesmas untuk konfirmasi.', allDone: true });
   }
 }

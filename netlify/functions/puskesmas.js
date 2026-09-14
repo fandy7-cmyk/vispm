@@ -1,5 +1,6 @@
 const { getPool, ok, err, conflict, cors } = require('./db');
 const { validateSession } = require('./middleware');
+const { logAudit, getSessionUser } = require('./_audit.js');
 
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors();
@@ -39,6 +40,8 @@ exports.handler = async (event) => {
          VALUES ($1, $2, $3, $4, $5)`,
         [kode, nama, parseFloat(indeks)||0, parseFloat(indeksKesulitan)||0, aktif!==false]
       );
+      const actorAdd = await getSessionUser(pool, event);
+      await logAudit(pool, event, { module: 'puskesmas', action: 'CREATE', userEmail: actorAdd?.email, userNama: actorAdd?.nama, userRole: actorAdd?.role, detail: `Menambahkan puskesmas "${nama}" (${kode})` });
       return ok({ message: 'Puskesmas berhasil ditambahkan' });
     }
 
@@ -50,6 +53,8 @@ exports.handler = async (event) => {
          indeks_kesulitan_wilayah=$3, aktif=$4 WHERE kode_pkm=$5`,
         [nama, parseFloat(indeks)||0, parseFloat(indeksKesulitan)||0, aktif!==false, kode]
       );
+      const actorUpd = await getSessionUser(pool, event);
+      await logAudit(pool, event, { module: 'puskesmas', action: 'UPDATE', userEmail: actorUpd?.email, userNama: actorUpd?.nama, userRole: actorUpd?.role, detail: `Mengubah puskesmas "${nama}" (${kode})` });
       return ok({ message: 'Puskesmas berhasil diupdate' });
     }
 
@@ -57,6 +62,8 @@ exports.handler = async (event) => {
       const { kode } = body;
       if (!kode) return err('Kode diperlukan');
       await pool.query('DELETE FROM master_puskesmas WHERE kode_pkm=$1', [kode]);
+      const actorDel = await getSessionUser(pool, event);
+      await logAudit(pool, event, { module: 'puskesmas', action: 'DELETE', userEmail: actorDel?.email, userNama: actorDel?.nama, userRole: actorDel?.role, detail: `Menghapus puskesmas (${kode})` });
       return ok({ message: 'Puskesmas berhasil dihapus' });
     }
 

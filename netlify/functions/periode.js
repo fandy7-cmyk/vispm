@@ -1,5 +1,6 @@
 const { getPool, ok, err, cors } = require('./db');
 const { validateSession } = require('./middleware');
+const { logAudit, getSessionUser } = require('./_audit.js');
 
 let _migrated = false;
 
@@ -132,6 +133,8 @@ exports.handler = async (event) => {
           [tahun, bulan, namaBulan, tanggalMulai, tanggalSelesai, jm, js, tmv, tsv, jmv, jsv, status || 'Aktif']
         );
       }
+      const actorSave = await getSessionUser(pool, event);
+      await logAudit(pool, event, { module: 'periode', action: exists.rows.length > 0 ? 'UPDATE' : 'CREATE', userEmail: actorSave?.email, userNama: actorSave?.nama, userRole: actorSave?.role, detail: `Menyimpan periode ${namaBulan || bulan}/${tahun}` });
       return ok({ message: 'Periode berhasil disimpan' });
     }
 
@@ -149,6 +152,8 @@ exports.handler = async (event) => {
         return err('Tidak dapat menghapus periode yang sedang aktif hari ini');
       }
       await pool.query('DELETE FROM periode_input WHERE tahun=$1 AND bulan=$2', [parseInt(tahun), parseInt(bulan)]);
+      const actorDel = await getSessionUser(pool, event);
+      await logAudit(pool, event, { module: 'periode', action: 'DELETE', userEmail: actorDel?.email, userNama: actorDel?.nama, userRole: actorDel?.role, detail: `Menghapus periode ${bulan}/${tahun}` });
       return ok({ message: 'Periode berhasil dihapus' });
     }
 

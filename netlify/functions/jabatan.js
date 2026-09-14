@@ -1,5 +1,6 @@
 const { getPool, ok, err, conflict, cors } = require('./db');
 const { validateSession } = require('./middleware');
+const { logAudit, getSessionUser } = require('./_audit.js');
 
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return cors();
@@ -29,6 +30,8 @@ exports.handler = async (event) => {
           await pool.query('UPDATE users SET jabatan=$1 WHERE email=$2', [tokens.join('|'), u.email]);
         }
       }
+      const actorDel = await getSessionUser(pool, event);
+      await logAudit(pool, event, { module: 'jabatan', action: 'DELETE', userEmail: actorDel?.email, userNama: actorDel?.nama, userRole: actorDel?.role, detail: `Menghapus jabatan "${namaHapus}"` });
       return ok({ message: 'Jabatan berhasil dihapus' });
     }
 
@@ -54,6 +57,8 @@ exports.handler = async (event) => {
             await pool.query('UPDATE users SET jabatan=$1 WHERE email=$2', [updated, u.email]);
           }
         }
+        const actorUpd = await getSessionUser(pool, event);
+        await logAudit(pool, event, { module: 'jabatan', action: 'UPDATE', userEmail: actorUpd?.email, userNama: actorUpd?.nama, userRole: actorUpd?.role, detail: `Mengubah jabatan "${namaLama}" → "${nama.trim()}"` });
         return ok({ id, message: 'Jabatan berhasil diperbarui' });
       } else {
         
@@ -68,6 +73,8 @@ exports.handler = async (event) => {
           'INSERT INTO master_jabatan (nama_jabatan, aktif) VALUES ($1, true) RETURNING id',
           [nama.trim()]
         );
+        const actorAdd = await getSessionUser(pool, event);
+        await logAudit(pool, event, { module: 'jabatan', action: 'CREATE', userEmail: actorAdd?.email, userNama: actorAdd?.nama, userRole: actorAdd?.role, detail: `Menambahkan jabatan "${nama.trim()}"` });
         return ok({ id: r.rows[0].id, message: 'Jabatan berhasil ditambahkan' });
       }
     }
@@ -86,6 +93,8 @@ exports.handler = async (event) => {
           await pool.query('UPDATE users SET jabatan=$1 WHERE email=$2', [updated, u.email]);
         }
       }
+      const actorPut = await getSessionUser(pool, event);
+      await logAudit(pool, event, { module: 'jabatan', action: 'UPDATE', userEmail: actorPut?.email, userNama: actorPut?.nama, userRole: actorPut?.role, detail: `Mengubah jabatan "${namaLama2}" → "${nama.trim()}"` });
       return ok({ message: 'Jabatan diupdate' });
     }
 

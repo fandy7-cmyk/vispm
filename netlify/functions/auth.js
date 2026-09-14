@@ -1,4 +1,5 @@
 const { getPool, ok, err, cors } = require('./db');
+const { logAudit } = require('./_audit.js');
 const crypto = require('crypto');
 
 let bcrypt;
@@ -154,6 +155,12 @@ await pool.query(
        VALUES ($1, $2, NULL, $3)`,
       [user.email, sessionToken, deviceInfo]
     );
+
+    await logAudit(pool, event, {
+      module: 'auth', action: 'LOGIN',
+      userEmail: user.email, userNama: user.nama, userRole: user.role,
+      detail: 'Login berhasil',
+    });
 
     return ok({
       email: user.email,

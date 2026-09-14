@@ -13,8 +13,8 @@
 <meta name="apple-mobile-web-app-title" content="VISPM">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-<link rel="stylesheet" href="/css/app.css?v=1.1.9">
-<link rel="stylesheet" href="/css/responsive.css?v=1.1.9">
+<link rel="stylesheet" href="/css/app.css?v=1.2.0">
+<link rel="stylesheet" href="/css/responsive.css?v=1.2.0">
 <script>
 
 (function() {
@@ -112,87 +112,8 @@
   </div>
 </div>
 
-<script src="/js/api.js?v=1.1.9"></script>
+<script src="/js/api.js?v=1.2.0"></script>
 <script>
-function _labelWilayah(raw, label, fullWord) {
-  if (!raw) return null;
-  const lower = raw.toLowerCase();
-  if (lower.startsWith(fullWord.toLowerCase()) || lower.startsWith(label.toLowerCase().replace('.', ''))) {
-    return raw;
-  }
-  return `${label} ${raw}`;
-}
-
-// Susun 3 level administratif: Kec → Kab/Kota → Provinsi.
-// Level Desa/Kelurahan sengaja tidak dipakai — di daerah yang datanya minim
-// di OSM (mis. luar Jawa), Nominatim sering nempelin nama dusun/kampung
-// terdekat yang belum tentu akurat, jadi berpotensi menyesatkan.
-function _formatAlamatNominatim(addr) {
-  if (!addr) return null;
-  const parts = [];
-
-  const kecamatan = addr.city_district || addr.subdistrict || addr.district || addr.borough || addr.town || addr.municipality;
-  if (kecamatan) {
-    parts.push(_labelWilayah(kecamatan, 'Kecamatan', 'kecamatan'));
-  }
-
-  const kabKota = addr.county || addr.regency || addr.city || addr.state_district;
-  if (kabKota && kabKota !== kecamatan) {
-    parts.push(/kota/i.test(kabKota) ? kabKota : _labelWilayah(kabKota, 'Kabupaten', 'kabupaten'));
-  }
-
-  if (addr.state) {
-    parts.push(_labelWilayah(addr.state, 'Provinsi', 'provinsi'));
-  }
-
-  return parts.length ? parts.join(', ') : null;
-}
-
-async function _getLokasiTomTom(latitude, longitude) {
-  try {
-    const r = await fetch('/api/reverse-geocode', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ lat: latitude, lon: longitude }),
-      signal: AbortSignal.timeout(4000),
-    });
-    if (!r.ok) return null;
-    const d = await r.json();
-    return d?.data?.lokasi || d?.lokasi || null;
-  } catch {
-    return null;
-  }
-}
-
-async function _getLokasiNominatim(latitude, longitude) {
-  try {
-    const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&addressdetails=1&accept-language=id`, {
-      signal: AbortSignal.timeout(3500),
-      headers: { 'Accept': 'application/json' },
-    });
-    if (!r.ok) return null;
-    const d = await r.json();
-    return _formatAlamatNominatim(d.address) || d.display_name || null;
-  } catch {
-    return null;
-  }
-}
-
-async function _getBrowserLokasi() {
-  try {
-    if (!navigator.geolocation) return null;
-    const pos = await new Promise((resolve, reject) => {
-      navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 3000, maximumAge: 600000 });
-    });
-    const { latitude, longitude } = pos.coords;
-    const tomtom = await _getLokasiTomTom(latitude, longitude);
-    if (tomtom) return tomtom;
-    return await _getLokasiNominatim(latitude, longitude);
-  } catch {
-    return null;
-  }
-}
-
 async function doLogin() {
   const email = document.getElementById('authEmail').value.trim();
   if (!email) return setAuthStatus('Masukkan email Anda', 'error');
@@ -207,15 +128,10 @@ async function doLogin() {
   try {
     const user = await API.login(email, password);
     sessionStorage.setItem('spm_user', JSON.stringify(user));
-    
-    
-    
-    _getBrowserLokasi().then(lokasi => {
-      API.logAudit({ module: 'auth', action: 'LOGIN', userEmail: user.email, userNama: user.nama, userRole: user.role, detail: 'Login berhasil', lokasi });
-    });
-    
-    
-    
+
+    // Audit log LOGIN sekarang dicatat di backend (netlify/functions/auth.js),
+    // bukan dari sini — biar gak bisa diinspect/diblok/dipalsukan oleh user
+    // lewat DevTools.
     window.location.href = '/';
   } catch (e) {
     setAuthStatus(e.message, 'error');

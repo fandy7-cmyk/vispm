@@ -9,6 +9,9 @@ const API = {
       const _token = _user.sessionToken || '';
       const _authHeader = _token ? { 'Authorization': 'Bearer ' + _token } : {};
 
+      // Mutasi (POST/PUT/DELETE) → buang cache list biar data gak basi
+      if (options.method && options.method !== 'GET') this._gc.clear();
+
       const res = await fetch(`${this.BASE}/${endpoint}`, {
         ...options,
         headers: {
@@ -53,6 +56,21 @@ const API = {
     } catch (e) {
       throw e;
     }
+  },
+
+  // Cache singkat (8 dtk) buat GET list yang sering kepanggil berbarengan
+  // (dashboard + dropdown tahun + poller notif). Params sama = 1 request.
+  _gc: new Map(),
+  _cachedGet(endpoint, params = {}, ttl = 8000) {
+    const key = endpoint + '?' + JSON.stringify(params);
+    let hit = this._gc.get(key);
+    if (!hit || Date.now() - hit.t >= ttl) {
+      const p = this.get(endpoint, params);
+      hit = { t: Date.now(), p };
+      this._gc.set(key, hit);
+      p.catch(() => { if (this._gc.get(key) === hit) this._gc.delete(key); });
+    }
+    return hit.p.then(r => Array.isArray(r) ? r.slice() : r);
   },
 
   async get(endpoint, params = {}) {
@@ -115,7 +133,7 @@ const API = {
     savePeriode:   (data)  => API.post('periode', data),
 
   
-  getUsulan:           (params) => API.get('usulan', params),
+  getUsulan:           (params) => API._cachedGet('usulan', params),
   getNotifCount:       (params) => API.get('usulan', { action: 'notif-count', ...params }),
   getDetailUsulan:     (id)     => API.get('usulan', { action: 'detail', id }),
   getIndikatorUsulan:  (id)     => API.get('usulan', { action: 'indikator', id }),
@@ -136,6 +154,7 @@ const API = {
 
   
   getLaporan: (params) => API.get('laporan', params),
+  getLaporanKabupaten: (params) => API.get('laporan-kabupaten', params),
 
   
   getBuktiRekap: (params) => API.get('bukti-rekap', params),
@@ -231,26 +250,56 @@ function renderStatusBar(u) {
     { label: 'Admin', icon: 'admin_panel_settings', done: u.statusGlobal === 'Selesai', active: u.statusGlobal === 'Menunggu Admin', rejected: false },
   ];
   const isDitolak = ['Ditolak', 'Ditolak Sebagian'].includes(u.statusGlobal);
-  return `<div class="vp-stepper" style="display:flex;align-items:flex-start;gap:0;padding:4px 0;width:100%">${steps.map((s, i) => {
-    let color = '#cbd5e1', textColor = '#94a3b8', bg = 'white';
-    let icon = s.icon;
+  const n = steps.length;
+  const stepW = 100 / n; // lebar tiap kolom step dalam %
+  const circleCenterY = 18; // px dari atas .vp-stepper (padding 4px + radius lingkaran 14px)
+
+  const colored = steps.map(s => {
+    let color = '#cbd5e1', textColor = '#94a3b8', bg = 'white', icon = s.icon;
     if (s.done) { color='#0d9488'; textColor='#0d9488'; bg='#e6fffa'; icon='check_circle'; }
     else if (s.partial) { color='#06b6d4'; textColor='#0891b2'; bg='#ecfeff'; icon='hourglass_top'; }
     else if (isDitolak && s.rejected) { color='#ef4444'; textColor='#ef4444'; bg='#fef2f2'; icon='cancel'; }
     else if (s.active) { color='#f59e0b'; textColor='#d97706'; bg='#fffbeb'; icon='hourglass_top'; }
-    // Kolom step & connector pakai min-width:0 supaya flex:1 benar2 membagi rata,
-    // tidak melebar mengikuti panjang teks label (mis. "Kepala Puskesmas").
-    return '<div class="vp-step" style="display:flex;align-items:flex-start;flex:1;min-width:0">' +
-      '<div class="vp-step-col" style="display:flex;flex-direction:column;align-items:center;gap:1px;flex:1;min-width:0">' +
-        '<div class="vp-step-circle" style="width:28px;height:28px;border-radius:50%;background:' + bg + ';border:2px solid ' + color + ';display:flex;align-items:center;justify-content:center;flex-shrink:0">' +
-          '<span class="material-icons" style="font-size:15px;color:' + color + '">' + icon + '</span>' +
-        '</div>' +
-        '<span class="vp-step-label" style="font-size:10px;font-weight:700;color:' + textColor + ';white-space:normal;word-break:break-word;text-align:center;line-height:1.2;max-width:100%">' + s.label + '</span>' +
-        (s.vpText && !s.done ? '<span style="font-size:9px;color:#0891b2">' + s.vpText + '</span>' : '') +
+    return { ...s, color, textColor, bg, icon };
+  });
+
+  // Garis dibuat MENYAMBUNG dari titik tengah lingkaran ke titik tengah lingkaran berikutnya,
+  // lalu ditaruh di belakang (z-index rendah) sedangkan lingkaran di depan (z-index tinggi) -
+  // jadi bagian garis yang lewat "di bawah" lingkaran otomatis tertutup dan terlihat nyambung
+  // tanpa jeda.
+  // Garis (dan anak panah di ujungnya) HANYA menyala kalau step sebelumnya sudah benar2 "done" -
+  // kalau step sebelumnya masih partial/active (mis. Pengelola Program 10/11) garis ke step
+  // selanjutnya (Admin) tetap abu-abu, karena progress belum benar2 sampai ke sana.
+  // Anak panah dibuat dari CSS triangle (bukan icon dalam bulatan terpisah) supaya betul2
+  // menyatu jadi bagian dari garis - sama seperti gaya panah di modal "Riwayat Aktivitas".
+  const circleR = 14; // radius lingkaran (28px/2)
+  const gap = -1;       // ujung panah masuk 1px ke bawah lingkaran (lingkaran z-index lebih tinggi) supaya tdk ada celah saat zoom/subpixel
+  const arrowW = 8, arrowH = 10; // ukuran segitiga panah (sama seperti di modal Riwayat Aktivitas)
+  const lines = colored.slice(0, -1).map((s, i) => {
+    const leftCenter = stepW * i + stepW / 2;
+    const rightCenter = stepW * (i + 1) + stepW / 2;
+    const isLit = s.done; // hanya nyala kalau step sebelumnya sudah selesai
+    const lineColor = isLit ? '#0d9488' : '#e2e8f0';
+    // ujung segitiga (tip) diposisikan tepat sebelum lingkaran berikutnya; sisi datar segitiga
+    // menempel pada garis sehingga terlihat sebagai satu kesatuan yang meruncing.
+    const triLeft = 'calc(' + rightCenter + '% - ' + (circleR + gap + arrowW) + 'px)';
+    return (
+      '<div style="position:absolute;top:' + (circleCenterY - 1) + 'px;left:' + leftCenter + '%;width:' + stepW + '%;height:2px;background:' + lineColor + ';z-index:0"></div>' +
+      '<svg width="' + arrowW + '" height="' + arrowH + '" viewBox="0 0 ' + arrowW + ' ' + arrowH + '" style="position:absolute;top:' + (circleCenterY - arrowH/2) + 'px;left:' + triLeft + ';z-index:0" fill="' + lineColor + '"><polygon points="0,0 ' + arrowW + ',' + (arrowH/2) + ' 0,' + arrowH + '"/></svg>'
+    );
+  }).join('');
+
+  const stepsHtml = colored.map(s =>
+    '<div class="vp-step-col" style="position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;gap:1px;flex:1;min-width:0">' +
+      '<div class="vp-step-circle" style="width:28px;height:28px;border-radius:50%;background:' + s.bg + ';border:2px solid ' + s.color + ';display:flex;align-items:center;justify-content:center;flex-shrink:0">' +
+        '<span class="material-icons" style="font-size:15px;color:' + s.color + '">' + s.icon + '</span>' +
       '</div>' +
-      (i < steps.length-1 ? '<div class="vp-step-connector" style="flex:0.6;height:2px;background:' + (s.done ? '#0d9488' : s.partial ? '#06b6d4' : '#e2e8f0') + ';margin-top:13px;min-width:6px"></div>' : '') +
-    '</div>';
-  }).join('')}</div>`;
+      '<span class="vp-step-label" style="font-size:10px;font-weight:700;color:' + s.textColor + ';white-space:normal;word-break:break-word;text-align:center;line-height:1.2;max-width:100%">' + s.label + '</span>' +
+      (s.vpText && !s.done ? '<span style="font-size:9px;color:#0891b2">' + s.vpText + '</span>' : '') +
+    '</div>'
+  ).join('');
+
+  return '<div class="vp-stepper" style="position:relative;display:flex;align-items:flex-start;gap:0;padding:4px 0;width:100%">' + lines + stepsHtml + '</div>';
 }
 
 function formatDate(d) {

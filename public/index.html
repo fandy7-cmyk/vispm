@@ -13,8 +13,8 @@
 <meta name="apple-mobile-web-app-title" content="VISPM">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-<link rel="stylesheet" href="/css/app.css?v=1.2.1">
-<link rel="stylesheet" href="/css/responsive.css?v=1.2.1">
+<link rel="stylesheet" href="/css/app.css?v=1.2.4">
+<link rel="stylesheet" href="/css/responsive.css?v=1.2.4">
 </head>
 <body>
 
@@ -72,7 +72,7 @@
       <div class="topbar-constellation" id="topbarConstellation" aria-hidden="true">
         <canvas id="topbarConstellationCanvas"></canvas>
       </div>
-      <script src="js/topbar_constellation.js?v=1.2.1"></script>
+      <script src="js/topbar_constellation.js?v=1.2.4"></script>
 
       <div class="topbar-right">
         
@@ -145,6 +145,23 @@
       <button class="btn btn-cancel" onclick="document.getElementById('resetPasswordModal').style.display='none'"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:5px;vertical-align:middle;flex-shrink:0"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>Batal</button>
       <button class="btn btn-primary" onclick="doResetPassword()">
         <span class="material-icons">lock_reset</span> Reset Password
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="quickBuatUsulanModal" style="z-index:3000">
+  <div class="modal-card" style="max-width:420px;width:100%">
+    <div class="modal-header">
+      <span class="material-icons" style="color:#0d9488">add_circle</span>
+      <h3>Buat Usulan Baru</h3>
+      <button class="btn-icon" onclick="closeQuickBuatUsulan()"><span class="material-icons">close</span></button>
+    </div>
+    <div class="modal-body" id="quickBuatUsulanBody"></div>
+    <div class="modal-footer">
+      <button class="btn btn-cancel" onclick="closeQuickBuatUsulan()"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:5px;vertical-align:middle;flex-shrink:0"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>Batal</button>
+      <button class="btn btn-primary" id="quickBuatUsulanConfirmBtn" onclick="confirmQuickBuatUsulan()">
+        <span class="material-icons">add</span> Buat Usulan
       </button>
     </div>
   </div>
@@ -349,19 +366,20 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script src="/js/api.js?v=1.2.1"></script>
-<script src="/js/app-core.js?v=1.2.1"></script>
-<script src="/js/app-pagination.js?v=1.2.1"></script>
-<script src="/js/app-theme.js?v=1.2.1"></script>
-<script src="/js/app-notif.js?v=1.2.1"></script>
-<script src="/js/app-dashboard.js?v=1.2.1"></script>
-<script src="/js/app-input.js?v=1.2.1"></script>
-<script src="/js/app-verifikasi.js?v=1.2.1"></script>
-<script src="/js/app-profil.js?v=1.2.1"></script>
-<script src="/js/app-master.js?v=1.2.1"></script>
-<script src="/js/app-laporan-ranking.js?v=1.2.1"></script>
-<script src="/js/app-pengumuman.js?v=1.2.1"></script>
-<script src="/js/date-picker.js?v=1.2.1"></script> 
+<script src="/js/api.js?v=1.2.4"></script>
+<script src="/js/app-core.js?v=1.2.4"></script>
+<script src="/js/app-pagination.js?v=1.2.4"></script>
+<script src="/js/app-theme.js?v=1.2.4"></script>
+<script src="/js/app-notif.js?v=1.2.4"></script>
+<script src="/js/app-dashboard.js?v=1.2.4"></script>
+<script src="/js/app-input.js?v=1.2.4"></script>
+<script src="/js/app-verifikasi.js?v=1.2.4"></script>
+<script src="/js/app-profil.js?v=1.2.4"></script>
+<script src="/js/app-master.js?v=1.2.4"></script>
+<script src="/js/app-laporan-ranking.js?v=1.2.4"></script>
+<script src="/js/app-laporan-kabupaten.js?v=1.2.4"></script>
+<script src="/js/app-pengumuman.js?v=1.2.4"></script>
+<script src="/js/date-picker.js?v=1.2.4"></script> 
 <script>
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -398,9 +416,9 @@ function showForgotPasswordInfo() {
   box._hideTimer = setTimeout(() => { box.style.display = 'none'; }, 4000);
 }
 </script>
- <script src="/js/responsive-patch.js?v=1.2.1"></script>
- <script src="/js/custom-select.js?v=1.2.1"></script>
- <script src="/js/custom-tooltip.js?v=1.2.1"></script>
+ <script src="/js/responsive-patch.js?v=1.2.4"></script>
+ <script src="/js/custom-select.js?v=1.2.4"></script>
+ <script src="/js/custom-tooltip.js?v=1.2.4"></script>
 
 </body>
 </html>

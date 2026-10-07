@@ -384,7 +384,6 @@
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   flex-wrap: nowrap !important;
-  padding-bottom: 4px;
   scrollbar-width: none; 
 }
 .tabs::-webkit-scrollbar {
@@ -644,13 +643,6 @@ table .badge {
 }
 
 @media (max-width: 480px) {
-  .vp-step-circle {
-    width: 24px !important;
-    height: 24px !important;
-  }
-  .vp-step-circle .material-icons {
-    font-size: 13px !important;
-  }
   .vp-step-label {
     font-size: 9px !important;
   }
@@ -660,13 +652,6 @@ table .badge {
 }
 
 @media (max-width: 360px) {
-  .vp-step-circle {
-    width: 22px !important;
-    height: 22px !important;
-  }
-  .vp-step-circle .material-icons {
-    font-size: 12px !important;
-  }
   .vp-step-label {
     font-size: 8.5px !important;
   }

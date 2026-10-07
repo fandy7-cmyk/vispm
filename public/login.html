@@ -13,8 +13,8 @@
 <meta name="apple-mobile-web-app-title" content="VISPM">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-<link rel="stylesheet" href="/css/app.css?v=1.2.1">
-<link rel="stylesheet" href="/css/responsive.css?v=1.2.1">
+<link rel="stylesheet" href="/css/app.css?v=1.2.4">
+<link rel="stylesheet" href="/css/responsive.css?v=1.2.4">
 <script>
 
 (function() {
@@ -69,7 +69,7 @@
       </div>
       
       <div class="auth-left-footer">
-        <p><strong>Dinas Kesehatan, Pengendalian Penduduk dan Keluarga Berencana</strong><br>Kabupaten Banggai Laut &copy; 2026</p>
+        <p><strong>Dinas Kesehatan, Pengendalian Penduduk dan Keluarga Berencana</strong><br>Kabupaten Banggai Laut &copy; <span id="authYear">2026</span></p>
       </div>
     </div>
     
@@ -112,7 +112,7 @@
   </div>
 </div>
 
-<script src="/js/api.js?v=1.2.1"></script>
+<script src="/js/api.js?v=1.2.4"></script>
 <script>
 async function doLogin() {
   const email = document.getElementById('authEmail').value.trim();
@@ -163,6 +163,8 @@ function showForgotPasswordInfo() {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
+  var yr = document.getElementById('authYear');
+  if (yr) yr.textContent = new Date().getFullYear();
   document.getElementById('authEmail').addEventListener('keydown', function(e) {
     if (e.key === 'Enter') doLogin();
   });

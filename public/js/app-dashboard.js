@@ -92,23 +92,6 @@ async function renderDashboard() {
   }
 }
 
-async function _renderDashTahunDropdown(selectedTahun) {
-  const list = await _loadDashTahunList();
-  
-  const allTahun = [...new Set([...list, CURRENT_YEAR])].sort((a,b) => b - a);
-  if (allTahun.length === 1) {
-    
-    return `<select id="dashTahunFilter" class="form-control" onchange="renderDashboard()"
-    style="border:1px solid var(--border,#e2e8f0);border-radius:7px;padding:5px 10px;font-size:12px;outline:none;font-family:inherit;background:var(--surface,white);color:var(--text);cursor:pointer">
-    <option value="${allTahun[0]}" selected>${allTahun[0]}</option>
-  </select>`;
-  }
-  return `<select id="dashTahunFilter" class="form-control" onchange="renderDashboard()"
-    style="border:1px solid var(--border,#e2e8f0);border-radius:7px;padding:5px 10px;font-size:12px;outline:none;font-family:inherit;background:var(--surface,white);color:var(--text);cursor:pointer">
-    <option value="">Semua Tahun</option>
-    ${allTahun.map(t => `<option value="${t}" ${t == selectedTahun ? 'selected' : ''}>${t}</option>`).join('')}
-  </select>`;
-}
 
 function renderAdminDashboard(el, d, tahunDipilih) {
   const chartMode = d.chartMode || (tahunDipilih ? 'bulan' : 'tahun');
@@ -119,7 +102,7 @@ function renderAdminDashboard(el, d, tahunDipilih) {
     <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:14px">
       <h1 style="margin:0"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;color:var(--primary)"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</h1>
       <div style="display:flex;align-items:center;gap:8px">
-        <span style="font-size:12px;color:var(--text-light);font-weight:600">Filter</span>
+        <span style="font-size:12px;color:var(--text-light);font-weight:400">Tahun</span>
         <div id="dashTahunWrap"><select id="dashTahunFilter" class="form-control" onchange="renderDashboard()"
           style="border:1px solid var(--border,#e2e8f0);border-radius:7px;padding:5px 10px;font-size:12px;outline:none;font-family:inherit;background:var(--surface,white);color:var(--text);cursor:pointer">
           <option value="">Memuat...</option>
@@ -370,7 +353,7 @@ function renderAdminAllUsulanTable(rows) {
     return;
   }
   const { items, page: p, totalPages, total } = paginateDash(rows, _adminAllPage);
-  el.innerHTML = renderUsulanTable(items, 'admin')
+  el.innerHTML = renderUsulanTable(items, 'admin', { showNo: true, startNo: (p - 1) * DASH_ITEMS_PER_PAGE + 1 })
     + renderPagination('adminAllUsulanTable', total, p, totalPages, `pg => { _adminAllPage=pg; filterAdminAllUsulan(false); }`, DASH_ITEMS_PER_PAGE);
 }
 
@@ -468,7 +451,7 @@ function _renderPKMProgressPaged(pg) {
       const pct = pkm.total > 0 ? Math.round((pkm.selesai / pkm.total) * 100) : 0;
       const barColor = pct >= 80 ? '#10b981' : pct >= 50 ? '#f59e0b' : '#ef4444';
       return `<tr>
-        <td style="font-weight:600;font-size:13px;word-break:break-word;max-width:140px">${pkm.nama}</td>
+        <td style="font-weight:600;font-size:13px;word-break:break-word;max-width:140px;text-align:left">${pkm.nama}</td>
         <td style="text-align:center;padding:10px 8px">${pkm.total}</td>
         <td style="text-align:center;padding:10px 8px"><span style="color:#10b981;font-weight:700">${pkm.selesai}</span></td>
         <td style="text-align:center;padding:10px 8px"><span style="color:#f59e0b;font-weight:700">${pkm.menunggu}</span></td>
@@ -553,12 +536,17 @@ renderOperatorDashboard(el, d, tahunDipilih) {
   const periodeListRaw = d.periodeAktifList || (d.periodeAktif ? [d.periodeAktif] : []);
   const periodeList = periodeListRaw.filter(p => p.isAktifToday);
   const periodeLabel = periodeList.length > 0 ? periodeList.length : '-';
+  window._dashPeriodeAktifList = periodeList; // dipakai modal "Buat Usulan Baru" cepat
+  const chartMode = d.chartMode || (tahunDipilih ? 'bulan' : 'tahun');
+  const chartTitle = tahunDipilih
+    ? `Statistik per Bulan (${tahunDipilih})`
+    : `Statistik per Tahun`;
 
   el.innerHTML = `
     <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:14px">
       <h1 style="margin:0"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;color:var(--primary)"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</h1>
       <div style="display:flex;align-items:center;gap:8px">
-        <span style="font-size:12px;color:var(--text-light);font-weight:600">Filter</span>
+        <span style="font-size:12px;color:var(--text-light);font-weight:400">Tahun</span>
         <select id="dashTahunFilter" class="form-control" onchange="renderDashboard()"
           style="border:1px solid var(--border,#e2e8f0);border-radius:7px;padding:5px 10px;font-size:12px;outline:none;font-family:inherit;background:var(--surface,white);color:var(--text);cursor:pointer">
           <option value="">Memuat...</option>
@@ -572,7 +560,17 @@ renderOperatorDashboard(el, d, tahunDipilih) {
       ${statCard('cyan','event_available','Periode Aktif', periodeLabel)}
       <div id="dashStatBerakhirOp" style="display:contents">${statCard('red','error','Periode Berakhir', '…', 'Memuat...')}</div>
     </div>
-    ${renderPeriodeBanner(periodeListRaw)}
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;align-items:stretch;margin-bottom:14px">
+      ${_dashPeriodeColHtml(renderPeriodeBanner(periodeListRaw))}
+      <div class="card" style="margin:0;display:flex;flex-direction:column">
+        <div class="card-header-bar">
+          <span class="card-title"><span class="material-icons">timeline</span>${chartTitle}</span>
+        </div>
+        <div class="card-body" style="padding:12px 16px;flex:1;display:flex;flex-direction:column;justify-content:center">
+          ${renderChart(d.chartData, chartMode)}
+        </div>
+      </div>
+    </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;align-items:stretch;margin-bottom:14px">
       <div class="card" style="margin:0;display:flex;flex-direction:column">
         <div class="card-header-bar">
@@ -580,7 +578,7 @@ renderOperatorDashboard(el, d, tahunDipilih) {
         </div>
         <div class="card-body" style="display:flex;flex-direction:column;gap:10px;flex:1;justify-content:center">
           <div style="display:flex;gap:10px;flex-wrap:wrap">
-            <button class="btn btn-primary" onclick="loadPage('input')" ${periodeList.length === 0 ? 'style="opacity:0.5;cursor:not-allowed"' : ''} title="${periodeList.length === 0 ? 'Tidak ada periode input aktif' : ''}"><span class="material-icons">add</span>Buat Usulan Baru</button>
+            <button class="btn btn-primary" id="dashBuatUsulanBtn" onclick="openQuickBuatUsulan()" ${periodeList.length === 0 ? 'style="opacity:0.5;cursor:not-allowed" disabled' : ''} title="${periodeList.length === 0 ? 'Tidak ada periode input aktif' : ''}"><span class="material-icons">add</span>Buat Usulan Baru</button>
             <button class="btn btn-secondary" onclick="loadPage('laporan')"><span class="material-icons">bar_chart</span>Lihat Laporan</button>
           </div>
         </div>
@@ -628,19 +626,33 @@ renderOperatorDashboard(el, d, tahunDipilih) {
     if (elBerakhirOp) elBerakhirOp.innerHTML = statCard('red','error','Periode Berakhir', berakhirCountOp);
     const elProsesOp = document.getElementById("dashStatProsesOp");
     if (elProsesOp) elProsesOp.innerHTML = statCard("orange","pending","Dalam Proses", prosesCountOp);
+
+    // Periode aktif yang belum punya usulan — dipakai modal "Buat Usulan Baru" &
+    // buat nonaktifin tombolnya kalau semua periode aktif udah ada usulannya
+    const availablePeriode = periodeList.filter(p =>
+      !rows.some(u => parseInt(u.tahun) === parseInt(p.tahun) && parseInt(u.bulan) === parseInt(p.bulan))
+    );
+    window._dashPeriodeAktifList = availablePeriode;
+    const btnBuat = document.getElementById('dashBuatUsulanBtn');
+    if (btnBuat && periodeList.length > 0) {
+      if (availablePeriode.length === 0) {
+        btnBuat.disabled = true;
+        btnBuat.style.opacity = '0.5';
+        btnBuat.style.cursor = 'not-allowed';
+        btnBuat.title = 'Usulan untuk periode aktif saat ini sudah dibuat';
+      } else {
+        btnBuat.disabled = false;
+        btnBuat.style.opacity = '';
+        btnBuat.style.cursor = '';
+        btnBuat.title = '';
+      }
+    }
   }).catch(() => {
     const el2 = document.getElementById("recentTable");
     if (el2) el2.innerHTML = `<div class="empty-state" style="padding:32px"><span class="material-icons">inbox</span><p>Belum ada data usulan</p></div>`;
   });
 }
 
-async function downloadLaporanDashboardOperator() {
-  try {
-    const rows = await API.getUsulan({ email_operator: currentUser.email, status: "Selesai" });
-    if (!rows || !rows.length) { toast("Belum ada laporan yang selesai diverifikasi", "warning"); return; }
-    await downloadLaporanPDF(rows[0].idUsulan);
-  } catch(e) { toast(e.message, "error"); }
-}
 function renderPeriodeBanner(periodeListRaw) {
   const svgCal = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>';
   const svgSend = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>';
@@ -957,11 +969,31 @@ function renderPeriodeVerifBanner(periodeList) {
 }
 
 function renderKepalasDashboard(el, d, tahunDipilih) {
+  const chartMode = d.chartMode || (tahunDipilih ? 'bulan' : 'tahun');
+  const chartTitle = tahunDipilih
+    ? `Statistik per Bulan (${tahunDipilih})`
+    : `Statistik per Tahun`;
+  const periodeVerifHtml = renderPeriodeVerifBanner(d.periodeAktifList || []);
+  const chartCardHtml = `
+      <div class="card" style="margin:0;display:flex;flex-direction:column">
+        <div class="card-header-bar">
+          <span class="card-title"><span class="material-icons">timeline</span>${chartTitle}</span>
+        </div>
+        <div class="card-body" style="padding:12px 16px;flex:1;display:flex;flex-direction:column;justify-content:center">
+          ${renderChart(d.chartData, chartMode)}
+        </div>
+      </div>`;
+  const chartRowHtml = periodeVerifHtml
+    ? `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;align-items:stretch;margin-bottom:14px">
+        ${_dashPeriodeColHtml(periodeVerifHtml)}
+        ${chartCardHtml}
+      </div>`
+    : `<div style="margin-bottom:14px">${chartCardHtml}</div>`;
   el.innerHTML = `
     <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:14px">
       <h1 style="margin:0"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;color:var(--primary)"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</h1>
       <div style="display:flex;align-items:center;gap:8px">
-        <span style="font-size:12px;color:var(--text-light);font-weight:600">Filter</span>
+        <span style="font-size:12px;color:var(--text-light);font-weight:400">Tahun</span>
         <select id="dashTahunFilter" class="form-control" onchange="renderDashboard()"
           style="border:1px solid var(--border,#e2e8f0);border-radius:7px;padding:5px 10px;font-size:12px;outline:none;font-family:inherit;background:var(--surface,white);color:var(--text);cursor:pointer">
           <option value="">Memuat...</option>
@@ -974,7 +1006,7 @@ function renderKepalasDashboard(el, d, tahunDipilih) {
       ${statCard('blue','assignment','Total Usulan PKM Saya', d.total)}
       <div id="dashStatBerakhirKapus" style="display:contents">${statCard('red','error','Periode Berakhir', '…', 'Memuat...')}</div>
     </div>
-    ${renderPeriodeVerifBanner(d.periodeAktifList || [])}
+    ${chartRowHtml}
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;align-items:stretch;margin-bottom:14px">
       <div class="card" style="margin:0;display:flex;flex-direction:column">
         <div class="card-header-bar">
@@ -1053,8 +1085,8 @@ function renderKepalasDashboard(el, d, tahunDipilih) {
       if (!elAll) return;
       if (!rows.length) { elAll.innerHTML = `<div class="empty-state" style="padding:32px"><span class="material-icons">inbox</span><p>Belum ada data usulan</p></div>`; return; }
       const { items, page: p, totalPages, total } = paginateDash(rows, pg);
-      elAll.innerHTML = renderUsulanTable(items, 'kepala-puskesmas')
-        + renderPagination('kapusAllTable', total, p, totalPages, `pg => window._kapusAllGoTo(pg)`);
+      elAll.innerHTML = renderUsulanTable(items, 'kepala-puskesmas', { showNo: true, startNo: (p - 1) * DASH_ITEMS_PER_PAGE + 1 })
+        + renderPagination('kapusAllTable', total, p, totalPages, `pg => window._kapusAllGoTo(pg)`, DASH_ITEMS_PER_PAGE);
     };
     window._kapusAllGoTo = (pg) => renderKapusAllPaged(pg);
     renderKapusAllPaged(1);
@@ -1062,7 +1094,26 @@ function renderKepalasDashboard(el, d, tahunDipilih) {
 }
 
 function renderProgramDashboard(el, d, tahunDipilih) {
-  
+  const chartMode = d.chartMode || (tahunDipilih ? 'bulan' : 'tahun');
+  const chartTitle = tahunDipilih
+    ? `Statistik per Bulan (${tahunDipilih})`
+    : `Statistik per Tahun`;
+  const periodeVerifHtml = renderPeriodeVerifBanner(d.periodeAktifList || []);
+  const chartCardHtml = `
+      <div class="card" style="margin:0;display:flex;flex-direction:column">
+        <div class="card-header-bar">
+          <span class="card-title"><span class="material-icons">timeline</span>${chartTitle}</span>
+        </div>
+        <div class="card-body" style="padding:12px 16px;flex:1;display:flex;flex-direction:column;justify-content:center">
+          ${renderChart(d.chartData, chartMode)}
+        </div>
+      </div>`;
+  const chartRowHtml = periodeVerifHtml
+    ? `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;align-items:stretch;margin-bottom:14px">
+        ${_dashPeriodeColHtml(periodeVerifHtml)}
+        ${chartCardHtml}
+      </div>`
+    : `<div style="margin-bottom:14px">${chartCardHtml}</div>`;
   const aksesArr = (currentUser.indikatorAkses || []);
   
   const _getIndNama = (no) => {
@@ -1090,7 +1141,7 @@ function renderProgramDashboard(el, d, tahunDipilih) {
     <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:14px">
       <h1 style="margin:0"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;color:var(--primary)"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</h1>
       <div style="display:flex;align-items:center;gap:8px">
-        <span style="font-size:12px;color:var(--text-light);font-weight:600">Filter</span>
+        <span style="font-size:12px;color:var(--text-light);font-weight:400">Tahun</span>
         <select id="dashTahunFilter" class="form-control" onchange="renderDashboard()"
           style="border:1px solid var(--border,#e2e8f0);border-radius:7px;padding:5px 10px;font-size:12px;outline:none;font-family:inherit;background:var(--surface,white);color:var(--text);cursor:pointer">
           <option value="">Memuat...</option>
@@ -1102,7 +1153,7 @@ function renderProgramDashboard(el, d, tahunDipilih) {
       ${statCard('green','check_circle','Sudah Diverifikasi', d.terverifikasi)}
       ${statCard('blue','assignment','Total Ditugaskan', d.total)}
     </div>
-    ${renderPeriodeVerifBanner(d.periodeAktifList || [])}
+    ${chartRowHtml}
     <div class="card" style="border-left:3px solid var(--primary);margin-bottom:14px" id="ppIndikatorInfoCard">
       <div class="card-body" style="padding:10px 16px;display:flex;align-items:center;gap:8px">
         <span class="material-icons" style="color:var(--primary);font-size:18px">info</span>
@@ -1257,8 +1308,8 @@ function renderProgramDashboard(el, d, tahunDipilih) {
         return;
       }
       const { items, page: p, totalPages, total } = paginateDash(pendingActive, pg);
-      el.innerHTML = renderUsulanTable(items, 'program')
-        + renderPagination('pendingTable', total, p, totalPages, `pg => window._ppPendingGoTo(pg)`);
+      el.innerHTML = renderUsulanTable(items, 'program', { showNo: true, startNo: (p - 1) * DASH_ITEMS_PER_PAGE + 1 })
+        + renderPagination('pendingTable', total, p, totalPages, `pg => window._ppPendingGoTo(pg)`, DASH_ITEMS_PER_PAGE);
     };
     const renderDonePaged = (pg) => {
       _ppDonePage = pg;
@@ -1269,8 +1320,8 @@ function renderProgramDashboard(el, d, tahunDipilih) {
         return;
       }
       const { items, page: p, totalPages, total } = paginateDash(done, pg);
-      elDone.innerHTML = renderUsulanTable(items, 'program')
-        + renderPagination('ppDoneTable', total, p, totalPages, `pg => window._ppDoneGoTo(pg)`);
+      elDone.innerHTML = renderUsulanTable(items, 'program', { showNo: true, startNo: (p - 1) * DASH_ITEMS_PER_PAGE + 1 })
+        + renderPagination('ppDoneTable', total, p, totalPages, `pg => window._ppDoneGoTo(pg)`, DASH_ITEMS_PER_PAGE);
     };
 
     window._ppPendingGoTo = (pg) => renderPendingPaged(pg);
@@ -1304,6 +1355,16 @@ function statCard(color, icon, label, value, sub = null) {
       ${sub !== null ? `<div style="font-size:10px;color:rgba(255,255,255,0.6);font-weight:500">${sub}</div>` : ''}
     </div>
   </div>`;
+}
+
+// Bungkus HTML banner periode (renderPeriodeBanner/renderPeriodeVerifBanner) supaya
+// tingginya sama persis dengan card statistik di sebelahnya (grid align-items:stretch).
+function _dashPeriodeColHtml(bannerHtml) {
+  if (!bannerHtml) return bannerHtml;
+  return bannerHtml
+    .replace('style="margin-bottom:14px"', 'style="margin-bottom:0;height:100%;display:flex;flex-direction:column"')
+    .replace('<div class="card" style="margin:0">', '<div class="card" style="margin:0;height:100%;display:flex;flex-direction:column">')
+    .replace('<div class="card-body">', '<div class="card-body" style="flex:1;display:flex;flex-direction:column;justify-content:center">');
 }
 
 function renderChart(data, chartMode) {
@@ -1340,7 +1401,6 @@ function renderChart(data, chartMode) {
         style="height:0px;background:${barColor};opacity:${isEmpty ? '0.45' : '1'}"
         title="${d.label}: ${d.total} usulan"></div>
       <div class="chart-bar-lbl" style="color:${isEmpty ? 'var(--text-xlight)' : 'var(--text-light)'}${!isBulanMode ? ';font-size:9.5px' : ''}">${d.label}</div>
-      ${!isEmpty ? `<div class="chart-tooltip">${d.label}<br><b>${d.total}</b> usulan</div>` : ''}
     </div>`;
   }).join('');
   setTimeout(() => {
@@ -1441,10 +1501,12 @@ function _isPeriodeVerifOpenFor(tahun, bulan) {
   return nowDT >= toDs(tmv) + 'T' + jmv && nowDT <= toDs(tsv) + 'T' + jsv;
 }
 
-function renderUsulanTable(rows, role) {
+function renderUsulanTable(rows, role, opts) {
   if (!rows || rows.length === 0) {
     return `<div class="empty-state" style="padding:32px"><span class="material-icons">inbox</span><p>Belum ada data usulan</p></div>`;
   }
+  const showNo = !!(opts && opts.showNo);
+  const startNo = (opts && opts.startNo) || 1;
   const actionBtn = (u) => {
     const viewBtn = `<button class="btn-icon view" onclick="viewDetail('${u.idUsulan}')" title="Detail"><span class="material-icons">visibility</span></button>`;
     const logBtnEarly = `<button class="btn-icon" onclick="openLogAktivitas('${u.idUsulan}')" title="Riwayat Aktivitas" style="background:transparent;border:none;color:#64748b"><span class="material-icons" style="font-size:18px">history</span></button>`;
@@ -1518,10 +1580,11 @@ function renderUsulanTable(rows, role) {
   };
 
   return `<div class="table-container"><table>
-    <thead><tr style="background:#0d9488"><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">ID Usulan</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Puskesmas</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Periode</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Indeks SPM</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:1%;min-width:140px;white-space:nowrap">Status</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Dibuat</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:1%;min-width:150px;white-space:nowrap">Aksi</th></tr></thead>
-    <tbody>${rows.map(u => `<tr>
+    <thead><tr style="background:#0d9488">${showNo ? `<th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:1%">No</th>` : ''}<th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">ID Usulan</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Puskesmas</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Periode</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Indeks SPM</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:1%;min-width:140px;white-space:nowrap">Status</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Waktu Dibuat</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:1%;min-width:150px;white-space:nowrap">Aksi</th></tr></thead>
+    <tbody>${rows.map((u, _i) => `<tr>
+      ${showNo ? `<td style="font-size:12px;color:var(--text-light)">${startNo + _i}</td>` : ''}
       <td><span style="font-weight:600;font-size:12px;">${u.idUsulan}</span></td>
-      <td>${u.namaPKM || u.kodePKM}</td>
+      <td style="text-align:left">${u.namaPKM || u.kodePKM}</td>
       <td>${u.namaBulan || ''} ${u.tahun}</td>
       <td class="rasio-cell" style="font-weight:700;color:var(--primary)">${parseFloat(u.indeksSPM||0).toFixed(2)}</td>
       <td>
@@ -1692,7 +1755,7 @@ const nos = _nosAdmin.sort((a,b)=>a-b).map(n => `<span style="background:#fecaca
         })() : ''}
       </td>
       <td style="font-size:12px;color:var(--text-light)">${formatDateTime(u.createdAt)}</td>
-      <td style="white-space:nowrap"><div style="display:flex;align-items:center;gap:2px">${actionBtn(u)}</div></td>
+      <td style="white-space:nowrap"><div style="display:flex;align-items:center;justify-content:center;gap:2px">${actionBtn(u)}</div></td>
     </tr>`).join('')}</tbody>
   </table></div>`;
 }
@@ -1720,4 +1783,121 @@ function showPeriodeTutupBanner() {
         <span class="material-icons">arrow_back</span>Kembali ke Dashboard
       </button>
     </div>`;
+}
+// ===== Modal cepat "Buat Usulan Baru" dari Dashboard =====
+function openQuickBuatUsulan() {
+  const periodeList = window._dashPeriodeAktifList || [];
+  if (periodeList.length === 0) return;
+
+  // Dedupe per tahun+bulan (kalau ada beberapa entri periode utk periode yg sama)
+  const seen = new Set();
+  const opsi = periodeList.filter(p => {
+    const key = `${p.tahun}-${p.bulan}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  const selectHtml = opsi.length > 1
+    ? `<div class="form-group" style="margin-bottom:0">
+         <label>Periode</label>
+         <select class="form-control" id="quickBuatUsulanPeriode" onchange="_quickBuatUsulanStartTimer()">
+           ${opsi.map((p, i) => `<option value="${i}">${p.namaBulan || p.nama_bulan || BULAN_NAMA[p.bulan]} ${p.tahun}</option>`).join('')}
+         </select>
+       </div>`
+    : `<div style="font-size:13px;color:var(--text-light)">Periode: <b style="color:var(--text)">${opsi[0].namaBulan || opsi[0].nama_bulan || BULAN_NAMA[opsi[0].bulan]} ${opsi[0].tahun}</b></div>`;
+
+  window._quickBuatUsulanOpsi = opsi;
+
+  document.getElementById('quickBuatUsulanBody').innerHTML = `
+    ${selectHtml}
+    <div id="quickBuatUsulanTimerBox" style="margin-top:12px;display:flex;align-items:center;justify-content:space-between;background:var(--surface-alt,#f0fdfa);border:1px solid #99f6e4;border-radius:8px;padding:8px 12px;transition:background .2s,border-color .2s">
+      <span id="quickBuatUsulanTimerLabel" style="font-size:12px;font-weight:600;color:#0f766e">Batas waktu submit</span>
+      <span id="quickBuatUsulanTimer" style="font-size:13px;font-weight:800;color:#0d9488;font-variant-numeric:tabular-nums">--:--:--</span>
+    </div>
+    <div id="quickBuatUsulanStatus" style="font-size:13px;min-height:18px;color:var(--danger);margin-top:10px"></div>
+  `;
+  const btn = document.getElementById('quickBuatUsulanConfirmBtn');
+  if (btn) { btn.disabled = false; btn.classList.remove('btn-loading'); btn.innerHTML = `<span class="material-icons">add</span> Buat Usulan`; }
+  document.getElementById('quickBuatUsulanModal').classList.add('show');
+  _quickBuatUsulanStartTimer();
+}
+
+function _quickBuatUsulanStartTimer() {
+  if (window._quickBuatUsulanTid) { clearInterval(window._quickBuatUsulanTid); window._quickBuatUsulanTid = null; }
+  const opsi = window._quickBuatUsulanOpsi || [];
+  const idxSel = document.getElementById('quickBuatUsulanPeriode');
+  const p = opsi[idxSel ? parseInt(idxSel.value) : 0];
+  const el = document.getElementById('quickBuatUsulanTimer');
+  const box = document.getElementById('quickBuatUsulanTimerBox');
+  const label = document.getElementById('quickBuatUsulanTimerLabel');
+  if (!p || !el) return;
+  const jm = fmt24(p.jamMulai || p.jam_mulai) || '00:00';
+  const js = fmt24(p.jamSelesai || p.jam_selesai) || '23:59';
+  const deadline = _pEpochWITA(p.tanggalSelesai || p.tanggal_selesai, js);
+  if (deadline == null) { el.textContent = '-'; return; }
+  let startMs = _pEpochWITA(p.tanggalMulai || p.tanggal_mulai, jm);
+  // Fallback kalau tanggal mulai gak ada/gak valid: pakai jendela 24 jam sblm deadline
+  // biar gradasi warnanya tetep jalan menjelang batas waktu.
+  if (startMs == null || startMs >= deadline) startMs = deadline - 24 * 3600000;
+  // Warna disamakan dgn gradasi progress bar timeline (_pGradientColor di app-master.js):
+  // hijau di awal periode -> kuning -> merah menjelang/lewat batas waktu.
+  const setColor = (pct, closed) => {
+    const c = _pGradientColor(pct);
+    el.style.color = c;
+    if (label) label.style.color = c;
+    if (box) {
+      box.style.background = _pGradientColor(pct, 0.10);
+      box.style.borderColor = _pGradientColor(pct, closed ? 0.55 : 0.35);
+    }
+  };
+  const tick = () => {
+    const now = Date.now();
+    const diff = deadline - now;
+    const pct = Math.max(0, Math.min(100, ((now - startMs) / (deadline - startMs)) * 100));
+    if (diff <= 0) { el.textContent = 'Ditutup'; setColor(100, true); clearInterval(window._quickBuatUsulanTid); return; }
+    const h = Math.floor(diff / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    const s = Math.floor((diff % 60000) / 1000);
+    const mm = String(m).padStart(2, '0'), ss = String(s).padStart(2, '0');
+    el.textContent = h >= 24
+      ? Math.floor(h / 24) + 'h ' + String(h % 24).padStart(2, '0') + ':' + mm + ':' + ss
+      : String(h).padStart(2, '0') + ':' + mm + ':' + ss;
+    setColor(pct, false);
+  };
+  tick();
+  window._quickBuatUsulanTid = setInterval(tick, 1000);
+}
+
+function closeQuickBuatUsulan() {
+  document.getElementById('quickBuatUsulanModal').classList.remove('show');
+  if (window._quickBuatUsulanTid) { clearInterval(window._quickBuatUsulanTid); window._quickBuatUsulanTid = null; }
+}
+
+async function confirmQuickBuatUsulan() {
+  const opsi = window._quickBuatUsulanOpsi || [];
+  if (opsi.length === 0) return;
+  const idxSel = document.getElementById('quickBuatUsulanPeriode');
+  const p = opsi[idxSel ? parseInt(idxSel.value) : 0];
+  const statusEl = document.getElementById('quickBuatUsulanStatus');
+  const btn = document.getElementById('quickBuatUsulanConfirmBtn');
+
+  if (statusEl) statusEl.textContent = '';
+  if (btn) { btn.disabled = true; btn.classList.add('btn-loading'); btn.innerHTML = '<div class="spm-spinner sm white"><div class="sr1"></div><div class="sr2"></div><div class="sr3"></div></div> Memproses...'; }
+
+  try {
+    const result = await API.buatUsulan({
+      kodePKM: currentUser.kodePKM,
+      tahun: parseInt(p.tahun),
+      bulan: parseInt(p.bulan),
+      emailOperator: currentUser.email
+    });
+    closeQuickBuatUsulan();
+    toast(`Usulan ${result.idUsulan} berhasil dibuat! Silakan isi data indikator.`, 'success');
+    renderDashboard(); // refresh stat card, status "Dalam Proses", & tombol "Buat Usulan Baru" tanpa perlu reload manual
+    setTimeout(() => openIndikatorModal(result.idUsulan), 500);
+  } catch (e) {
+    if (statusEl) statusEl.textContent = e.message || 'Gagal membuat usulan';
+    if (btn) { btn.disabled = false; btn.classList.remove('btn-loading'); btn.innerHTML = `<span class="material-icons">add</span> Buat Usulan`; }
+  }
 }

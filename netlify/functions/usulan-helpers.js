@@ -28,9 +28,16 @@ async function logAktivitas(pool, email, role, aksi, idUsulan, detail, event) {
   // Data → Audit Trail) supaya aksi usulan (submit/verifikasi/tolak/dst) ikut
   // kelihatan di sana, sama seperti update Surat di SAPA — bukan cuma di
   // riwayat masing-masing usulan.
+  // Nama pelaku diambil dari tabel users berdasarkan email (sebelumnya tidak
+  // dikirim, jadi kolom User di Audit Trail cuma nampil "-" + email).
+  let userNama = null;
+  try {
+    const u = await pool.query('SELECT nama FROM users WHERE LOWER(email)=LOWER($1) LIMIT 1', [email]);
+    userNama = u.rows[0]?.nama || null;
+  } catch (e) { console.error('Lookup nama audit error:', e); }
   await logAudit(pool, event, {
     module: 'usulan', action: aksi,
-    userEmail: email, userRole: role,
+    userEmail: email, userNama, userRole: role,
     detail, meta: { idUsulan },
   });
 }

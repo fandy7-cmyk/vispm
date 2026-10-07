@@ -88,7 +88,7 @@
   border-radius: var(--sp-md, 13px);
   box-shadow: 0 8px 32px rgba(0,0,0,0.14), 0 2px 8px rgba(0,0,0,0.06);
   overflow: hidden;
-  min-width: 160px;
+  min-width: 0; /* lebar dihitung di positionPanel: teks opsi terpanjang, minimal selebar trigger */
   max-width: 420px;
 
   /* Animasi masuk */
@@ -273,6 +273,40 @@
   let _openWrap = null; 
 
   
+  // ── Auto-fit: lebar trigger mengikuti teks opsi terpanjang ──
+  let _measureCtx = null;
+  function measureText(text, font) {
+    if (!_measureCtx) _measureCtx = document.createElement('canvas').getContext('2d');
+    _measureCtx.font = font;
+    return _measureCtx.measureText(text).width;
+  }
+  function fitWrapToText(wrap, select) {
+    if (!wrap || !wrap._csAutoFit || !select) return;
+    const trigger = wrap.querySelector('.cs-trigger');
+    if (!trigger) return;
+    const cs = getComputedStyle(trigger);
+    const font = cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily;
+    let maxW = 0;
+    for (const opt of select.options) maxW = Math.max(maxW, measureText(opt.text, font));
+    const chev = wrap.querySelector('.cs-chevron');
+    const chevW = (chev && chev.offsetWidth) || 18;
+    const gap = parseFloat(cs.columnGap) || 6;
+    const extra = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight)
+                + parseFloat(cs.borderLeftWidth) + parseFloat(cs.borderRightWidth) + gap + chevW;
+    wrap.style.width = Math.max(Math.ceil(maxW + extra + 4), 88) + 'px';
+    wrap.style.maxWidth = '100%';
+  }
+  function refitAll() {
+    document.querySelectorAll('.cs-wrap').forEach(w => {
+      if (w._csAutoFit) fitWrapToText(w, w.querySelector('select'));
+    });
+  }
+  // Font web bisa selesai dimuat setelah pengukuran pertama -> ukur ulang
+  if (document.fonts) {
+    if (document.fonts.ready) document.fonts.ready.then(refitAll);
+    if (document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', refitAll);
+  }
+
   function getSelectedText(select) {
     const opt = select.options[select.selectedIndex];
     return opt ? opt.text : '';
@@ -289,9 +323,21 @@
     const vw = window.innerWidth;
     const vh = window.innerHeight;
     const panelH = 320; 
-    const panelW = Math.max(rect.width, 200);
+    // Lebar panel mengikuti teks opsi terpanjang (diukur sekali saat dibuka),
+    // minimal selebar trigger, maksimal 420px. Panel ber-search minimal 150px.
+    if (panel._csNatural == null) {
+      panel.style.width = 'max-content';
+      const list = panel.querySelector('.cs-list');
+      const sb = list && list.scrollHeight > list.clientHeight ? 6 : 0;
+      panel._csNatural = panel.offsetWidth + sb;
+    }
+    const hasSearch = !!panel.querySelector('.cs-search');
+    // Trigger yang melebar mengikuti layout (bukan auto-fit) di baris filter: panel cukup selebar
+    // teks opsi. Selain itu panel minimal selebar trigger.
+    const baseW = (!wrap._csAutoFit && wrap.closest('.filter-row')) ? 0 : rect.width;
+    const panelW = Math.min(Math.max(baseW, panel._csNatural, hasSearch ? 150 : 0), 420, vw - 16);
 
-    panel.style.width = Math.min(panelW, 420) + 'px';
+    panel.style.width = panelW + 'px';
 
     
     const spaceBelow = vh - rect.bottom - 8;
@@ -367,7 +413,7 @@
       searchWrap.style.position = 'relative';
       searchWrap.innerHTML = `
         <span class="material-icons cs-search-icon">search</span>
-        <input class="cs-search" placeholder="Cari..." type="text" autocomplete="off" spellcheck="false">
+        <input class="cs-search" size="1" placeholder="Cari..." type="text" autocomplete="off" spellcheck="false">
       `;
       panel.appendChild(searchWrap);
       searchInput = searchWrap.querySelector('.cs-search');
@@ -512,6 +558,15 @@
     if (wrap._csPanel) { _closePanel(wrap); return; } 
     closeAll(wrap);
 
+    // Bersihkan panel lama milik wrap ini yang masih nyangkut di DOM (misal user
+    // buka-tutup cepat sebelum animasi 200ms selesai) — biar gak numpuk dan nampilin
+    // state checklist yang basi/salah.
+    document.querySelectorAll('.cs-panel').forEach(p => {
+      if (p._csWrap === wrap && p !== wrap._csPanel) {
+        if (p.parentNode) p.parentNode.removeChild(p);
+      }
+    });
+
     const { panel, searchInput } = buildPanel(wrap, select);
     const trigger = wrap.querySelector('.cs-trigger');
     trigger.setAttribute('aria-expanded', 'true');
@@ -544,20 +599,33 @@
 
     select._csReplaced = true;
 
-    
+    // Auto-fit: semua select (baris filter, field form, modal) lebarnya mengikuti teks opsi
+    // terpanjang. Dikecualikan hanya yang sengaja diberi flex / lebar persen / class flex-1, w-full.
+    const _w = select.style.width || '';
+    const autoFit = !select.style.flex
+      && !select.classList.contains('flex-1')
+      && !select.classList.contains('w-full')
+      && (!_w || /px$/.test(_w));
+
     const wrap = document.createElement('div');
     wrap.className = 'cs-wrap';
     if (select.disabled) wrap.classList.add('cs-disabled');
     
     ['flex-1', 'w-full'].forEach(c => { if (select.classList.contains(c)) wrap.classList.add(c); });
     
-    if (select.style.width)    wrap.style.width    = select.style.width;
-    if (select.style.minWidth) wrap.style.minWidth = select.style.minWidth;
+    wrap._csAutoFit = autoFit;
+    if (autoFit) {
+      // Kalahkan aturan `.filter-row .cs-wrap { flex:1; min-width:140px }` yang membuat select melebar
+      wrap.style.flex = '0 0 auto';
+      wrap.style.minWidth = '0';
+    }
+    if (!autoFit && select.style.width)    wrap.style.width    = select.style.width;
+    if (!autoFit && select.style.minWidth) wrap.style.minWidth = select.style.minWidth;
     if (select.style.maxWidth) wrap.style.maxWidth = select.style.maxWidth;
     if (select.style.flex)     wrap.style.flex     = select.style.flex;
     
     
-    if (!select.style.width && !select.style.flex) {
+    if (!autoFit && !select.style.width && !select.style.flex) {
       
       const parentStyle = window.getComputedStyle(select.parentNode);
       const isFlexParent = parentStyle.display === 'flex' || parentStyle.display === 'inline-flex';
@@ -588,6 +656,15 @@
     `;
 
     wrap.insertBefore(trigger, select);
+
+    if (autoFit) {
+      fitWrapToText(wrap, select);
+      let _raf = 0;
+      new MutationObserver(() => {
+        cancelAnimationFrame(_raf);
+        _raf = requestAnimationFrame(() => fitWrapToText(wrap, select));
+      }).observe(select, { childList: true, subtree: true, characterData: true });
+    }
 
     
     trigger.addEventListener('click', (e) => {

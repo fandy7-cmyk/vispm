@@ -2,7 +2,7 @@
 
 const INDIKATOR_TARGET_KUNCI = [8, 9];
 
-const INDIKATOR_TARGET_SISA = [];
+const INDIKATOR_TARGET_SISA = [7];
 
 function isValidText(str) {
   return str && /[a-zA-Z0-9\u00C0-\u024F\u4e00-\u9fff]/.test(str.trim());
@@ -593,7 +593,7 @@ function doLogout() {
     title: 'Keluar dari Sistem',
     message: 'Yakin ingin keluar dari sistem?',
     type: 'warning',
-    onConfirm: () => { window._intentionalLogout = true; clearInterval(window._notifInterval); sessionStorage.removeItem('spm_user'); try { sessionStorage.removeItem('spm_last_page'); } catch(e) {} if(currentUser) { API.logout(); API.logAudit({module:'auth',action:'LOGOUT',userEmail:currentUser.email,userNama:currentUser.nama,userRole:currentUser.role,detail:'Logout manual'}).catch(()=>{}); } currentUser = null; location.reload(); }
+    onConfirm: () => { window._intentionalLogout = true; clearInterval(window._notifInterval); sessionStorage.removeItem('spm_user'); try { sessionStorage.removeItem('spm_last_page'); sessionStorage.removeItem('spm_tab_verif'); sessionStorage.removeItem('spm_tab_master'); } catch(e) {} if(currentUser) { API.logout(); API.logAudit({module:'auth',action:'LOGOUT',userEmail:currentUser.email,userNama:currentUser.nama,userRole:currentUser.role,detail:'Logout manual'}).catch(()=>{}); } currentUser = null; location.reload(); }
   });
 }
 
@@ -661,9 +661,11 @@ function startApp() {
   
   API.get('periode').then(allPeriode => {
     window._periodeAktifList = Array.isArray(allPeriode) ? allPeriode : [];
+    window._periodeAktifListLoaded = true;
     buildSidebar(); 
   }).catch(() => {
     window._periodeAktifList = [];
+    window._periodeAktifListLoaded = true;
   });
   buildSidebar();
 
@@ -987,7 +989,7 @@ const PAGE_TITLES = {
 
 function loadPage(page) {
   
-  if (page === 'input' && currentUser && currentUser.role === 'Operator') {
+  if (page === 'input' && currentUser && currentUser.role === 'Operator' && window._periodeAktifListLoaded) {
     const periodeAktif = (window._periodeAktifList || []).filter(p => p.isAktifToday);
     if (periodeAktif.length === 0) {
       showPeriodeTutupBanner();
@@ -1062,11 +1064,3 @@ function yearOptions(selected, maxYear) {
   return html;
 }
 // Generate <option> tahun HANYA dari data yang ada (untuk filter data)
-function yearOptionsFromData(rows, selected) {
-  const years = [...new Set((rows || []).map(u => parseInt(u.tahun)).filter(Boolean))].sort((a, b) => b - a);
-  if (!years.length) {
-    const y = selected || CURRENT_YEAR;
-    return `<option value="${y}">${y}</option>`;
-  }
-  return years.map(y => `<option value="${y}" ${y == selected ? 'selected' : ''}>${y}</option>`).join('');
-}

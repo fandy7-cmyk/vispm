@@ -106,12 +106,11 @@
   }
 
     function convert(el) {
-    if (el._ttConverted) return;
     const t = el.getAttribute('title');
     if (!t || !t.trim()) return;
     el._ttConverted = true;
     el.setAttribute('data-tooltip', t);
-    if (!el.hasAttribute('aria-label')) el.setAttribute('aria-label', t);
+    el.setAttribute('aria-label', t);
     el.removeAttribute('title');
   }
 
@@ -124,7 +123,8 @@
     const el = e.target.closest('[data-tooltip]');
     if (!el || el === currentEl) return;
     clearTimeout(hideTimer); clearTimeout(showTimer);
-    showTimer = setTimeout(() => show(el), 350);
+    // Kalau tooltip lain sedang tampil (pindah antar elemen), langsung tampil; kalau tidak, delay singkat.
+    showTimer = setTimeout(() => show(el), currentEl ? 0 : 80);
   });
   document.addEventListener('mouseout', e => {
     const el = e.target.closest('[data-tooltip]');

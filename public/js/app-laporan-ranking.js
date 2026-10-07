@@ -149,7 +149,7 @@
         + '<td style="text-align:center!important;padding:10px 12px;vertical-align:middle">'
         + (isSelesai ? _badge(rank) : '<div style="text-align:center"><span style="font-size:12px;color:#94a3b8">—</span></div>')
         + '</td>'
-        + '<td style="padding:10px 12px;font-size:13px">' + (r.namaPKM || '-') + '</td>'
+        + '<td style="padding:10px 12px;font-size:13px;text-align:left">' + (r.namaPKM || '-') + '</td>'
         + (showBulanCol ? '<td style="font-size:12px;color:var(--text-light);padding:10px 12px">' + (r.namaBulan || '') + ' ' + (r.tahun || '') + '</td>' : '')
         + '<td style="font-size:12px;padding:10px 12px;color:var(--text-light);vertical-align:middle">' + _fmt(r.createdAt) + '</td>'
         + '<td style="font-size:12px;padding:10px 12px;color:var(--text-light);vertical-align:middle">'
@@ -164,7 +164,10 @@
                 + 'Sedang diproses</span>')
         + '</td>'
         + '<td style="font-weight:700;color:#0d9488;padding:10px 12px">' + parseFloat(r.indeksSPM || 0).toFixed(2) + '</td>'
-        + '<td style="padding:10px 12px">' + statusBadge(r.statusGlobal, r) + '</td>'
+        + '<td style="padding:10px 12px">' + (r.statusGlobal === 'Draft' || typeof _lapShowProgres !== 'function'
+            ? statusBadge(r.statusGlobal, r)
+            : '<div onclick="_lapShowProgres(\'' + r.idUsulan + '\')" title="Klik untuk lihat progres semua tahap" style="cursor:pointer;display:inline-block" onmouseover="this.style.opacity=.75" onmouseout="this.style.opacity=1">'
+              + statusBadge(r.statusGlobal, r) + '</div>') + '</td>'
         + '<td style="white-space:nowrap;padding:10px 12px">'
         + '<button class="btn-icon view" onclick="viewDetail(\'' + r.idUsulan + '\')" title="Detail"><span class="material-icons">visibility</span></button>'
         + getDownloadBtn(r, 18, currentUser.role, currentUser.indikatorAkses)
@@ -181,7 +184,7 @@
       + (totalDiproses > 0 ? '<div style="display:flex;align-items:center;gap:5px;font-size:12px"><span class="material-icons" style="font-size:15px;color:#f59e0b">pending</span><span style="color:var(--text-light)">Sedang Diproses:</span><span style="font-weight:700;color:#f59e0b">' + totalDiproses + '</span></div>' : '')
       + (totalBerakhir > 0 ? '<div style="display:flex;align-items:center;gap:5px;font-size:12px"><span class="material-icons" style="font-size:15px;color:#991b1b">error</span><span style="color:var(--text-light)">Periode Berakhir:</span><span style="font-weight:700;color:#991b1b">' + totalBerakhir + '</span></div>' : '')
       + '<div style="display:flex;align-items:center;gap:5px;font-size:12px"><span class="material-icons" style="font-size:15px;color:#64748b">local_hospital</span><span style="color:var(--text-light)">Total:</span><span style="font-weight:700;color:var(--text)">' + totalSemua + '</span></div>'
-      + '<span style="margin-left:auto;font-size:11px;color:#94a3b8">Diurutkan berdasarkan tanggal penyelesaian tercepat</span>'
+      + '<span style="margin-left:auto;font-size:11px;color:#94a3b8">Diurutkan berdasarkan waktu penyelesaian tercepat</span>'
       // ── "Diperbarui" badge — lebih mencolok ──
       + '<span style="display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;color:#0d9488;background:rgba(13,148,136,0.08);border:1px solid rgba(13,148,136,0.25);border-radius:20px;padding:3px 10px 3px 7px">'
       + '<span class="material-icons" style="font-size:11px;color:#0d9488">update</span>'
@@ -193,8 +196,8 @@
       + '<th style="' + _th() + 'text-align:center!important;">Peringkat</th>'
       + '<th style="' + _th() + '">Puskesmas</th>'
       + (showBulanCol ? '<th style="' + _th() + '">Periode</th>' : '')
-      + '<th style="' + _th() + '">Tanggal Dibuat</th>'
-      + '<th style="' + _th() + '">Tanggal Selesai</th>'
+      + '<th style="' + _th() + '">Waktu Dibuat</th>'
+      + '<th style="' + _th() + '">Waktu Selesai</th>'
       + '<th style="' + _th() + '">Indeks SPM</th>'
       + '<th style="' + _th() + '">Status</th>'
       + '<th style="' + _th() + '">Aksi</th>'

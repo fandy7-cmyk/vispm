@@ -79,22 +79,40 @@ async function buatUsulan(pool, body, event) {
        VALUES ($1,$2,$3,$4,$5,0,$6,0,$7,0,'Menunggu','Menunggu','Menunggu','Draft',false,$8,NOW())`,
       [idUsulan,tahun,bulan,periodeKey,kodePKM,totalBobot,indeksBeban,emailOperator]
     );
-    for (const ind of indResult.rows) {
-      await client.query(`INSERT INTO usulan_indikator (id_usulan,no_indikator,target,capaian,realisasi_rasio,bobot,nilai_terbobot,status) VALUES ($1,$2,0,0,0,$3,0,'Draft')`, [idUsulan,ind.no_indikator,parseInt(ind.bobot)||0]);
-    }
-    const allIndNos = indResult.rows.map(r => r.no_indikator);
-    for (const pp of ppResult.rows) {
-      const aksArr = parseIndikatorAkses(pp.indikator_akses || '');
-      const ppStatus = aksArr.length === 0
-        ? 'Menunggu'
-        : (aksArr.some(n => allIndNos.includes(n)) ? 'Menunggu' : 'Selesai');
+    // Batch insert indikator (1 round-trip alih-alih 1 per indikator)
+    if (indResult.rows.length > 0) {
+      const indNos = indResult.rows.map(r => r.no_indikator);
+      const indBobots = indResult.rows.map(r => parseInt(r.bobot) || 0);
       await client.query(
-        `INSERT INTO verifikasi_program (id_usulan,email_program,nama_program,nip_program,jabatan_program,indikator_akses,status,created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())`,
-        [idUsulan, pp.email, pp.nama, pp.nip||null, pp.jabatan||null, pp.indikator_akses||'', ppStatus]
+        `INSERT INTO usulan_indikator (id_usulan,no_indikator,target,capaian,realisasi_rasio,bobot,nilai_terbobot,status)
+         SELECT $1, t.no_ind, 0, 0, 0, t.bbt, 0, 'Draft'
+         FROM unnest($2::int[], $3::int[]) AS t(no_ind, bbt)`,
+        [idUsulan, indNos, indBobots]
+      );
+    }
+
+    // Batch insert verifikasi_program (1 round-trip alih-alih 1 per Pengelola Program)
+    const allIndNos = indResult.rows.map(r => r.no_indikator);
+    if (ppResult.rows.length > 0) {
+      const ppEmails = [], ppNamas = [], ppNips = [], ppJabatans = [], ppAksesArr = [], ppStatuses = [];
+      for (const pp of ppResult.rows) {
+        const aksArr = parseIndikatorAkses(pp.indikator_akses || '');
+        const ppStatus = aksArr.length === 0
+          ? 'Menunggu'
+          : (aksArr.some(n => allIndNos.includes(n)) ? 'Menunggu' : 'Selesai');
+        ppEmails.push(pp.email); ppNamas.push(pp.nama); ppNips.push(pp.nip || null);
+        ppJabatans.push(pp.jabatan || null); ppAksesArr.push(pp.indikator_akses || ''); ppStatuses.push(ppStatus);
+      }
+      await client.query(
+        `INSERT INTO verifikasi_program (id_usulan,email_program,nama_program,nip_program,jabatan_program,indikator_akses,status,created_at)
+         SELECT $1, t.e, t.n, t.ni, t.j, t.a, t.s, NOW()
+         FROM unnest($2::text[], $3::text[], $4::text[], $5::text[], $6::text[], $7::text[]) AS t(e,n,ni,j,a,s)`,
+        [idUsulan, ppEmails, ppNamas, ppNips, ppJabatans, ppAksesArr, ppStatuses]
       );
     }
     await client.query('COMMIT');
-    await logAktivitas(pool, emailOperator, 'Operator', 'Buat Usulan', idUsulan, `Usulan dibuat untuk PKM ${kodePKM} periode ${bulan}/${tahun}`, event);
+    // Logging tidak perlu menunda response ke client — jalankan tanpa menunggu (fire-and-forget)
+    logAktivitas(pool, emailOperator, 'Operator', 'Buat Usulan', idUsulan, `Usulan dibuat untuk PKM ${kodePKM} periode ${bulan}/${tahun}`, event).catch(() => {});
     return ok({ idUsulan, message: 'Usulan berhasil dibuat' });
   } catch (e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }
 }

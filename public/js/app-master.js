@@ -16,40 +16,100 @@ let _lapAllData = window._lapAllData;
 
 async function renderLaporan() {
   const role = currentUser.role;
+  const bisaLihatKabupaten = (role === 'Admin' || role === 'Pengelola Program' || role === 'Kepala Puskesmas' || role === 'Operator');
+  const bisaPilihPuskesmas = (role === 'Admin' || role === 'Pengelola Program');
+
   document.getElementById('mainContent').innerHTML = `
     <div class="page-header">
       <h1><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;color:var(--primary)"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Laporan</h1>
+      ${bisaLihatKabupaten ? `
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:12.5px;color:var(--text-light);white-space:nowrap">Tampilan</span>
+        <select class="form-control" id="lapViewMode" onchange="_lapSetMode(this.value)" style="min-width:160px">
+          <option value="usulan">Per Usulan</option>
+          <option value="kabupaten">Per Indikator</option>
+        </select>
+      </div>` : ''}
     </div>
-    <div class="stats-grid" id="lapStats"></div>
-    <div class="card">
-      <div class="card-header-bar" style="justify-content:space-between">
-        <span class="card-title"><span class="material-icons">filter_list</span>Filter</span>
-        <div style="display:flex;gap:6px;align-items:center">
-          <button onclick="downloadRekapLaporan()" title="Download PDF Rekap sesuai filter"
-            style="background:transparent;border:none;padding:4px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"/><path d="m7 11 5 5 5-5"/><path d="M4 19c0 1.1 1.8 2 4 2h8c2.2 0 4-.9 4-2"/></svg>
-          </button>
-          <button onclick="openBuktiRekapModal()" title="Download Data Dukung per Indikator (ZIP)"
-            style="background:transparent;border:none;padding:4px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0d9488" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          </button>
+
+    <div id="lapModeUsulan">
+      <div class="stats-grid" id="lapStats"></div>
+      <div class="card">
+        <div class="card-header-bar" style="justify-content:space-between">
+          <span class="card-title"><span class="material-icons">filter_list</span>Filter</span>
+          <div style="display:flex;gap:6px;align-items:center">
+            <button onclick="downloadRekapLaporan()" title="Download PDF Rekap sesuai filter"
+              style="background:transparent;border:none;padding:4px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+              <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"/><path d="m7 11 5 5 5-5"/><path d="M4 19c0 1.1 1.8 2 4 2h8c2.2 0 4-.9 4-2"/></svg>
+            </button>
+            <button onclick="openBuktiRekapModal()" title="Download Data Dukung per Indikator (ZIP)"
+              style="background:transparent;border:none;padding:4px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+              <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0d9488" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            </button>
+          </div>
         </div>
-      </div>
-      <div class="card-body">
-        <div class="filter-row">
-          <select class="form-control" id="lapTahun" onchange="loadLaporan()" style="min-width:120px"><option value="">Semua Tahun</option></select>
-          <select class="form-control" id="lapBulan" onchange="_lapApplyFilter()" style="min-width:150px"><option value="">Semua Bulan</option></select>
-          ${role === 'Admin' ? `<select class="form-control" id="lapPKM" onchange="_lapApplyFilter()" style="min-width:180px"><option value="">Semua Puskesmas</option></select>` : ''}
-          <select class="form-control" id="lapStatus" onchange="_lapApplyFilter()" style="min-width:170px">
-            <option value="">Semua Status</option>
-          </select>
+        <div class="card-body">
+          <div class="filter-row">
+            <div class="search-input-wrap"><span class="material-icons search-icon">search</span><input class="search-input" type="search" id="lapSearch" style="min-height:36px;box-sizing:border-box" name="lapSearch" placeholder="Cari puskesmas, periode, atau ID usulan..." oninput="_lapApplyFilter(true)" autocomplete="off" data-lpignore="true" data-1p-ignore="true"></div>
+            <select class="form-control" id="lapTahun" onchange="loadLaporan()" style="min-width:120px"><option value="">Semua Tahun</option></select>
+            <select class="form-control" id="lapBulan" onchange="_lapApplyFilter()" style="min-width:150px"><option value="">Semua Bulan</option></select>
+            ${role === 'Admin' ? `<select class="form-control" id="lapPKM" onchange="_lapApplyFilter()" style="min-width:180px"><option value="">Semua Puskesmas</option></select>` : ''}
+            <select class="form-control" id="lapStatus" onchange="_lapApplyFilter()" style="min-width:170px">
+              <option value="">Semua Status</option>
+            </select>
+          </div>
         </div>
+        <div style="padding:0" id="lapTable">${loadingBlock('Memuat...')}</div>
       </div>
-      <div style="padding:0" id="lapTable">${loadingBlock('Memuat...')}</div>
-    </div>`;
+    </div>
+
+    ${bisaLihatKabupaten ? `
+    <div id="lapModeKabupaten" style="display:none">
+      <div class="stats-grid" id="lkStats"></div>
+      <div class="card">
+        <div class="card-body" style="padding:14px 16px;border-bottom:1px solid var(--border,#f1f5f9)">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="font-size:12px;color:var(--text-light)">Tahun:</span>
+              <select id="lkTahun" class="form-control" onchange="_lkOnTahunChange()" style="min-width:120px"></select>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="font-size:12px;color:var(--text-light)">Bulan:</span>
+              <select id="lkBulanAwal" class="form-control" onchange="_lkOnBulanChange()" style="min-width:140px"></select>
+              <span style="font-size:12px;color:var(--text-light)">s.d.</span>
+              <select id="lkBulanAkhir" class="form-control" onchange="_lkOnBulanChange()" style="min-width:140px"></select>
+            </div>
+            ${bisaPilihPuskesmas ? `
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="font-size:12px;color:var(--text-light)">Indikator:</span>
+              <select id="lkIndikator" class="form-control" onchange="_lkOnIndikatorChange()" style="min-width:220px;max-width:320px"></select>
+            </div>
+            <div id="lkPkmWrap" style="display:flex;align-items:center;gap:6px">
+              <span style="font-size:12px;color:var(--text-light)">Puskesmas:</span>
+              <select id="lkPuskesmas" class="form-control" onchange="_lkOnPuskesmasChange()" style="min-width:180px"></select>
+            </div>` : ''}
+            <span id="lkSubtitle" style="margin-left:auto;font-size:11.5px;color:var(--text-light)"></span>
+          </div>
+        </div>
+        <div id="lkTable" style="padding:0">${loadingBlock('Memuat...')}</div>
+      </div>
+    </div>` : ''}
+  `;
 
   await loadLaporan();
 }
+
+// Toggle antara tabel "Per Usulan" (default) dan agregat "Total Kabupaten per Indikator"
+window._lapSetMode = function (mode) {
+  const usulanEl    = document.getElementById('lapModeUsulan');
+  const kabupatenEl = document.getElementById('lapModeKabupaten');
+  if (usulanEl)    usulanEl.style.display    = mode === 'kabupaten' ? 'none' : '';
+  if (kabupatenEl) kabupatenEl.style.display = mode === 'kabupaten' ? '' : 'none';
+
+  if (mode === 'kabupaten' && typeof window._lkLoadIfNeeded === 'function') {
+    window._lkLoadIfNeeded();
+  }
+};
 
 // Rebuild filter opsi dari data yang ada
 function _lapRebuildFilters(rows, selTahun, selBulan, selStatus, selPKM) {
@@ -120,21 +180,28 @@ function _lapRebuildFilters(rows, selTahun, selBulan, selStatus, selPKM) {
 }
 
 // Apply filter di sisi klien ke _lapAllData
-function _lapApplyFilter() {
+function _lapMatchSearch(r, q) {
+  return [r.namaPKM, r.kodePKM, r.idUsulan, (r.namaBulan || '') + ' ' + (r.tahun || '')]
+    .some(v => String(v || '').toLowerCase().includes(q));
+}
+
+// skipRebuild=true dipakai oleh kolom cari (tidak perlu membangun ulang opsi dropdown tiap ketikan)
+function _lapApplyFilter(skipRebuild) {
   const tahun    = document.getElementById('lapTahun')?.value;
   const bulan    = document.getElementById('lapBulan')?.value;
   const status   = document.getElementById('lapStatus')?.value;
   const pkm      = document.getElementById('lapPKM')?.value;
+  const q        = (document.getElementById('lapSearch')?.value || '').trim().toLowerCase();
 
-  
-  _lapRebuildFilters(_lapAllData, tahun, bulan, status, pkm);
+  if (skipRebuild !== true) _lapRebuildFilters(_lapAllData, tahun, bulan, status, pkm);
 
   const filtered = _lapAllData.filter(r => {
     const statusOk = matchStatusFilter(r, status);
     return (!tahun    || String(r.tahun) === String(tahun))  &&
       (!bulan    || String(r.bulan) === String(bulan))  &&
       statusOk                                          &&
-      (!pkm      || r.kodePKM       === pkm);
+      (!pkm      || r.kodePKM       === pkm)           &&
+      (!q        || _lapMatchSearch(r, q));
   });
 
   _lapRenderTable(filtered);
@@ -202,6 +269,58 @@ function _lapRenderTable(data) {
   _lapRenderPage(1);
 }
 
+// ===== Progres verifikasi per usulan (Kapus -> Pengelola Program -> Admin) =====
+function _lapProgres(r) {
+  const list = r.programList || [];
+  const isDone = v => v.status === 'Selesai' || v.status === 'Ditolak';
+  const ppSelesai = list.filter(isDone).length;
+  const ppTotal = list.length;
+  const kapus = r.statusKapus === 'Selesai' ? 'done' : (r.statusKapus === 'Ditolak' ? 'rej' : 'wait');
+  const pp = ppTotal && ppSelesai === ppTotal ? 'done' : 'wait';
+  const admin = r.statusGlobal === 'Selesai' ? 'done' : 'wait';
+  return { list, isDone, ppSelesai, ppTotal, kapus, pp, admin };
+}
+
+function _lapShowProgres(idUsulan) {
+  const r = (window._lapAllData || []).find(x => x.idUsulan === idUsulan);
+  if (!r) return;
+  if (!document.getElementById('lapProgresModal')) {
+    document.body.insertAdjacentHTML('beforeend',
+      '<div class="modal" id="lapProgresModal" style="z-index:3000" onclick="if(event.target===this)closeModal(\'lapProgresModal\')">'
+      + '<div class="modal-card lg" style="max-width:680px;width:100%">'
+      + '<div class="modal-header"><span class="material-icons">account_tree</span><h3 id="lapProgresTitle"></h3>'
+      + '<button class="btn-icon" onclick="closeModal(\'lapProgresModal\')"><span class="material-icons">close</span></button></div>'
+      + '<div class="modal-body" id="lapProgresBody" style="padding:18px 22px"></div></div></div>');
+  }
+  const esc = t => String(t || '').replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  const g = _lapProgres(r);
+  const item = (st, nama, sub) => {
+    const c = st === 'done' ? '#0d9488' : (st === 'rej' ? '#dc2626' : '#d97706');
+    const ic = st === 'done' ? 'check_circle' : (st === 'rej' ? 'cancel' : 'schedule');
+    return `<div style="display:flex;align-items:flex-start;gap:6px;font-size:12.5px;line-height:1.4"><span class="material-icons" style="font-size:16px;color:${c};flex-shrink:0">${ic}</span><span style="${st === 'wait' ? 'font-weight:600' : 'color:var(--text-light)'}">${esc(nama)}${sub ? `<span style="display:block;font-size:10.5px;color:var(--text-light);font-weight:400">${sub}</span>` : ''}</span></div>`;
+  };
+  const sec = (icon, judul, kanan, isi) => `<div style="border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;margin-top:12px">`
+    + `<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;font-size:12.5px;font-weight:700"><span class="material-icons" style="font-size:17px;color:#0d9488">${icon}</span>${judul}<span style="margin-left:auto;font-size:11.5px;font-weight:600;color:var(--text-light)">${kanan}</span></div>${isi}</div>`;
+
+  const kapusTxt = g.kapus === 'done' ? 'Sudah verifikasi' : (g.kapus === 'rej' ? 'Menolak' : 'Belum verifikasi');
+  const kapusIsi = r.kapusNama ? item(g.kapus, r.kapusNama) : '<span style="font-size:12px;color:var(--text-light)">-</span>';
+  const pplist = g.list.slice().sort((a, b) => (g.isDone(a) ? 1 : 0) - (g.isDone(b) ? 1 : 0));
+  const ppIsi = pplist.length
+    ? '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:7px 16px">'
+      + pplist.map(v => item(v.status === 'Ditolak' ? 'rej' : (g.isDone(v) ? 'done' : 'wait'), v.nama)).join('') + '</div>'
+    : '<span style="font-size:12px;color:var(--text-light)">Belum ada Pengelola Program</span>';
+  const adminIsi = item(g.admin, r.adminNama || 'Admin', r.adminNama ? '' : (g.admin === 'done' ? '' : 'Menunggu semua tahap sebelumnya'));
+
+  document.getElementById('lapProgresTitle').textContent = 'Progres Verifikasi - ' + r.namaPKM + ' (' + r.namaBulan + ' ' + r.tahun + ')';
+  document.getElementById('lapProgresBody').innerHTML =
+    renderStatusBar({ statusGlobal: r.statusGlobal, statusKapus: r.statusKapus, statusProgram: r.statusProgram,
+      vpProgress: g.ppTotal ? { total: g.ppTotal, selesai: g.ppSelesai } : null })
+    + sec('person', 'Kepala Puskesmas', kapusTxt, kapusIsi)
+    + sec('groups', 'Pengelola Program', g.ppSelesai + '/' + g.ppTotal + ' selesai', ppIsi)
+    + sec('admin_panel_settings', 'Admin', g.admin === 'done' ? 'Sudah verifikasi' : 'Belum verifikasi', adminIsi);
+  showModal('lapProgresModal');
+}
+
 function _lapRenderPage(page) {
   const data = window._laporanData || [];
   const { items, page: p, totalPages, total } = paginateData(data, page);
@@ -212,14 +331,14 @@ function _lapRenderPage(page) {
 
   document.getElementById('lapTable').innerHTML = `
     <div class="table-container"><table>
-      <thead><tr style="background:#0d9488"><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">No</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Puskesmas</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Periode</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Tanggal Dibuat</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Indeks SPM</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:1%;min-width:140px;white-space:nowrap">Status</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Aksi</th></tr></thead>
+      <thead><tr style="background:#0d9488"><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">No</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Puskesmas</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Periode</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Waktu Dibuat</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Indeks SPM</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:1%;min-width:140px;white-space:nowrap">Status</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Aksi</th></tr></thead>
       <tbody>${items.map((r, i) => `<tr>
         <td>${offset + i + 1}</td>
-        <td>${r.namaPKM}</td>
+        <td style="text-align:left">${r.namaPKM}</td>
         <td>${r.namaBulan} ${r.tahun}</td>
         <td style="font-size:11.5px;color:var(--text-light)">${formatDateTime(r.createdAt)}</td>
         <td class="rasio-cell" style="font-weight:700;color:var(--primary)">${parseFloat(r.indeksSPM||0).toFixed(2)}</td>
-        <td>${statusBadge(r.statusGlobal, r)}</td>
+        <td>${r.statusGlobal === 'Draft' ? statusBadge(r.statusGlobal, r) : `<div onclick="_lapShowProgres('${r.idUsulan}')" title="Klik untuk lihat progres semua tahap" style="cursor:pointer;display:inline-block" onmouseover="this.style.opacity=.75" onmouseout="this.style.opacity=1">${statusBadge(r.statusGlobal, r)}</div>`}</td>
         <td style="white-space:nowrap">
           <button class="btn-icon view" onclick="viewDetail('${r.idUsulan}')" title="Detail"><span class="material-icons">visibility</span></button>
           ${getDownloadBtn(r, 20, currentUser.role, currentUser.indikatorAkses)}
@@ -231,24 +350,6 @@ function _lapRenderPage(page) {
     + renderPagination('lapTable', total, p, totalPages, pg => _lapRenderPage(pg));
 }
 
-function exportLaporan() {
-  const data = window._laporanData;
-  if (!data || !data.length) return toast('Tidak ada data untuk diekspor', 'warning');
-  const tahun   = document.getElementById('lapTahun')?.value || '';
-  const bulan   = document.getElementById('lapBulan')?.options[document.getElementById('lapBulan').selectedIndex]?.text || 'Semua Bulan';
-  const pkm     = document.getElementById('lapPKM')?.options[document.getElementById('lapPKM')?.selectedIndex]?.text || '';
-  const filterInfo = `Tahun: ${tahun} | Bulan: ${bulan}${pkm ? ' | PKM: '+pkm : ''}`;
-  const headers = ['No','ID Usulan','Puskesmas','Periode','Tanggal Dibuat','Indeks SPM','Status','Dibuat Oleh'];
-  const rows = data.map((r, i) => [
-    i + 1, r.idUsulan, r.namaPKM,
-    r.namaBulan + ' ' + r.tahun,
-    formatDateTime(r.createdAt),
-    parseFloat(r.indeksSPM||0).toFixed(2),
-    r.statusGlobal, r.createdBy||''
-  ]);
-  _downloadExcel('Laporan_SPM_' + tahun, headers, rows);
-  toast('Export Excel berhasil! Filter: ' + filterInfo, 'success');
-}
 
 async function downloadRekapLaporan() {
   const data = window._laporanData;
@@ -623,7 +724,16 @@ async function _brStartDownload() {
 let _masterActiveTab = 'users';
 
 async function renderMasterData(tab) {
-  if (tab) _masterActiveTab = tab;
+  if (tab) {
+    _masterActiveTab = tab;
+    try { sessionStorage.setItem('spm_tab_master', tab); } catch(e) {}
+  } else {
+    // Dibuka tanpa memilih tab (mis. setelah reload): pulihkan tab terakhir
+    try {
+      const saved = sessionStorage.getItem('spm_tab_master');
+      if (saved && _masterTabs.some(t => t.id === saved)) _masterActiveTab = saved;
+    } catch(e) {}
+  }
   const activeTab = _masterActiveTab;
 
   
@@ -656,42 +766,6 @@ async function renderMasterData(tab) {
   } finally {  }
 }
 
-async function renderSettingsTab(el) {
-  
-  const target = el || document.getElementById('masterTabContent');
-  if (!target) return;
-  target.innerHTML = `
-    <div class="card">
-      <div class="card-header-bar">
-        <span class="card-title"><span class="material-icons">settings</span>Pengaturan Sistem</span>
-      </div>
-      <div class="card-body">
-        <p style="font-size:13px;color:#64748b;margin-bottom:20px">Atur rentang tahun yang tampil di seluruh sistem (filter laporan, input usulan, dll).</p>
-        <div class="form-row" style="max-width:400px">
-          <div class="form-group">
-            <label>Tahun Awal</label>
-            <input class="form-control" type="number" id="settingTahunAwal" min="2020" max="2040" placeholder="cth: 2024">
-          </div>
-          <div class="form-group">
-            <label>Tahun Akhir</label>
-            <input class="form-control" type="number" id="settingTahunAkhir" min="2020" max="2040" placeholder="cth: 2027">
-          </div>
-        </div>
-        <div id="settingStatus" style="font-size:12.5px;color:#ef4444;min-height:18px;margin-bottom:12px"></div>
-        <button class="btn btn-primary" onclick="saveSettings()">
-          <span class="material-icons">save</span>Simpan Pengaturan
-        </button>
-      </div>
-    </div>`;
-
-  try {
-    const res = await API.get('settings');
-    if (res && res.tahun_awal) {
-      document.getElementById('settingTahunAwal').value = res.tahun_awal;
-      document.getElementById('settingTahunAkhir').value = res.tahun_akhir;
-    }
-  } catch(e) {  }
-}
 
 async function renderPejabatTab(el) {
   el.innerHTML = `
@@ -998,11 +1072,11 @@ function renderUsersTable(users, page) {
   const filteredUsers = (_currentFilteredUsers || users || allUsers).filter(u => u.role !== 'Super Admin' && u.role !== 'Admin' && u.email !== 'admin@vispm.com');
   const { items, page: p, totalPages, total } = paginateData(filteredUsers, _usersPage);
   const rowsHtml = items.map(u => `<tr>
-      <td style="font-size:12px">${u.email}</td>
-      <td>${u.nama}</td>
+      <td style="font-size:12px;text-align:left">${u.email}</td>
+      <td style="text-align:left">${u.nama}</td>
       <td style="font-size:11px;color:var(--text-light)">${u.nip || '-'}</td>
       <td style="white-space:nowrap"><span class="badge badge-info" style="white-space:nowrap">${u.role}</span></td>
-      <td>${u.namaPKM || u.kodePKM || '-'}</td>
+      <td style="text-align:left">${u.namaPKM || u.kodePKM || '-'}</td>
       <td style="font-size:12px">${u.role === 'Pengelola Program' ? (u.jabatan ? u.jabatan.split('|').map(j=>'<div style="font-weight:600;color:var(--primary);font-size:11px;white-space:nowrap">'+j.trim()+'</div>').join('') : '') + '<div style="color:var(--text-light);font-size:11px">'+(u.indikatorAkses || '')+'</div>' : ''}</td>
       <td>${u.aktif ? '<span class="badge badge-success">Aktif</span>' : '<span class="badge badge-default">Non-aktif</span>'}</td>
       <td style="display:flex;gap:4px">
@@ -1160,17 +1234,6 @@ function getSelectedJabatan() {
   return Array.from(boxes).map(b => b.value);
 }
 
-async function tambahJabatanBaru() {
-  const newJab = document.getElementById('uJabatanBaru')?.value.trim();
-  if (!newJab) return toast('Ketik nama jabatan baru terlebih dahulu', 'warning');
-  try {
-    await API.post('jabatan', { nama: newJab });
-    toast(`Jabatan "${newJab}" ditambahkan`, 'success');
-    document.getElementById('uJabatanBaru').value = '';
-    const cur = getSelectedJabatan();
-    await loadJabatanDropdown([...cur, newJab]);
-  } catch(e) { toast(e.message, 'error'); }
-}
 
 function checkUserRole() {
   const role = document.getElementById('uRole').value;
@@ -1415,7 +1478,7 @@ function _renderJabatanTable(list, page) {
   const { items, page: p, totalPages, total } = _paginateCustom(list, _jabPage, _PAGE_SIZE_JAB);
   const rowsHtml = items.map((j, i) => `<tr>
       <td>${(p-1)*_PAGE_SIZE_JAB + i + 1}</td>
-      <td style="font-weight:500">${j.nama}</td>
+      <td style="font-weight:500;text-align:left">${j.nama}</td>
       <td>${j.aktif
         ? '<span style="background:#d1fae5;color:#065f46;padding:2px 10px;border-radius:20px;font-size:12px;font-weight:600">Aktif</span>'
         : '<span style="background:#f1f5f9;color:#94a3b8;padding:2px 10px;border-radius:20px;font-size:12px;font-weight:600">Non-aktif</span>'}</td>
@@ -1539,7 +1602,7 @@ function renderPKMTable(pkm, page) {
     const kodeQ = p.kode.replace(/'/g, "\'");
     return '<tr>'
       + '<td><span style="font-weight:700">'+p.kode+'</span></td>'
-      + '<td>'+p.nama+'</td>'
+      + '<td style="text-align:left">'+p.nama+'</td>'
       + '<td class="rasio-cell">'+parseFloat(p.indeks||0).toFixed(2)+'</td>'
       + '<td class="rasio-cell">'+parseFloat(p.indeksKesulitan||0).toFixed(2)+'</td>'
       + '<td>'+(p.aktif ? '<span class="badge badge-success">Aktif</span>' : '<span class="badge badge-default">Non-aktif</span>')+'</td>'
@@ -1675,7 +1738,7 @@ async function loadTargetTahunan() {
             <div style="font-size:12px;color:var(--text-light)">Target Sasaran Tahun ${tahun}</div>
           </div>
           <div style="display:flex;gap:8px">
-            ${hasData ? `<span style="font-size:12px;color:#0d9488;background:#f0fdf9;padding:4px 10px;border-radius:6px;border:1px solid #0d9488">✓ Data tersimpan</span>` : `<span style="font-size:12px;color:#f59e0b;background:#fffbeb;padding:4px 10px;border-radius:6px;border:1px solid #fcd34d">⚠ Belum ada data</span>`}
+            ${hasData ? `<span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#fff;background:linear-gradient(135deg,#14b8a6,#0d9488);padding:6px 12px 6px 8px;border-radius:999px;box-shadow:0 2px 6px rgba(13,148,136,0.35)"><span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:rgba(255,255,255,0.25)"><span class="material-icons" style="font-size:12px;line-height:1">check</span></span>Data tersimpan</span>` : `<span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#fff;background:linear-gradient(135deg,#fbbf24,#f59e0b);padding:6px 12px 6px 8px;border-radius:999px;box-shadow:0 2px 6px rgba(245,158,11,0.35)"><span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:rgba(255,255,255,0.25)"><span class="material-icons" style="font-size:12px;line-height:1">priority_high</span></span>Belum ada data</span>`}
             <button class="btn btn-primary" onclick="saveTargetTahunan()"><span class="material-icons">save</span>Simpan Semua</button>
           </div>
         </div>
@@ -1684,8 +1747,8 @@ async function loadTargetTahunan() {
             <thead><tr style="background:#0d9488"><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:40px">No</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Nama Indikator</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:160px;text-align:center">Jumlah Sasaran (Satu Tahun)</th></tr></thead>
             <tbody>
               ${_ttIndikator.map(ind => `<tr>
-                <td><span style="font-weight:700">${ind.noIndikator}</span></td>
-                <td style="font-size:13px">${ind.namaIndikator}</td>
+                <td>${ind.noIndikator}</td>
+                <td style="font-size:13px;text-align:left">${ind.namaIndikator}</td>
                 <td style="text-align:center">
                   <input type="number" min="0"
                     class="form-control" id="tt-${ind.noIndikator}"
@@ -1776,8 +1839,8 @@ function renderIndTable(inds, page) {
   if (tbEl) tbEl.textContent = totalBobot;
   const { items, page: p, totalPages, total } = _paginateCustom(inds, _indPage, _PAGE_SIZE_IND);
   const rowsHtml = items.map(i => `<tr>
-      <td><span style="font-weight:700">${i.no}</span></td>
-      <td>${i.nama}</td>
+      <td>${i.no}</td>
+      <td style="text-align:left">${i.nama}</td>
       <td style="text-align:center"><span style="font-family:">${i.bobot}</span></td>
       <td>${i.aktif ? '<span class="badge badge-success">Aktif</span>' : '<span class="badge badge-default">Non-aktif</span>'}</td>
       <td style="display:flex;gap:4px">
@@ -2061,6 +2124,30 @@ function _pFormatCountdown(ms) {
   const s = totalSec % 60;
   const hh = String(h).padStart(2, '0'), mm = String(m).padStart(2, '0'), ss = String(s).padStart(2, '0');
   return d > 0 ? `${d} hari ${hh}:${mm}:${ss}` : `${hh}:${mm}:${ss}`;
+}
+
+// Warna yang sama dengan gradasi progress bar timeline (_pTimelineRow: hijau -> kuning -> merah),
+// dipakai biar elemen lain (mis. badge countdown) bisa ikut warna progress bar timer.
+// pct: 0-100 (persentase waktu yang sudah berlalu). alpha opsional utk rgba (background tint).
+function _pGradientColor(pct, alpha) {
+  const stops = [
+    [34, 197, 94],   // #22c55e
+    [132, 204, 22],  // #84cc16
+    [234, 179, 8],   // #eab308
+    [249, 115, 22],  // #f97316
+    [239, 68, 68]    // #ef4444
+  ];
+  const p = Math.max(0, Math.min(100, pct || 0)) / 100;
+  const segCount = stops.length - 1;
+  const segPos = p * segCount;
+  const idx = Math.min(Math.floor(segPos), segCount - 1);
+  const t = segPos - idx;
+  const [r1, g1, b1] = stops[idx];
+  const [r2, g2, b2] = stops[idx + 1];
+  const r = Math.round(r1 + (r2 - r1) * t);
+  const g = Math.round(g1 + (g2 - g1) * t);
+  const b = Math.round(b1 + (b2 - b1) * t);
+  return alpha != null ? `rgba(${r},${g},${b},${alpha})` : `rgb(${r},${g},${b})`;
 }
 
 function _pTickTimelineRow(rowId, startMs, endMs, nowMs) {
@@ -2625,7 +2712,7 @@ function resetIdleTimer() {
       _hideIdleWarning();
       currentUser = null;
       sessionStorage.removeItem('spm_user');
-      try { sessionStorage.removeItem('spm_last_page'); } catch(e) {}
+      try { sessionStorage.removeItem('spm_last_page'); sessionStorage.removeItem('spm_tab_verif'); sessionStorage.removeItem('spm_tab_master'); } catch(e) {}
       toast('Sesi berakhir karena tidak ada aktivitas. Silakan login kembali.', 'warning');
       setTimeout(() => location.reload(), 2000);
     }
@@ -2671,6 +2758,7 @@ async function renderKelolaUsulan() {
     <div class="card">
       <div class="card-body" style="padding:12px 16px">
         <div class="filter-row">
+          <div class="search-input-wrap"><span class="material-icons search-icon">search</span><input class="search-input" type="search" id="kuSearch" style="min-height:36px;box-sizing:border-box" name="kuSearch" placeholder="Cari ID usulan, puskesmas, atau operator..." oninput="_kuApplyFilter()" autocomplete="off" data-lpignore="true" data-1p-ignore="true"></div>
           <select class="form-control" id="kuTahun" onchange="_kuOnTahunChange()" style="min-width:120px"><option value="">Memuat...</option></select>
           <select class="form-control" id="kuBulan" onchange="_kuApplyFilter()" style="min-width:150px">
             <option value="">Semua Bulan</option>
@@ -2777,16 +2865,23 @@ function _kuOnTahunChange() {
 }
 
 // Apply filter tahun/bulan/status ke _kuAllRows, lalu render tabel
+function _kuMatchSearch(u, q) {
+  return [u.idUsulan, u.namaPKM, u.kodePKM, u._namaOperator, u.createdBy, (u.namaBulan || '') + ' ' + (u.tahun || '')]
+    .some(v => String(v || '').toLowerCase().includes(q));
+}
+
 function _kuApplyFilter(page) {
   _kuPage = page || 1;
   const tahun  = document.getElementById('kuTahun')?.value;
   const bulan  = document.getElementById('kuBulan')?.value;
   const status = document.getElementById('kuStatus')?.value;
+  const q      = (document.getElementById('kuSearch')?.value || '').trim().toLowerCase();
 
   _kuRows = _kuAllRows.filter(u =>
     (!tahun  || String(u.tahun)       === String(tahun))  &&
     (!bulan  || String(u.bulan)       === String(bulan))  &&
-    matchStatusFilter(u, status)
+    matchStatusFilter(u, status) &&
+    (!q || _kuMatchSearch(u, q))
   );
 
   _kuRenderTable();
@@ -2845,15 +2940,17 @@ function _kuRenderTable() {
     return;
   }
   const { items, page: p, totalPages, total } = paginateData(_kuRows, _kuPage);
-  const rowsHtml = items.map(u => `<tr>
-      <td><span style="font-weight:600;font-size:12px">${u.idUsulan}</span></td>
-      <td>${u.namaPKM || u.kodePKM}</td>
-      <td style="font-size:12px">${u._namaOperator || u.createdBy || '-'}</td>
-      <td>${u.namaBulan || ''} ${u.tahun}</td>
-      <td class="rasio-cell" style="font-weight:700;color:var(--primary)">${parseFloat(u.indeksSPM||0).toFixed(2)}</td>
-      <td>${statusBadge(u.statusGlobal, u)}</td>
-      <td style="font-size:12px;color:var(--text-light)">${formatDateTime(u.createdAt)}</td>
-      <td style="display:flex;gap:4px">
+  const startNo = (p - 1) * ITEMS_PER_PAGE + 1;
+  const rowsHtml = items.map((u, i) => `<tr>
+      <td style="font-size:12px;color:var(--text-light);text-align:center">${startNo + i}</td>
+      <td style="text-align:center"><span style="font-weight:600;font-size:12px">${u.idUsulan}</span></td>
+      <td style="text-align:left">${u.namaPKM || u.kodePKM}</td>
+      <td style="font-size:12px;text-align:left">${u._namaOperator || u.createdBy || '-'}</td>
+      <td style="text-align:center">${u.namaBulan || ''} ${u.tahun}</td>
+      <td class="rasio-cell" style="font-weight:700;color:var(--primary);text-align:center">${parseFloat(u.indeksSPM||0).toFixed(2)}</td>
+      <td style="text-align:center">${statusBadge(u.statusGlobal, u)}</td>
+      <td style="font-size:12px;color:var(--text-light);text-align:center">${formatDateTime(u.createdAt)}</td>
+      <td style="display:flex;gap:4px;justify-content:center">
         <button class="btn-icon view" onclick="viewDetail('${u.idUsulan}')" title="Detail"><span class="material-icons">visibility</span></button>
         <button class="btn-icon del" onclick="adminDeleteUsulan('${u.idUsulan}')" title="Hapus"><span class="material-icons">delete</span></button>
         ${u.statusGlobal === 'Menunggu Admin' && u.statusKapus !== 'Selesai'
@@ -2862,14 +2959,11 @@ function _kuRenderTable() {
       </td>
     </tr>`).join('');
   el.innerHTML = '<div class="table-container"><table>'
-    + '<thead><tr style="background:#0d9488"><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">ID Usulan</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Puskesmas</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Operator</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Periode</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Indeks SPM</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:1%;min-width:140px;white-space:nowrap">Status</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Dibuat</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Aksi</th></tr></thead>'
+    + '<thead><tr style="background:#0d9488"><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:1%">No</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">ID Usulan</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Puskesmas</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Operator</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Periode</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Indeks SPM</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:1%;min-width:140px;white-space:nowrap">Status</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Waktu Dibuat</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Aksi</th></tr></thead>'
     + '<tbody>' + rowsHtml + '</tbody></table></div>'
     + renderPagination('kuTable', total, p, totalPages, 'pg => { _kuPage=pg; _kuRenderTable(); }');
 }
 
-function adminEditUsulan(idUsulan) {
-  openIndikatorModal(idUsulan);
-}
 
 async function adminResetUsulan(idUsulan) {
   showConfirm({
@@ -3008,10 +3102,11 @@ async function renderAuditTrail(el) {
 
   
   
-  await Promise.all([
-    _populateAuditFilterOptions(),
-    loadAuditTrail()
-  ]);
+  // Daftar log dimuat DULU; opsi dropdown (fetch 5000 baris) menyusul sesudahnya dan tidak
+  // ditunggu. Dulu keduanya jalan bersamaan sehingga berebut koneksi DB dan list utama
+  // bisa kena timeout ("Server error 500") gara-gara menunggu fetch 5000 baris.
+  await loadAuditTrail();
+  _populateAuditFilterOptions();
 }
 
 async function _populateAuditFilterOptions() {
@@ -3099,6 +3194,44 @@ function _atLokasiIcon(akurat) {
   return `<span class="material-icons" style="font-size:12px;color:#d97706" title="Lokasi perkiraan dari IP, bisa kurang akurat">location_searching</span>`;
 }
 
+// Detail panjang dipotong 3 baris + tombol "Show" / "Hide". Klik di luar area detail
+// otomatis meng-hide lagi. Teks di-escape karena detail bisa berisi input user
+// (mis. alasan penolakan).
+function _atDetailCell(detail) {
+  const txt = String(detail == null ? '' : detail).trim();
+  if (!txt) return '-';
+  const safe = _escHtml(txt);
+  if (txt.length <= 70) return safe;
+  return `<div class="at-detail" data-open="0">` +
+    `<div class="at-detail-text" style="display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">${safe}</div>` +
+    `<a href="javascript:void(0)" class="at-detail-toggle" onclick="_atToggleDetail(this)" style="display:inline-flex;align-items:center;margin-top:2px;font-size:11px;font-weight:600;color:#0d9488;text-decoration:none;cursor:pointer">${_showHideLabel(false)}</a>` +
+    `</div>`;
+}
+function _atSetDetail(wrap, open) {
+  const box = wrap.querySelector('.at-detail-text');
+  const btn = wrap.querySelector('.at-detail-toggle');
+  if (!box || !btn) return;
+  box.style.display = open ? 'block' : '-webkit-box';
+  wrap.dataset.open = open ? '1' : '0';
+  btn.innerHTML = _showHideLabel(open);
+}
+function _atToggleDetail(a) {
+  const wrap = a.closest('.at-detail');
+  if (!wrap) return;
+  _atSetDetail(wrap, wrap.dataset.open !== '1');
+}
+// Klik di luar area detail yang sedang terbuka -> otomatis Hide (didaftarkan sekali).
+if (!window._atDetailOutsideBound) {
+  window._atDetailOutsideBound = true;
+  document.addEventListener('click', (e) => {
+    // composedPath(): ikon chevron ikut diganti saat toggle, jadi e.target bisa sudah lepas dari DOM
+    const path = e.composedPath ? e.composedPath() : [];
+    document.querySelectorAll('.at-detail[data-open="1"]').forEach(w => {
+      if (!path.includes(w) && !w.contains(e.target)) _atSetDetail(w, false);
+    });
+  });
+}
+
 function _atRenderTable() {
   const el = document.getElementById('auditTrailTable');
   if (!el) return;
@@ -3116,12 +3249,12 @@ function _atRenderTable() {
       <thead><tr style="background:#0d9488">
         <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:12%">Waktu</th>
         <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:8%">Modul</th>
-        <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:8%">Aksi</th>
+        <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:13%">Aksi</th>
         <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:20%">User</th>
         <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:9%">Role</th>
         <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:9%">Detail</th>
         <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:11%">IP Address</th>
-        <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:23%">Lokasi</th>
+        <th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;width:18%">Lokasi</th>
       </tr></thead>
       <tbody>${items.map(r => {
         const ac = (r.action||'').toUpperCase();
@@ -3130,10 +3263,10 @@ function _atRenderTable() {
         return `<tr>
           <td style="font-size:11.5px;color:#64748b;white-space:nowrap">${formatDateTime(r.created_at)}</td>
           <td><span style="font-size:11px;font-weight:700;background:#f1f5f9;color:#475569;padding:2px 8px;border-radius:20px">${r.module||'-'}</span></td>
-          <td><span style="font-size:11px;font-weight:700;background:${bg};color:${col};padding:2px 8px;border-radius:20px;border:1px solid ${col}33">${ac||'-'}</span></td>
-          <td style="font-size:12px;overflow:hidden"><div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${r.user_nama||'-'}">${r.user_nama||'-'}</div><div style="font-size:11px;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${r.user_email||''}">${r.user_email||''}</div></td>
+          <td><span title="${ac||'-'}" style="display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle;font-size:11px;font-weight:700;background:${bg};color:${col};padding:2px 8px;border-radius:20px;border:1px solid ${col}33">${ac||'-'}</span></td>
+          <td style="font-size:12px;overflow:hidden;text-align:left"><div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${r.user_nama||'-'}">${r.user_nama||'-'}</div><div style="font-size:11px;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${r.user_email||''}">${r.user_email||''}</div></td>
           <td style="font-size:12px;color:#64748b">${r.user_role||'-'}</td>
-          <td style="font-size:12px;word-break:break-word">${r.detail||'-'}</td>
+          <td style="font-size:12px;word-break:break-word">${_atDetailCell(r.detail)}</td>
           <td style="font-size:11px;color:#94a3b8;word-break:break-all;overflow-wrap:break-word">${r.ip_address||'-'}</td>
           <td style="font-size:11px;color:#64748b;overflow-wrap:break-word">${r.lokasi
             ? `<span style="display:flex;align-items:flex-start;gap:4px"><span style="flex-shrink:0;margin-top:1px">${_atLokasiIcon(_atLokasiIsAkurat(r.lokasi))}</span><span>${r.lokasi}</span></span>`
@@ -3371,21 +3504,16 @@ document.addEventListener('keydown', e => {
 
 function _buildMasterShell() {
   const tabsHtml = _masterTabs.map(t => `
-    <button id="masterTab_${t.id}" onclick="renderMasterData('${t.id}')"
-      style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border:none;
-             border-bottom:3px solid transparent;background:transparent;color:#64748b;
-             font-weight:500;font-size:13px;cursor:pointer;transition:all 0.15s;white-space:nowrap">
-      <span class="material-icons" style="font-size:16px">${t.icon}</span>${t.label}
+    <button type="button" class="tab" id="masterTab_${t.id}" onclick="renderMasterData('${t.id}')">
+      <span class="material-icons">${t.icon}</span>${t.label}
     </button>`).join('');
 
   document.getElementById('mainContent').innerHTML = `
     <div class="page-header">
       <h1><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;color:var(--primary)"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>Master Data</h1>
     </div>
-    <div style="background:white;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,0.07);margin-bottom:16px">
-      <div style="display:flex;gap:0;padding:0 8px;overflow-x:auto;border-bottom:1px solid #e2e8f0">
-        ${tabsHtml}
-      </div>
+    <div class="tabs" id="masterTabs">
+      ${tabsHtml}
     </div>
     <div id="masterTabContent" style="min-height:200px"></div>`;
 }
@@ -3394,9 +3522,7 @@ function _highlightMasterTab(activeId) {
   _masterTabs.forEach(t => {
     const btn = document.getElementById('masterTab_' + t.id);
     if (!btn) return;
-    btn.style.borderBottomColor = t.id === activeId ? '#0d9488' : 'transparent';
-    btn.style.color = t.id === activeId ? '#0d9488' : '#64748b';
-    btn.style.fontWeight = t.id === activeId ? '700' : '500';
+    btn.classList.toggle('active', t.id === activeId);
   });
 }
 
@@ -3475,10 +3601,10 @@ function _renderPenandatanganRow(ind, currentJabatan, jabatanOptions) {
 
   // Tags urutan yang sudah dipilih
   const tagsHtml = currentJabatan.map((j, i) => `
-    <div id="ptag-${ind.no}-${i}" class="pen-tag-chip" style="display:inline-flex;align-items:center;gap:4px;background:#e0f2fe;border:1px solid #7dd3fc;border-radius:20px;padding:3px 10px;font-size:12px;color:#0369a1;font-weight:600;margin:2px;white-space:nowrap">
-      <span style="background:#0369a1;color:white;border-radius:50%;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0">${i+1}</span>
+    <div id="ptag-${ind.no}-${i}" class="pen-tag-chip" style="display:inline-flex;align-items:center;gap:4px;background:#ccfbf1;border:1px solid #5eead4;border-radius:20px;padding:3px 10px 3px 3px;font-size:12px;color:#0f766e;font-weight:600;margin:2px;white-space:nowrap">
+      <span style="background:#14b8a6;color:white;border-radius:50%;width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0">${i+1}</span>
       <span style="white-space:nowrap">${j}</span>
-      <button onclick="_uncheckPenandatangan(${ind.no}, '${j.replace(/'/g, "\\\'")}', ${i})" style="background:none;border:none;cursor:pointer;color:#0369a1;padding:0;display:flex;line-height:1;margin-left:2px;flex-shrink:0">
+      <button onclick="_uncheckPenandatangan(${ind.no}, '${j.replace(/'/g, "\\\'")}', ${i})" style="background:none;border:none;cursor:pointer;color:#0f766e;opacity:0.85;padding:0;display:flex;line-height:1;margin-left:2px;flex-shrink:0">
         <span class="material-icons" style="font-size:14px">close</span>
       </button>
     </div>`).join('');
@@ -3566,10 +3692,10 @@ function _refreshPenandatanganTags(noInd) {
     return;
   }
   tagsEl.innerHTML = state.map((j, i) => `
-    <div id="ptag-${noInd}-${i}" class="pen-tag-chip" style="display:inline-flex;align-items:center;gap:4px;background:#e0f2fe;border:1px solid #7dd3fc;border-radius:20px;padding:3px 10px;font-size:12px;color:#0369a1;font-weight:600;margin:2px;white-space:nowrap">
-      <span style="background:#0369a1;color:white;border-radius:50%;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0">${i+1}</span>
+    <div id="ptag-${noInd}-${i}" class="pen-tag-chip" style="display:inline-flex;align-items:center;gap:4px;background:#ccfbf1;border:1px solid #5eead4;border-radius:20px;padding:3px 10px 3px 3px;font-size:12px;color:#0f766e;font-weight:600;margin:2px;white-space:nowrap">
+      <span style="background:#14b8a6;color:white;border-radius:50%;width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0">${i+1}</span>
       <span style="white-space:nowrap">${j}</span>
-      <button onclick="event.stopPropagation();_uncheckPenandatangan(${noInd}, '${j.replace(/'/g, "\\\'")}', ${i})" style="background:none;border:none;cursor:pointer;color:#0369a1;padding:0;display:flex;line-height:1;margin-left:2px;flex-shrink:0">
+      <button onclick="event.stopPropagation();_uncheckPenandatangan(${noInd}, '${j.replace(/'/g, "\\\'")}', ${i})" style="background:none;border:none;cursor:pointer;color:#0f766e;opacity:0.85;padding:0;display:flex;line-height:1;margin-left:2px;flex-shrink:0">
         <span class="material-icons" style="font-size:14px">close</span>
       </button>
     </div>`).join('');

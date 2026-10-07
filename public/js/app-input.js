@@ -1,3 +1,33 @@
+// ── Teks panjang dipotong 2 baris + tombol Show / Hide. Klik di luar area yang sedang
+// terbuka otomatis meng-Hide lagi (didaftarkan sekali). Pola yang sama dengan detail Audit Trail.
+// Label tombol Show/Hide + ikon chevron (dipakai juga oleh detail Audit Trail di app-master.js)
+function _showHideLabel(open) {
+  return (open ? 'Hide' : 'Show')
+    + '<span class="material-icons" style="font-size:14px;line-height:1;margin-left:1px">' + (open ? 'expand_less' : 'expand_more') + '</span>';
+}
+function _clampSet(wrap, open) {
+  const box = wrap.querySelector('[data-clamp-text]');
+  const btn = wrap.querySelector('[data-clamp-btn]');
+  if (!box || !btn) return;
+  box.style.webkitLineClamp = open ? 'unset' : '2';
+  wrap.dataset.clampOpen = open ? '1' : '0';
+  btn.innerHTML = _showHideLabel(open);
+}
+function _clampToggle(btn) {
+  const wrap = btn.closest('[data-clamp-open]');
+  if (wrap) _clampSet(wrap, wrap.dataset.clampOpen !== '1');
+}
+if (!window._clampOutsideBound) {
+  window._clampOutsideBound = true;
+  document.addEventListener('click', (e) => {
+    // composedPath() dicek karena tombol mengganti isinya (innerHTML) saat diklik: kalau yang
+    // diklik ikon chevron, node targetnya sudah lepas dari DOM dan contains() salah menganggap "di luar".
+    const path = e.composedPath ? e.composedPath() : [];
+    document.querySelectorAll('[data-clamp-open="1"]').forEach(w => {
+      if (!path.includes(w) && !w.contains(e.target)) _clampSet(w, false);
+    });
+  });
+}
 
 async function renderInput() {
   
@@ -9,7 +39,15 @@ async function renderInput() {
   try {
     [pkmList] = await Promise.all([API.getPKM(true)]);
     try {
-      const periodeRes = await API.get('periode');
+      let periodeRes;
+      try {
+        periodeRes = await API.get('periode');
+      } catch (eRetry) {
+        // Gagal pertama (sering karena cold-start/race auth pas baru refresh) —
+        // coba sekali lagi sebelum nyerah, biar gak salah nunjukin "Periode Ditutup".
+        await new Promise(r => setTimeout(r, 700));
+        periodeRes = await API.get('periode');
+      }
       allPeriode = Array.isArray(periodeRes) ? periodeRes : [];
       
       
@@ -181,17 +219,32 @@ function updateBulanOptions() {
     : BULAN_NAMA.slice(1).map((m, i) => ({ bulan: i + 1, namaBulan: m }));
   const available = bulanList.filter(p => !sudahAda.includes(parseInt(p.bulan)));
   const btnBuat = document.querySelector('button[onclick="createUsulan()"]');
+  const tahunSel = document.getElementById('inputTahun');
+  // Cek apakah tahun LAIN (selain yg lagi dipilih) masih ada bulan yg belum dipakai —
+  // kalau iya, dropdown Tahun tetep aktif (biar bisa pindah tahun); kalau semua tahun aktif
+  // udah abis jatah bulannya, dropdown Tahun ikut digrayout biar konsisten sama Bulan & tombolnya.
+  const adaTahunLainTersedia = periodeOptions.some(p => {
+    const bln = p.bulan ?? p.no_bulan ?? p.noBulan;
+    const sudahAdaTahunP = (window._existingUsulanBulan || []).filter(u => u.tahun == p.tahun).map(u => parseInt(u.bulan));
+    return !sudahAdaTahunP.includes(parseInt(bln));
+  });
   if (available.length === 0) {
     sel.innerHTML = `<option value="">— Semua bulan sudah memiliki usulan —</option>`;
     sel.disabled = true;
     if (btnBuat) { btnBuat.disabled = true; btnBuat.style.opacity = '0.5'; btnBuat.style.cursor = 'not-allowed'; }
+    if (tahunSel && !adaTahunLainTersedia) {
+      tahunSel.disabled = true;
+      tahunSel.style.opacity = '0.5'; tahunSel.style.cursor = 'not-allowed'; tahunSel.style.background = '#f1f5f9';
+      tahunSel.title = 'Semua periode aktif sudah memiliki usulan';
+    }
   } else if (available.length === 1) {
-    
+    if (tahunSel) { tahunSel.disabled = false; tahunSel.style.opacity = ''; tahunSel.style.cursor = ''; tahunSel.style.background = ''; tahunSel.title = ''; }
     sel.disabled = false;
     sel.innerHTML = available.map(p => `<option value="${p.bulan}" selected>${p.namaBulan}</option>`).join('');
     sel.value = String(available[0].bulan); // force select
     if (btnBuat) { btnBuat.disabled = false; btnBuat.style.opacity = ''; btnBuat.style.cursor = ''; }
   } else {
+    if (tahunSel) { tahunSel.disabled = false; tahunSel.style.opacity = ''; tahunSel.style.cursor = ''; tahunSel.style.background = ''; tahunSel.title = ''; }
     // Lebih dari 1 bulan — tampilkan placeholder, tombol disabled sampai user pilih
     sel.disabled = false;
     sel.innerHTML = `<option value="">— Pilih Bulan —</option>`
@@ -211,7 +264,7 @@ function updateBulanOptions() {
 function _renderMyUsulanRow(u) {
   return `<tr>
           <td><span style="font-weight:600;font-size:12px;">${u.idUsulan}</span></td>
-          <td>${u.namaPKM || u.kodePKM}</td>
+          <td style="text-align:left">${u.namaPKM || u.kodePKM}</td>
           <td>${u.namaBulan} ${u.tahun}</td>
           <td style="min-width:220px">
             ${renderStatusBar(u)}
@@ -266,13 +319,14 @@ function _renderMyUsulanPaged(page) {
     tbl.innerHTML = `<div class="empty-state" style="padding:32px"><span class="material-icons">inbox</span><p>Belum ada usulan</p></div>`;
     return;
   }
-  const { items, page: p, totalPages, total } = paginateData(rows, page);
+  const MY_USULAN_PAGE_SIZE = 5;
+  const { items, page: p, totalPages, total } = paginateData(rows, page, MY_USULAN_PAGE_SIZE);
   window._myUsulanPage = p;
   tbl.innerHTML = `<div class="table-container"><table>
       <thead><tr style="background:#0d9488"><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">ID Usulan</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Puskesmas</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Periode</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Progress Verifikasi</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Aksi</th></tr></thead>
       <tbody>${items.map(u => _renderMyUsulanRow(u)).join('')}</tbody>
     </table></div>`
-    + renderPagination('myUsulanTable', total, p, totalPages, pg => _renderMyUsulanPaged(pg));
+    + renderPagination('myUsulanTable', total, p, totalPages, pg => _renderMyUsulanPaged(pg), MY_USULAN_PAGE_SIZE);
 }
 
 async function loadMyUsulan() {
@@ -340,8 +394,14 @@ async function deleteUsulan(idUsulan) {
   showConfirm({ title: 'Hapus Usulan', message: `Hapus usulan ${idUsulan}? Data tidak dapat dikembalikan.`,
     onConfirm: async () => {
       try {
+        const deleted = (window._myUsulanRows || []).find(u => u.idUsulan === idUsulan);
         await API.del('usulan', { idUsulan });
         toast('Usulan berhasil dihapus');
+        if (deleted) {
+          window._existingUsulanBulan = (window._existingUsulanBulan || [])
+            .filter(u => !(u.tahun == deleted.tahun && u.bulan == deleted.bulan));
+          updateBulanOptions();
+        }
         loadMyUsulan();
       } catch (e) { toast(e.message, 'error'); }
     }
@@ -351,26 +411,6 @@ async function deleteUsulan(idUsulan) {
 let currentIndikatorUsulan = null;
 let indikatorData = [];
 
-async function openGDriveFolder(kodePKM, tahun, bulan, namaBulan, idUsulan) {
-  const btn = document.getElementById('btnOpenDrive');
-  if (btn) { btn.innerHTML = '<div class="spm-spinner sm"><div class="sr1"></div><div class="sr2"></div><div class="sr3"></div></div> Membuat folder...'; btn.disabled = true; }
-  try {
-    const result = await API.get('drive', { kodePKM, tahun, bulan, namaBulan });
-    
-    if (idUsulan) {
-      await API.put('usulan?action=drive-folder', { idUsulan, driveFolderId: result.folderId, driveFolderUrl: result.folderUrl })
-        .catch(e => console.warn('[drive-folder] Gagal simpan folder URL:', e.message));
-    }
-    window.open(result.folderUrl, '_blank');
-    if (btn) { btn.innerHTML = '<span class="material-icons" style="font-size:15px">folder_open</span> Buka Folder Drive'; btn.disabled = false; }
-    
-    const linkEl = document.getElementById('driveFolderLink');
-    if (linkEl) { linkEl.href = result.folderUrl; linkEl.style.display = 'inline-flex'; }
-  } catch (e) {
-    toast('Gagal membuka Google Drive: ' + e.message, 'error');
-    if (btn) { btn.innerHTML = '<span class="material-icons" style="font-size:15px">open_in_new</span> Buka Google Drive'; btn.disabled = false; }
-  }
-}
 
 async function openIndikatorModal(idUsulan) {
   
@@ -530,7 +570,7 @@ async function openIndikatorModal(idUsulan) {
       const _sisaColor = '#1e293b';
       return `<tr id="indRow-${ind.no}">
         <td><span style="font-weight:700">${ind.no}</span></td>
-        <td style="max-width:220px;font-size:12.5px">${ind.nama}</td>
+        <td style="max-width:220px;font-size:12.5px;text-align:left">${ind.nama}</td>
         <input type="hidden" id="bobot-${ind.no}" value="${ind.bobot}">
         <input type="hidden" id="sasaran-${ind.no}" value="${ind.sasaranTahunan || 0}">
         <input type="hidden" id="prevkum-${ind.no}" value="${Math.max(0, (ind.realisasiKumulatif || 0) - (ind.capaian || 0))}">
@@ -1645,6 +1685,27 @@ async function doSubmitUsulan(forceSubmit) {
   }
 }
 
+function koreksiTargetSisa(no) {
+  const tEl = document.getElementById(`t-${no}`);
+  if (!tEl) return;
+  const sasaran  = parseInt(document.getElementById(`sasaran-${no}`)?.value) || 0;
+  const prevKum  = parseInt(document.getElementById(`prevkum-${no}`)?.value) || 0;
+  const bulanIni = parseInt(document.getElementById(`bulan-ind-${no}`)?.value) || 1;
+  if (sasaran <= 0) { saveIndikator(no); return; }
+
+  const sisaTarget  = Math.max(0, sasaran - prevKum);
+  const sisaBulan   = Math.max(1, 12 - bulanIni + 1);
+  const targetBenar = Math.round(sisaTarget / sisaBulan);
+
+  if ((parseInt(tEl.value) || 0) !== targetBenar) {
+    tEl.value = targetBenar;
+    toast(`Target Bulan Ini Indikator ${no} otomatis dihitung: Sisa Target Tahunan (${sisaTarget}) ÷ Sisa Bulan (${sisaBulan}) = ${targetBenar}`, 'warning');
+  }
+  updateSisaTarget(no);
+  previewSPM(no);
+  saveIndikator(no);
+}
+
 function clampRealisasi(no) {
   const tEl = document.getElementById(`t-${no}`);
   const cEl = document.getElementById(`c-${no}`);
@@ -2000,18 +2061,18 @@ async function viewDetail(idUsulan) {
               ${isDitolakVP && v.catatan ? (() => {
   const id = 'alasan_' + Math.random().toString(36).slice(2,8);
   const short = v.catatan.length > 80;
-  return `<div style="font-size:11px;color:#7f1d1d;margin-top:4px;background:#fee2e2;border-radius:4px;padding:4px 6px">
+  return `<div data-clamp-open="0" style="font-size:11px;color:#7f1d1d;margin-top:4px;background:#fee2e2;border-radius:4px;padding:4px 6px">
     <span style="font-weight:700">Alasan:</span>
-    <span id="${id}" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${v.catatan}</span>
-    ${short ? `<button onclick="(function(b){var s=document.getElementById('${id}');var open=s.style.webkitLineClamp==='unset';s.style.webkitLineClamp=open?'2':'unset';b.textContent=open?'Selengkapnya':'Sembunyikan';})(this)" style="background:none;border:none;color:#b91c1c;font-size:10.5px;font-weight:700;cursor:pointer;padding:0;margin-top:2px;display:block">Selengkapnya</button>` : ''}
+    <span id="${id}" data-clamp-text style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${v.catatan}</span>
+    ${short ? `<button data-clamp-btn onclick="_clampToggle(this)" style="background:none;border:none;color:#b91c1c;font-size:10.5px;font-weight:700;cursor:pointer;padding:0;margin-top:2px;display:flex;align-items:center">${_showHideLabel(false)}</button>` : ''}
   </div>`;
 })() : ''}
 ${isSelesai && v.catatan ? (() => {
   const id2 = 'ctt_' + Math.random().toString(36).slice(2,8);
   const short2 = v.catatan.length > 80;
-  return `<div style="font-size:11px;color:#065f46;margin-top:3px;font-style:italic">
-    <span id="${id2}" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">"${v.catatan}"</span>
-    ${short2 ? `<button onclick="(function(b){var s=document.getElementById('${id2}');var open=s.style.webkitLineClamp==='unset';s.style.webkitLineClamp=open?'2':'unset';b.textContent=open?'Selengkapnya':'Sembunyikan';})(this)" style="background:none;border:none;color:#065f46;font-size:10.5px;font-weight:700;cursor:pointer;padding:0;margin-top:2px;display:block">Selengkapnya</button>` : ''}
+  return `<div data-clamp-open="0" style="font-size:11px;color:#065f46;margin-top:3px;font-style:italic">
+    <span id="${id2}" data-clamp-text style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">"${v.catatan}"</span>
+    ${short2 ? `<button data-clamp-btn onclick="_clampToggle(this)" style="background:none;border:none;color:#065f46;font-size:10.5px;font-weight:700;cursor:pointer;padding:0;margin-top:2px;display:flex;align-items:center">${_showHideLabel(false)}</button>` : ''}
   </div>`;
 })() : ''}
 
@@ -2046,7 +2107,7 @@ ${isSelesai && v.catatan ? (() => {
   document.getElementById('detailModalBody').innerHTML = `
     <div style="padding:24px;background:white">
       ${rejectionBanner}
-      <div style="margin-bottom:16px">${renderStatusBar({...detail, vpProgress: detail.verifikasiProgram ? {total:vp.length,selesai:vp.filter(v=>v.status==='Selesai').length} : null})}</div>
+      <div style="margin-bottom:16px">${renderStatusBar({...detail, vpProgress: detail.verifikasiProgram ? {total:vp.length,selesai:vp.filter(v=>v.status==='Selesai' || v.status==='Ditolak').length} : null})}</div>
       ${renderHeaderInfo(detail)}
       ${detail.driveFolderUrl ? `<div style="margin-bottom:12px"><a href="${detail.driveFolderUrl}" target="_blank" class="btn btn-secondary btn-sm"><span class="material-icons" style="font-size:14px">folder_open</span> Lihat Folder Data Dukung Google Drive</a></div>` : ''}
       <div style="font-weight:700;font-size:13.5px;margin-bottom:8px">Detail Indikator</div>
@@ -2054,7 +2115,7 @@ ${isSelesai && v.catatan ? (() => {
         <table>
           <thead><tr style="background:#0d9488"><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">No</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px">Indikator</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;text-align:center;min-width:80px">Target Tahunan</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;text-align:center">Target Bulan Ini</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;text-align:center">Realisasi Bulan Ini</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;text-align:center;min-width:80px">Sisa Target Tahunan</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;text-align:center">Capaian</th><th style="background:#0d9488;color:white;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;padding:10px 12px;text-align:center">Data Dukung</th></tr></thead>
           <tbody>${inds.map(i => { const _sisa = INDIKATOR_TARGET_KUNCI.includes(i.no) ? (i.sasaranTahunan > 0 ? i.sasaranTahunan : null) : (i.sasaranTahunan > 0 ? Math.max(0, i.sasaranTahunan - i.realisasiKumulatif) : null); const _sc = '#1e293b'; return `<tr>
-            <td>${i.no}</td><td style="max-width:220px;font-size:12.5px">${i.nama}</td>
+            <td>${i.no}</td><td style="max-width:220px;font-size:12.5px;text-align:left">${i.nama}</td>
             <td style="text-align:center;color:#475569">${i.sasaranTahunan > 0 ? i.sasaranTahunan : '<span style=\"color:#cbd5e1\">-</span>'}</td>
             <td style="text-align:center">${i.target}</td><td style="text-align:center">${i.capaian}</td>
             <td style="text-align:center;font-weight:700;color:${_sc}">${_sisa !== null ? _sisa : '<span style=\"color:#cbd5e1\">-</span>'}</td>
@@ -2090,6 +2151,85 @@ function approvalBox(label, by, at, alasanTolak = '') {
     ${at ? `<div style="font-size:11px;color:var(--text-light)">${formatDateTime(at)}</div>` : ''}
     ${isDitolak && alasanTolak ? `<div style="font-size:11px;color:#7f1d1d;margin-top:4px;font-style:italic">"${alasanTolak}"</div>` : ''}
   </div>`;
+}
+
+function toggleLogDetail(id) {
+  const s = document.getElementById(id + '_s'), f = document.getElementById(id + '_f'), b = document.getElementById(id + '_b');
+  if (!s || !f || !b) return;
+  if (f.style.display === 'none') {
+    f.style.display = 'inline'; s.style.display = 'none'; b.textContent = 'Hide';
+  } else {
+    f.style.display = 'none'; s.style.display = 'inline'; b.textContent = 'Show';
+  }
+  if (window._logConnResizeHandler) requestAnimationFrame(window._logConnResizeHandler);
+}
+
+// Auto-collapse detail log yang lagi terbuka kalau klik di luar box-nya (sekali pasang aja).
+if (!window._logDetailOutsideHandlerAttached) {
+  window._logDetailOutsideHandlerAttached = true;
+  document.addEventListener('click', (e) => {
+    document.querySelectorAll('button[id$="_b"]').forEach(btn => {
+      if (btn.textContent === 'Hide') {
+        const wrap = btn.closest('[id$="_wrap"]');
+        if (wrap && !wrap.contains(e.target)) {
+          toggleLogDetail(btn.id.replace(/_b$/, ''));
+        }
+      }
+    });
+  });
+}
+
+function drawLogRowConnectors(boundaries) {
+  const wrap = document.getElementById('logGridWrap');
+  const old = document.getElementById('logConnectorSvg');
+  if (old) old.remove();
+  if (!wrap || !boundaries || !boundaries.length) return;
+  const wrapRect = wrap.getBoundingClientRect();
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNS, 'svg');
+  svg.setAttribute('id', 'logConnectorSvg');
+  svg.setAttribute('width', wrapRect.width);
+  svg.setAttribute('height', wrapRect.height);
+  svg.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;z-index:0;overflow:visible';
+  boundaries.forEach(({ source, target }) => {
+    const srcEl = document.getElementById(`logCircle_${source}`);
+    const tgtEl = document.getElementById(`logCircle_${target}`);
+    if (!srcEl || !tgtEl) return;
+    const s = srcEl.getBoundingClientRect();
+    const t = tgtEl.getBoundingClientRect();
+    const scy = s.top + s.height / 2 - wrapRect.top;
+    const tcy = t.top + t.height / 2 - wrapRect.top;
+    const goRight = (s.left + s.width / 2) >= (t.left + t.width / 2);
+    const railX = goRight ? wrapRect.width - 8 : 8;
+    const sxEdge = (goRight ? s.right : s.left) - wrapRect.left;
+    const txEdge = (goRight ? t.right : t.left) - wrapRect.left;
+    const txEnd = txEdge + (goRight ? 7 : -7);
+    // Sudut belokan dibuat melengkung (bukan siku tajam) pakai quadratic curve.
+    const dx1 = Math.sign(railX - sxEdge) || 1;
+    const dy = Math.sign(tcy - scy) || 1;
+    const dx2 = Math.sign(txEnd - railX) || 1;
+    const r = Math.max(0, Math.min(14, Math.abs(railX - sxEdge), Math.abs(txEnd - railX), Math.abs(tcy - scy) / 2));
+    const p1x = railX - dx1 * r, p1y = scy;
+    const p2x = railX, p2y = scy + dy * r;
+    const p3x = railX, p3y = tcy - dy * r;
+    const p4x = railX + dx2 * r, p4y = tcy;
+    const path = document.createElementNS(svgNS, 'path');
+    path.setAttribute('d', `M ${sxEdge} ${scy} L ${p1x} ${p1y} Q ${railX} ${scy} ${p2x} ${p2y} L ${p3x} ${p3y} Q ${railX} ${tcy} ${p4x} ${p4y} L ${txEnd} ${tcy}`);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', '#94a3b8');
+    path.setAttribute('stroke-width', '2');
+    path.setAttribute('stroke-linecap', 'round');
+    path.setAttribute('stroke-linejoin', 'round');
+    svg.appendChild(path);
+    const arrow = document.createElementNS(svgNS, 'polygon');
+    const tip = txEdge;
+    arrow.setAttribute('points', goRight
+      ? `${tip + 7},${tcy - 5} ${tip + 7},${tcy + 5} ${tip},${tcy}`
+      : `${tip - 7},${tcy - 5} ${tip - 7},${tcy + 5} ${tip},${tcy}`);
+    arrow.setAttribute('fill', '#94a3b8');
+    svg.appendChild(arrow);
+  });
+  wrap.appendChild(svg);
 }
 
 async function openLogAktivitas(idUsulan) {
@@ -2196,6 +2336,7 @@ async function openLogAktivitas(idUsulan) {
     }
     const COLS = 10;
     let gridHtml;
+    let rowBoundaries = [];
     if (!logs.length) {
       gridHtml = `<div class="empty-state"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/><line x1="2" y1="2" x2="22" y2="22" stroke="#cbd5e1"/></svg><p>Belum ada aktivitas</p></div>`;
     } else {
@@ -2243,14 +2384,14 @@ async function openLogAktivitas(idUsulan) {
         const rowWithIdx = row.map(l => ({log:l, idx: globalIdx++}));
         const displayRow = isLtrRow ? rowWithIdx : [...rowWithIdx].reverse();
         const isLastRow = rowIdx === rows.length - 1;
-        html += `<div style="display:flex;flex-direction:row;align-items:flex-start;gap:0;position:relative;margin-bottom:0">`;
+        html += `<div id="logRow_${rowIdx}" style="display:flex;flex-direction:row;align-items:flex-start;gap:0;position:relative;margin-bottom:${isLastRow ? 0 : 56}px">`;
         displayRow.forEach(({log, idx}, di) => {
           const cfg = aksiConfig[log.aksi] || { color:'#64748b', bg:'#f8fafc', icon:'info', label:log.aksi };
           const isLastInDisplayRow = di === displayRow.length - 1;
           const hasRight = !isLastInDisplayRow;
           html += `<div style="position:relative;display:flex;flex-direction:column;align-items:center;flex:1;min-width:0;padding:0 4px">
-            <div style="font-size:9.5px;font-weight:800;color:${cfg.color};margin-bottom:3px">#${idx+1}</div>
-            <div style="width:40px;height:40px;border-radius:50%;background:${cfg.bg};border:2.5px solid ${cfg.color};display:flex;align-items:center;justify-content:center;flex-shrink:0;z-index:1;box-shadow:0 1px 4px ${cfg.color}33">
+            <div style="font-size:9.5px;line-height:14px;font-weight:800;color:${cfg.color};margin-bottom:3px">#${idx+1}</div>
+            <div id="logCircle_${idx}" style="width:40px;height:40px;border-radius:50%;background:${cfg.bg};border:2.5px solid ${cfg.color};display:flex;align-items:center;justify-content:center;flex-shrink:0;z-index:1;box-shadow:0 1px 4px ${cfg.color}33">
               ${_svgIco(cfg.icon, 18).replace('<svg ', `<svg style="color:${cfg.color}" `)}
             </div>
             <div style="margin-top:5px;display:flex;flex-direction:column;align-items:center;gap:2px;width:100%">
@@ -2263,28 +2404,22 @@ async function openLogAktivitas(idUsulan) {
                 const _LIMIT = 120;
                 const _isLong = log.detail.length > _LIMIT;
                 const _short = _isLong ? log.detail.substring(0, _LIMIT).replace(/\s+\S*$/, '')+'\u2026' : log.detail;
-                return `<div style="margin-top:3px;width:100%;box-sizing:border-box">
-                  <div style="font-size:10px;color:#334155;background:#f8fafc;border-left:2.5px solid ${cfg.color};padding:4px 7px;border-radius:0 5px 5px 0;line-height:1.5;text-align:left;word-break:break-word">
-                    <span id="${_dId}_s">${_short}</span><span id="${_dId}_f" style="display:none">${log.detail}</span>${_isLong ? `<button id="${_dId}_b" onclick="(function(id){var s=document.getElementById(id+'_s'),f=document.getElementById(id+'_f'),b=document.getElementById(id+'_b');if(f.style.display==='none'){f.style.display='inline';s.style.display='none';b.textContent='Lebih sedikit';}else{f.style.display='none';s.style.display='inline';b.textContent='Selengkapnya';}})('${_dId}')" style="display:block;margin-top:3px;font-size:9.5px;font-weight:700;color:${cfg.color};background:none;border:none;padding:0;cursor:pointer;text-decoration:underline;text-underline-offset:2px">Selengkapnya</button>` : ''}
+                return `<div id="${_dId}_wrap" style="margin-top:3px;width:100%;box-sizing:border-box">
+                  <div style="font-size:10px;color:#334155;background:#f8fafc;padding:6px 7px 4px;border-radius:5px;line-height:1.5;text-align:center;word-break:break-word">
+                    <div style="width:36px;height:2.5px;background:${cfg.color};border-radius:2px;margin:0 auto 4px"></div>
+                    <span id="${_dId}_s">${_short}</span><span id="${_dId}_f" style="display:none">${log.detail}</span>${_isLong ? `<button id="${_dId}_b" onclick="event.stopPropagation();toggleLogDetail('${_dId}')" style="display:block;width:100%;margin-top:3px;font-size:9.5px;font-weight:700;color:${cfg.color};background:none;border:none;padding:0;cursor:pointer;text-decoration:underline;text-underline-offset:2px;text-align:center">Show</button>` : ''}
                   </div>
                 </div>`;
               })() : ''}
             </div>
-            ${hasRight ? `<div style="position:absolute;top:26px;left:calc(50% + 18px);right:0;height:2px;background:linear-gradient(to right,${cfg.color}66,#cbd5e1);z-index:0"></div>` : ''}
+            ${hasRight ? (isLtrRow
+              ? `<div style="position:absolute;top:37px;left:calc(50% + 20px);right:calc(-50% + 20px + 7px);height:2px;background:linear-gradient(to right,${cfg.color}66,#cbd5e1);z-index:0"></div><svg width="7" height="8" viewBox="0 0 7 8" style="position:absolute;top:34px;right:calc(-50% + 20px - 1px);z-index:0" fill="#cbd5e1"><polygon points="0,0 7,4 0,8"/></svg>`
+              : `<div style="position:absolute;top:37px;left:calc(50% + 20px);right:calc(-50% + 20px + 7px);height:2px;background:linear-gradient(to left,${cfg.color}66,#cbd5e1);z-index:0"></div><svg width="7" height="8" viewBox="0 0 7 8" style="position:absolute;top:34px;left:calc(50% + 20px - 1px);z-index:0" fill="#cbd5e1"><polygon points="7,0 0,4 7,8"/></svg>`
+            ) : ''}
           </div>`;
         });
         html += `</div>`;
-        if (!isLastRow) {
-          const lastLog = isLtrRow ? row[row.length-1] : row[0];
-          const lCfg = aksiConfig[lastLog.aksi] || { color:'#94a3b8' };
-          const side = isLtrRow ? 'justify-content:flex-end' : 'justify-content:flex-start';
-          html += `<div style="display:flex;${side};padding:0 4px;margin:0">
-            <div style="display:flex;flex-direction:column;align-items:center">
-              <div style="width:2px;height:20px;background:linear-gradient(to bottom,${lCfg.color}88,#cbd5e1)"></div>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-top:-2px"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
-            </div>
-          </div>`;
-        }
+        if (!isLastRow) rowBoundaries.push({ source: globalIdx - 1, target: globalIdx, rowIdx });
       });
       gridHtml = html;
     }
@@ -2294,7 +2429,12 @@ async function openLogAktivitas(idUsulan) {
         <div style="font-weight:700;font-size:13px;margin-bottom:2px">${usulan.idUsulan}</div>
         <div>${usulan.namaPKM} — ${usulan.namaBulan} ${usulan.tahun}</div>
       </div>
-      <div style="width:100%">${gridHtml}</div>`;
+      <div id="logGridWrap" style="width:100%;position:relative">${gridHtml}</div>`;
+
+    if (window._logConnResizeHandler) window.removeEventListener('resize', window._logConnResizeHandler);
+    window._logConnResizeHandler = () => drawLogRowConnectors(rowBoundaries);
+    window.addEventListener('resize', window._logConnResizeHandler);
+    requestAnimationFrame(() => drawLogRowConnectors(rowBoundaries));
 
     const btnLogDl = document.getElementById('btnLogDownloadLog');
     if (btnLogDl) {

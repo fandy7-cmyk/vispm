@@ -271,9 +271,9 @@ function _renderPgmTable(containerId) {
         : `<span class="badge badge-default" style="opacity:0.6;white-space:nowrap">Nonaktif</span>`);
 
     return `<tr>
-      <td style="padding:12px 14px;vertical-align:top;max-width:220px">
-        <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_escHtml(p.judul)}</div>
-        <div style="font-size:11.5px;color:var(--text-light);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px">${_stripHtml(p.isi)}</div>
+      <td style="padding:12px 14px;vertical-align:middle;text-align:left">
+        <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:420px">${_escHtml(p.judul)}</div>
+        <div style="font-size:11.5px;color:var(--text-light);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:420px">${_stripHtml(p.isi)}</div>
       </td>
       <td style="padding:12px 14px;white-space:nowrap">
         <span class="badge ${cfg.cls}"><span class="material-icons" style="font-size:12px;vertical-align:middle;margin-right:2px">${cfg.icon}</span>${cfg.label}</span>
@@ -281,7 +281,7 @@ function _renderPgmTable(containerId) {
       <td style="padding:12px 14px;font-size:12.5px;color:var(--text-light);white-space:nowrap">${_fmtTglPgm(mulai)}</td>
       <td style="padding:12px 14px;font-size:12.5px;color:var(--text-light);white-space:nowrap">${_fmtTglPgm(selesai)}</td>
       <td style="padding:12px 14px">${statusBadgeHtml}</td>
-      <td style="padding:12px 14px;white-space:nowrap;text-align:right">
+      <td style="padding:12px 14px;white-space:nowrap;text-align:center">
         <button class="btn-icon edit" title="Edit" onclick="openFormPengumuman('${p.id}','${containerId}')">
           <span class="material-icons">edit</span>
         </button>
@@ -297,12 +297,12 @@ function _renderPgmTable(containerId) {
       <table style="width:100%;border-collapse:collapse;min-width:560px">
         <thead>
           <tr style="background:#0d9488">
-            <th style="background:#0d9488;color:white;padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;text-align:left">Judul / Isi</th>
-            <th style="background:#0d9488;color:white;padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;text-align:left">Tipe</th>
-            <th style="background:#0d9488;color:white;padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;text-align:left">Mulai</th>
-            <th style="background:#0d9488;color:white;padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;text-align:left">Selesai</th>
-            <th style="background:#0d9488;color:white;padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;text-align:left">Status</th>
-            <th style="background:#0d9488;color:white;padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;text-align:right">Aksi</th>
+            <th style="background:#0d9488;color:white;padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;text-align:center">Judul / Isi</th>
+            <th style="background:#0d9488;color:white;padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;text-align:center">Tipe</th>
+            <th style="background:#0d9488;color:white;padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;text-align:center">Mulai</th>
+            <th style="background:#0d9488;color:white;padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;text-align:center">Selesai</th>
+            <th style="background:#0d9488;color:white;padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;text-align:center">Status</th>
+            <th style="background:#0d9488;color:white;padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;text-align:center">Aksi</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
@@ -565,24 +565,3 @@ async function savePengumuman(id, containerId) {
   } finally { setLoading(false); }
 }
 
-function previewPengumuman() {
-  const judul   = document.getElementById('pgmJudul')?.value.trim();
-  const rteEl   = document.getElementById('pgmRte');
-  const isi     = (rteEl ? rteEl.innerHTML : document.getElementById('pgmIsi')?.value || '').trim();
-  const tipe    = document.getElementById('pgmTipe')?.value || 'info';
-  const mulai   = document.getElementById('pgmMulai')?.value;
-  const selesai = document.getElementById('pgmSelesai')?.value;
-
-  if (!judul || !isi) {
-    toast('Isi judul dan isi pengumuman terlebih dahulu', 'warning');
-    return;
-  }
-
-  const fakeData = [{ id: '__preview__', judul, isi, tipe, tanggal_mulai: mulai, tanggal_selesai: selesai }];
-  
-  try {
-    const arr = _getPengumumanSesiDismissed().filter(x => x !== '__preview__');
-    sessionStorage.setItem('pgm_dismissed', JSON.stringify(arr));
-  } catch {}
-  _showSatuPengumuman(fakeData, 0);
-}

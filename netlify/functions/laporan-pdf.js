@@ -149,7 +149,7 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
     `SELECT ui.*,
             mi.nama_indikator, mi.catatan as catatan_indikator,
             COALESCE(tt.sasaran, 0) as sasaran_tahunan,
-            -- realisasi kumulatif = SUM semua bulan di tahun ini, puskesmas & indikator sama
+            -- realisasi kumulatif = SUM dari bulan Januari s.d. bulan usulan ini saja, puskesmas & indikator sama
             -- status NOT IN Draft/Ditolak agar hanya hitung yang sudah diproses
             COALESCE((
               SELECT SUM(ui2.capaian)
@@ -157,6 +157,7 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
               JOIN usulan_header uh2 ON uh2.id_usulan = ui2.id_usulan
               WHERE uh2.kode_pkm = $2
                 AND uh2.tahun = $3
+                AND uh2.bulan <= $4
                 AND ui2.no_indikator = ui.no_indikator
                 AND uh2.status_global NOT IN ('Draft', 'Ditolak')
             ), 0) as realisasi_kumulatif,
@@ -168,7 +169,7 @@ async function generateLaporanIndikator(pool, idUsulan, isSementara, aksesFilter
      LEFT JOIN master_indikator mi ON ui.no_indikator = mi.no_indikator
      LEFT JOIN target_tahunan tt ON tt.kode_pkm = $2 AND tt.no_indikator = ui.no_indikator AND tt.tahun = $3
      WHERE ui.id_usulan = $1 ORDER BY ui.no_indikator`,
-    [idUsulan, h.kode_pkm, h.tahun]
+    [idUsulan, h.kode_pkm, h.tahun, h.bulan]
   );
 
   

@@ -2,11 +2,6 @@
 
 window._indikatorBermasalahMap = {};
 
-function renderBadgeIndikatorBermasalah(idUsulan) {
-  const nos = (window._indikatorBermasalahMap || {})[idUsulan];
-  if (!nos || !nos.length) return '';
-  return `<span style="display:inline-flex;align-items:center;gap:3px;background:#fef3c7;color:#92400e;border:1px solid #fcd34d;border-radius:5px;padding:1px 7px;font-size:11px;font-weight:600;margin-left:6px;vertical-align:middle;white-space:nowrap"><span class="material-icons" style="font-size:11px">warning</span>Re-verif: Ind.&nbsp;${nos.map(n => '#' + n).join(', ')}</span>`;
-}
 
 async function renderVerifikasi() {
   const role = currentUser.role;
@@ -44,12 +39,28 @@ async function renderVerifikasi() {
       </div>
     </div>`;
 
+  // Pulihkan tab terakhir yang dipilih (tetap aktif setelah reload / render ulang setelah aksi).
+  // Hanya dipakai kalau tab-nya memang ada untuk role ini.
+  try {
+    const saved = sessionStorage.getItem('spm_tab_verif');
+    if (saved && saved !== 'semua') {
+      const tabs = [...document.querySelectorAll('#verifTabs .tab')];
+      const target = tabs.find(t => (t.getAttribute('onclick') || '').includes("loadVerifTab('" + saved + "'"));
+      if (target) {
+        tabs.forEach(t => t.classList.remove('active'));
+        target.classList.add('active');
+        statusFilter = saved;
+      }
+    }
+  } catch(e) {}
+
   loadVerifData(statusFilter);
 }
 
 async function loadVerifTab(status, el) {
   document.querySelectorAll('#verifTabs .tab').forEach(t => t.classList.remove('active'));
   if (el) el.classList.add('active');
+  try { sessionStorage.setItem('spm_tab_verif', status); } catch(e) {}
   loadVerifData(status);
 }
 
@@ -113,7 +124,7 @@ function _renderVerifTablePaged(page) {
   const { items, page: p, totalPages, total } = paginateData(rows, page);
   window._verifPage = p;
   document.getElementById('verifTable').innerHTML =
-    renderUsulanTable(items, verifRole)
+    renderUsulanTable(items, verifRole, { showNo: true, startNo: (p - 1) * ITEMS_PER_PAGE + 1 })
     + renderPagination('verifTable', total, p, totalPages, pg => _renderVerifTablePaged(pg));
 }
 
@@ -824,7 +835,7 @@ _ppBanner.innerHTML = `<span class="material-icons" style="color:#f59e0b;font-si
       const _scV = '#1e293b';
       return `<tr id="pgRow_${i.no}">
         <td>${i.no}</td>
-        <td style="font-size:13px">${i.nama}${catatanInd}</td>
+        <td style="font-size:13px;text-align:left">${i.nama}${catatanInd}</td>
         <td style="text-align:center;color:#475569">${i.sasaranTahunan > 0 ? i.sasaranTahunan : '<span style="color:#cbd5e1">-</span>'}</td>
         <td style="text-align:center">${i.target}</td><td style="text-align:center">${i.capaian}</td>
         <td style="text-align:center;font-weight:700;color:${_scV}">${_sisaV !== null ? _sisaV : '<span style="color:#cbd5e1">-</span>'}</td>

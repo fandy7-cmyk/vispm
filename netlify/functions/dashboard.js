@@ -74,15 +74,26 @@ async function adminStats(pool, tahun) {
 
 async function operatorStats(pool, email, tahun) {
   const tahunFilterAnd = tahun ? `AND tahun = ${tahun}` : '';
-  const result = await pool.query(
-    `SELECT
-      COUNT(*) as total,
-      COUNT(*) FILTER(WHERE status_global='Selesai') as selesai,
-      COUNT(*) FILTER(WHERE status_global NOT IN ('Selesai','Ditolak')) as menunggu
-     FROM usulan_header WHERE created_by=$1 ${tahunFilterAnd}`,
-    [email]
-  );
+  const bulanNama = ['','Jan','Feb','Mar','Apr','Mei','Jun','Jul','Ags','Sep','Okt','Nov','Des'];
+  // Sama seperti Admin: tahun dipilih → chart per bulan, "Semua Tahun" → chart per tahun.
+  const chartQuery = tahun
+    ? `SELECT bulan, COUNT(*) as total FROM usulan_header WHERE created_by=$1 AND tahun = ${tahun} GROUP BY bulan ORDER BY bulan`
+    : `SELECT tahun, COUNT(*) as total FROM usulan_header WHERE created_by=$1 GROUP BY tahun ORDER BY tahun`;
+  const [result, chartResult] = await Promise.all([
+    pool.query(
+      `SELECT
+        COUNT(*) as total,
+        COUNT(*) FILTER(WHERE status_global='Selesai') as selesai,
+        COUNT(*) FILTER(WHERE status_global NOT IN ('Selesai','Ditolak')) as menunggu
+       FROM usulan_header WHERE created_by=$1 ${tahunFilterAnd}`,
+      [email]
+    ),
+    pool.query(chartQuery, [email])
+  ]);
   const s = result.rows[0];
+  const chart = tahun
+    ? chartResult.rows.map(r => ({ label: bulanNama[r.bulan] || r.bulan, total: parseInt(r.total), isBulan: true }))
+    : chartResult.rows.map(r => ({ label: String(r.tahun), total: parseInt(r.total), isBulan: false }));
 
   // Ambil periode Aktif DAN Tidak Aktif — yang Tidak Aktif dibutuhkan biar dashboard operator
   // masih bisa nunjukin badge "Periode Berikutnya" (oranye) buat periode yang di-disable manual
@@ -131,17 +142,24 @@ async function operatorStats(pool, email, tahun) {
     menunggu: parseInt(s.menunggu) || 0,
     periodeAktif,
     periodeAktifList,
+    chartData: chart,
+    chartMode: tahun ? 'bulan' : 'tahun',
     tahunFilter: tahun || null
   });
 }
 
 async function kapusStats(pool, kodePKM, tahun) {
   const tahunFilter = tahun ? `AND tahun = ${tahun}` : '';
-  const [result, periodeResult] = await Promise.all([
+  const bulanNama = ['','Jan','Feb','Mar','Apr','Mei','Jun','Jul','Ags','Sep','Okt','Nov','Des'];
+  // Sama seperti Admin: tahun dipilih → chart per bulan, "Semua Tahun" → chart per tahun.
+  const chartQuery = tahun
+    ? `SELECT bulan, COUNT(*) as total FROM usulan_header WHERE kode_pkm=$1 AND tahun = ${tahun} GROUP BY bulan ORDER BY bulan`
+    : `SELECT tahun, COUNT(*) as total FROM usulan_header WHERE kode_pkm=$1 GROUP BY tahun ORDER BY tahun`;
+  const [result, periodeResult, chartResult] = await Promise.all([
     pool.query(
       `SELECT
         COUNT(*) FILTER(WHERE status_global='Menunggu Kepala Puskesmas') as menunggu,
-        COUNT(*) FILTER(WHERE status_kapus='Selesai') as terverifikasi,
+        COUNT(*) FILTER(WHERE status_kapus IN ('Selesai','Ditolak')) as terverifikasi,
         COUNT(*) as total
        FROM usulan_header WHERE kode_pkm=$1 ${tahunFilter}`,
       [kodePKM]
@@ -149,9 +167,13 @@ async function kapusStats(pool, kodePKM, tahun) {
     pool.query(
       `SELECT tahun, bulan, nama_bulan, status, tanggal_mulai, tanggal_selesai, jam_mulai, jam_selesai, tanggal_mulai_verif, tanggal_selesai_verif, jam_mulai_verif, jam_selesai_verif
        FROM periode_input WHERE status IN ('Aktif','Tidak Aktif') ORDER BY tahun, bulan`
-    )
+    ),
+    pool.query(chartQuery, [kodePKM])
   ]);
   const s = result.rows[0];
+  const chart = tahun
+    ? chartResult.rows.map(r => ({ label: bulanNama[r.bulan] || r.bulan, total: parseInt(r.total), isBulan: true }))
+    : chartResult.rows.map(r => ({ label: String(r.tahun), total: parseInt(r.total), isBulan: false }));
   const _nowWita = new Date(Date.now() + 8 * 3600000);
   const _todayStr = _nowWita.toISOString().slice(0, 10);
   const _nowTime  = _nowWita.toISOString().slice(11, 16);
@@ -166,6 +188,8 @@ async function kapusStats(pool, kodePKM, tahun) {
     menunggu: parseInt(s.menunggu) || 0,
     terverifikasi: parseInt(s.terverifikasi) || 0,
     total: parseInt(s.total) || 0,
+    chartData: chart,
+    chartMode: tahun ? 'bulan' : 'tahun',
     tahunFilter: tahun || null,
     
     
@@ -190,11 +214,25 @@ async function kapusStats(pool, kodePKM, tahun) {
 
 async function programStats(pool, email, tahun) {
   const tahunFilterAnd = tahun ? `AND uh.tahun = ${tahun}` : '';
+  const bulanNama = ['','Jan','Feb','Mar','Apr','Mei','Jun','Jul','Ags','Sep','Okt','Nov','Des'];
+  // Sama seperti Admin: tahun dipilih → chart per bulan, "Semua Tahun" → chart per tahun.
+  // Dihitung dari usulan yang pernah ditugaskan ke PP ini (distinct id_usulan).
+  const chartQuery = tahun
+    ? `SELECT uh.bulan, COUNT(DISTINCT vp.id_usulan) as total
+       FROM verifikasi_program vp JOIN usulan_header uh ON vp.id_usulan = uh.id_usulan
+       WHERE LOWER(vp.email_program)=LOWER($1) AND uh.tahun = ${tahun} GROUP BY uh.bulan ORDER BY uh.bulan`
+    : `SELECT uh.tahun, COUNT(DISTINCT vp.id_usulan) as total
+       FROM verifikasi_program vp JOIN usulan_header uh ON vp.id_usulan = uh.id_usulan
+       WHERE LOWER(vp.email_program)=LOWER($1) GROUP BY uh.tahun ORDER BY uh.tahun`;
+  const chartResult = await pool.query(chartQuery, [email]).catch(() => ({ rows: [] }));
+  const chart = tahun
+    ? chartResult.rows.map(r => ({ label: bulanNama[r.bulan] || r.bulan, total: parseInt(r.total), isBulan: true }))
+    : chartResult.rows.map(r => ({ label: String(r.tahun), total: parseInt(r.total), isBulan: false }));
   // Total & terverifikasi: semua usulan yang pernah ditugaskan ke PP ini
   const totalResult = await pool.query(
     `SELECT
       COUNT(DISTINCT vp.id_usulan) as total,
-      COUNT(DISTINCT vp.id_usulan) FILTER(WHERE vp.status='Selesai') as terverifikasi
+      COUNT(DISTINCT vp.id_usulan) FILTER(WHERE vp.status IN ('Selesai','Ditolak')) as terverifikasi
      FROM verifikasi_program vp
      JOIN usulan_header uh ON vp.id_usulan = uh.id_usulan
      WHERE LOWER(vp.email_program)=LOWER($1) ${tahunFilterAnd}`,
@@ -325,6 +363,8 @@ async function programStats(pool, email, tahun) {
     jamSelesaiVerif: pv.jam_selesai_verif || '17:00',
     periodeAktifList,
     indikatorBermasalahPerUsulan,
+    chartData: chart,
+    chartMode: tahun ? 'bulan' : 'tahun',
     tahunFilter: tahun || null
   });
 }

@@ -11,12 +11,13 @@ function paginateDash(rows, page) {
   return { items, page: p, totalPages, total };
 }
 
-function paginateData(rows, page) {
+function paginateData(rows, page, itemsPerPage) {
+  const perPage = itemsPerPage || ITEMS_PER_PAGE;
   const total = rows.length;
-  const totalPages = Math.ceil(total / ITEMS_PER_PAGE);
+  const totalPages = Math.ceil(total / perPage);
   const p = Math.max(1, Math.min(page || 1, totalPages || 1));
-  const start = (p - 1) * ITEMS_PER_PAGE;
-  const items = rows.slice(start, start + ITEMS_PER_PAGE);
+  const start = (p - 1) * perPage;
+  const items = rows.slice(start, start + perPage);
   return { items, page: p, totalPages, total };
 }
 

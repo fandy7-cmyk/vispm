@@ -84,6 +84,20 @@ exports.handler = async (event) => {
       'Juli','Agustus','September','Oktober','November','Desember'];
     const s = countResult.rows[0];
 
+    // Nama pelaksana verifikasi (Kapus, Pengelola Program, Admin) untuk kolom Status
+    const ids = dataResult.rows.map(r => r.id_usulan);
+    const pkms = [...new Set(dataResult.rows.map(r => r.kode_pkm).filter(Boolean))];
+    const emails = [...new Set(dataResult.rows.flatMap(r => [r.kapus_approved_by, r.admin_approved_by]).filter(Boolean).map(e => e.toLowerCase()))];
+    const [vpRes, kapusRes, userRes] = ids.length ? await Promise.all([
+      pool.query(`SELECT id_usulan, email_program, nama_program, status FROM verifikasi_program WHERE id_usulan = ANY($1) ORDER BY created_at`, [ids]),
+      pool.query(`SELECT kode_pkm, nama FROM users WHERE kode_pkm = ANY($1) AND role IN ('Kapus','kapus','Kepala Puskesmas') AND COALESCE(aktif, true) = true ORDER BY nama`, [pkms]),
+      pool.query(`SELECT LOWER(email) AS email, nama FROM users WHERE LOWER(email) = ANY($1)`, [emails])
+    ]) : [{ rows: [] }, { rows: [] }, { rows: [] }];
+    const vpMap = {}, kapusMap = {}, namaMap = {};
+    vpRes.rows.forEach(v => { (vpMap[v.id_usulan] = vpMap[v.id_usulan] || []).push({ nama: v.nama_program || v.email_program, status: v.status || 'Menunggu' }); });
+    kapusRes.rows.forEach(k => { (kapusMap[k.kode_pkm] = kapusMap[k.kode_pkm] || []).push(k.nama); });
+    userRes.rows.forEach(u => { namaMap[u.email] = u.nama; });
+
     const data = dataResult.rows.map((r, i) => ({
       no: i + 1,
       idUsulan: r.id_usulan,
@@ -96,6 +110,10 @@ exports.handler = async (event) => {
       indeksSPM: parseFloat(r.indeks_spm) ? parseFloat(r.indeks_spm).toFixed(2) : '0',
       statusGlobal: r.status_global || 'Draft',
       statusKapus: r.status_kapus || 'Menunggu',
+      statusProgram: r.status_program || 'Menunggu',
+      kapusNama: r.kapus_approved_by ? (namaMap[r.kapus_approved_by.toLowerCase()] || r.kapus_approved_by) : (kapusMap[r.kode_pkm] || []).join(', '),
+      adminNama: r.admin_approved_by ? (namaMap[r.admin_approved_by.toLowerCase()] || r.admin_approved_by) : '',
+      programList: vpMap[r.id_usulan] || [],
       createdBy: r.created_by || '',
       createdAt: r.created_at,
       finalApprovedBy: r.final_approved_by || '',

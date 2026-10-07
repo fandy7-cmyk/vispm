@@ -1,20 +1,89 @@
 
 window._notifInterval = null;
 let _notifCount = 0;
+window._notifCurrentItems = [];
+
+// ===== Read-state tracking (client-side, per akun) =====
+// Notifikasi dihitung live dari status usulan (tidak ada kolom "sudah dibaca" di DB),
+// jadi status "sudah dibaca" disimpan di localStorage per email. Kalau status usulan
+// berubah lagi (mis. Ditolak -> Menunggu lagi), key-nya beda -> otomatis dianggap baru lagi.
+function _notifReadKey() {
+  return (currentUser && currentUser.email) ? `notifRead_${currentUser.email}` : null;
+}
+
+function _getNotifReadSet() {
+  const key = _notifReadKey();
+  if (!key) return {};
+  try { return JSON.parse(localStorage.getItem(key) || '{}'); } catch(e) { return {}; }
+}
+
+function _saveNotifReadSet(set) {
+  const key = _notifReadKey();
+  if (!key) return;
+  try { localStorage.setItem(key, JSON.stringify(set)); } catch(e) {}
+}
+
+function _isNotifRead(readSet, item) {
+  return readSet[item.id] === item.status;
+}
+
+// Bangun daftar notifikasi mentah (belum difilter status baca) — dipakai bareng
+// oleh fetchNotifCount (badge) & loadNotifPanel (isi panel) biar konsisten.
+async function _buildNotifItems() {
+  if (!currentUser) return [];
+  const role = currentUser.role;
+  const items = [];
+
+  if (role === 'Operator') {
+    const myUsulan = await API.getUsulan({ email_operator: currentUser.email }).catch(() => []);
+    (myUsulan || []).filter(u => ['Ditolak','Ditolak Sebagian'].includes(u.statusGlobal)).forEach(u => {
+      items.push({ id: u.idUsulan, status: u.statusGlobal, icon: 'cancel', color: '#ef4444', bg: '#fef2f2',
+        title: `Usulan ${u.idUsulan} Ditolak`,
+        sub: `${u.namaBulan} ${u.tahun} — ${u.namaPKM}`,
+        action: `openIndikatorModal('${u.idUsulan}')` });
+    });
+  } else if (role === 'Kepala Puskesmas') {
+    const list = await API.getUsulan({ kode_pkm: currentUser.kodePKM }).catch(() => []);
+    (list || []).filter(u => ['Menunggu Kepala Puskesmas','Menunggu Re-verifikasi Kepala Puskesmas'].includes(u.statusGlobal) && !u.periodeExpired).forEach(u => {
+      items.push({ id: u.idUsulan, status: u.statusGlobal, icon: 'hourglass_top', color: '#f59e0b', bg: '#fffbeb',
+        title: `Menunggu Verifikasi Anda`,
+        sub: `${u.idUsulan} · ${u.namaBulan} ${u.tahun}`,
+        action: `loadPage('verifikasi')` });
+    });
+  } else if (role === 'Pengelola Program') {
+    const list = await API.getUsulan({ email_program: currentUser.email }).catch(() => []);
+    (list || []).filter(u => ['Menunggu Pengelola Program','Menunggu Re-verifikasi PP'].includes(u.statusGlobal) && !u.periodeExpired).forEach(u => {
+      const isReVerif = u.statusGlobal === 'Menunggu Re-verifikasi PP';
+      items.push({ id: u.idUsulan, status: u.statusGlobal, icon: isReVerif ? 'replay' : 'hourglass_top', color: isReVerif ? '#ea580c' : '#2563eb', bg: isReVerif ? '#fff7ed' : '#eff6ff',
+        title: isReVerif ? `Re-verifikasi diperlukan` : `Menunggu Verifikasi Program`,
+        sub: `${u.idUsulan} · ${u.namaBulan} ${u.tahun}`,
+        action: `loadPage('verifikasi')` });
+    });
+  } else if (role === 'Admin') {
+    const list = await API.getUsulan({}).catch(() => []);
+    (list || []).filter(u => u.statusGlobal === 'Menunggu Admin' && !u.periodeExpired).forEach(u => {
+      items.push({ id: u.idUsulan, status: u.statusGlobal, icon: 'admin_panel_settings', color: '#8b5cf6', bg: '#f5f3ff',
+        title: `Menunggu Persetujuan Admin`,
+        sub: `${u.idUsulan} · ${u.namaPKM} · ${u.namaBulan} ${u.tahun}`,
+        action: `loadPage('verifikasi')` });
+    });
+  }
+
+  return items;
+}
 
 async function fetchNotifCount() {
   if (!currentUser) return;
   try {
     const role = currentUser.role;
-    let params = { role };
-    if (role === 'Operator' || role === 'Pengelola Program') params.email = currentUser.email;
-    else if (role === 'Kepala Puskesmas') params.kode_pkm = currentUser.kodePKM;
-    else if (role !== 'Admin') { _notifCount = 0; updateNotifBadge(0); return; } // role tanpa notif (mis. Super Admin)
+    if (!['Operator','Pengelola Program','Kepala Puskesmas','Admin'].includes(role)) { _notifCount = 0; updateNotifBadge(0); return; } // role tanpa notif (mis. Super Admin)
 
-    const count = await API.getNotifCount(params).catch(() => 0);
+    const items = await _buildNotifItems();
+    const readSet = _getNotifReadSet();
+    const unread = items.filter(it => !_isNotifRead(readSet, it));
 
-    _notifCount = count;
-    updateNotifBadge(count);
+    _notifCount = unread.length;
+    updateNotifBadge(_notifCount);
   } catch(e) {}
 }
 
@@ -55,9 +124,12 @@ function toggleNotifPanel() {
   panel.id = 'notifPanel';
   panel.style.cssText = 'position:absolute;top:calc(100% + 8px);right:0;width:340px;max-width:calc(100vw - 16px);background:var(--surface,#fff);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.15);border:1px solid var(--border,#e2e8f0);z-index:9000;overflow:hidden';
   panel.innerHTML = `
-    <div style="padding:12px 16px;border-bottom:1px solid var(--border,#f1f5f9);display:flex;align-items:center;justify-content:space-between">
+    <div style="padding:12px 16px;border-bottom:1px solid var(--border,#f1f5f9);display:flex;align-items:center;justify-content:space-between;gap:8px">
       <span style="font-size:14px;font-weight:700;color:var(--text,#1e293b)">Notifikasi</span>
-      <button onclick="document.getElementById('notifPanel').style.display='none'" style="background:none;border:none;cursor:pointer;color:var(--text-light,#94a3b8);display:flex"><span class="material-icons" style="font-size:18px">close</span></button>
+      <div style="display:flex;align-items:center;gap:12px">
+        <button id="notifMarkAllBtn" onclick="markAllNotifRead()" style="display:none;background:none;border:none;cursor:pointer;color:var(--primary,#0d9488);font-size:11.5px;font-weight:700;white-space:nowrap;padding:0">Tandai Semua Dibaca</button>
+        <button onclick="document.getElementById('notifPanel').style.display='none'" style="background:none;border:none;cursor:pointer;color:var(--text-light,#94a3b8);display:flex"><span class="material-icons" style="font-size:18px">close</span></button>
+      </div>
     </div>
     <div id="notifPanelBody" style="max-height:360px;overflow-y:auto">
       <div style="padding:24px;text-align:center;color:var(--text-light,#94a3b8);font-size:13px"><div style="position:relative;width:36px;height:36px;display:inline-block;margin-bottom:6px"><div style="position:absolute;inset:0;border-radius:50%;border:3px solid transparent;border-top-color:#0d9488;animation:spin 1.1s linear infinite"></div><div style="position:absolute;inset:6px;border-radius:50%;border:3px solid transparent;border-right-color:#14b8a6;animation:spin 1.7s linear infinite reverse"></div><div style="position:absolute;inset:12px;border-radius:50%;border:3px solid transparent;border-bottom-color:#5eead4;animation:spin 2.3s linear infinite"></div></div><div>Memuat...</div></div>
@@ -86,45 +158,18 @@ async function loadNotifPanel() {
   if (!el) return;
 
   try {
-    const role = currentUser.role;
-    const items = [];
+    const items = await _buildNotifItems();
+    const readSet = _getNotifReadSet();
+    const unread = items.filter(it => !_isNotifRead(readSet, it));
+    window._notifCurrentItems = unread;
 
-    if (role === 'Operator') {
-      const myUsulan = await API.getUsulan({ email_operator: currentUser.email }).catch(() => []);
-      (myUsulan || []).filter(u => ['Ditolak','Ditolak Sebagian'].includes(u.statusGlobal)).forEach(u => {
-        items.push({ icon: 'cancel', color: '#ef4444', bg: '#fef2f2',
-          title: `Usulan ${u.idUsulan} Ditolak`,
-          sub: `${u.namaBulan} ${u.tahun} — ${u.namaPKM}`,
-          action: `openIndikatorModal('${u.idUsulan}')` });
-      });
-    } else if (role === 'Kepala Puskesmas') {
-      const list = await API.getUsulan({ kode_pkm: currentUser.kodePKM }).catch(() => []);
-      (list || []).filter(u => ['Menunggu Kepala Puskesmas','Menunggu Re-verifikasi Kepala Puskesmas'].includes(u.statusGlobal) && !u.periodeExpired).forEach(u => {
-        items.push({ icon: 'hourglass_top', color: '#f59e0b', bg: '#fffbeb',
-          title: `Menunggu Verifikasi Anda`,
-          sub: `${u.idUsulan} · ${u.namaBulan} ${u.tahun}`,
-          action: `loadPage('verifikasi')` });
-      });
-    } else if (role === 'Pengelola Program') {
-      const list = await API.getUsulan({ email_program: currentUser.email }).catch(() => []);
-      (list || []).filter(u => ['Menunggu Pengelola Program','Menunggu Re-verifikasi PP'].includes(u.statusGlobal) && !u.periodeExpired).forEach(u => {
-        const isReVerif = u.statusGlobal === 'Menunggu Re-verifikasi PP';
-        items.push({ icon: isReVerif ? 'replay' : 'hourglass_top', color: isReVerif ? '#ea580c' : '#2563eb', bg: isReVerif ? '#fff7ed' : '#eff6ff',
-          title: isReVerif ? `Re-verifikasi diperlukan` : `Menunggu Verifikasi Program`,
-          sub: `${u.idUsulan} · ${u.namaBulan} ${u.tahun}`,
-          action: `loadPage('verifikasi')` });
-      });
-    } else if (role === 'Admin') {
-      const list = await API.getUsulan({}).catch(() => []);
-      (list || []).filter(u => u.statusGlobal === 'Menunggu Admin' && !u.periodeExpired).forEach(u => {
-        items.push({ icon: 'admin_panel_settings', color: '#8b5cf6', bg: '#f5f3ff',
-          title: `Menunggu Persetujuan Admin`,
-          sub: `${u.idUsulan} · ${u.namaPKM} · ${u.namaBulan} ${u.tahun}`,
-          action: `loadPage('verifikasi')` });
-      });
-    }
+    _notifCount = unread.length;
+    updateNotifBadge(_notifCount);
 
-    if (!items.length) {
+    const markAllBtn = document.getElementById('notifMarkAllBtn');
+    if (markAllBtn) markAllBtn.style.display = unread.length ? 'inline-flex' : 'none';
+
+    if (!unread.length) {
       el.innerHTML = `<div style="padding:32px;text-align:center;color:var(--text-light,#94a3b8);font-size:13px">
         <span class="material-icons" style="font-size:36px;display:block;margin-bottom:8px;color:#d1fae5">check_circle</span>
         Tidak ada notifikasi baru
@@ -132,7 +177,7 @@ async function loadNotifPanel() {
       return;
     }
 
-    el.innerHTML = items.map(item => `
+    el.innerHTML = unread.map(item => `
       <button onclick="${item.action};document.getElementById('notifPanel').style.display='none'"
         style="width:100%;display:flex;align-items:flex-start;gap:10px;padding:12px 16px;background:none;border:none;border-bottom:1px solid var(--border-light,#f8fafc);cursor:pointer;text-align:left"
         onmouseover="this.style.background='var(--bg,#f8fafc)'" onmouseout="this.style.background='none'">
@@ -146,6 +191,30 @@ async function loadNotifPanel() {
       </button>`).join('');
   } catch(e) {
     el.innerHTML = `<div style="padding:20px;text-align:center;color:#ef4444;font-size:13px">Gagal memuat notifikasi</div>`;
+  }
+}
+
+// Tandai semua notifikasi yang lagi tampil (unread) sebagai sudah dibaca.
+// Disimpan per akun (localStorage) — kalau statusnya berubah lagi nanti, otomatis
+// dianggap notifikasi baru lagi (bukan permanen disembunyikan).
+function markAllNotifRead() {
+  const readSet = _getNotifReadSet();
+  (window._notifCurrentItems || []).forEach(it => { readSet[it.id] = it.status; });
+  _saveNotifReadSet(readSet);
+
+  window._notifCurrentItems = [];
+  _notifCount = 0;
+  updateNotifBadge(0);
+
+  const markAllBtn = document.getElementById('notifMarkAllBtn');
+  if (markAllBtn) markAllBtn.style.display = 'none';
+
+  const el = document.getElementById('notifPanelBody');
+  if (el) {
+    el.innerHTML = `<div style="padding:32px;text-align:center;color:var(--text-light,#94a3b8);font-size:13px">
+      <span class="material-icons" style="font-size:36px;display:block;margin-bottom:8px;color:#d1fae5">check_circle</span>
+      Tidak ada notifikasi baru
+    </div>`;
   }
 }
 
